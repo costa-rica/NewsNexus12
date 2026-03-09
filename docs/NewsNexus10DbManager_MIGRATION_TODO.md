@@ -263,11 +263,11 @@ If all tests pass, check off the completed tasks above and commit all changes be
 
 ---
 
-## Phase 7: Migrate the zip import module
+## Phase 7: Migrate the zip import module ✅
 
 Port the ZIP import module, updating imports from `newsnexus10db` to `@newsnexus/db-models`.
 
-- [ ] Migrate `src/modules/zipImport.ts`
+- [x] Migrate `src/modules/zipImport.ts`
   - Change `import * as db from "newsnexus10db"` to `from "@newsnexus/db-models"`
   - Change `import { sequelize } from "newsnexus10db"` to `from "@newsnexus/db-models"`
   - Change `import { DataTypes } from "sequelize"` — no change needed
@@ -280,26 +280,26 @@ Test the pure helper functions directly. Mock database and filesystem for the ma
 **File:** `tests/modules/zipImport.test.ts`
 
 Test cases for `normalizeDateValue()` (export it or test via `sanitizeDateFields`):
-- [ ] Returns ISO string for a valid date string with `DATE` type
-- [ ] Returns `YYYY-MM-DD` for a valid date string with `DATEONLY` type
-- [ ] Returns `null` for empty string
-- [ ] Returns `null` for `null` input
-- [ ] Returns `null` for an unparseable date string
+- [x] Returns ISO string for a valid date string with `DATE` type
+- [x] Returns `YYYY-MM-DD` for a valid date string with `DATEONLY` type
+- [x] Returns `null` for empty string
+- [x] Returns `null` for `null` input
+- [x] Returns `null` for an unparseable date string
 
 Test cases for `sanitizeDateFields()`:
-- [ ] Returns 0 when no date fields exist
-- [ ] Returns 0 when records are empty
-- [ ] Normalizes valid date strings in-place
-- [ ] Sets invalid date values to `null` and returns the sanitized count
+- [x] Returns 0 when no date fields exist
+- [x] Returns 0 when records are empty
+- [x] Normalizes valid date strings in-place
+- [x] Sets invalid date values to `null` and returns the sanitized count
 
 Test cases for `importZipFileToDatabase()`:
-- [ ] Throws when the zip file path does not exist
-- [ ] Throws `"No CSV files found"` when the zip contains no CSV files
-- [ ] Imports CSV records into matching models via `bulkCreate`
-- [ ] Reports skipped files when CSV filenames do not match any model
-- [ ] Disables and re-enables foreign keys around the import
-- [ ] Re-enables foreign keys even when an error occurs during import
-- [ ] Cleans up the temporary extraction directory after import
+- [x] Throws when the zip file path does not exist
+- [x] Throws `"No CSV files found"` when the zip contains no CSV files
+- [x] Imports CSV records into matching models via `bulkCreate`
+- [x] Reports skipped files when CSV filenames do not match any model
+- [x] Disables and re-enables foreign keys around the import
+- [x] Re-enables foreign keys even when an error occurs during import
+- [x] Cleans up the temporary extraction directory after import
 
 ### Phase 7 Checkpoint
 
