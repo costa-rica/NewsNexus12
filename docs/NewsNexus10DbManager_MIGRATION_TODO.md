@@ -7,11 +7,11 @@ This document tracks the migration of `NewsNexus10DbManager` into the NewsNexus1
 
 ---
 
-## Phase 1: Scaffold the package
+## Phase 1: Scaffold the package ✅
 
 Create the `db-manager/` directory with project configuration files aligned to monorepo conventions.
 
-- [ ] Create `db-manager/package.json`
+- [x] Create `db-manager/package.json`
   - Set name to `@newsnexus/db-manager`
   - Set version to `1.0.0`
   - Set main to `dist/index.js`
@@ -19,27 +19,27 @@ Create the `db-manager/` directory with project configuration files aligned to m
   - Add dependency on `@newsnexus/db-models` via `"file:../db-models"`
   - Add runtime dependencies: `adm-zip`, `archiver`, `csv-parser`, `dotenv`, `json2csv`, `sequelize`, `winston`
   - Add dev dependencies: `@types/archiver`, `@types/adm-zip`, `@types/json2csv`, `@types/node`, `ts-node`, `typescript`, `jest`, `ts-jest`, `@types/jest`
-- [ ] Create `db-manager/tsconfig.json`
+- [x] Create `db-manager/tsconfig.json`
   - Match monorepo conventions: target `ES2022`, module `CommonJS`, moduleResolution `Node`, strict mode enabled
   - Set `outDir` to `dist`, `rootDir` to `src`
   - Include `types: ["node", "jest"]`
   - Exclude `dist`, `node_modules`, `tests`
-- [ ] Create `db-manager/jest.config.cjs`
+- [x] Create `db-manager/jest.config.cjs`
   - Use `ts-jest` preset with `testEnvironment: "node"`
   - Set `roots` to `['<rootDir>/tests']`
   - Enable `clearMocks: true`
   - Set `testTimeout: 15000`
-- [ ] Create `db-manager/tests/tsconfig.json`
+- [x] Create `db-manager/tests/tsconfig.json`
   - Extend from `../tsconfig.json`
   - Set `noEmit: true`
   - Include `types: ["node", "jest"]`
-- [ ] Create `db-manager/.gitignore`
+- [x] Create `db-manager/.gitignore`
   - Exclude `node_modules/`, `dist/`, `.env`
-- [ ] Create `db-manager/src/` directory structure
+- [x] Create `db-manager/src/` directory structure
   - `src/config/`
   - `src/modules/`
   - `src/types/`
-- [ ] Create `db-manager/tests/` directory structure
+- [x] Create `db-manager/tests/` directory structure
   - `tests/smoke/`
   - `tests/modules/`
 
@@ -50,10 +50,10 @@ Create a smoke test that validates the package scaffolding is correct.
 **File:** `tests/smoke/scaffold.test.ts`
 
 Test cases:
-- [ ] Verify `package.json` can be read and has correct name `@newsnexus/db-manager`
-- [ ] Verify `tsconfig.json` can be read and has `strict: true`
-- [ ] Verify the `src/` directory structure exists (config, modules, types)
-- [ ] Verify the `tests/` directory structure exists (smoke, modules)
+- [x] Verify `package.json` can be read and has correct name `@newsnexus/db-manager`
+- [x] Verify `tsconfig.json` can be read and has `strict: true`
+- [x] Verify the `src/` directory structure exists (config, modules, types)
+- [x] Verify the `tests/` directory structure exists (smoke, modules)
 
 ### Phase 1 Checkpoint
 
