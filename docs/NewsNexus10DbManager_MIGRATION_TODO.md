@@ -68,15 +68,15 @@ If all tests pass, check off the completed tasks above and commit all changes be
 
 ---
 
-## Phase 2: Migrate type definitions and CLI module
+## Phase 2: Migrate type definitions and CLI module ✅
 
 Port the pure-logic modules that have no database or filesystem dependencies.
 
-- [ ] Copy `src/types/cli.ts` — the `CliOptions` type
+- [x] Copy `src/types/cli.ts` — the `CliOptions` type
   - No changes needed; this is a pure type definition
-- [ ] Copy `src/types/status.ts` — the `DatabaseStatus` type
+- [x] Copy `src/types/status.ts` — the `DatabaseStatus` type
   - No changes needed; this is a pure type definition
-- [ ] Migrate `src/modules/cli.ts` — CLI argument parser
+- [x] Migrate `src/modules/cli.ts` — CLI argument parser
   - No import changes needed; this module only depends on `../types/cli`
   - Includes: `parseCliArgs()`, `DEFAULT_DELETE_DAYS`, `levenshtein()`, `suggestFlag()`
 
@@ -87,23 +87,23 @@ Create unit tests for the CLI parser. This is a pure module with no external dep
 **File:** `tests/modules/cli.test.ts`
 
 Test cases for `parseCliArgs()`:
-- [ ] Returns empty options when no arguments are provided
-- [ ] Parses `--delete_articles` with no value and defaults to `DEFAULT_DELETE_DAYS` (180)
-- [ ] Parses `--delete_articles 90` with a space-separated value
-- [ ] Parses `--delete_articles=90` with an equals-separated value
-- [ ] Parses `--delete_articles_trim 5` with a space-separated value
-- [ ] Parses `--delete_articles_trim=5` with an equals-separated value
-- [ ] Throws on `--delete_articles_trim` with no value
-- [ ] Throws on `--delete_articles_trim 0` (non-positive)
-- [ ] Parses `--zip_file /path/to/file.zip` with a space-separated value
-- [ ] Parses `--zip_file=/path/to/file.zip` with an equals-separated value
-- [ ] Throws on `--zip_file` with no value
-- [ ] Parses `--create_backup` as a boolean flag (no value)
-- [ ] Throws on `--create_backup somevalue` (does not accept a value)
-- [ ] Combines multiple flags in one invocation (e.g., `--create_backup --delete_articles 30`)
-- [ ] Throws on unknown argument with a suggestion (e.g., `--delet_articles`)
-- [ ] Throws on unknown argument without a suggestion (e.g., `--foobar_xyz`)
-- [ ] Throws on arguments that do not start with `--`
+- [x] Returns empty options when no arguments are provided
+- [x] Parses `--delete_articles` with no value and defaults to `DEFAULT_DELETE_DAYS` (180)
+- [x] Parses `--delete_articles 90` with a space-separated value
+- [x] Parses `--delete_articles=90` with an equals-separated value
+- [x] Parses `--delete_articles_trim 5` with a space-separated value
+- [x] Parses `--delete_articles_trim=5` with an equals-separated value
+- [x] Throws on `--delete_articles_trim` with no value
+- [x] Throws on `--delete_articles_trim 0` (non-positive)
+- [x] Parses `--zip_file /path/to/file.zip` with a space-separated value
+- [x] Parses `--zip_file=/path/to/file.zip` with an equals-separated value
+- [x] Throws on `--zip_file` with no value
+- [x] Parses `--create_backup` as a boolean flag (no value)
+- [x] Throws on `--create_backup somevalue` (does not accept a value)
+- [x] Combines multiple flags in one invocation (e.g., `--create_backup --delete_articles 30`)
+- [x] Throws on unknown argument with a suggestion (e.g., `--delet_articles`)
+- [x] Throws on unknown argument without a suggestion (e.g., `--foobar_xyz`)
+- [x] Throws on arguments that do not start with `--`
 
 ### Phase 2 Checkpoint
 
