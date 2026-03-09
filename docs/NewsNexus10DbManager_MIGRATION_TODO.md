@@ -152,11 +152,11 @@ If all tests pass, check off the completed tasks above and commit all changes be
 
 ---
 
-## Phase 4: Migrate the status module
+## Phase 4: Migrate the status module ✅
 
 Port the database status reporting module, updating imports from `newsnexus10db` to `@newsnexus/db-models`.
 
-- [ ] Migrate `src/modules/status.ts`
+- [x] Migrate `src/modules/status.ts`
   - Change `import { Article, ArticleApproved, ArticleIsRelevant } from "newsnexus10db"` to `from "@newsnexus/db-models"`
   - Change `import { Op } from "sequelize"` — no change needed
   - Change `import { DatabaseStatus } from "../types/status"` — no change needed
@@ -168,12 +168,12 @@ Mock `@newsnexus/db-models` at the module boundary. Do not use a real database.
 **File:** `tests/modules/status.test.ts`
 
 Test cases for `getDatabaseStatus()`:
-- [ ] Returns correct counts when database has articles, relevant, and approved records
-- [ ] Returns zero counts when all tables are empty
-- [ ] Computes `deletableOldArticles` by excluding articles in `ArticleIsRelevant` and `ArticleApproved`
-- [ ] Uses the default 180-day threshold when no argument is passed
-- [ ] Uses a custom threshold when a `daysOldThreshold` argument is provided
-- [ ] Returns a `cutoffDate` string in `YYYY-MM-DD` format
+- [x] Returns correct counts when database has articles, relevant, and approved records
+- [x] Returns zero counts when all tables are empty
+- [x] Computes `deletableOldArticles` by excluding articles in `ArticleIsRelevant` and `ArticleApproved`
+- [x] Uses the default 180-day threshold when no argument is passed
+- [x] Uses a custom threshold when a `daysOldThreshold` argument is provided
+- [x] Returns a `cutoffDate` string in `YYYY-MM-DD` format
 
 ### Phase 4 Checkpoint
 
