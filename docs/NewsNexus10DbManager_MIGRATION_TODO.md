@@ -227,11 +227,11 @@ If all tests pass, check off the completed tasks above and commit all changes be
 
 ---
 
-## Phase 6: Migrate the backup module
+## Phase 6: Migrate the backup module ✅
 
 Port the database backup module, updating imports from `newsnexus10db` to `@newsnexus/db-models`.
 
-- [ ] Migrate `src/modules/backup.ts`
+- [x] Migrate `src/modules/backup.ts`
   - Change `import * as db from "newsnexus10db"` to `from "@newsnexus/db-models"`
   - Change `import { logger } from "../config/logger"` — no change needed
   - Keep `getModelRegistry()`, `getTimestamp()`, and `createDatabaseBackupZipFile()` logic
@@ -243,14 +243,14 @@ Mock `@newsnexus/db-models`, `../config/logger`, and filesystem operations (`fs`
 **File:** `tests/modules/backup.test.ts`
 
 Test cases for `createDatabaseBackupZipFile()`:
-- [ ] Throws when `PATH_DB_BACKUPS` env var is not set
-- [ ] Creates a `.zip` file at the expected path when tables have data
-- [ ] Throws `"No data found in any tables"` when all model `findAll` calls return empty arrays
-- [ ] Cleans up the temporary backup directory after creating the zip
-- [ ] Includes CSV files for each model that returned data
+- [x] Throws when `PATH_DB_BACKUPS` env var is not set
+- [x] Creates a `.zip` file at the expected path when tables have data
+- [x] Throws `"No data found in any tables"` when all model `findAll` calls return empty arrays
+- [x] Cleans up the temporary backup directory after creating the zip
+- [x] Includes CSV files for each model that returned data
 
 Test cases for `getModelRegistry()` (internal, tested indirectly):
-- [ ] Only includes exports from `@newsnexus/db-models` that have a `findAll` method
+- [x] Only includes exports from `@newsnexus/db-models` that have a `findAll` method
 
 ### Phase 6 Checkpoint
 
