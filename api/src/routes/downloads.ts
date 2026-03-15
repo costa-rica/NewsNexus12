@@ -17,6 +17,15 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function getWebBrowserExtensionsDir(): string | null {
+  const resourcesPath = process.env.PATH_PROJECT_RESOURCES;
+  if (!resourcesPath) {
+    return null;
+  }
+
+  return path.join(resourcesPath, 'utilities', 'web_browser_extensions');
+}
+
 router.get(
   '/utilities/download-excel-file/:excelFileName',
   authenticateToken,
@@ -160,5 +169,59 @@ router.post(
     }
   }
 );
+
+router.get('/utilities/web-browser-extensions', authenticateToken, async (_req, res) => {
+  try {
+    const webBrowserExtensionsDir = getWebBrowserExtensionsDir();
+    if (!webBrowserExtensionsDir) {
+      return res.status(500).json({
+        result: false,
+        message: 'PATH_PROJECT_RESOURCES is not configured.',
+      });
+    }
+
+    const files = await fs.promises.readdir(webBrowserExtensionsDir);
+    const webBrowserExtensionsArray = files.filter((file) => file.endsWith('.zip'));
+
+    return res.json({ result: true, webBrowserExtensionsArray });
+  } catch (error) {
+    logger.error('Error retrieving web browser extensions list:', error);
+    return res.status(500).json({
+      result: false,
+      message: 'Internal server error',
+      error: getErrorMessage(error),
+    });
+  }
+});
+
+router.get('/utilities/web-browser-extension/:filename', authenticateToken, (req, res) => {
+  const filename = Array.isArray(req.params.filename)
+    ? req.params.filename[0]
+    : req.params.filename;
+  const webBrowserExtensionsDir = getWebBrowserExtensionsDir();
+  if (!webBrowserExtensionsDir) {
+    return res.status(500).json({
+      result: false,
+      message: 'PATH_PROJECT_RESOURCES is not configured.',
+    });
+  }
+
+  const filePath = path.join(webBrowserExtensionsDir, filename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ result: false, message: 'File not found.' });
+  }
+
+  res.setHeader('Content-Type', 'application/zip');
+
+  return res.download(filePath, filename, (err) => {
+    if (err) {
+      logger.error('Download error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ result: false, message: 'File download failed.' });
+      }
+    }
+  });
+});
 
 export = router;

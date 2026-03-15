@@ -12,7 +12,7 @@ export function WebBrowserExtensionsSection() {
   const fetchWebBrowserExtensionsList = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/automations/web-browser-extensions`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/downloads/utilities/web-browser-extensions`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -47,7 +47,7 @@ export function WebBrowserExtensionsSection() {
   const downloadWebBrowserExtension = async (extension: string) => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/automations/web-browser-extension/${extension}`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/downloads/utilities/web-browser-extension/${extension}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
