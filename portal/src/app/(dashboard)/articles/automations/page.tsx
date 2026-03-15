@@ -2,6 +2,7 @@
 import React from "react";
 import { ArticleRequestSpreadsheetsSection } from "@/components/automations/ArticleRequestSpreadsheetsSection";
 import { GoogleRssSection } from "@/components/automations/GoogleRssSection";
+import { StateAssignerSection } from "@/components/automations/StateAssignerSection";
 
 export default function ManageAutomation() {
   return (
@@ -11,6 +12,7 @@ export default function ManageAutomation() {
       </h1>
 
       <GoogleRssSection />
+      <StateAssignerSection />
       <ArticleRequestSpreadsheetsSection />
     </div>
   );

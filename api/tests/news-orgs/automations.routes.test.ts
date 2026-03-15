@@ -103,6 +103,44 @@ describe("news org automations routes", () => {
     );
   });
 
+  test("POST /automations/state-assigner/start-job proxies worker-node response", async () => {
+    mockAxios.post.mockResolvedValue({
+      data: {
+        endpointName: "/state-assigner/start-job",
+        jobId: "job-2",
+        status: "queued",
+      },
+      status: 202,
+    });
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/automations/state-assigner/start-job")
+      .send({
+        targetArticleStateReviewCount: 100,
+        targetArticleThresholdDaysOld: 180,
+      });
+
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      endpointName: "/state-assigner/start-job",
+      jobId: "job-2",
+      status: "queued",
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      "http://worker-node/state-assigner/start-job",
+      {
+        targetArticleStateReviewCount: 100,
+        targetArticleThresholdDaysOld: 180,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  });
+
   test("POST /automations/worker-node/cancel-job/:jobId proxies cancel response", async () => {
     mockAxios.post.mockResolvedValue({
       data: {
