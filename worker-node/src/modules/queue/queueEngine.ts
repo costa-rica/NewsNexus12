@@ -121,6 +121,25 @@ export class GlobalQueueEngine {
     return getQueueStatus(this.store);
   }
 
+  public async getLatestJobByEndpointName(
+    endpointName: string
+  ): Promise<QueueJobRecord | null> {
+    await this.store.ensureInitialized();
+
+    const jobs = await this.store.getJobs();
+    const matchingJobs = jobs.filter((job) => job.endpointName === endpointName);
+
+    if (matchingJobs.length === 0) {
+      return null;
+    }
+
+    return matchingJobs.reduce((latest, candidate) => {
+      return new Date(candidate.createdAt).getTime() >= new Date(latest.createdAt).getTime()
+        ? candidate
+        : latest;
+    });
+  }
+
   public async cancelJob(jobId: string): Promise<CancelJobResult> {
     await this.store.ensureInitialized();
 

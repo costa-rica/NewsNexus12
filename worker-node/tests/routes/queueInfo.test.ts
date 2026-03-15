@@ -99,6 +99,56 @@ describe('queueInfo routes', () => {
     expect(response.body.queuedJobs[0].jobId).toBe('job-queued');
   });
 
+  it('returns latest job for GET /queue-info/latest-job', async () => {
+    await store.appendJob(
+      makeJob({
+        jobId: 'job-older',
+        endpointName: '/request-google-rss/start-job',
+        status: 'completed',
+        createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString()
+      })
+    );
+    await store.appendJob(
+      makeJob({
+        jobId: 'job-latest',
+        endpointName: '/request-google-rss/start-job',
+        status: 'running',
+        createdAt: new Date('2026-01-01T00:05:00.000Z').toISOString(),
+        startedAt: new Date('2026-01-01T00:05:01.000Z').toISOString()
+      })
+    );
+    await store.appendJob(
+      makeJob({
+        jobId: 'job-other-endpoint',
+        endpointName: '/semantic-scorer/start-job',
+        status: 'queued',
+        createdAt: new Date('2026-01-01T00:06:00.000Z').toISOString()
+      })
+    );
+
+    const app = buildTestApp(engine);
+    const response = await request(app)
+      .get('/queue-info/latest-job')
+      .query({ endpointName: '/request-google-rss/start-job' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.job).toMatchObject({
+      jobId: 'job-latest',
+      endpointName: '/request-google-rss/start-job',
+      status: 'running'
+    });
+  });
+
+  it('returns null job when GET /queue-info/latest-job has no matches', async () => {
+    const app = buildTestApp(engine);
+    const response = await request(app)
+      .get('/queue-info/latest-job')
+      .query({ endpointName: '/request-google-rss/start-job' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ job: null });
+  });
+
   it('cancels a queued job via POST /queue-info/cancel_job/:jobId', async () => {
     let releaseFirst: (() => void) | undefined;
     const firstGate = new Promise<void>((resolve) => {
@@ -164,6 +214,21 @@ describe('queueInfo routes', () => {
       message: 'Request validation failed',
       status: 400,
       details: [{ field: 'jobId', message: 'jobId route parameter is required' }]
+    });
+  });
+
+  it('returns VALIDATION_ERROR when endpointName query is blank', async () => {
+    const app = buildTestApp(engine);
+    const response = await request(app).get('/queue-info/latest-job').query({
+      endpointName: ' '
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Request validation failed',
+      status: 400,
+      details: [{ field: 'endpointName', message: 'endpointName query parameter is required' }]
     });
   });
 });

@@ -24,6 +24,36 @@ function getWorkerNodeBaseUrl(): string | null {
   return process.env.URL_BASE_NEWS_NEXUS_WORKER_NODE || null;
 }
 
+function getRequiredWorkerNodeBaseUrl(res: express.Response): string | null {
+  const workerNodeBaseUrl = getWorkerNodeBaseUrl();
+
+  if (!workerNodeBaseUrl) {
+    res.status(500).json({
+      result: false,
+      message: 'URL_BASE_NEWS_NEXUS_WORKER_NODE is not configured.',
+    });
+    return null;
+  }
+
+  return workerNodeBaseUrl;
+}
+
+function forwardAxiosError(res: express.Response, error: unknown): express.Response {
+  if (axios.isAxiosError(error)) {
+    return res.status(error.response?.status || 500).json(
+      error.response?.data || {
+        result: false,
+        message: error.message,
+      }
+    );
+  }
+
+  return res.status(500).json({
+    result: false,
+    message: getErrorMessage(error),
+  });
+}
+
 const storage = multer.diskStorage({
   destination: function (_req: any, _file: any, cb: any) {
     const excelFilesDir = getAutomationExcelDir();
@@ -112,13 +142,9 @@ router.post(
 );
 
 router.post('/request-google-rss/start-job', authenticateToken, async (_req, res) => {
-  const workerNodeBaseUrl = getWorkerNodeBaseUrl();
-
+  const workerNodeBaseUrl = getRequiredWorkerNodeBaseUrl(res);
   if (!workerNodeBaseUrl) {
-    return res.status(500).json({
-      result: false,
-      message: 'URL_BASE_NEWS_NEXUS_WORKER_NODE is not configured.',
-    });
+    return;
   }
 
   try {
@@ -135,20 +161,55 @@ router.post('/request-google-rss/start-job', authenticateToken, async (_req, res
     return res.status(response.status).json(response.data);
   } catch (error: unknown) {
     logger.error('Error starting Google RSS worker job:', error);
+    return forwardAxiosError(res, error);
+  }
+});
 
-    if (axios.isAxiosError(error)) {
-      return res.status(error.response?.status || 500).json(
-        error.response?.data || {
-          result: false,
-          message: error.message,
-        }
-      );
-    }
+router.get('/worker-node/latest-job', authenticateToken, async (req, res) => {
+  const workerNodeBaseUrl = getRequiredWorkerNodeBaseUrl(res);
+  if (!workerNodeBaseUrl) {
+    return;
+  }
 
-    return res.status(500).json({
+  const endpointName = req.query.endpointName;
+  if (typeof endpointName !== 'string' || endpointName.trim() === '') {
+    return res.status(400).json({
       result: false,
-      message: getErrorMessage(error),
+      message: 'endpointName query parameter is required.',
     });
+  }
+
+  try {
+    const response = await axios.get(`${workerNodeBaseUrl}/queue-info/latest-job`, {
+      params: {
+        endpointName: endpointName.trim(),
+      },
+    });
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error retrieving latest worker-node job:', error);
+    return forwardAxiosError(res, error);
+  }
+});
+
+router.post('/worker-node/cancel-job/:jobId', authenticateToken, async (req, res) => {
+  const workerNodeBaseUrl = getRequiredWorkerNodeBaseUrl(res);
+  if (!workerNodeBaseUrl) {
+    return;
+  }
+
+  const jobId = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
+
+  try {
+    const response = await axios.post(
+      `${workerNodeBaseUrl}/queue-info/cancel_job/${encodeURIComponent(jobId)}`
+    );
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error canceling worker-node job:', error);
+    return forwardAxiosError(res, error);
   }
 });
 

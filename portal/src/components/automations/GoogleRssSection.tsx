@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useAppSelector } from "@/store/hooks";
 import { CollapsibleAutomationSection } from "@/components/automations/CollapsibleAutomationSection";
 import { FixedAutomationSpreadsheetControls } from "@/components/automations/FixedAutomationSpreadsheetControls";
+import { WorkerNodeJobStatusPanel } from "@/components/automations/WorkerNodeJobStatusPanel";
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
 
@@ -22,6 +23,7 @@ const DEFAULT_ALERT_MODAL_STATE: AlertModalState = {
 };
 
 const GOOGLE_RSS_FILE_NAME = "AutomatedRequestsGoogleNewsRss04.xlsx";
+const GOOGLE_RSS_ENDPOINT_NAME = "/request-google-rss/start-job";
 
 function buildWorkerNodeResponseMessage(result: {
   endpointName?: string;
@@ -62,6 +64,7 @@ function getErrorMessage(errorBody: string): string {
 export function GoogleRssSection() {
   const { token } = useAppSelector((state) => state.user);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [refreshSignal, setRefreshSignal] = useState(0);
   const [alertModal, setAlertModal] = useState<AlertModalState>(
     DEFAULT_ALERT_MODAL_STATE,
   );
@@ -101,6 +104,7 @@ export function GoogleRssSection() {
         title: "Google RSS Job Queued",
         variant: "success",
       });
+      setRefreshSignal((current) => current + 1);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown error starting job.";
@@ -130,6 +134,12 @@ export function GoogleRssSection() {
               ? "Starting Google RSS Job..."
               : "Start Requesting Google RSS Queries"}
           </button>
+
+          <WorkerNodeJobStatusPanel
+            endpointName={GOOGLE_RSS_ENDPOINT_NAME}
+            refreshSignal={refreshSignal}
+            title="Last Google RSS Job"
+          />
 
           <FixedAutomationSpreadsheetControls fileName={GOOGLE_RSS_FILE_NAME} />
         </div>

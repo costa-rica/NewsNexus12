@@ -20,9 +20,23 @@ const requireJobIdParam = (rawJobId: unknown): string => {
   return rawJobId.trim();
 };
 
+const requireEndpointNameQuery = (rawEndpointName: unknown): string => {
+  if (typeof rawEndpointName !== 'string' || rawEndpointName.trim() === '') {
+    throw AppError.validation([
+      {
+        field: 'endpointName',
+        message: 'endpointName query parameter is required'
+      }
+    ]);
+  }
+
+  return rawEndpointName.trim();
+};
+
 /**
  * queue-info method mapping:
  * - GET /check-status/:jobId
+ * - GET /latest-job
  * - GET /queue_status
  * - POST /cancel_job/:jobId
  */
@@ -44,6 +58,17 @@ export const createQueueInfoRouter = (
           message: `Job not found: ${jobId}`
         });
       }
+
+      return res.status(200).json({ job: jobRecord });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.get('/latest-job', async (req, res, next) => {
+    try {
+      const endpointName = requireEndpointNameQuery(req.query.endpointName);
+      const jobRecord = await queueEngine.getLatestJobByEndpointName(endpointName);
 
       return res.status(200).json({ job: jobRecord });
     } catch (error) {
