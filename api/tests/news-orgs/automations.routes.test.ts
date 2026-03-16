@@ -32,6 +32,7 @@ describe("news org automations routes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.URL_BASE_NEWS_NEXUS_WORKER_NODE = "http://worker-node";
+    process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER = "http://worker-python";
   });
 
   test("POST /automations/request-google-rss/start-job proxies worker-node response", async () => {
@@ -162,6 +163,67 @@ describe("news org automations routes", () => {
     });
     expect(mockAxios.post).toHaveBeenCalledWith(
       "http://worker-node/queue-info/cancel_job/job-55",
+    );
+  });
+
+  test("GET /automations/worker-python/latest-job proxies latest worker job", async () => {
+    mockAxios.get.mockResolvedValue({
+      data: {
+        job: {
+          createdAt: "2026-03-16T12:00:00.000Z",
+          endpointName: "/deduper/start-job",
+          jobId: "0004",
+          status: "running",
+        },
+      },
+      status: 200,
+    });
+
+    const app = buildApp();
+    const response = await request(app).get("/automations/worker-python/latest-job").query({
+      endpointName: "/deduper/start-job",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      job: {
+        createdAt: "2026-03-16T12:00:00.000Z",
+        endpointName: "/deduper/start-job",
+        jobId: "0004",
+        status: "running",
+      },
+    });
+    expect(mockAxios.get).toHaveBeenCalledWith(
+      "http://worker-python/queue-info/latest-job",
+      {
+        params: {
+          endpointName: "/deduper/start-job",
+        },
+      },
+    );
+  });
+
+  test("POST /automations/worker-python/cancel-job/:jobId proxies cancel response", async () => {
+    mockAxios.post.mockResolvedValue({
+      data: {
+        jobId: "0004",
+        outcome: "cancel_requested",
+      },
+      status: 200,
+    });
+
+    const app = buildApp();
+    const response = await request(app).post(
+      "/automations/worker-python/cancel-job/0004",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      jobId: "0004",
+      outcome: "cancel_requested",
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      "http://worker-python/queue-info/cancel-job/0004",
     );
   });
 });
