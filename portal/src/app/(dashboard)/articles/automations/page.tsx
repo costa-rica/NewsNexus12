@@ -4,6 +4,7 @@ import { ApprovedArticlesDuplicateAnalysisSection } from "@/components/automatio
 import { ArticleRequestSpreadsheetsSection } from "@/components/automations/ArticleRequestSpreadsheetsSection";
 import { GoogleRssSection } from "@/components/automations/GoogleRssSection";
 import { LocationScorerSection } from "@/components/automations/LocationScorerSection";
+import { SemanticScorerSection } from "@/components/automations/SemanticScorerSection";
 import { StateAssignerSection } from "@/components/automations/StateAssignerSection";
 
 export default function ManageAutomation() {
@@ -15,6 +16,7 @@ export default function ManageAutomation() {
 
       <GoogleRssSection />
       <StateAssignerSection />
+      <SemanticScorerSection />
       <LocationScorerSection />
       <ApprovedArticlesDuplicateAnalysisSection />
       <ArticleRequestSpreadsheetsSection />

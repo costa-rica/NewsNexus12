@@ -187,6 +187,59 @@ describe("news org automations routes", () => {
     });
   });
 
+  test("POST /automations/semantic-scorer/start-job proxies worker-node response", async () => {
+    mockAxios.post.mockResolvedValue({
+      data: {
+        endpointName: "/semantic-scorer/start-job",
+        jobId: "job-3",
+        status: "queued",
+      },
+      status: 202,
+    });
+
+    const app = buildApp();
+    const response = await request(app).post(
+      "/automations/semantic-scorer/start-job",
+    );
+
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      endpointName: "/semantic-scorer/start-job",
+      jobId: "job-3",
+      status: "queued",
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      "http://worker-node/semantic-scorer/start-job",
+      {},
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  });
+
+  test("POST /automations/semantic-scorer/start-job returns worker-node unavailable message on connection refusal", async () => {
+    mockAxios.isAxiosError.mockReturnValue(true);
+    mockAxios.post.mockRejectedValue({
+      code: "ECONNREFUSED",
+      message: "connect ECONNREFUSED 127.0.0.1:3002",
+      response: undefined,
+    });
+
+    const app = buildApp();
+    const response = await request(app).post(
+      "/automations/semantic-scorer/start-job",
+    );
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      result: false,
+      message:
+        "Unable to reach the worker-node app. Make sure the worker-node service is running and try again.",
+    });
+  });
+
   test("POST /automations/worker-node/cancel-job/:jobId proxies cancel response", async () => {
     mockAxios.post.mockResolvedValue({
       data: {

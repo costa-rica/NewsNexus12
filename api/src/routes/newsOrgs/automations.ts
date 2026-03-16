@@ -259,6 +259,30 @@ router.post('/state-assigner/start-job', authenticateToken, async (req, res) => 
   }
 });
 
+router.post('/semantic-scorer/start-job', authenticateToken, async (_req, res) => {
+  const workerNodeBaseUrl = getRequiredWorkerNodeBaseUrl(res);
+  if (!workerNodeBaseUrl) {
+    return;
+  }
+
+  try {
+    const response = await axios.post(
+      `${workerNodeBaseUrl}/semantic-scorer/start-job`,
+      {},
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error starting semantic scorer worker job:', error);
+    return forwardWorkerNodeAxiosError(res, error);
+  }
+});
+
 router.get('/worker-node/latest-job', authenticateToken, async (req, res) => {
   const workerNodeBaseUrl = getRequiredWorkerNodeBaseUrl(res);
   if (!workerNodeBaseUrl) {
