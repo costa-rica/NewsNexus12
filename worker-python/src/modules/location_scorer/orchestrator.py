@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from datetime import datetime, timezone
 import time
 from typing import Any
@@ -47,6 +48,7 @@ class LocationScorerOrchestrator:
         self,
         limit: int | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        on_progress: Callable[[PipelineSummary], None] | None = None,
     ) -> PipelineSummary:
         summary = self.new_summary(LocationScorerRunMode.SCORE)
         summary.limit = limit
@@ -88,7 +90,7 @@ class LocationScorerOrchestrator:
             (LocationScorerStep.WRITE, run_write),
         ]
 
-        self._execute_pipeline_steps(summary, steps, should_cancel)
+        self._execute_pipeline_steps(summary, steps, should_cancel, on_progress)
         return summary
 
     def _execute_pipeline_steps(
@@ -96,10 +98,13 @@ class LocationScorerOrchestrator:
         summary: PipelineSummary,
         steps: list[tuple[LocationScorerStep, Callable[[], dict[str, Any]]]],
         should_cancel: Callable[[], bool] | None,
+        on_progress: Callable[[PipelineSummary], None] | None,
     ) -> None:
         cancel_check = should_cancel or (lambda: False)
+        emit_progress = on_progress or (lambda current_summary: None)
 
         try:
+            emit_progress(deepcopy(summary))
             for step, fn in steps:
                 if cancel_check():
                     raise LocationScorerProcessorError("Pipeline cancelled")
@@ -110,6 +115,7 @@ class LocationScorerOrchestrator:
                     started_at=_utc_now_iso(),
                 )
                 summary.steps.append(progress)
+                emit_progress(deepcopy(summary))
                 self.logger.info(
                     "event=location_scorer_step_start step={} limit={}",
                     step,
@@ -124,6 +130,7 @@ class LocationScorerOrchestrator:
                 progress.processed = int(result.get("processed", 0))
                 progress.total = int(result.get("total", progress.processed))
                 progress.message = str(result)
+                emit_progress(deepcopy(summary))
                 duration_ms = int((time.perf_counter() - step_started) * 1000)
                 self.logger.info(
                     "event=location_scorer_step_complete step={} processed={} duration_ms={}",
@@ -133,12 +140,14 @@ class LocationScorerOrchestrator:
                 )
 
             summary.status = "completed"
+            emit_progress(deepcopy(summary))
             self.logger.info(
                 "event=location_scorer_pipeline_complete limit={}",
                 summary.limit,
             )
         except LocationScorerProcessorError:
             summary.status = "cancelled"
+            emit_progress(deepcopy(summary))
             self.logger.warning(
                 "event=location_scorer_pipeline_cancelled limit={}",
                 summary.limit,
@@ -146,6 +155,7 @@ class LocationScorerOrchestrator:
             raise
         except Exception as exc:
             summary.status = "failed"
+            emit_progress(deepcopy(summary))
             self.logger.error(
                 "event=location_scorer_pipeline_failed limit={} error={}",
                 summary.limit,
@@ -154,3 +164,4 @@ class LocationScorerOrchestrator:
             raise
         finally:
             summary.completed_at = _utc_now_iso()
+            emit_progress(deepcopy(summary))

@@ -206,28 +206,28 @@ pytest tests/unit/location_scorer/
 
 This phase requires the shared queue engine from the queue refactor TODO (at least through Phase 3 of that document).
 
-- [ ] Create `src/routes/location_scorer.py`.
-- [ ] Implement `POST /location-scorer/start-job`:
+- [x] Create `src/routes/location_scorer.py`.
+- [x] Implement `POST /location-scorer/start-job`:
   - Accept optional JSON body: `{ "limit": int | null }`.
   - Enqueue the job via the shared queue engine with `endpointName: "/location-scorer/start-job"`.
   - Return 202 with `{ "jobId": "...", "status": "queued", "endpointName": "/location-scorer/start-job" }`.
-- [ ] Implement the job runner function that the queue engine will call:
+- [x] Implement the job runner function that the queue engine will call:
   - Create `LocationScorerOrchestrator` and `LocationScorerRepository`.
   - Call `orchestrator.run_score(limit=limit, should_cancel=cancel_callback)`.
   - Ensure repository is closed in a `finally` block.
-- [ ] Persist enough result metadata during execution to support a more informative portal status display without introducing new shared queue status enum values.
-- [ ] Register the location scorer router in `src/main.py`.
-- [ ] Add `validate_location_scorer_startup_env()` call to the startup validation block in `src/main.py`.
-- [ ] Confirm that queue-info endpoints (`/queue-info/latest-job?endpointName=/location-scorer/start-job`, `/queue-info/check-status/{jobId}`, `/queue-info/cancel-job/{jobId}`) work for location scorer jobs without any changes to the queue-info router.
+- [x] Persist enough result metadata during execution to support a more informative portal status display without introducing new shared queue status enum values.
+- [x] Register the location scorer router in `src/main.py`.
+- [x] Add `validate_location_scorer_startup_env()` call to the startup validation block in `src/main.py`.
+- [x] Confirm that queue-info endpoints (`/queue-info/latest-job?endpointName=/location-scorer/start-job`, `/queue-info/check-status/{jobId}`, `/queue-info/cancel-job/{jobId}`) work for location scorer jobs without any changes to the queue-info router.
 
 Tests to implement in this phase:
 
-- [ ] Add integration tests for `POST /location-scorer/start-job` using FastAPI test client with the queue enqueue boundary mocked or controlled.
-- [ ] Test that the start-job response matches the expected shape: `jobId`, `status`, `endpointName`.
-- [ ] Test that an enqueued location scorer job appears via `/queue-info/latest-job?endpointName=/location-scorer/start-job`.
-- [ ] Test that cancellation works through the queue-info cancel endpoint.
-- [ ] Test start-job with and without the optional `limit` body parameter.
-- [ ] Add at least one failure-path test for startup with missing `NAME_AI_ENTITY_LOCATION_SCORER` env var and assert the log output identifies the missing variable.
+- [x] Add integration tests for `POST /location-scorer/start-job` using FastAPI test client with the queue enqueue boundary mocked or controlled.
+- [x] Test that the start-job response matches the expected shape: `jobId`, `status`, `endpointName`.
+- [x] Test that an enqueued location scorer job appears via `/queue-info/latest-job?endpointName=/location-scorer/start-job`.
+- [x] Test that cancellation works through the queue-info cancel endpoint.
+- [x] Test start-job with and without the optional `limit` body parameter.
+- [x] Add at least one failure-path test for startup with missing `NAME_AI_ENTITY_LOCATION_SCORER` env var and assert the log output identifies the missing variable.
 
 Suggested test files:
 

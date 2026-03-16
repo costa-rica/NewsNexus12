@@ -9,6 +9,10 @@ os.environ.setdefault("NAME_APP", "worker-python-tests")
 os.environ.setdefault("RUN_ENVIRONMENT", "testing")
 os.environ.setdefault("PATH_TO_LOGS", "/tmp")
 os.environ.setdefault("PATH_UTILTIES", "/tmp")
+os.environ.setdefault(
+    "NAME_AI_ENTITY_LOCATION_SCORER",
+    "NewsNexusClassifierLocationScorer01",
+)
 
 from src.main import app
 from src.services.job_manager import job_manager
