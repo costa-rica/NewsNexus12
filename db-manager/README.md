@@ -89,6 +89,27 @@ npm start -- --zip_file /path/to/backup.zip
 
 **Note:** Import is skipped if the database already contains data (displays status only).
 
+Run the import as the same OS user that will later run the NewsNexus11 services. On the production server that user is `limited_user`.
+
+Recommended production workflow:
+
+```bash
+cd /home/limited_user/applications/NewsNexus11/db-manager
+npm start -- --zip_file /path/to/backup.zip
+```
+
+If the command must be launched from another account, run the process as `limited_user` instead of creating the database as a different user and changing ownership afterward:
+
+```bash
+sudo -u limited_user -H bash -lc 'cd /home/limited_user/applications/NewsNexus11/db-manager && npm start -- --zip_file /path/to/backup.zip'
+```
+
+Why this matters:
+
+- SQLite may create temporary side files such as `newsnexus11.db-journal`, `newsnexus11.db-wal`, or `newsnexus11.db-shm`
+- Importing as a different user can leave the database or side files in a state that later causes `SQLITE_READONLY`
+- Changing ownership of only `newsnexus11.db` after the import may not fix those side files or related metadata
+
 ### Delete Old Articles
 
 Remove articles older than N days (default: 180) that are not approved or marked relevant:
