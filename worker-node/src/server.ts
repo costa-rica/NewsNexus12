@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'node:path';
 import { createApp } from './app';
 import logger, { initializeLogger, isLoggerInitialized } from './modules/logger';
 import { isStartupConfigError, loadAppConfig } from './modules/startup/config';
@@ -41,6 +42,14 @@ export const startServer = async (options: StartServerOptions = {}): Promise<voi
     });
 
     logger.info('Worker-node startup attempt');
+    logger.info('Worker-node runtime configuration loaded', {
+      nodeEnv: config.nodeEnv,
+      port: config.port,
+      databasePath: path.resolve(config.pathDatabase, config.nameDb),
+      pathToStateAssignerFiles: config.pathToStateAssignerFiles,
+      pathToSemanticScorerDir: config.pathToSemanticScorerDir,
+      pathToLogs: config.pathToLogs
+    });
     await ensureStateAssignerDirectories(config.pathToStateAssignerFiles);
 
     const app = createApp();

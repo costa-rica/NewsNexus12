@@ -4,6 +4,7 @@ import { QueueJobHandler } from '../modules/queue/queueEngine';
 import { createStateAssignerJobHandler } from '../modules/jobs/stateAssignerJob';
 import { globalQueueEngine } from '../modules/queue/globalQueue';
 import { GlobalQueueEngine } from '../modules/queue/queueEngine';
+import logger from '../modules/logger';
 
 interface StateAssignerRouteDependencies {
   queueEngine: GlobalQueueEngine;
@@ -115,6 +116,13 @@ export const createStateAssignerRouter = (
       const pathToStateAssignerFiles = resolveStateAssignerFilesPath(env);
       const body = validateStartJobBody(req.body);
 
+      logger.info('Received state assigner start request', {
+        endpointName,
+        targetArticleThresholdDaysOld: body.targetArticleThresholdDaysOld,
+        targetArticleStateReviewCount: body.targetArticleStateReviewCount,
+        pathToStateAssignerFiles
+      });
+
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
         run: buildJobHandler({
@@ -123,6 +131,12 @@ export const createStateAssignerRouter = (
           keyOpenAi: openAiKey,
           pathToStateAssignerFiles
         })
+      });
+
+      logger.info('Queued state assigner job', {
+        endpointName,
+        jobId: enqueueResult.jobId,
+        status: enqueueResult.status
       });
 
       return res.status(202).json({

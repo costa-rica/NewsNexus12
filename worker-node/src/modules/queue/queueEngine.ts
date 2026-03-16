@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { QueueJobStore, resolveDefaultQueueStorePath } from './jobStore';
 import { QueueJobRecord } from './types';
 import { QueueStatusView, getCheckStatusByJobId, getQueueStatus } from './queueStatus';
+import logger from '../logger';
 
 export interface CancelableProcessHandle {
   kill: (signal?: NodeJS.Signals | number) => boolean;
@@ -103,6 +104,12 @@ export class GlobalQueueEngine {
       jobId,
       endpointName: input.endpointName,
       run: input.run
+    });
+
+    logger.info('Queue job enqueued', {
+      jobId,
+      endpointName: input.endpointName,
+      queueDepth: this.pendingQueue.length
     });
 
     this.triggerProcessLoop();
@@ -231,6 +238,12 @@ export class GlobalQueueEngine {
       startedAt: this.now().toISOString()
     }));
 
+    logger.info('Queue job started', {
+      jobId: item.jobId,
+      endpointName: item.endpointName,
+      remainingQueueDepth: this.pendingQueue.length
+    });
+
     try {
       await item.run({
         jobId: item.jobId,
@@ -246,6 +259,10 @@ export class GlobalQueueEngine {
 
       if (activeJob.cancelRequested || activeJob.abortController.signal.aborted) {
         await this.persistCanceledStatus(item.jobId, 'canceled_by_request');
+        logger.warn('Queue job canceled after run returned', {
+          jobId: item.jobId,
+          endpointName: item.endpointName
+        });
       } else {
         await this.store.updateJob(item.jobId, (job) => ({
           ...job,
@@ -253,17 +270,33 @@ export class GlobalQueueEngine {
           endedAt: this.now().toISOString(),
           failureReason: undefined
         }));
+
+        logger.info('Queue job completed', {
+          jobId: item.jobId,
+          endpointName: item.endpointName
+        });
       }
     } catch (error) {
       if (activeJob.cancelRequested || activeJob.abortController.signal.aborted) {
         await this.persistCanceledStatus(item.jobId, 'canceled_by_request');
+        logger.warn('Queue job canceled during execution', {
+          jobId: item.jobId,
+          endpointName: item.endpointName
+        });
       } else {
+        const failureReason = getErrorMessage(error);
         await this.store.updateJob(item.jobId, (job) => ({
           ...job,
           status: 'failed',
           endedAt: this.now().toISOString(),
-          failureReason: getErrorMessage(error)
+          failureReason
         }));
+
+        logger.error('Queue job failed', {
+          jobId: item.jobId,
+          endpointName: item.endpointName,
+          failureReason
+        });
       }
     } finally {
       if (activeJob.sigkillTimer) {
