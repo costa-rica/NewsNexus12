@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import { QueueJobStore, resolveDefaultQueueStorePath } from './jobStore';
+import { getNextJobId } from './jobIds';
 import { QueueJobRecord } from './types';
 import { QueueStatusView, getCheckStatusByJobId, getQueueStatus } from './queueStatus';
 import logger from '../logger';
@@ -34,7 +34,7 @@ export interface CancelJobResult {
 }
 
 export interface QueueEngineOptions {
-  createJobId?: () => string;
+  createJobId?: () => string | Promise<string>;
   now?: () => Date;
   cancelGraceMs?: number;
   setTimeoutFn?: typeof setTimeout;
@@ -65,7 +65,7 @@ const getErrorMessage = (error: unknown): string => {
 
 export class GlobalQueueEngine {
   private readonly store: QueueJobStore;
-  private readonly createJobId: () => string;
+  private readonly createJobId: () => string | Promise<string>;
   private readonly now: () => Date;
   private readonly cancelGraceMs: number;
   private readonly setTimeoutFn: typeof setTimeout;
@@ -78,7 +78,10 @@ export class GlobalQueueEngine {
 
   constructor(store: QueueJobStore, options: QueueEngineOptions = {}) {
     this.store = store;
-    this.createJobId = options.createJobId ?? (() => randomUUID());
+    this.createJobId = options.createJobId ?? (async () => {
+      const jobs = await this.store.getJobs();
+      return getNextJobId(jobs.map((job) => job.jobId));
+    });
     this.now = options.now ?? (() => new Date());
     this.cancelGraceMs = options.cancelGraceMs ?? 10_000;
     this.setTimeoutFn = options.setTimeoutFn ?? setTimeout;
@@ -88,7 +91,7 @@ export class GlobalQueueEngine {
   public async enqueueJob(input: EnqueueJobInput): Promise<EnqueueJobResult> {
     await this.store.ensureInitialized();
 
-    const jobId = input.jobId ?? this.createJobId();
+    const jobId = input.jobId ?? await this.createJobId();
     const nowIso = this.now().toISOString();
 
     const jobRecord: QueueJobRecord = {
