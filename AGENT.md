@@ -104,3 +104,47 @@ Each package reads from its own `.env`. Key variables:
 
 - Deployed on Ubuntu VM behind reverse proxy
 - All services share the same SQLite database file
+
+## Commit Message Guidance
+
+### Guidelines
+
+- Only generate the message for staged files/changes
+- Title is lowercase, no period at the end.
+- Title should be a clear summary, max 50 characters.
+- Use the body (optional) to explain _why_, not just _what_.
+- Bullet points should be concise and high-level.
+- try to use ideal format, but if the commit has many "types" then
+
+### Format
+
+Try to use the ideal format. But if the commit is too broad or has too many different types, then use the borad format.
+
+#### Ideal Format
+
+```
+<type>:<space><message title>
+
+<bullet points summarizing what was updated>
+```
+
+#### Broad Format
+
+```
+<message title>
+
+<bullet points summarizing what was updated>
+```
+
+#### Types for Ideal Format
+
+| Type     | Description                           |
+| -------- | ------------------------------------- |
+| feat     | New feature                           |
+| fix      | Bug fix                               |
+| chore    | Maintenance (e.g., tooling, deps)     |
+| docs     | Documentation changes                 |
+| refactor | Code restructure (no behavior change) |
+| test     | Adding or refactoring tests           |
+| style    | Code formatting (no logic change)     |
+| perf     | Performance improvements              |
