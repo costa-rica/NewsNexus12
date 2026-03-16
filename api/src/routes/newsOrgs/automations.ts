@@ -21,7 +21,25 @@ function getAutomationExcelDir(): string | null {
 }
 
 function getWorkerNodeBaseUrl(): string | null {
-  return process.env.URL_BASE_NEWS_NEXUS_WORKER_NODE || null;
+  const rawValue = process.env.URL_BASE_NEWS_NEXUS_WORKER_NODE || '';
+  const trimmedValue = rawValue.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  return trimmedValue.replace(/\/+$/, '');
+}
+
+function getWorkerPythonBaseUrl(): string | null {
+  const rawValue = process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER || '';
+  const trimmedValue = rawValue.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  return trimmedValue.replace(/\/+$/, '');
 }
 
 function getRequiredWorkerNodeBaseUrl(res: express.Response): string | null {
@@ -36,6 +54,20 @@ function getRequiredWorkerNodeBaseUrl(res: express.Response): string | null {
   }
 
   return workerNodeBaseUrl;
+}
+
+function getRequiredWorkerPythonBaseUrl(res: express.Response): string | null {
+  const workerPythonBaseUrl = getWorkerPythonBaseUrl();
+
+  if (!workerPythonBaseUrl) {
+    res.status(500).json({
+      result: false,
+      message: 'URL_BASE_NEWS_NEXUS_PYTHON_QUEUER is not configured.',
+    });
+    return null;
+  }
+
+  return workerPythonBaseUrl;
 }
 
 function forwardAxiosError(res: express.Response, error: unknown): express.Response {
@@ -233,6 +265,54 @@ router.post('/worker-node/cancel-job/:jobId', authenticateToken, async (req, res
     return res.status(response.status).json(response.data);
   } catch (error: unknown) {
     logger.error('Error canceling worker-node job:', error);
+    return forwardAxiosError(res, error);
+  }
+});
+
+router.get('/worker-python/latest-job', authenticateToken, async (req, res) => {
+  const workerPythonBaseUrl = getRequiredWorkerPythonBaseUrl(res);
+  if (!workerPythonBaseUrl) {
+    return;
+  }
+
+  const endpointName = req.query.endpointName;
+  if (typeof endpointName !== 'string' || endpointName.trim() === '') {
+    return res.status(400).json({
+      result: false,
+      message: 'endpointName query parameter is required.',
+    });
+  }
+
+  try {
+    const response = await axios.get(`${workerPythonBaseUrl}/queue-info/latest-job`, {
+      params: {
+        endpointName: endpointName.trim(),
+      },
+    });
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error retrieving latest worker-python job:', error);
+    return forwardAxiosError(res, error);
+  }
+});
+
+router.post('/worker-python/cancel-job/:jobId', authenticateToken, async (req, res) => {
+  const workerPythonBaseUrl = getRequiredWorkerPythonBaseUrl(res);
+  if (!workerPythonBaseUrl) {
+    return;
+  }
+
+  const jobId = Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId;
+
+  try {
+    const response = await axios.post(
+      `${workerPythonBaseUrl}/queue-info/cancel-job/${encodeURIComponent(jobId)}`
+    );
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error canceling worker-python job:', error);
     return forwardAxiosError(res, error);
   }
 });
