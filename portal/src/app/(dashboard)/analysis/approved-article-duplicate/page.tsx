@@ -79,11 +79,11 @@ export default function ApprovedArticleDuplicate() {
 
       const resJson: JobListStatusResponse = await response.json();
 
-      // Check if any job has status "running"
-      const hasRunningJob = resJson.jobs?.some(
-        (job) => job.status === "running"
+      // Queue-backed deduper jobs can be either queued or running while active.
+      const hasActiveJob = resJson.jobs?.some(
+        (job) => job.status === "running" || job.status === "queued"
       );
-      setJobsStatus(hasRunningJob ? "loading" : "no jobs");
+      setJobsStatus(hasActiveJob ? "loading" : "no jobs");
     } catch (error) {
       console.error("Error fetching job list status:", error);
       setJobsStatus("no jobs");

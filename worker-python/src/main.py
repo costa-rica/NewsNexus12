@@ -4,15 +4,15 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from loguru import logger
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BASE_DIR / ".env")
+
 from src.logger import setup_logger
 from src.modules.deduper.config import validate_startup_env
 from src.modules.queue.config import validate_queue_startup_env
 from src.routes.deduper import router as deduper_router
 from src.routes.index import router as index_router
 from src.routes.queue_info import router as queue_info_router
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(BASE_DIR / ".env")
 
 setup_logger()
 
