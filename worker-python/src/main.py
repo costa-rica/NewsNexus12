@@ -6,6 +6,7 @@ from loguru import logger
 
 from src.logger import setup_logger
 from src.modules.deduper.config import validate_startup_env
+from src.modules.queue.config import validate_queue_startup_env
 from src.routes.deduper import router as deduper_router
 from src.routes.index import router as index_router
 
@@ -16,6 +17,7 @@ setup_logger()
 
 try:
     validate_startup_env()
+    validate_queue_startup_env()
 except Exception as exc:
     logger.critical("event=startup_fatal error={}", exc)
     raise SystemExit(1) from exc

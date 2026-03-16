@@ -26,9 +26,9 @@ Recommended test layout for this refactor:
 
 ## Phase 1. Define the queue record contract and JSON store path
 
-- [ ] Add `PATH_UTILTIES` startup validation for worker-python.
-- [ ] Define the resolved queue store target path as `PATH_UTILTIES/worker-python/queue-jobs.json`.
-- [ ] Document the queue record shape in code comments or module docs:
+- [x] Add `PATH_UTILTIES` startup validation for worker-python.
+- [x] Define the resolved queue store target path as `PATH_UTILTIES/worker-python/queue-jobs.json`.
+- [x] Document the queue record shape in code comments or module docs:
   - `jobId`
   - `endpointName`
   - `status`
@@ -38,22 +38,22 @@ Recommended test layout for this refactor:
   - `failureReason`
   - optional `logs`
   - optional `parameters`
-- [ ] Define status vocabulary aligned to the portal and worker-node pattern:
+- [x] Define status vocabulary aligned to the portal and worker-node pattern:
   - `queued`
   - `running`
   - `completed`
   - `failed`
   - `canceled`
-- [ ] Define `jobId` as a string field, not an integer field.
-- [ ] Define the human-readable `jobId` format as 4-digit zero-padded strings such as `0001`.
-- [ ] Define overflow behavior so IDs continue past `9999` as wider strings rather than rolling over.
+- [x] Define `jobId` as a string field, not an integer field.
+- [x] Define the human-readable `jobId` format as 4-digit zero-padded strings such as `0001`.
+- [x] Define overflow behavior so IDs continue past `9999` as wider strings rather than rolling over.
 
 Tests to implement in this phase:
 
-- [ ] Add a unit test file for queue path resolution and startup validation.
-- [ ] Add unit tests that validate accepted status values.
-- [ ] Add unit tests that validate the `jobId` formatting rules and overflow behavior.
-- [ ] Add at least one failure-path test for missing `PATH_UTILTIES`.
+- [x] Add a unit test file for queue path resolution and startup validation.
+- [x] Add unit tests that validate accepted status values.
+- [x] Add unit tests that validate the `jobId` formatting rules and overflow behavior.
+- [x] Add at least one failure-path test for missing `PATH_UTILTIES`.
 
 Suggested test files:
 

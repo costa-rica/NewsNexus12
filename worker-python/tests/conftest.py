@@ -6,7 +6,9 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("PATH_DATABASE", "/tmp")
 os.environ.setdefault("NAME_DB", "test.db")
 os.environ.setdefault("NAME_APP", "worker-python-tests")
+os.environ.setdefault("RUN_ENVIRONMENT", "testing")
 os.environ.setdefault("PATH_TO_LOGS", "/tmp")
+os.environ.setdefault("PATH_UTILTIES", "/tmp")
 
 from src.main import app
 from src.services.job_manager import job_manager
