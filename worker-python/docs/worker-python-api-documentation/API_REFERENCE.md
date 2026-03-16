@@ -8,6 +8,7 @@ This file is the top-level reference index for engineers and service consumers.
 
 - [index](./endpoints/index.md)
 - [deduper](./endpoints/deduper.md)
+- [queue-info](./endpoints/queue-info.md)
 
 ## Quick usage guidance
 
