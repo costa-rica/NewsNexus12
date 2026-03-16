@@ -37,29 +37,29 @@ Recommended test layout:
 
 ## Phase 1. Define module structure, config, types, and errors
 
-- [ ] Create `src/modules/location_scorer/__init__.py` with public API exports.
-- [ ] Create `src/modules/location_scorer/errors.py` with:
+- [x] Create `src/modules/location_scorer/__init__.py` with public API exports.
+- [x] Create `src/modules/location_scorer/errors.py` with:
   - `LocationScorerError` (base)
   - `LocationScorerConfigError`
   - `LocationScorerDatabaseError`
   - `LocationScorerProcessorError`
-- [ ] Create `src/modules/location_scorer/types.py` with:
+- [x] Create `src/modules/location_scorer/types.py` with:
   - `LocationScorerStep` StrEnum: `load`, `classify`, `write`
   - `LocationScorerRunMode` StrEnum (e.g., `score`)
   - `StepProgress` dataclass (reuse or mirror deduper pattern)
   - `PipelineSummary` dataclass
-- [ ] Create `src/modules/location_scorer/config.py` with:
+- [x] Create `src/modules/location_scorer/config.py` with:
   - `LocationScorerConfig` dataclass with `from_env()` classmethod
   - Required env vars: `PATH_DATABASE`, `NAME_DB`, `NAME_AI_ENTITY_LOCATION_SCORER`
   - Optional env vars: `LOCATION_SCORER_BATCH_SIZE` (default `10`), `LOCATION_SCORER_CHECKPOINT_INTERVAL` (default `10`)
   - `validate_location_scorer_startup_env()` function that logs the specific missing env var name before raising
-- [ ] Create `src/modules/location_scorer/processors/__init__.py` (empty).
+- [x] Create `src/modules/location_scorer/processors/__init__.py` (empty).
 
 Tests to implement in this phase:
 
-- [ ] Add unit tests for config `from_env()` with valid and missing env vars.
-- [ ] Add unit tests for `validate_location_scorer_startup_env()` with missing required keys.
-- [ ] Add unit tests for status enum values and step enum values.
+- [x] Add unit tests for config `from_env()` with valid and missing env vars.
+- [x] Add unit tests for `validate_location_scorer_startup_env()` with missing required keys.
+- [x] Add unit tests for status enum values and step enum values.
 
 Suggested test files:
 
