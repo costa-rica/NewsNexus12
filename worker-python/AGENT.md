@@ -15,6 +15,8 @@ It now runs absorbed workflows in-process and uses a shared JSON-backed queue fo
 
 The deduper workflow from NewsNexusDeduper02 is already absorbed internally under `src/modules/deduper`.
 
+The location scorer workflow from NewsNexusClassifierLocationScorer01 is now absorbed internally under `src/modules/location_scorer`.
+
 ## Runtime architecture
 
 1. Application bootstrap
@@ -24,6 +26,7 @@ The deduper workflow from NewsNexusDeduper02 is already absorbed internally unde
 2. HTTP routes
 - `src/routes/index.py`
 - `src/routes/deduper.py`
+- `src/routes/location_scorer.py`
 - `src/routes/queue_info.py`
 
 3. Shared queue infrastructure
@@ -52,6 +55,18 @@ The deduper workflow from NewsNexusDeduper02 is already absorbed internally unde
 6. Deduper utilities
 - `src/modules/deduper/utils/csv_input.py`
 - `src/modules/deduper/utils/text_norm.py`
+
+7. Location scorer workflow
+- `src/modules/location_scorer/config.py`
+- `src/modules/location_scorer/repository.py`
+- `src/modules/location_scorer/orchestrator.py`
+- `src/modules/location_scorer/types.py`
+- `src/modules/location_scorer/errors.py`
+
+8. Location scorer processors
+- `src/modules/location_scorer/processors/load.py`
+- `src/modules/location_scorer/processors/classify.py`
+- `src/modules/location_scorer/processors/write.py`
 
 ## Queue model
 
@@ -115,6 +130,27 @@ The queue is the backbone of worker status reporting used by the portal automati
 4. Cancellation:
 - `POST /queue-info/cancel-job/{job_id}`
 
+### Location scorer create and execute flow
+
+1. API or internal callers create a queued location scorer job at:
+- `POST /location-scorer/start-job`
+
+2. `src/routes/location_scorer.py` enqueues a shared queue job with endpoint name:
+- `/location-scorer/start-job`
+
+3. The route runner creates `LocationScorerRepository` and `LocationScorerOrchestrator`.
+
+4. `LocationScorerOrchestrator.run_score(...)` executes in-process stages:
+- `load`
+- `classify`
+- `write`
+
+5. During execution, the runner persists progress details into the queue job `result` payload so callers can display a richer status message without changing the shared queue status enum.
+
+6. Latest job and cancel operations reuse the same queue-info routes:
+- `GET /queue-info/latest-job?endpointName=/location-scorer/start-job`
+- `POST /queue-info/cancel-job/{job_id}`
+
 ## Environment variables
 
 Required:
@@ -127,6 +163,10 @@ Required:
 
 3. `PATH_UTILTIES`
 - Base utilities path used to resolve `worker-python/queue-jobs.json`.
+
+4. `NAME_AI_ENTITY_LOCATION_SCORER`
+- AI entity name used by the location scorer to resolve `ArtificialIntelligences` and `EntityWhoCategorizedArticles`.
+- Worker startup fails if this value is missing.
 
 Optional:
 
@@ -147,6 +187,10 @@ Optional:
 4. Deduper resilience and memory tuning
 - `DEDUPER_CACHE_MAX_ENTRIES` default `10000`
 - `DEDUPER_CHECKPOINT_INTERVAL` default `250`
+
+5. Location scorer tuning
+- `LOCATION_SCORER_BATCH_SIZE` default `10`
+- `LOCATION_SCORER_CHECKPOINT_INTERVAL` default `10`
 
 Deprecated in the absorbed runtime path:
 
@@ -177,16 +221,25 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 - Ensure `.env` is present in `worker-python/`.
 - Ensure `PATH_UTILTIES` is defined.
 
-3. Common issue: `job not found`
+3. Common issue: worker fails at startup with `NAME_AI_ENTITY_LOCATION_SCORER is required`
+- Ensure the location scorer AI entity env var is set in `worker-python/.env`.
+- Ensure the referenced AI entity and related `EntityWhoCategorizedArticles` row exist in the shared database.
+
+4. Common issue: `job not found`
 - Usually caused by polling with `reportId` instead of `jobId`.
 - Queue and deduper status routes require the job ID returned at creation time.
 
-4. Common issue: completed job but no rows
+5. Common issue: completed location scorer job but no rows
+- Confirm the `ArtificialIntelligences` row exists for `NAME_AI_ENTITY_LOCATION_SCORER`.
+- Confirm the related `EntityWhoCategorizedArticles` row exists.
+- Confirm there are unscored `Articles` for that entity.
+
+6. Common issue: completed job but no deduper rows
 - Validate source rows for the report in the shared SQLite database.
 - Validate approved rows exist for the target report.
 - Validate worker-python points at the intended DB file.
 
-5. Cancellation behavior
+7. Cancellation behavior
 - Cancellation is cooperative, not force-kill based.
 - Processors must check `should_cancel` at checkpoints between batches or units of work.
 

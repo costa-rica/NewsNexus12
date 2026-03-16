@@ -249,21 +249,21 @@ pytest tests/unit/location_scorer/ tests/integration/test_location_scorer_routes
 
 ## Phase 5. Dependencies and documentation
 
-- [ ] Add `transformers` to `requirements.txt` with an explicit version pin.
-- [ ] Verify that `torch` is available transitively via `sentence-transformers`. If not, add it explicitly.
-- [ ] Update `worker-python/AGENT.md` to document:
+- [x] Add `transformers` to `requirements.txt` with an explicit version pin.
+- [x] Verify that `torch` is available transitively via `sentence-transformers`. If not, add it explicitly.
+- [x] Update `worker-python/AGENT.md` to document:
   - Location scorer module under the architecture map.
   - Runtime flow for location scorer jobs.
   - Required and optional environment variables for the location scorer.
   - The stable `endpointName` value: `/location-scorer/start-job`.
-- [ ] Confirm that the AI entity prerequisite (`ArtificialIntelligences` and `EntityWhoCategorizedArticles` rows) is documented. Either:
+- [x] Confirm that the AI entity prerequisite (`ArtificialIntelligences` and `EntityWhoCategorizedArticles` rows) is documented. Either:
   - Include a standalone setup script at `src/standalone/update_location_scorer_ai_entities.py`, or
   - Document the manual SQL or existing script from the source project.
-- [ ] Update `worker-python/docs/worker-python-api-documentation/` with endpoint documentation for `POST /location-scorer/start-job`.
+- [x] Update `worker-python/docs/worker-python-api-documentation/` with endpoint documentation for `POST /location-scorer/start-job`.
 
 Tests to implement in this phase:
 
-- [ ] Run the full worker-python test suite to confirm no regressions.
+- [x] Run the full worker-python test suite to confirm no regressions.
 
 Phase completion instructions:
 
