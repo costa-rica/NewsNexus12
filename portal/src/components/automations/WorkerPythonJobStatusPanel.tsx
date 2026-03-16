@@ -19,6 +19,14 @@ type WorkerPythonJobRecord = {
   endpointName: string;
   failureReason?: string;
   jobId: string;
+  result?: {
+    completedStepCount?: number;
+    currentStep?: string;
+    currentStepProcessed?: number;
+    currentStepStatus?: string;
+    statusText?: string;
+    summaryStatus?: string;
+  };
   startedAt?: string;
   status: "canceled" | "completed" | "failed" | "queued" | "running";
 };
@@ -255,6 +263,26 @@ export function WorkerPythonJobStatusPanel({
             <div>Created: {formatDate(job.createdAt)}</div>
             <div>Started: {formatDate(job.startedAt)}</div>
             <div>Ended: {formatDate(job.endedAt)}</div>
+            {job.result?.statusText ? (
+              <div>Status Detail: {job.result.statusText}</div>
+            ) : null}
+            {job.result?.summaryStatus ? (
+              <div>Workflow Status: {job.result.summaryStatus}</div>
+            ) : null}
+            {job.result?.currentStep ? (
+              <div>
+                Current Step: {job.result.currentStep}
+                {job.result.currentStepStatus
+                  ? ` (${job.result.currentStepStatus})`
+                  : ""}
+              </div>
+            ) : null}
+            {typeof job.result?.currentStepProcessed === "number" ? (
+              <div>Current Step Processed: {job.result.currentStepProcessed}</div>
+            ) : null}
+            {typeof job.result?.completedStepCount === "number" ? (
+              <div>Completed Steps: {job.result.completedStepCount}</div>
+            ) : null}
             {job.failureReason ? <div>Reason: {job.failureReason}</div> : null}
           </div>
         ) : (

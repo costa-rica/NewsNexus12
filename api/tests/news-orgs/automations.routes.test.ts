@@ -226,4 +226,40 @@ describe("news org automations routes", () => {
       "http://worker-python/queue-info/cancel-job/0004",
     );
   });
+
+  test("POST /automations/location-scorer/start-job proxies worker-python response", async () => {
+    mockAxios.post.mockResolvedValue({
+      data: {
+        endpointName: "/location-scorer/start-job",
+        jobId: "0007",
+        status: "queued",
+      },
+      status: 202,
+    });
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/automations/location-scorer/start-job")
+      .send({
+        limit: 25,
+      });
+
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      endpointName: "/location-scorer/start-job",
+      jobId: "0007",
+      status: "queued",
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      "http://worker-python/location-scorer/start-job",
+      {
+        limit: 25,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  });
 });

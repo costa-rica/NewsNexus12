@@ -317,4 +317,28 @@ router.post('/worker-python/cancel-job/:jobId', authenticateToken, async (req, r
   }
 });
 
+router.post('/location-scorer/start-job', authenticateToken, async (req, res) => {
+  const workerPythonBaseUrl = getRequiredWorkerPythonBaseUrl(res);
+  if (!workerPythonBaseUrl) {
+    return;
+  }
+
+  try {
+    const response = await axios.post(
+      `${workerPythonBaseUrl}/location-scorer/start-job`,
+      req.body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.status(response.status).json(response.data);
+  } catch (error: unknown) {
+    logger.error('Error starting location scorer worker job:', error);
+    return forwardAxiosError(res, error);
+  }
+});
+
 export = router;

@@ -3,6 +3,7 @@ import React from "react";
 import { ApprovedArticlesDuplicateAnalysisSection } from "@/components/automations/ApprovedArticlesDuplicateAnalysisSection";
 import { ArticleRequestSpreadsheetsSection } from "@/components/automations/ArticleRequestSpreadsheetsSection";
 import { GoogleRssSection } from "@/components/automations/GoogleRssSection";
+import { LocationScorerSection } from "@/components/automations/LocationScorerSection";
 import { StateAssignerSection } from "@/components/automations/StateAssignerSection";
 
 export default function ManageAutomation() {
@@ -14,6 +15,7 @@ export default function ManageAutomation() {
 
       <GoogleRssSection />
       <StateAssignerSection />
+      <LocationScorerSection />
       <ApprovedArticlesDuplicateAnalysisSection />
       <ArticleRequestSpreadsheetsSection />
     </div>
