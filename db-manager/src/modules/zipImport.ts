@@ -33,6 +33,10 @@ type DateFieldInfo = {
   typeKey: "DATE" | "DATEONLY";
 };
 
+const IMPORT_BATCH_SIZE = 1000;
+const INITIAL_PROGRESS_LOG_THRESHOLD = 1000;
+const LARGE_PROGRESS_LOG_INTERVAL = 100000;
+
 function getDateFields(model: { rawAttributes?: Record<string, unknown> }): DateFieldInfo[] {
   if (!model.rawAttributes) {
     return [];
@@ -147,6 +151,77 @@ async function readCsvFile(filePath: string): Promise<Record<string, string | nu
   return records;
 }
 
+async function importCsvFileInBatches(
+  filePath: string,
+  tableName: string,
+  model: { bulkCreate: Function; rawAttributes?: Record<string, unknown> },
+): Promise<{ importedCount: number; sanitizedDates: number }> {
+  const dateFields = getDateFields(model);
+  let importedCount = 0;
+  let sanitizedDates = 0;
+  let batch: Record<string, string | null>[] = [];
+  let nextProgressLogAt = INITIAL_PROGRESS_LOG_THRESHOLD;
+
+  const flushBatch = async (): Promise<void> => {
+    if (batch.length === 0) {
+      return;
+    }
+
+    sanitizedDates += sanitizeDateFields(batch, dateFields);
+    await model.bulkCreate(batch, { ignoreDuplicates: true });
+    importedCount += batch.length;
+    batch = [];
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const stream = fs.createReadStream(filePath).pipe(csvParser());
+
+    const handleError = (error: unknown): void => {
+      reject(error);
+    };
+
+    stream.on("data", (row) => {
+      stream.pause();
+      batch.push(row);
+
+      void (async () => {
+        try {
+          if (batch.length >= IMPORT_BATCH_SIZE) {
+            await flushBatch();
+            if (importedCount >= nextProgressLogAt) {
+              logger.info(
+                `Imported ${importedCount.toLocaleString("en-US")} records into ${tableName}`,
+              );
+              nextProgressLogAt =
+                nextProgressLogAt === INITIAL_PROGRESS_LOG_THRESHOLD
+                  ? LARGE_PROGRESS_LOG_INTERVAL
+                  : nextProgressLogAt + LARGE_PROGRESS_LOG_INTERVAL;
+            }
+          }
+          stream.resume();
+        } catch (error) {
+          stream.destroy(error as Error);
+        }
+      })();
+    });
+
+    stream.on("end", () => {
+      void (async () => {
+        try {
+          await flushBatch();
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      })();
+    });
+
+    stream.on("error", handleError);
+  });
+
+  return { importedCount, sanitizedDates };
+}
+
 export async function importZipFileToDatabase(
   zipFilePath: string,
 ): Promise<ImportZipResult> {
@@ -185,14 +260,15 @@ export async function importZipFileToDatabase(
         continue;
       }
 
-      const records = await readCsvFile(csvFile);
+      const { importedCount, sanitizedDates } = await importCsvFileInBatches(
+        csvFile,
+        tableName,
+        model,
+      );
 
-      if (records.length === 0) {
+      if (importedCount === 0) {
         continue;
       }
-
-      const dateFields = getDateFields(model);
-      const sanitizedDates = sanitizeDateFields(records, dateFields);
 
       if (sanitizedDates > 0) {
         logger.warn(
@@ -200,8 +276,7 @@ export async function importZipFileToDatabase(
         );
       }
 
-      await model.bulkCreate(records, { ignoreDuplicates: true });
-      totalRecords += records.length;
+      totalRecords += importedCount;
       if (!importedTables.includes(tableName)) {
         importedTables.push(tableName);
       }

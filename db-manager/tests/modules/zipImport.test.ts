@@ -324,6 +324,12 @@ describe("Zip import module", () => {
       zip.addFile("Article.csv", Buffer.from("id,title\n1,Article 1"));
       zip.writeZip(zipPath);
 
+      const tempDirsBefore = new Set(
+        fs
+          .readdirSync(os.tmpdir())
+          .filter((name) => name.startsWith("newsnexus-db-import-")),
+      );
+
       (db.Article.bulkCreate as jest.Mock).mockResolvedValue(null);
       (db.sequelize.query as jest.Mock).mockResolvedValue(null);
 
@@ -335,7 +341,8 @@ describe("Zip import module", () => {
         name.startsWith("newsnexus-db-import-"),
       );
 
-      expect(newsnexusTempDirs.length).toBe(0);
+      const newTempDirs = newsnexusTempDirs.filter((name) => !tempDirsBefore.has(name));
+      expect(newTempDirs).toEqual([]);
     });
 
     it("logs progress during import", async () => {
