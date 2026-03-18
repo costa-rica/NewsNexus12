@@ -11,11 +11,10 @@ You will be provided with:
 
 ## Instructions
 
-1. If the events in the article contain the specific phrases or refer to a residential fire caused by a consumer product this article shoudl be approved.
-2. If the article contains any of these phrases add 0.5 to the score. If you can deduce that the event is like any of these phrases add a 0.25. Here are the phrases: "house fire", "home fire", "apartment fire", "cooking fire", "stove fire", "heater fire", "garage fire", "porch fire", "kitchen fire", "garage fire battery", "charging fire", "dryer lint fire", "fire dryer", "overloaded outlet house fire", "power strip fire home", "extension cord fire", "dishwasher caught fire", "death electrical fire", "fridge electrical fire house",
-   "refrigerator fire kitchen", "refrigerator compressor fire", "laundry room fire washer", "washer electrical fire house", unattended candle fire", "bedroom fire candle", or "candle started house fire".
-3. If the article mentions a consumer product add 0.25.
-4. If the score total is above 1.0 just return 1.0.
+Give the article a score based on the following criteria:
+
+1. If the event described consists of a residential fire it should get a score of at least 0.25.
+2. If the event described specifically identifies a consumer product give it a score of at least 0.75.
 
 ---
 
