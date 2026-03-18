@@ -38,6 +38,42 @@ make test-fast
 make test-contract
 ```
 
+## AI Approver prompt setup
+
+The AI Approver flow can use prompt rows from `AiApproverPromptVersions` before the portal prompt-management page exists.
+
+Use the one-time setup script to insert a prompt row from a markdown file:
+
+```bash
+cd worker-python
+python3 src/standalone/setup_ai_approver_prompt.py --active
+```
+
+Default behavior:
+
+- loads environment variables from `worker-python/.env`
+- reads `PATH_DATABASE` and `NAME_DB`
+- reads `worker-python/docs/PROMPT_RESIDENTIAL_FIRE.md`
+- inserts a row into `AiApproverPromptVersions`
+- marks the row active when `--active` is provided
+
+Optional arguments:
+
+- `--prompt-file` to load a different markdown file
+- `--name` to override the prompt row name
+- `--description` to override the prompt row description
+
+Example:
+
+```bash
+cd worker-python
+python3 src/standalone/setup_ai_approver_prompt.py \
+  --prompt-file docs/PROMPT_RESIDENTIAL_FIRE.md \
+  --name "Residential Fire" \
+  --description "Initial AI approver prompt for residential fire scoring." \
+  --active
+```
+
 ## Endpoints currently implemented
 
 - `GET /`

@@ -1,3 +1,5 @@
+import { AiApproverArticleScore } from "./AiApproverArticleScore";
+import { AiApproverPromptVersion } from "./AiApproverPromptVersion";
 import { Article } from "./Article";
 import { ArticleApproved } from "./ArticleApproved";
 import { ArticleContent } from "./ArticleContent";
@@ -27,6 +29,14 @@ import { User } from "./User";
 import { WebsiteDomain } from "./WebsiteDomain";
 
 export function applyAssociations(): void {
+	// --- AI Approver associations ---
+	AiApproverPromptVersion.hasMany(AiApproverArticleScore, {
+		foreignKey: "promptVersionId",
+	});
+	AiApproverArticleScore.belongsTo(AiApproverPromptVersion, {
+		foreignKey: "promptVersionId",
+	});
+
 	// --- EntityWhoCategorizedArticle associations ---
 	EntityWhoCategorizedArticle.hasMany(ArticleKeywordContract, {
 		foreignKey: "entityWhoCategorizesId",
@@ -134,6 +144,9 @@ export function applyAssociations(): void {
 
 	Article.hasMany(ArticleStateContract02, { foreignKey: "articleId" });
 	ArticleStateContract02.belongsTo(Article, { foreignKey: "articleId" });
+
+	Article.hasMany(AiApproverArticleScore, { foreignKey: "articleId" });
+	AiApproverArticleScore.belongsTo(Article, { foreignKey: "articleId" });
 
 	// --- ArticleDuplicateAnalysis associations ---
 	Article.hasMany(ArticleDuplicateAnalysis, {

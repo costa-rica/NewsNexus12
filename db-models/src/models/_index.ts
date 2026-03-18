@@ -1,5 +1,13 @@
 import { sequelize } from "./_connection";
 
+import {
+	initAiApproverArticleScore,
+	AiApproverArticleScore,
+} from "./AiApproverArticleScore";
+import {
+	initAiApproverPromptVersion,
+	AiApproverPromptVersion,
+} from "./AiApproverPromptVersion";
 import { initArticle, Article } from "./Article";
 import { initArticleApproved, ArticleApproved } from "./ArticleApproved";
 import { initArticleContent, ArticleContent } from "./ArticleContent";
@@ -73,6 +81,8 @@ import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
 import { applyAssociations } from "./_associations";
 
 export function initModels() {
+	initAiApproverArticleScore();
+	initAiApproverPromptVersion();
 	initArticle();
 	initArticleApproved();
 	initArticleContent();
@@ -105,6 +115,8 @@ export function initModels() {
 
 	return {
 		sequelize,
+		AiApproverArticleScore,
+		AiApproverPromptVersion,
 		Article,
 		ArticleApproved,
 		ArticleContent,
@@ -137,6 +149,8 @@ export function initModels() {
 
 export {
 	sequelize,
+	AiApproverArticleScore,
+	AiApproverPromptVersion,
 	Article,
 	ArticleApproved,
 	ArticleContent,
