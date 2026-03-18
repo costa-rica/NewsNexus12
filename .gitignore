@@ -36,3 +36,6 @@ _logs/
 
 # IDE
 .vscode/
+
+# Claude Code
+.claude/
