@@ -166,24 +166,24 @@
 
 ## 8. phase 7 - portal prompt management page
 
-- [ ] Add a new portal page for AI approver prompt management.
-- [ ] Add a top form for prompt creation.
-- [ ] Show `id` as read-only when applicable.
-- [ ] Add inputs for `name`, `description`, `promptInMarkdown`, and `isActive`.
-- [ ] Show `endedAt` as visible but read-only.
-- [ ] Add a table below for `AiApproverPromptVersions` rows.
-- [ ] Add `Copy` action in the table.
-- [ ] Add `Delete` action in the table.
-- [ ] Ensure there is no direct edit flow for existing prompts.
-- [ ] Make `Copy` create a new prompt draft from an existing row.
-- [ ] Hard delete prompts only when no `AiApproverArticleScores` rows reference that `promptVersionId`.
-- [ ] Show blocked-delete feedback when score rows reference the prompt.
-- [ ] Refresh the table after create, copy, activate/deactivate, or delete actions.
-- [ ] Add portal navigation entry or route wiring for the prompt-management page as needed.
-- [ ] Add portal tests or lint verification for this phase.
-- [ ] Run relevant tests for this phase.
-- [ ] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 7.
+- [x] Add a new portal page for AI approver prompt management.
+- [x] Add a top form for prompt creation.
+- [x] Show `id` as read-only when applicable.
+- [x] Add inputs for `name`, `description`, `promptInMarkdown`, and `isActive`.
+- [x] Show `endedAt` as visible but read-only.
+- [x] Add a table below for `AiApproverPromptVersions` rows.
+- [x] Add `Copy` action in the table.
+- [x] Add `Delete` action in the table.
+- [x] Ensure there is no direct edit flow for existing prompts.
+- [x] Make `Copy` create a new prompt draft from an existing row.
+- [x] Hard delete prompts only when no `AiApproverArticleScores` rows reference that `promptVersionId`.
+- [x] Show blocked-delete feedback when score rows reference the prompt.
+- [x] Refresh the table after create, copy, activate/deactivate, or delete actions.
+- [x] Add portal navigation entry or route wiring for the prompt-management page as needed.
+- [x] Add portal tests or lint verification for this phase.
+- [x] Run relevant tests for this phase.
+- [x] If tests pass, check off completed tasks in this phase.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 7.
 
 ## 9. phase 8 - final verification and cleanup
 
