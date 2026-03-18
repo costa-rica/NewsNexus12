@@ -61,7 +61,7 @@
 - [x] Add API tests for create, copy, list, activate/deactivate, and guarded delete behavior.
 - [x] Run relevant tests for this phase.
 - [x] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 2.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 2.
 
 ## 4. phase 3 - worker-python OpenAI integration and AI approver workflow
 
@@ -98,7 +98,7 @@
 - [x] Add worker-python tests for filtering, prompt lookup, response handling, persistence behavior, and OpenAI configuration behavior.
 - [x] Run relevant tests for this phase.
 - [x] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 3.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 3.
 
 ## 5. phase 4 - API worker integration and score endpoints
 
@@ -120,23 +120,23 @@
 - [x] Add API tests for start, fetch details, human validation update, and top-score query behavior.
 - [x] Run relevant tests for this phase.
 - [x] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 4.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 4.
 
 ## 6. phase 5 - portal automations UI
 
-- [ ] Add an `AI Approver` section to `/articles/automations`.
-- [ ] Reuse the existing automation section/status patterns where possible.
-- [ ] Add input for article count.
-- [ ] Add checkbox, checked by default, for requiring AI state assignment.
-- [ ] Add state filter dropdown.
-- [ ] Implement multi-select behavior for the state filter.
-- [ ] Pass the selected filters in the request body to the API.
-- [ ] Add `Manage Agent Prompts` button.
-- [ ] Route the button to the new prompt-management page.
-- [ ] Show run/job status in the section.
-- [ ] Add portal tests or lint verification for this phase.
-- [ ] Run relevant tests for this phase.
-- [ ] If tests pass, check off completed tasks in this phase.
+- [x] Add an `AI Approver` section to `/articles/automations`.
+- [x] Reuse the existing automation section/status patterns where possible.
+- [x] Add input for article count.
+- [x] Add checkbox, checked by default, for requiring AI state assignment.
+- [x] Add state filter dropdown.
+- [x] Implement multi-select behavior for the state filter.
+- [x] Pass the selected filters in the request body to the API.
+- [x] Add `Manage Agent Prompts` button.
+- [x] Route the button to the new prompt-management page.
+- [x] Show run/job status in the section.
+- [x] Add portal tests or lint verification for this phase.
+- [x] Run relevant tests for this phase.
+- [x] If tests pass, check off completed tasks in this phase.
 - [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 5.
 
 ## 7. phase 6 - review table and modal

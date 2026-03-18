@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { ApprovedArticlesDuplicateAnalysisSection } from "@/components/automations/ApprovedArticlesDuplicateAnalysisSection";
+import { AiApproverSection } from "@/components/automations/AiApproverSection";
 import { ArticleRequestSpreadsheetsSection } from "@/components/automations/ArticleRequestSpreadsheetsSection";
 import { GoogleRssSection } from "@/components/automations/GoogleRssSection";
 import { LocationScorerSection } from "@/components/automations/LocationScorerSection";
@@ -18,6 +19,7 @@ export default function ManageAutomation() {
       <GoogleRssSection />
       <ScrapeArticleContentSection />
       <StateAssignerSection />
+      <AiApproverSection />
       <SemanticScorerSection />
       <LocationScorerSection />
       <ApprovedArticlesDuplicateAnalysisSection />
