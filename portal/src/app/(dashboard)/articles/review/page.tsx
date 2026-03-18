@@ -19,6 +19,19 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
 import ModalStateAssignerDetails from "@/components/ui/modal/ModalStateAssignerDetails";
+import ModalAiApproverDetails from "@/components/ui/modal/ModalAiApproverDetails";
+
+type AiApproverTopScoreMap = Record<
+	string,
+	{
+		id: number;
+		articleId: number;
+		promptVersionId: number;
+		score: number | null;
+		resultStatus: string;
+		promptName: string | null;
+	}
+>;
 
 export default function ReviewArticles() {
 	const dispatch = useAppDispatch();
@@ -26,6 +39,7 @@ export default function ReviewArticles() {
 	const [articlesArray, setArticlesArray] = useState<Article[]>([]);
 	const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 	const [stateAssignerArticleId, setStateAssignerArticleId] = useState<number | null>(null);
+	const [aiApproverArticleId, setAiApproverArticleId] = useState<number | null>(null);
 	const userReducer = useAppSelector((s) => s.user);
 	const [loadingComponents, setLoadingComponents] = useState({
 		table01: false,
@@ -245,6 +259,50 @@ export default function ReviewArticles() {
 		}
 	};
 
+	const mergeAiApproverTopScores = useCallback(
+		(articles: Article[], topScores: AiApproverTopScoreMap = {}) =>
+			articles.map((article) => {
+				const scoreRow = topScores[String(article.id)];
+				return {
+					...article,
+					aiApproverTopScore: scoreRow?.score ?? null,
+					aiApproverTopScoreId: scoreRow?.id ?? null,
+					aiApproverTopPromptVersionId: scoreRow?.promptVersionId ?? null,
+					aiApproverTopPromptName: scoreRow?.promptName ?? null,
+				};
+			}),
+		[]
+	);
+
+	const fetchAiApproverTopScores = useCallback(
+		async (articleIds: number[]) => {
+			if (!token || articleIds.length === 0) {
+				return {};
+			}
+
+			const response = await fetch(
+				`${process.env.NEXT_PUBLIC_API_BASE_URL}/analysis/ai-approver/top-scores`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${token}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({ articleIds }),
+				}
+			);
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(`Server Error: ${errorText}`);
+			}
+
+			const result = await response.json();
+			return (result.topScores || {}) as AiApproverTopScoreMap;
+		},
+		[token]
+	);
+
 	const fetchArticlesArray = async () => {
 		const bodyParams = {
 			...(userReducer.articleTableBodyParams || {
@@ -285,7 +343,9 @@ export default function ReviewArticles() {
 			console.log("Fetched Data:", result);
 
 			if (result.articlesArray && Array.isArray(result.articlesArray)) {
-				setArticlesArray(result.articlesArray);
+				const articleIds = result.articlesArray.map((article: Article) => article.id);
+				const topScores = await fetchAiApproverTopScores(articleIds);
+				setArticlesArray(mergeAiApproverTopScores(result.articlesArray, topScores));
 			} else {
 				setArticlesArray([]);
 			}
@@ -298,6 +358,20 @@ export default function ReviewArticles() {
 			table01: false,
 		}));
 	};
+
+	const handleAiApproverArticleUpdate = useCallback(
+		async (articleId: number) => {
+			try {
+				const topScores = await fetchAiApproverTopScores([articleId]);
+				setArticlesArray((prevArray) =>
+					mergeAiApproverTopScores(prevArray, topScores)
+				);
+			} catch (error) {
+				console.error("Error refreshing AI approver top score:", error);
+			}
+		},
+		[fetchAiApproverTopScores, mergeAiApproverTopScores]
+	);
 
 	const updateStateArrayWithArticleState = useCallback(
 		(article: Article) => {
@@ -802,6 +876,7 @@ export default function ReviewArticles() {
 				onToggleReviewed={handleClickIsReviewed}
 				onToggleRelevant={handleClickIsRelevant}
 				onStateAssignmentClick={setStateAssignerArticleId}
+				onAiApproverClick={setAiApproverArticleId}
 			/>
 
 			{/* Alert Modal */}
@@ -825,6 +900,14 @@ export default function ReviewArticles() {
 					onClose={() => setStateAssignerArticleId(null)}
 					onArticleUpdate={handleStateAssignerArticleUpdate}
 					showFullDetails={false}
+				/>
+			)}
+
+			{aiApproverArticleId && (
+				<ModalAiApproverDetails
+					articleId={aiApproverArticleId}
+					onClose={() => setAiApproverArticleId(null)}
+					onScoresUpdated={handleAiApproverArticleUpdate}
 				/>
 			)}
 		</div>

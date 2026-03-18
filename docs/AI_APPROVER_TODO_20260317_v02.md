@@ -137,32 +137,32 @@
 - [x] Add portal tests or lint verification for this phase.
 - [x] Run relevant tests for this phase.
 - [x] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 5.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 5.
 
 ## 7. phase 6 - review table and modal
 
-- [ ] Add a new AI approver score column to the `/articles/review` table.
-- [ ] Display the highest non-rejected AI approver score for each article.
-- [ ] Show `N/A` or blank with no link when an article has no AI approver scores.
-- [ ] Render the score as a clickable circle using the Nexus Semantic Rating color style.
-- [ ] Add modal entry behavior when the score is clicked.
-- [ ] Create a modal using the existing modal structure in `portal/src/components/ui/modal`.
-- [ ] Fetch AI approver score rows for the selected `articleId` when the modal opens.
-- [ ] Show all score rows and reasons in score order.
-- [ ] Make each prompt name clickable to reveal the prompt text.
-- [ ] Add human validation controls for the current highest non-rejected score row.
-- [ ] Ensure human validation controls do not appear for lower-ranked rows while a higher non-rejected row exists.
-- [ ] Support `approve`, `reject`, and `undetermined`.
-- [ ] Show rejection text input only when `reject` is selected.
-- [ ] Add `Validate Human Approval Status` action.
-- [ ] Submit validation changes to the API.
-- [ ] Refresh modal data after validation.
-- [ ] Ensure that rejecting the current top row promotes the next highest non-rejected row in the table and modal.
-- [ ] Ensure the UI makes clear that score acceptance is not final article approval.
-- [ ] Add portal tests or lint verification for this phase.
-- [ ] Run relevant tests for this phase.
-- [ ] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 6.
+- [x] Add a new AI approver score column to the `/articles/review` table.
+- [x] Display the highest non-rejected AI approver score for each article.
+- [x] Show `N/A` or blank with no link when an article has no AI approver scores.
+- [x] Render the score as a clickable circle using the Nexus Semantic Rating color style.
+- [x] Add modal entry behavior when the score is clicked.
+- [x] Create a modal using the existing modal structure in `portal/src/components/ui/modal`.
+- [x] Fetch AI approver score rows for the selected `articleId` when the modal opens.
+- [x] Show all score rows and reasons in score order.
+- [x] Make each prompt name clickable to reveal the prompt text.
+- [x] Add human validation controls for the current highest non-rejected score row.
+- [x] Ensure human validation controls do not appear for lower-ranked rows while a higher non-rejected row exists.
+- [x] Support `approve`, `reject`, and `undetermined`.
+- [x] Show rejection text input only when `reject` is selected.
+- [x] Add `Validate Human Approval Status` action.
+- [x] Submit validation changes to the API.
+- [x] Refresh modal data after validation.
+- [x] Ensure that rejecting the current top row promotes the next highest non-rejected row in the table and modal.
+- [x] Ensure the UI makes clear that score acceptance is not final article approval.
+- [x] Add portal tests or lint verification for this phase.
+- [x] Run relevant tests for this phase.
+- [x] If tests pass, check off completed tasks in this phase.
+- [x] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 6.
 
 ## 8. phase 7 - portal prompt management page
 

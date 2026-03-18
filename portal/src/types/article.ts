@@ -27,7 +27,43 @@ export interface Article {
 	nameOfOrg?: string;
 	semanticRatingMax?: number | string;
 	locationClassifierScore?: number | string;
+	aiApproverTopScore?: number | null;
+	aiApproverTopScoreId?: number | null;
+	aiApproverTopPromptVersionId?: number | null;
+	aiApproverTopPromptName?: string | null;
 	stateAssignment?: StateAssignment | null;
+}
+
+export interface AiApproverPromptVersion {
+	id: number;
+	name: string;
+	description: string | null;
+	promptInMarkdown: string;
+	isActive: boolean;
+	endedAt: string | null;
+}
+
+export interface AiApproverScoreRow {
+	id: number;
+	articleId: number;
+	promptVersionId: number;
+	resultStatus: "completed" | "failed" | "invalid_response" | string;
+	score: number | null;
+	reason: string | null;
+	errorCode: string | null;
+	errorMessage: string | null;
+	isHumanApproved: boolean | null;
+	reasonHumanRejected: string | null;
+	createdAt: string;
+	updatedAt: string;
+	promptVersion: AiApproverPromptVersion | null;
+}
+
+export interface AiApproverArticleDetailsResponse {
+	result: boolean;
+	articleId: number;
+	topEligibleScoreId: number | null;
+	scores: AiApproverScoreRow[];
 }
 
 // Article Report Contract (junction table between articles and reports)

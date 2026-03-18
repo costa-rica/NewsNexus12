@@ -35,6 +35,7 @@ interface TableReviewArticlesProps {
 	onToggleRelevant?: (articleId: number) => void;
 	onDeleteArticle?: (article: Article) => void;
 	onStateAssignmentClick?: (articleId: number) => void;
+	onAiApproverClick?: (articleId: number) => void;
 }
 
 const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
@@ -49,6 +50,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	onToggleRelevant,
 	onDeleteArticle,
 	onStateAssignmentClick,
+	onAiApproverClick,
 }) => {
 	const [pagination, setPagination] = useState<PaginationState>({
 		pageIndex: 0,
@@ -287,6 +289,44 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 						}
 					),
 					columnHelper.accessor(
+						(row) => {
+							const value = row.aiApproverTopScore;
+							if (value === null || value === undefined) {
+								return undefined;
+							}
+							return Number(value);
+						},
+						{
+							id: "aiApproverTopScore",
+							header: "AI Approver",
+							enableSorting: true,
+							sortUndefined: "last",
+							sortingFn: "basic",
+							cell: ({ row, getValue }) => {
+								const value = getValue();
+								if (value === undefined || value === null) {
+									return <div className="text-center text-xs text-gray-400">N/A</div>;
+								}
+								const normalized = Math.max(0, Math.min(1, Number(value)));
+								const green = Math.floor(normalized * 200);
+								const color = `rgb(${128 - green / 3}, ${green}, ${128 - green / 3})`;
+								const percent = Math.round(normalized * 100);
+								return (
+									<div className="flex justify-center">
+										<button
+											type="button"
+											onClick={() => onAiApproverClick?.(row.original.id)}
+											className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition-transform hover:scale-105"
+											style={{ backgroundColor: color }}
+										>
+											{percent}%
+										</button>
+									</div>
+								);
+							},
+						}
+					),
+					columnHelper.accessor(
 						(row) => row.stateAssignment?.stateName ?? undefined,
 						{
 							id: "stateAssignmentStateName",
@@ -321,6 +361,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			onToggleRelevant,
 			onDeleteArticle,
 			onStateAssignmentClick,
+			onAiApproverClick,
 			showReviewedColumn,
 			showRelevantColumn,
 			showDeleteColumn,
