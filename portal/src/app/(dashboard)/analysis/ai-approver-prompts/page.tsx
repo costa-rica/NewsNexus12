@@ -6,6 +6,7 @@ import TextArea from "@/components/form/input/TextArea";
 import { LoadingDots } from "@/components/common/LoadingDots";
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
+import { ModalInformationYesOrNo } from "@/components/ui/modal/ModalInformationYesOrNo";
 import { useAppSelector } from "@/store/hooks";
 import type { AiApproverPromptVersion } from "@/types/article";
 
@@ -28,6 +29,11 @@ type DeleteTargetState = {
 	name: string;
 } | null;
 
+type SourcePromptState = {
+	id: number;
+	name: string;
+} | null;
+
 export default function AiApproverPromptsPage() {
 	const { token } = useAppSelector((state) => state.user);
 	const [prompts, setPrompts] = useState<AiApproverPromptVersion[]>([]);
@@ -43,6 +49,18 @@ export default function AiApproverPromptsPage() {
 		DEFAULT_FEEDBACK_MODAL_STATE
 	);
 	const [deleteTarget, setDeleteTarget] = useState<DeleteTargetState>(null);
+	const [sourcePrompt, setSourcePrompt] = useState<SourcePromptState>(null);
+	const [showCopyConfirmModal, setShowCopyConfirmModal] = useState(false);
+
+	const clearCreateForm = useCallback(() => {
+		setCreateForm({
+			name: "",
+			description: "",
+			promptInMarkdown: "",
+			isActive: false,
+		});
+		setSourcePrompt(null);
+	}, []);
 
 	const fetchPrompts = useCallback(async () => {
 		if (!token) {
@@ -116,17 +134,14 @@ export default function AiApproverPromptsPage() {
 				throw new Error(errorText || "Failed to create AI approver prompt");
 			}
 
-			setCreateForm({
-				name: "",
-				description: "",
-				promptInMarkdown: "",
-				isActive: false,
-			});
+			clearCreateForm();
 			await fetchPrompts();
 			setFeedbackModal({
 				show: true,
-				title: "Prompt Created",
-				message: "The AI approver prompt was created successfully.",
+				title: sourcePrompt ? "Prompt Copy Created" : "Prompt Created",
+				message: sourcePrompt
+					? "A new prompt row was created from the selected prompt."
+					: "The AI approver prompt was created successfully.",
 				variant: "success",
 			});
 		} catch (error) {
@@ -144,48 +159,17 @@ export default function AiApproverPromptsPage() {
 		}
 	};
 
-	const handleCopyPrompt = async (promptVersionId: number) => {
-		if (!token) {
-			return;
-		}
-
-		try {
-			setIsSubmitting(true);
-			const response = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/analysis/ai-approver/prompts/${promptVersionId}/copy`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			);
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(errorText || "Failed to copy AI approver prompt");
-			}
-
-			await fetchPrompts();
-			setFeedbackModal({
-				show: true,
-				title: "Prompt Copied",
-				message: "A new prompt row was created from the selected prompt.",
-				variant: "success",
-			});
-		} catch (error) {
-			setFeedbackModal({
-				show: true,
-				title: "Error",
-				message:
-					error instanceof Error
-						? error.message
-						: "Failed to copy AI approver prompt",
-				variant: "error",
-			});
-		} finally {
-			setIsSubmitting(false);
-		}
+	const handleSelectPrompt = (prompt: AiApproverPromptVersion) => {
+		setSourcePrompt({
+			id: prompt.id,
+			name: prompt.name,
+		});
+		setCreateForm({
+			name: prompt.name,
+			description: prompt.description || "",
+			promptInMarkdown: prompt.promptInMarkdown,
+			isActive: prompt.isActive,
+		});
 	};
 
 	const handleToggleActive = async (
@@ -315,8 +299,8 @@ export default function AiApproverPromptsPage() {
 						Create Prompt
 					</h2>
 					<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-						Prompt rows are immutable after creation. Use Copy to create a new
-						version from an existing prompt.
+						Prompt rows are immutable after creation. Click a prompt row ID
+						below to load its values into this form and create a new copy.
 					</p>
 				</div>
 
@@ -328,7 +312,11 @@ export default function AiApproverPromptsPage() {
 							</label>
 							<Input
 								type="text"
-								value="Created automatically"
+								value={
+									sourcePrompt
+										? `New ID will be created from source prompt ${sourcePrompt.id}`
+										: "Created automatically"
+								}
 								disabled
 							/>
 						</div>
@@ -415,18 +403,40 @@ export default function AiApproverPromptsPage() {
 							Set active immediately
 						</label>
 
-						<button
-							type="button"
-							onClick={() => void handleCreatePrompt()}
-							disabled={
-								isSubmitting ||
-								createForm.name.trim().length === 0 ||
-								createForm.promptInMarkdown.trim().length === 0
-							}
-							className="rounded-lg bg-brand-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
-						>
-							{isSubmitting ? "Creating..." : "Create Prompt"}
-						</button>
+						<div className="flex flex-wrap gap-3">
+							{sourcePrompt && (
+								<button
+									type="button"
+									onClick={clearCreateForm}
+									disabled={isSubmitting}
+									className="rounded-lg border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+								>
+									Clear
+								</button>
+							)}
+							<button
+								type="button"
+								onClick={() => {
+									if (sourcePrompt) {
+										setShowCopyConfirmModal(true);
+										return;
+									}
+									void handleCreatePrompt();
+								}}
+								disabled={
+									isSubmitting ||
+									createForm.name.trim().length === 0 ||
+									createForm.promptInMarkdown.trim().length === 0
+								}
+								className="rounded-lg bg-brand-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
+							>
+								{isSubmitting
+									? "Creating..."
+									: sourcePrompt
+										? "Copy and Create New Prompt"
+										: "Create Prompt"}
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -438,8 +448,8 @@ export default function AiApproverPromptsPage() {
 							Prompt Rows
 						</h2>
 						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-							Use Copy to create a new prompt version. Existing prompt rows are
-							view-only.
+							Click a prompt ID to load its values into the form above. Existing
+							prompt rows are view-only.
 						</p>
 					</div>
 
@@ -468,7 +478,6 @@ export default function AiApproverPromptsPage() {
 										"ID",
 										"Name",
 										"Description",
-										"Prompt",
 										"Active",
 										"Ended At",
 										"Actions",
@@ -484,20 +493,28 @@ export default function AiApproverPromptsPage() {
 							</thead>
 							<tbody className="divide-y divide-gray-200 dark:divide-gray-800">
 								{prompts.map((prompt) => (
-									<tr key={prompt.id}>
+									<tr
+										key={prompt.id}
+										className={
+											sourcePrompt?.id === prompt.id
+												? "bg-brand-50 dark:bg-brand-900/10"
+												: ""
+										}
+									>
 										<td className="px-4 py-4 text-sm text-gray-800 dark:text-gray-200">
-											{prompt.id}
+											<button
+												type="button"
+												onClick={() => handleSelectPrompt(prompt)}
+												className="font-medium text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
+											>
+												{prompt.id}
+											</button>
 										</td>
 										<td className="px-4 py-4 text-sm text-gray-800 dark:text-gray-200">
 											<div className="font-medium">{prompt.name}</div>
 										</td>
 										<td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
 											{prompt.description || "N/A"}
-										</td>
-										<td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-											<pre className="max-w-xl whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-xs dark:bg-gray-900/50">
-												{prompt.promptInMarkdown}
-											</pre>
 										</td>
 										<td className="px-4 py-4 text-sm">
 											<span
@@ -517,14 +534,6 @@ export default function AiApproverPromptsPage() {
 										</td>
 										<td className="px-4 py-4">
 											<div className="flex flex-wrap gap-2">
-												<button
-													type="button"
-													onClick={() => void handleCopyPrompt(prompt.id)}
-													disabled={isSubmitting}
-													className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-												>
-													Copy
-												</button>
 												<button
 													type="button"
 													onClick={() =>
@@ -567,6 +576,22 @@ export default function AiApproverPromptsPage() {
 					message={feedbackModal.message}
 					variant={feedbackModal.variant}
 					onClose={() => setFeedbackModal(DEFAULT_FEEDBACK_MODAL_STATE)}
+				/>
+			</Modal>
+
+			<Modal
+				isOpen={showCopyConfirmModal}
+				onClose={() => setShowCopyConfirmModal(false)}
+				className="max-w-xl"
+			>
+				<ModalInformationYesOrNo
+					title="Copy and Create New Prompt?"
+					message={`A new prompt row will be created from source prompt ${sourcePrompt?.id ?? ""}. Make sure you give it a new name and description before continuing. A new ID will be created for the copied prompt.`}
+					onYes={() => void handleCreatePrompt()}
+					onClose={() => setShowCopyConfirmModal(false)}
+					yesButtonText="Yes, Create Copy"
+					noButtonText="Cancel"
+					yesButtonStyle="primary"
 				/>
 			</Modal>
 
