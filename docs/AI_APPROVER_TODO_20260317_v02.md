@@ -65,39 +65,39 @@
 
 ## 4. phase 3 - worker-python OpenAI integration and AI approver workflow
 
-- [ ] Add the required OpenAI dependency to `worker-python/requirements.txt`.
-- [ ] Add `OPENAI_API_KEY` to worker-python environment requirements.
-- [ ] Add startup/config validation for `OPENAI_API_KEY`.
-- [ ] Add a thin OpenAI client wrapper or shared request utility for the AI approver flow.
-- [ ] Add a new generic `ai_approver` workflow module in `worker-python/src/modules/`.
-- [ ] Add a worker-python route for the AI approver flow.
-- [ ] Reuse the shared queue and job-status patterns.
-- [ ] Use a queue-based `start-job` route pattern.
-- [ ] Add repository queries to load active rows from `AiApproverPromptVersions`.
-- [ ] Add repository queries to select eligible articles.
-- [ ] Add filtering logic for:
+- [x] Add the required OpenAI dependency to `worker-python/requirements.txt`.
+- [x] Add `OPENAI_API_KEY` to worker-python environment requirements.
+- [x] Add startup/config validation for `OPENAI_API_KEY`.
+- [x] Add a thin OpenAI client wrapper or shared request utility for the AI approver flow.
+- [x] Add a new generic `ai_approver` workflow module in `worker-python/src/modules/`.
+- [x] Add a worker-python route for the AI approver flow.
+- [x] Reuse the shared queue and job-status patterns.
+- [x] Use a queue-based `start-job` route pattern.
+- [x] Add repository queries to load active rows from `AiApproverPromptVersions`.
+- [x] Add repository queries to select eligible articles.
+- [x] Add filtering logic for:
   - article count limit
   - require AI state assignment flag
   - optional `stateIds: number[]` filter from the request body
   - skip any article that already has at least one row in `AiApproverArticleScores`
-- [ ] Filter by `stateId` values from `ArticleStateContract02` when `stateIds` are provided.
-- [ ] Load article content using the existing pattern:
+- [x] Filter by `stateId` values from `ArticleStateContract02` when `stateIds` are provided.
+- [x] Load article content using the existing pattern:
   - prefer `ArticleContents`
   - fall back to article description if needed
-- [ ] Use `gpt-4o-mini` for v1 AI approver calls.
-- [ ] Send all active prompt versions through the inner loop for each eligible article.
-- [ ] Run prompt-version executions sequentially per article.
-- [ ] Require structured JSON responses.
-- [ ] Persist each score row immediately after each prompt-version response is processed.
-- [ ] Persist valid responses as `completed`.
-- [ ] Persist invalid JSON responses as `invalid_response`.
-- [ ] Persist provider or execution failures as `failed`.
-- [ ] Ensure invalid and failed attempts still create score rows.
-- [ ] Capture usage data from OpenAI responses when available.
-- [ ] Include enough job/result data for portal polling and troubleshooting.
-- [ ] Add worker-python tests for filtering, prompt lookup, response handling, persistence behavior, and OpenAI configuration behavior.
-- [ ] Run relevant tests for this phase.
-- [ ] If tests pass, check off completed tasks in this phase.
+- [x] Use `gpt-4o-mini` for v1 AI approver calls.
+- [x] Send all active prompt versions through the inner loop for each eligible article.
+- [x] Run prompt-version executions sequentially per article.
+- [x] Require structured JSON responses.
+- [x] Persist each score row immediately after each prompt-version response is processed.
+- [x] Persist valid responses as `completed`.
+- [x] Persist invalid JSON responses as `invalid_response`.
+- [x] Persist provider or execution failures as `failed`.
+- [x] Ensure invalid and failed attempts still create score rows.
+- [x] Capture usage data from OpenAI responses when available.
+- [x] Include enough job/result data for portal polling and troubleshooting.
+- [x] Add worker-python tests for filtering, prompt lookup, response handling, persistence behavior, and OpenAI configuration behavior.
+- [x] Run relevant tests for this phase.
+- [x] If tests pass, check off completed tasks in this phase.
 - [ ] Commit with a message that references `docs/AI_APPROVER_TODO_20260317_v02.md` and phase 3.
 
 ## 5. phase 4 - API worker integration and score endpoints

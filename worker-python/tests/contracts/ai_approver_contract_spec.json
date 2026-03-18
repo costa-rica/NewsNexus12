@@ -1,0 +1,10 @@
+{
+  "endpoints": [
+    {
+      "path": "/ai-approver/start-job",
+      "method": "POST",
+      "expected_status": 202,
+      "required_json_keys": ["jobId", "status", "endpointName"]
+    }
+  ]
+}

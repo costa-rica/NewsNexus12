@@ -9,6 +9,7 @@ os.environ.setdefault("NAME_APP", "worker-python-tests")
 os.environ.setdefault("RUN_ENVIRONMENT", "testing")
 os.environ.setdefault("PATH_TO_LOGS", "/tmp")
 os.environ.setdefault("PATH_UTILTIES", "/tmp")
+os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 os.environ.setdefault(
     "NAME_AI_ENTITY_LOCATION_SCORER",
     "NewsNexusClassifierLocationScorer01",
