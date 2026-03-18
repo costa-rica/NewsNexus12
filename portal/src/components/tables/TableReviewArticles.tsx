@@ -10,6 +10,7 @@ import {
 	createColumnHelper,
 	SortingState,
 	PaginationState,
+	VisibilityState,
 } from "@tanstack/react-table";
 import Link from "next/link";
 import type { Article } from "@/types/article";
@@ -58,7 +59,9 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	});
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [globalFilter, setGlobalFilter] = useState("");
-	const [columnVisibility, setColumnVisibility] = useState({});
+	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+		locationClassifierScore: false,
+	});
 
 	const columns = useMemo(
 		() => {
