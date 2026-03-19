@@ -196,15 +196,21 @@ Current implementation details:
 
 `worker-node` uses `@newsnexus/db-models` directly. This means workflow code is tightly coupled to the shared SQLite-backed Sequelize model package and should respect that package’s initialization patterns.
 
-1. DB initialization
+1. Database location is environment-driven
+- Do not assume the live database is stored inside the `worker-node/` repo folder.
+- The actual SQLite file location is resolved from environment variables, primarily `PATH_DATABASE` and `NAME_DB`.
+- A repo-local file such as `worker-node/database.sqlite` may exist, but it is not a reliable indicator of the database currently used by the running service.
+- When investigating live data issues, confirm the resolved database path from the active environment before drawing conclusions from any local SQLite file.
+
+2. DB initialization
 - Use `src/modules/db/ensureDbReady.ts` when a workflow needs models ready.
 - Avoid scattering ad hoc `initModels()` and `sequelize.sync()` calls through unrelated files.
 
-2. Model usage
+3. Model usage
 - Keep direct model reads and writes inside workflow modules and repositories/helpers.
 - Prefer explicit behavior over “magic” convenience calls.
 
-3. Article content caveat
+4. Article content caveat
 - `ArticleContents` may contain duplicate rows for one `articleId`.
 - Do not assume a schema-level uniqueness guarantee unless future schema work adds it.
 - Use the canonical-row helper logic already present in `src/modules/article-content/repository.ts`.
