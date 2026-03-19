@@ -71,12 +71,12 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 					header: "ID",
 					enableSorting: true,
 					cell: ({ row }) => (
-						<button
+						<span
 							onClick={() => onSelectArticle?.(row.original)}
-							className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+							className="cursor-pointer select-text text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
 						>
 							{row.original.id}
-						</button>
+						</span>
 					),
 				}),
 			];
