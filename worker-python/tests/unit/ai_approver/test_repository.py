@@ -21,6 +21,16 @@ def _create_repo(tmp_path) -> AiApproverRepository:
             articleId INTEGER,
             content TEXT
         );
+        CREATE TABLE ArticleIsRelevants (
+            id INTEGER PRIMARY KEY,
+            articleId INTEGER,
+            isRelevant INTEGER
+        );
+        CREATE TABLE ArticleApproveds (
+            id INTEGER PRIMARY KEY,
+            articleId INTEGER,
+            isApproved INTEGER
+        );
         CREATE TABLE ArticleStateContracts02 (
             id INTEGER PRIMARY KEY,
             articleId INTEGER,
@@ -58,6 +68,8 @@ def _create_repo(tmp_path) -> AiApproverRepository:
             (1, "A1", "D1"),
             (2, "A2", "D2"),
             (3, "A3", "D3"),
+            (4, "A4", "D4"),
+            (5, "A5", "D5"),
         ],
     )
     conn.executemany(
@@ -65,11 +77,19 @@ def _create_repo(tmp_path) -> AiApproverRepository:
         [(1, 1, "C1"), (2, 2, "C2")],
     )
     conn.executemany(
+        "INSERT INTO ArticleIsRelevants(id, articleId, isRelevant) VALUES (?, ?, ?)",
+        [(1, 3, 0)],
+    )
+    conn.executemany(
+        "INSERT INTO ArticleApproveds(id, articleId, isApproved) VALUES (?, ?, ?)",
+        [(1, 4, 1), (2, 5, 0)],
+    )
+    conn.executemany(
         """
         INSERT INTO ArticleStateContracts02(id, articleId, stateId, isDeterminedToBeError)
         VALUES (?, ?, ?, ?)
         """,
-        [(1, 1, 5, 0), (2, 2, 7, 0), (3, 3, None, 0)],
+        [(1, 1, 5, 0), (2, 2, 7, 0), (3, 3, None, 0), (4, 4, 5, 0)],
     )
     conn.executemany(
         """
@@ -125,3 +145,17 @@ def test_get_eligible_articles_filters_by_existing_scores_and_state(tmp_path) ->
 
     assert [row["id"] for row in rows] == [1]
     assert rows[0]["content"] == "C1"
+
+
+def test_get_eligible_articles_excludes_not_relevant_and_any_human_decision(tmp_path) -> None:
+    repo = _create_repo(tmp_path)
+    try:
+        rows = repo.get_eligible_articles(
+            limit=10,
+            require_state_assignment=False,
+            state_ids=None,
+        )
+    finally:
+        repo.close()
+
+    assert [row["id"] for row in rows] == [1]

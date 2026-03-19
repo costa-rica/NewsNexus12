@@ -54,7 +54,24 @@ class AiApproverRepository:
     ) -> list[dict[str, Any]]:
         conn = self.get_connection()
 
-        filters = ["NOT EXISTS (SELECT 1 FROM AiApproverArticleScores aas WHERE aas.articleId = a.id)"]
+        filters = [
+            "NOT EXISTS (SELECT 1 FROM AiApproverArticleScores aas WHERE aas.articleId = a.id)",
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM ArticleIsRelevants air
+                WHERE air.articleId = a.id
+                  AND air.isRelevant = 0
+            )
+            """,
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM ArticleApproveds aa
+                WHERE aa.articleId = a.id
+            )
+            """,
+        ]
         params: list[Any] = []
 
         if require_state_assignment:
