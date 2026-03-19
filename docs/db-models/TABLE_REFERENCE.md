@@ -29,7 +29,7 @@ Database table reference for NewsNexus11 (SQLite via Sequelize ORM).
 - belongsTo EntityWhoFoundArticle (via `entityWhoFoundArticleId`)
 - belongsTo NewsApiRequest (via `newsApiRequestId`)
 - belongsTo NewsRssRequest (via `newsRssRequestId`)
-- hasMany ArticleContent, ArticleApproved, ArticlesApproved02, ArticleReviewed, ArticleIsRelevant, ArticleDuplicateAnalysis, ArticleStateContract, ArticleStateContract02, ArticleKeywordContract, ArticleReportContract, ArticleEntityWhoCategorizedArticleContract, ArticleEntityWhoCategorizedArticleContracts02
+- hasMany ArticleContent, ArticleApproved, ArticlesApproved02, ArticleReviewed, ArticleIsRelevant, ArticleDuplicateAnalysis, ArticleStateContract, ArticleStateContract02, ArticleKeywordContract, ArticleReportContract, ArticleEntityWhoCategorizedArticleContract, ArticleEntityWhoCategorizedArticleContracts02, AiApproverArticleScore
 - belongsToMany State (through ArticleStateContract)
 
 ---
@@ -160,6 +160,59 @@ Database table reference for NewsNexus11 (SQLite via Sequelize ORM).
 
 - belongsTo User (via `userId`)
 - belongsTo Article (via `articleId`)
+
+---
+
+### AiApproverArticleScore
+
+- **Table name**: `AiApproverArticleScores`
+
+| Column              | Type    | Constraints                          | Notes                                                        |
+| ------------------- | ------- | ------------------------------------ | ------------------------------------------------------------ |
+| id                  | INTEGER | PK, Auto Increment                   |                                                              |
+| articleId           | INTEGER | FK, NOT NULL                         | → Articles.id                                                |
+| promptVersionId     | INTEGER | FK, NOT NULL                         | → AiApproverPromptVersions.id                                |
+| resultStatus        | STRING  | NOT NULL                             | Processing outcome, commonly `completed`, `invalid_response`, or `failed` |
+| score               | FLOAT   | NULL                                 | AI approver score when available                             |
+| reason              | TEXT    | NULL                                 | Rationale returned by the AI approver                        |
+| errorCode           | STRING  | NULL                                 | Provider or workflow error code                              |
+| errorMessage        | TEXT    | NULL                                 | Provider or workflow error detail                            |
+| isHumanApproved     | BOOLEAN | NULL, DEFAULT null                   | Human validation state: approved, rejected, or undetermined  |
+| reasonHumanRejected | TEXT    | NULL                                 | Required by API flow when a human rejects a score            |
+| jobId               | STRING  | NULL                                 | Queue/job identifier for tracing workflow runs               |
+
+**Indexes**:
+
+- Unique composite index on (`articleId`, `promptVersionId`)
+- Non-unique indexes on `articleId`, `promptVersionId`, and `resultStatus`
+
+**Relationships**:
+
+- belongsTo Article (via `articleId`)
+- belongsTo AiApproverPromptVersion (via `promptVersionId`)
+
+---
+
+### AiApproverPromptVersion
+
+- **Table name**: `AiApproverPromptVersions`
+
+| Column           | Type    | Constraints                | Notes                                           |
+| ---------------- | ------- | -------------------------- | ----------------------------------------------- |
+| id               | INTEGER | PK, Auto Increment         |                                                 |
+| name             | STRING  | NOT NULL                   | Human-readable prompt version name              |
+| description      | TEXT    | NULL                       | Optional summary of what changed in the prompt  |
+| promptInMarkdown | TEXT    | NOT NULL                   | Full prompt body stored in Markdown             |
+| isActive         | BOOLEAN | NOT NULL, DEFAULT false    | Used to mark active prompt versions             |
+| endedAt          | DATE    | NULL                       | Set by the API when a prompt version is ended   |
+
+**Indexes**:
+
+- Non-unique indexes on `isActive` and `name`
+
+**Relationships**:
+
+- hasMany AiApproverArticleScore (via `promptVersionId`)
 
 ---
 
