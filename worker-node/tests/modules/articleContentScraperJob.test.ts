@@ -18,7 +18,8 @@ describe('article content scraper job handler', () => {
     const handler = createArticleContentScraperJobHandler(
       {
         targetArticleThresholdDaysOld: 15,
-        targetArticleStateReviewCount: 25
+        targetArticleStateReviewCount: 25,
+        includeArticlesThatMightHaveBeenStateAssigned: true
       },
       {
         ensureDb: jest.fn().mockResolvedValue(undefined),
@@ -36,7 +37,8 @@ describe('article content scraper job handler', () => {
 
     expect(selectArticles).toHaveBeenCalledWith({
       targetArticleThresholdDaysOld: 15,
-      targetArticleStateReviewCount: 25
+      targetArticleStateReviewCount: 25,
+      includeArticlesThatMightHaveBeenStateAssigned: true
     });
     expect(enrichContent).toHaveBeenCalledWith({
       articles: [],
@@ -69,7 +71,8 @@ describe('article content scraper job handler', () => {
           jobId: 'job-9',
           signal: new AbortController().signal,
           targetArticleThresholdDaysOld: 30,
-          targetArticleStateReviewCount: 50
+          targetArticleStateReviewCount: 50,
+          includeArticlesThatMightHaveBeenStateAssigned: false
         },
         {
           ensureDb: jest.fn().mockResolvedValue(undefined),

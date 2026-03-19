@@ -13,6 +13,7 @@ const buildApp = (
   buildJobHandler?: (input: {
     targetArticleThresholdDaysOld: number;
     targetArticleStateReviewCount: number;
+    includeArticlesThatMightHaveBeenStateAssigned?: boolean;
   }) => (context: QueueExecutionContext) => Promise<void>
 ): express.Express => {
   const app = express();
@@ -82,7 +83,8 @@ describe('articleContentScraper routes', () => {
 
     const response = await request(app).post('/article-content-scraper/start-job').send({
       targetArticleThresholdDaysOld: 180,
-      targetArticleStateReviewCount: 100
+      targetArticleStateReviewCount: 100,
+      includeArticlesThatMightHaveBeenStateAssigned: true
     });
 
     expect(response.status).toBe(202);
@@ -94,14 +96,21 @@ describe('articleContentScraper routes', () => {
   });
 
   it('allows the queued job to complete successfully in the happy path test', async () => {
-    const app = buildApp(queueEngine, () => async () => undefined);
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(queueEngine, buildJobHandler);
 
     const response = await request(app).post('/article-content-scraper/start-job').send({
       targetArticleThresholdDaysOld: 180,
-      targetArticleStateReviewCount: 100
+      targetArticleStateReviewCount: 100,
+      includeArticlesThatMightHaveBeenStateAssigned: true
     });
 
     expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith({
+      targetArticleThresholdDaysOld: 180,
+      targetArticleStateReviewCount: 100,
+      includeArticlesThatMightHaveBeenStateAssigned: true
+    });
 
     await queueEngine.onIdle();
     const queuedJob = await queueStore.getJobById('job-1');

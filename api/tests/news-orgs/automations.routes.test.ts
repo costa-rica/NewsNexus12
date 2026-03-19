@@ -201,6 +201,7 @@ describe("news org automations routes", () => {
     const response = await request(app)
       .post("/automations/article-content-scraper/start-job")
       .send({
+        includeArticlesThatMightHaveBeenStateAssigned: true,
         targetArticleStateReviewCount: 100,
         targetArticleThresholdDaysOld: 180,
       });
@@ -214,6 +215,7 @@ describe("news org automations routes", () => {
     expect(mockAxios.post).toHaveBeenCalledWith(
       "http://worker-node/article-content-scraper/start-job",
       {
+        includeArticlesThatMightHaveBeenStateAssigned: true,
         targetArticleStateReviewCount: 100,
         targetArticleThresholdDaysOld: 180,
       },

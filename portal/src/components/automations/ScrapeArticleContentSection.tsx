@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
 import { ArticleTargetingFields } from "@/components/automations/ArticleTargetingFields";
 import { ARTICLE_AUTOMATION_DEFAULTS } from "@/components/automations/articleTargetingDefaults";
+import { InfoIcon } from "@/icons";
 
 type AlertModalState = {
   message: string;
@@ -74,6 +75,10 @@ export function ScrapeArticleContentSection() {
     useState(ARTICLE_AUTOMATION_DEFAULTS.targetArticleThresholdDaysOld);
   const [targetArticleStateReviewCount, setTargetArticleStateReviewCount] =
     useState(ARTICLE_AUTOMATION_DEFAULTS.targetArticleStateReviewCount);
+  const [
+    includeArticlesThatMightHaveBeenStateAssigned,
+    setIncludeArticlesThatMightHaveBeenStateAssigned,
+  ] = useState(false);
   const [alertModal, setAlertModal] = useState<AlertModalState>(
     DEFAULT_ALERT_MODAL_STATE,
   );
@@ -93,6 +98,7 @@ export function ScrapeArticleContentSection() {
           body: JSON.stringify({
             targetArticleThresholdDaysOld: Number(targetArticleThresholdDaysOld),
             targetArticleStateReviewCount: Number(targetArticleStateReviewCount),
+            includeArticlesThatMightHaveBeenStateAssigned,
           }),
         },
       );
@@ -162,6 +168,43 @@ export function ScrapeArticleContentSection() {
             onThresholdDaysChange={setTargetArticleThresholdDaysOld}
             onReviewCountChange={setTargetArticleStateReviewCount}
           />
+
+          <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+            <input
+              id="includeArticlesThatMightHaveBeenStateAssigned"
+              type="checkbox"
+              checked={includeArticlesThatMightHaveBeenStateAssigned}
+              onChange={(e) =>
+                setIncludeArticlesThatMightHaveBeenStateAssigned(e.target.checked)
+              }
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="includeArticlesThatMightHaveBeenStateAssigned"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Include articles that might have been state assigned
+                </label>
+                <div className="group relative inline-flex overflow-visible">
+                  <span className="inline-flex h-6 w-6 items-center justify-center overflow-visible rounded-full text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+                    <InfoIcon className="h-5 w-5 overflow-visible" />
+                  </span>
+                  <span className="pointer-events-none invisible absolute left-1/2 top-full z-10 mt-2 w-72 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal text-white opacity-0 shadow-lg transition-all group-hover:visible group-hover:opacity-100 dark:bg-gray-700">
+                    When checked, this scraper includes articles that may already
+                    have AI state assignments, but still excludes articles that
+                    have any ArticleApproveds row and articles with
+                    ArticleIsRelevants.isRelevant = false.
+                  </span>
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Leave unchecked for the default scraper targeting that matches the
+                normal state assigner selection.
+              </p>
+            </div>
+          </div>
         </div>
       </CollapsibleAutomationSection>
 

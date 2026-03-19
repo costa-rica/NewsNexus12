@@ -25,14 +25,18 @@ export const runArticleContentScraperWorkflow = async (
 
   const articles = await selectArticles({
     targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
-    targetArticleStateReviewCount: input.targetArticleStateReviewCount
+    targetArticleStateReviewCount: input.targetArticleStateReviewCount,
+    includeArticlesThatMightHaveBeenStateAssigned:
+      input.includeArticlesThatMightHaveBeenStateAssigned
   });
 
   logger.info('Starting standalone article content scraper workflow', {
     jobId: input.jobId,
     candidateArticles: articles.length,
     targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
-    targetArticleStateReviewCount: input.targetArticleStateReviewCount
+    targetArticleStateReviewCount: input.targetArticleStateReviewCount,
+    includeArticlesThatMightHaveBeenStateAssigned:
+      input.includeArticlesThatMightHaveBeenStateAssigned === true
   });
 
   const summary = await enrichContent({
@@ -56,7 +60,9 @@ export const createArticleContentScraperJobHandler = (
         jobId: queueContext.jobId,
         signal: queueContext.signal,
         targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
-        targetArticleStateReviewCount: input.targetArticleStateReviewCount
+        targetArticleStateReviewCount: input.targetArticleStateReviewCount,
+        includeArticlesThatMightHaveBeenStateAssigned:
+          input.includeArticlesThatMightHaveBeenStateAssigned
       },
       dependencies
     );

@@ -1,5 +1,6 @@
 import {
   Article,
+  ArticleApproved,
   ArticleIsRelevant,
   ArticleStateContract,
   ArticleStateContract02
@@ -10,6 +11,7 @@ import logger from './logger';
 export interface ArticleAutomationTargetingInput {
   targetArticleThresholdDaysOld: number;
   targetArticleStateReviewCount: number;
+  includeArticlesThatMightHaveBeenStateAssigned?: boolean;
 }
 
 export interface TargetArticleRecord {
@@ -22,7 +24,8 @@ export interface TargetArticleRecord {
 
 export const ARTICLE_AUTOMATION_DEFAULTS: ArticleAutomationTargetingInput = {
   targetArticleThresholdDaysOld: 180,
-  targetArticleStateReviewCount: 100
+  targetArticleStateReviewCount: 100,
+  includeArticlesThatMightHaveBeenStateAssigned: false
 };
 
 const parsePositiveIntegerField = (
@@ -78,6 +81,7 @@ export const validateArticleAutomationTargetingInput = (
 };
 
 export const selectTargetArticles = async ({
+  includeArticlesThatMightHaveBeenStateAssigned = false,
   targetArticleStateReviewCount,
   targetArticleThresholdDaysOld
 }: ArticleAutomationTargetingInput): Promise<TargetArticleRecord[]> => {
@@ -89,21 +93,32 @@ export const selectTargetArticles = async ({
     `Filtering articles published on or after ${cutoffDateString} (within ${targetArticleThresholdDaysOld} days)`
   );
 
-  const contract02ArticleIds = await ArticleStateContract02.findAll({
-    attributes: ['articleId'],
-    raw: true
-  });
+  const contract02ArticleIds = includeArticlesThatMightHaveBeenStateAssigned
+    ? []
+    : await ArticleStateContract02.findAll({
+        attributes: ['articleId'],
+        raw: true
+      });
 
-  const contractArticleIds = await ArticleStateContract.findAll({
-    attributes: ['articleId'],
-    raw: true
-  });
+  const contractArticleIds = includeArticlesThatMightHaveBeenStateAssigned
+    ? []
+    : await ArticleStateContract.findAll({
+        attributes: ['articleId'],
+        raw: true
+      });
 
   const notRelevantArticleIds = await ArticleIsRelevant.findAll({
     attributes: ['articleId'],
     where: { isRelevant: false },
     raw: true
   });
+
+  const decidedArticleIds = includeArticlesThatMightHaveBeenStateAssigned
+    ? await ArticleApproved.findAll({
+        attributes: ['articleId'],
+        raw: true
+      })
+    : [];
 
   const assignedIds = [
     ...contract02ArticleIds
@@ -122,6 +137,13 @@ export const selectTargetArticles = async ({
         .filter((value): value is number => typeof value === 'number')
     )
   ];
+  const uniqueDecidedIds = [
+    ...new Set(
+      decidedArticleIds
+        .map((row) => (row as { articleId?: unknown }).articleId)
+        .filter((value): value is number => typeof value === 'number')
+    )
+  ];
 
   logger.info(
     `Found ${uniqueAssignedIds.length} articles with existing state assignments (${contract02ArticleIds.length} in ArticleStateContracts02, ${contractArticleIds.length} in ArticleStateContracts)`
@@ -129,6 +151,11 @@ export const selectTargetArticles = async ({
   logger.info(
     `Found ${uniqueNotRelevantIds.length} articles marked not relevant in ArticleIsRelevants`
   );
+  if (includeArticlesThatMightHaveBeenStateAssigned) {
+    logger.info(
+      `Scraper override enabled: including state-assigned articles and excluding ${uniqueDecidedIds.length} decided articles from ArticleApproveds`
+    );
+  }
 
   const articles = await Article.findAll({
     order: [['id', 'DESC']]
@@ -138,6 +165,7 @@ export const selectTargetArticles = async ({
     .filter((article) => Boolean(article.publishedDate) && article.publishedDate! >= cutoffDateString)
     .filter((article) => !uniqueAssignedIds.includes(article.id))
     .filter((article) => !uniqueNotRelevantIds.includes(article.id))
+    .filter((article) => !uniqueDecidedIds.includes(article.id))
     .slice(0, targetArticleStateReviewCount);
 
   logger.info(`Found ${unassignedArticles.length} articles to process`);

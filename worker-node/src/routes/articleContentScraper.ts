@@ -27,16 +27,23 @@ export const createArticleContentScraperRouter = (
   router.post('/start-job', async (req, res, next) => {
     try {
       const body = validateArticleAutomationTargetingInput(req.body);
+      const includeArticlesThatMightHaveBeenStateAssigned =
+        req.body?.includeArticlesThatMightHaveBeenStateAssigned === true;
+      const scraperInput: ArticleAutomationTargetingInput = {
+        ...body,
+        includeArticlesThatMightHaveBeenStateAssigned
+      };
 
       logger.info('Received article content scraper start request', {
         endpointName: ARTICLE_CONTENT_SCRAPER_ENDPOINT,
         targetArticleThresholdDaysOld: body.targetArticleThresholdDaysOld,
-        targetArticleStateReviewCount: body.targetArticleStateReviewCount
+        targetArticleStateReviewCount: body.targetArticleStateReviewCount,
+        includeArticlesThatMightHaveBeenStateAssigned
       });
 
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName: ARTICLE_CONTENT_SCRAPER_ENDPOINT,
-        run: buildJobHandler(body)
+        run: buildJobHandler(scraperInput)
       });
 
       logger.info('Queued article content scraper job', {
