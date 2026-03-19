@@ -1,4 +1,4 @@
-# AGENT.md
+# AGENTS.md
 
 This file provides guidance to engineers and AI agents working in `worker-node`.
 
@@ -23,11 +23,13 @@ The most important thing to understand is that this project is not a general-pur
 The service is organized so routes stay thin and workflow logic lives in modules.
 
 1. Application bootstrap
+
 - `src/server.ts`
 - `src/app.ts`
 - Loads configuration, initializes logging, ensures startup tasks run, and mounts routes.
 
 2. Shared infrastructure
+
 - `src/modules/logger.ts`
 - `src/modules/errors/`
 - `src/modules/middleware/`
@@ -35,6 +37,7 @@ The service is organized so routes stay thin and workflow logic lives in modules
 - `src/modules/db/`
 
 3. Shared queue engine
+
 - `src/modules/queue/jobStore.ts`
 - `src/modules/queue/jobIds.ts`
 - `src/modules/queue/queueEngine.ts`
@@ -43,6 +46,7 @@ The service is organized so routes stay thin and workflow logic lives in modules
 - `src/modules/queue/globalQueue.ts`
 
 4. Shared article targeting and scraping helpers
+
 - `src/modules/articleTargeting.ts`
 - `src/modules/article-content/config.ts`
 - `src/modules/article-content/types.ts`
@@ -51,12 +55,14 @@ The service is organized so routes stay thin and workflow logic lives in modules
 - `src/modules/article-content/enrichment.ts`
 
 5. Job modules
+
 - `src/modules/jobs/requestGoogleRssJob.ts`
 - `src/modules/jobs/semanticScorerJob.ts`
 - `src/modules/jobs/stateAssignerJob.ts`
 - `src/modules/jobs/articleContentScraperJob.ts`
 
 6. Route modules
+
 - `src/routes/health.ts`
 - `src/routes/queueInfo.ts`
 - `src/routes/requestGoogleRss.ts`
@@ -69,16 +75,19 @@ The service is organized so routes stay thin and workflow logic lives in modules
 The queue is the backbone of the project. The portal automations UI and API proxy routes depend on this queue behavior being stable.
 
 1. Global queue
+
 - There is one shared queue engine for the entire service.
 - Concurrency is global and fixed at `1`.
 - Jobs run in FIFO order.
 
 2. Persistence
+
 - Queue state is stored in JSON through `src/modules/queue/jobStore.ts`.
 - Jobs are durable enough for status inspection across requests.
 - Startup reconciliation marks stale `queued` or `running` jobs as failed after worker restart.
 
 3. Job states
+
 - `queued`
 - `running`
 - `completed`
@@ -86,12 +95,14 @@ The queue is the backbone of the project. The portal automations UI and API prox
 - `canceled`
 
 4. Cancellation
+
 - Queued jobs can be canceled immediately.
 - Running jobs are canceled cooperatively.
 - For child-process style jobs, the engine uses `SIGTERM`, waits, then `SIGKILL` if needed.
 - For in-process workflows, handlers should respect `AbortSignal` and return promptly when canceled.
 
 5. Status routes
+
 - `GET /queue-info/check-status/:jobId`
 - `GET /queue-info/latest-job?endpointName=...`
 - `GET /queue-info/queue_status`
@@ -146,14 +157,17 @@ Key files:
 Important behavior:
 
 1. The request body controls:
+
 - `targetArticleThresholdDaysOld`
 - `targetArticleStateReviewCount`
 
 2. `PATH_TO_STATE_ASSIGNER_FILES` must contain:
+
 - `prompts/`
 - `chatgpt_responses/`
 
 3. The state assigner now performs bounded pre-scrape enrichment before AI analysis.
+
 - It enriches only the exact candidate set it is already about to process.
 - If scraping fails, the job logs that failure and continues.
 - If durable article content is still unavailable, it falls back to `article.description`.
@@ -175,19 +189,23 @@ Key files:
 Current implementation details:
 
 1. Cheerio-first only
+
 - No Puppeteer fallback is active in the current implementation.
 
 2. HTTP policy
+
 - Platform `fetch`
 - `15000ms` timeout
 - Redirect policy `follow`
 - Browser-style worker User-Agent
 
 3. Content rules
+
 - Content shorter than `200` characters is treated as failed scrape.
 - Blank or too-short stored content is eligible for enrichment.
 
 4. Persistence rules
+
 - Update the existing canonical `ArticleContents` row first.
 - Create a new row only when none exists.
 - Duplicate rows are handled defensively with deterministic canonical-row selection.
@@ -197,20 +215,24 @@ Current implementation details:
 `worker-node` uses `@newsnexus/db-models` directly. This means workflow code is tightly coupled to the shared SQLite-backed Sequelize model package and should respect that package’s initialization patterns.
 
 1. Database location is environment-driven
+
 - Do not assume the live database is stored inside the `worker-node/` repo folder.
 - The actual SQLite file location is resolved from environment variables, primarily `PATH_DATABASE` and `NAME_DB`.
 - A repo-local file such as `worker-node/database.sqlite` may exist, but it is not a reliable indicator of the database currently used by the running service.
 - When investigating live data issues, confirm the resolved database path from the active environment before drawing conclusions from any local SQLite file.
 
 2. DB initialization
+
 - Use `src/modules/db/ensureDbReady.ts` when a workflow needs models ready.
 - Avoid scattering ad hoc `initModels()` and `sequelize.sync()` calls through unrelated files.
 
 3. Model usage
+
 - Keep direct model reads and writes inside workflow modules and repositories/helpers.
 - Prefer explicit behavior over “magic” convenience calls.
 
 4. Article content caveat
+
 - `ArticleContents` may contain duplicate rows for one `articleId`.
 - Do not assume a schema-level uniqueness guarantee unless future schema work adds it.
 - Use the canonical-row helper logic already present in `src/modules/article-content/repository.ts`.
@@ -243,37 +265,45 @@ If a route depends on a workflow-specific path or key, validate it at the route 
 These rules matter more than style preferences because they preserve the project’s current architecture.
 
 1. Keep routes thin
+
 - Validate input.
 - Resolve required env vars.
 - Enqueue the job.
 - Return queue metadata.
 
 2. Keep workflow logic in job or module files
+
 - Do not move major business logic into route handlers.
 - Prefer helper modules for reusable workflow pieces.
 
 3. Reuse shared targeting and enrichment logic
+
 - If two workflows need the same candidate article selection, centralize it.
 - If two workflows need the same article-content behavior, reuse `src/modules/article-content/`.
 
 4. Respect cooperative cancellation
+
 - Long-running work should check `AbortSignal`.
 - Iteration timeouts should skip the current unit of work and continue when appropriate.
 - External request failures should not crash the whole workflow unless the workflow truly cannot continue.
 
 5. Use the existing error contract
+
 - Validation errors should go through `AppError`.
 - Let `errorHandler` shape final HTTP error responses.
 
 6. Use the project logger
+
 - Prefer structured logging through `src/modules/logger.ts`.
 - Avoid `console.log` in workflow code and routes.
 
 7. Keep queue behavior consistent
+
 - New starter routes should return `202` plus `jobId`, `status`, and `endpointName`.
 - New automations should expose status through the existing latest-job queue routes.
 
 8. Keep tests behavior-focused
+
 - Follow `docs/TEST_IMPLEMENTATION_NODE.md`.
 - Mock network and DB boundaries explicitly.
 - Keep internal business logic real where practical.
@@ -283,12 +313,15 @@ These rules matter more than style preferences because they preserve the project
 Important test locations:
 
 1. Route tests
+
 - `tests/routes/`
 
 2. Module and job tests
+
 - `tests/modules/`
 
 3. Smoke tests
+
 - `tests/smoke/`
 
 Useful commands:
@@ -308,18 +341,22 @@ When adding a new workflow:
 ## Operational notes
 
 1. This service is usually called indirectly.
+
 - The `api/` project proxies requests into `worker-node`.
 - The `portal/` automations UI depends on those API proxy routes.
 
 2. The queue contract is user-facing.
+
 - Changes to `endpointName`, status semantics, or cancellation behavior can break the automations UI.
 
 3. State assigner and scraper are coupled on purpose.
+
 - The standalone scraper route exists for automation use.
 - The state assigner also reuses that logic as a bounded pre-step.
 - Do not fork those paths into separate implementations unless requirements demand it.
 
 4. Build for absorption, not for one-off scripts.
+
 - The long-term direction of this project is to absorb legacy microservices into stable in-process modules.
 
 ## Common pitfalls

@@ -1,4 +1,4 @@
-# AGENT.md
+# AGENTS.md
 
 This file provides guidance to the engineers or AI agents when working with code in this repository.
 
