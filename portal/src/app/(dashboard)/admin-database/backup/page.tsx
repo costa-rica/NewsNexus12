@@ -12,6 +12,7 @@ export default function DatabaseBackup() {
 		RowCount[]
 	>([]);
 	const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+	const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
 
 	const fetchBackupList = useCallback(async () => {
 		try {
@@ -125,6 +126,7 @@ export default function DatabaseBackup() {
 	}, [fetchBackupList, fetchRowCountsByTable]);
 
 	const fetchBackupZipFile = async (backup: string) => {
+		setIsDownloadingBackup(true);
 		try {
 			const response = await fetch(
 				`${process.env.NEXT_PUBLIC_API_BASE_URL}/admin-db/send-db-backup/${backup}`,
@@ -153,6 +155,8 @@ export default function DatabaseBackup() {
 		} catch (error) {
 			console.error("Error downloading backup:", error);
 			alert("Error downloading backup. Please try again.");
+		} finally {
+			setIsDownloadingBackup(false);
 		}
 	};
 
@@ -226,6 +230,20 @@ export default function DatabaseBackup() {
 			>
 				<div className="p-12">
 					<LoadingDots size={4} />
+				</div>
+			</Modal>
+
+			<Modal
+				isOpen={isDownloadingBackup}
+				onClose={() => {}}
+				showCloseButton={false}
+				className="flex items-center justify-center"
+			>
+				<div className="p-12 text-center">
+					<LoadingDots size={4} />
+					<p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+						Preparing download. Large backup files may take a minute.
+					</p>
 				</div>
 			</Modal>
 		</div>
