@@ -35,7 +35,9 @@ describe('article content enrichment service', () => {
           success: true,
           method: 'cheerio',
           content: 'A'.repeat(220),
-          contentLength: 220
+          contentLength: 220,
+          scrapeStatusCheerio: true,
+          scrapeStatusPuppeteer: null
         })
       }
     );
@@ -43,7 +45,8 @@ describe('article content enrichment service', () => {
     expect(mockArticleContent.create).toHaveBeenCalledWith({
       articleId: 10,
       content: 'A'.repeat(220),
-      scrapeStatusCheerio: true
+      scrapeStatusCheerio: true,
+      scrapeStatusPuppeteer: null
     });
     expect(summary).toEqual({
       articlesConsidered: 1,
@@ -86,14 +89,17 @@ describe('article content enrichment service', () => {
           success: true,
           method: 'cheerio',
           content: 'B'.repeat(240),
-          contentLength: 240
+          contentLength: 240,
+          scrapeStatusCheerio: true,
+          scrapeStatusPuppeteer: null
         })
       }
     );
 
     expect(update).toHaveBeenCalledWith({
       content: 'B'.repeat(240),
-      scrapeStatusCheerio: true
+      scrapeStatusCheerio: true,
+      scrapeStatusPuppeteer: null
     });
     expect(mockArticleContent.create).not.toHaveBeenCalled();
     expect(summary.updatedRows).toBe(1);
@@ -139,13 +145,16 @@ describe('article content enrichment service', () => {
           success: false,
           method: 'cheerio',
           failureType: 'network_error',
-          error: 'timeout'
+          error: 'timeout',
+          scrapeStatusCheerio: false,
+          scrapeStatusPuppeteer: null
         })
       }
     );
 
     expect(firstUpdate).toHaveBeenCalledWith({
-      scrapeStatusCheerio: false
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: null
     });
     expect(secondUpdate).not.toHaveBeenCalled();
   });
@@ -211,13 +220,16 @@ describe('article content enrichment service', () => {
           success: false,
           method: 'cheerio',
           failureType: 'http_error',
-          error: 'HTTP 403 while fetching article'
+          error: 'HTTP 403 while fetching article',
+          scrapeStatusCheerio: false,
+          scrapeStatusPuppeteer: null
         })
       }
     );
 
     expect(update).toHaveBeenCalledWith({
-      scrapeStatusCheerio: false
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: null
     });
     expect(summary).toEqual({
       articlesConsidered: 1,
@@ -227,5 +239,51 @@ describe('article content enrichment service', () => {
       updatedRows: 1,
       createdRows: 0
     });
+  });
+
+  it('persists Puppeteer success after Cheerio falls back on short content', async () => {
+    const update = jest.fn();
+    mockArticleContent.findAll.mockResolvedValue([
+      {
+        id: 22,
+        articleId: 15,
+        content: 'short',
+        scrapeStatusCheerio: null,
+        scrapeStatusPuppeteer: null,
+        update
+      }
+    ]);
+
+    const summary = await enrichArticleContent(
+      {
+        articles: [
+          {
+            id: 15,
+            title: 'Article 15',
+            description: 'desc',
+            url: 'https://example.com/15',
+            publishedDate: '2026-03-16'
+          }
+        ],
+        signal: new AbortController().signal
+      },
+      {
+        scrapeArticleContent: jest.fn().mockResolvedValue({
+          success: true,
+          method: 'puppeteer',
+          content: 'C'.repeat(260),
+          contentLength: 260,
+          scrapeStatusCheerio: false,
+          scrapeStatusPuppeteer: true
+        })
+      }
+    );
+
+    expect(update).toHaveBeenCalledWith({
+      content: 'C'.repeat(260),
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: true
+    });
+    expect(summary.successfulScrapes).toBe(1);
   });
 });

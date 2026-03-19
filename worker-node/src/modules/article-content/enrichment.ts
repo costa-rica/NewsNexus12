@@ -2,10 +2,10 @@ import { ArticleContent } from '@newsnexus/db-models';
 import logger from '../logger';
 import { ArticleContentCandidate, ArticleContentEnrichmentSummary } from './types';
 import { getCanonicalArticleContentRow, hasUsableArticleContent } from './repository';
-import { scrapeArticleContentWithCheerio } from './scraper';
+import { scrapeArticleContent } from './scraper';
 
 export interface EnrichArticleContentDependencies {
-  scrapeArticleContent?: typeof scrapeArticleContentWithCheerio;
+  scrapeArticleContent?: typeof scrapeArticleContent;
 }
 
 export interface EnrichArticleContentOptions {
@@ -42,7 +42,7 @@ export const enrichArticleContent = async (
   options: EnrichArticleContentOptions,
   dependencies: EnrichArticleContentDependencies = {}
 ): Promise<ArticleContentEnrichmentSummary> => {
-  const scrapeArticleContent = dependencies.scrapeArticleContent ?? scrapeArticleContentWithCheerio;
+  const scrapeArticleContentImpl = dependencies.scrapeArticleContent ?? scrapeArticleContent;
   const summary = createEmptySummary();
 
   for (const article of options.articles) {
@@ -73,21 +73,23 @@ export const enrichArticleContent = async (
       continue;
     }
 
-    const scrapeResult = await scrapeArticleContent(article.url, options.signal);
+    const scrapeResult = await scrapeArticleContentImpl(article.url, options.signal);
 
     if (!scrapeResult.success) {
       summary.failedScrapes += 1;
 
       if (existingRow) {
         await existingRow.update({
-          scrapeStatusCheerio: false
+          scrapeStatusCheerio: scrapeResult.scrapeStatusCheerio,
+          scrapeStatusPuppeteer: scrapeResult.scrapeStatusPuppeteer
         });
         summary.updatedRows += 1;
       } else {
         await ArticleContent.create({
           articleId: article.id,
           content: '',
-          scrapeStatusCheerio: false
+          scrapeStatusCheerio: scrapeResult.scrapeStatusCheerio,
+          scrapeStatusPuppeteer: scrapeResult.scrapeStatusPuppeteer
         });
         summary.createdRows += 1;
       }
@@ -106,14 +108,16 @@ export const enrichArticleContent = async (
     if (existingRow) {
       await existingRow.update({
         content: scrapeResult.content,
-        scrapeStatusCheerio: true
+        scrapeStatusCheerio: scrapeResult.scrapeStatusCheerio,
+        scrapeStatusPuppeteer: scrapeResult.scrapeStatusPuppeteer
       });
       summary.updatedRows += 1;
     } else {
       await ArticleContent.create({
         articleId: article.id,
         content: scrapeResult.content,
-        scrapeStatusCheerio: true
+        scrapeStatusCheerio: scrapeResult.scrapeStatusCheerio,
+        scrapeStatusPuppeteer: scrapeResult.scrapeStatusPuppeteer
       });
       summary.createdRows += 1;
     }

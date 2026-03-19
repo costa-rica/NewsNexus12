@@ -1,4 +1,7 @@
-import { scrapeArticleContentWithCheerio } from '../../src/modules/article-content/scraper';
+import {
+  scrapeArticleContent,
+  scrapeArticleContentWithCheerio
+} from '../../src/modules/article-content/scraper';
 
 describe('article content Cheerio scraper', () => {
   const originalFetch = global.fetch;
@@ -47,7 +50,9 @@ describe('article content Cheerio scraper', () => {
       success: false,
       method: 'cheerio',
       failureType: 'short_content',
-      error: 'Content too short (10 chars, minimum 200)'
+      error: 'Content too short (10 chars, minimum 200)',
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: null
     });
   });
 
@@ -60,7 +65,69 @@ describe('article content Cheerio scraper', () => {
       success: false,
       method: 'cheerio',
       failureType: 'network_error',
-      error: 'socket hang up'
+      error: 'socket hang up',
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: null
+    });
+  });
+
+  it('falls back to Puppeteer when Cheerio returns short content', async () => {
+    const result = await scrapeArticleContent('https://example.com/fallback', undefined, {
+      scrapeWithCheerio: jest.fn().mockResolvedValue({
+        success: false,
+        method: 'cheerio',
+        failureType: 'short_content',
+        error: 'Content too short (75 chars, minimum 200)',
+        scrapeStatusCheerio: false,
+        scrapeStatusPuppeteer: null
+      }),
+      scrapeWithPuppeteer: jest.fn().mockResolvedValue({
+        success: true,
+        method: 'puppeteer',
+        content: 'P'.repeat(260),
+        contentLength: 260,
+        scrapeStatusCheerio: false,
+        scrapeStatusPuppeteer: true
+      })
+    });
+
+    expect(result).toEqual({
+      success: true,
+      method: 'puppeteer',
+      content: 'P'.repeat(260),
+      contentLength: 260,
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: true
+    });
+  });
+
+  it('returns Puppeteer failure details when both scrape layers fail', async () => {
+    const result = await scrapeArticleContent('https://example.com/double-fail', undefined, {
+      scrapeWithCheerio: jest.fn().mockResolvedValue({
+        success: false,
+        method: 'cheerio',
+        failureType: 'http_error',
+        error: 'HTTP 403 while fetching article',
+        scrapeStatusCheerio: false,
+        scrapeStatusPuppeteer: null
+      }),
+      scrapeWithPuppeteer: jest.fn().mockResolvedValue({
+        success: false,
+        method: 'puppeteer',
+        failureType: 'browser_error',
+        error: 'Navigation timeout exceeded',
+        scrapeStatusCheerio: false,
+        scrapeStatusPuppeteer: false
+      })
+    });
+
+    expect(result).toEqual({
+      success: false,
+      method: 'puppeteer',
+      failureType: 'browser_error',
+      error: 'Navigation timeout exceeded',
+      scrapeStatusCheerio: false,
+      scrapeStatusPuppeteer: false
     });
   });
 });
