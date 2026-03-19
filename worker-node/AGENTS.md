@@ -188,23 +188,31 @@ Key files:
 
 Current implementation details:
 
-1. Cheerio-first only
+1. Cheerio-first with Puppeteer fallback
 
-- No Puppeteer fallback is active in the current implementation.
+- Cheerio runs first.
+- If Cheerio fails or returns content shorter than `200` characters, Puppeteer fallback is attempted.
+- `scrapeStatusCheerio` and `scrapeStatusPuppeteer` should reflect which layers were attempted and which one succeeded.
 
-2. HTTP policy
+2. Puppeteer runtime requirement
+
+- Puppeteer fallback requires a browser binary in the runtime environment.
+- Use `npm run puppeteer:browsers:install` in `worker-node/` to install the managed Chrome binary.
+- On Ubuntu or other multi-user servers, run that install command as the same user that runs the `worker-node` process.
+
+3. HTTP policy
 
 - Platform `fetch`
 - `15000ms` timeout
 - Redirect policy `follow`
 - Browser-style worker User-Agent
 
-3. Content rules
+4. Content rules
 
 - Content shorter than `200` characters is treated as failed scrape.
 - Blank or too-short stored content is eligible for enrichment.
 
-4. Persistence rules
+5. Persistence rules
 
 - Update the existing canonical `ArticleContents` row first.
 - Create a new row only when none exists.

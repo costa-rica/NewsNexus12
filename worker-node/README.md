@@ -134,9 +134,26 @@ Optional:
 
 1. `npm run dev`
 2. `npm run build`
-3. `npm start`
-4. `npm test`
-5. `npm run test:watch`
+3. `npm run puppeteer:browsers:install`
+4. `npm start`
+5. `npm test`
+6. `npm run test:watch`
+
+## Puppeteer browser install
+
+The article-content scraper can fall back to Puppeteer, which requires a browser binary in the runtime environment.
+
+Typical setup:
+
+1. `npm install`
+2. `npm run build`
+3. `npm run puppeteer:browsers:install`
+
+On Ubuntu servers, install the browser as the same user that runs `worker-node`. For example:
+
+```bash
+sudo -u limited_user npm run puppeteer:browsers:install
+```
 
 ## Documentation
 
