@@ -176,21 +176,21 @@ Phase completion steps:
 
 ## Phase 5 - Build Google Classification And Publisher URL Extraction
 
-- [ ] Add Google-page classification logic.
+- [x] Add Google-page classification logic.
   Run relevant tests after this task.
-- [ ] Detect consent, interstitial, or still-Google outcomes.
+- [x] Detect consent, interstitial, or still-Google outcomes.
   Run relevant tests after this task.
-- [ ] Detect when the browser already landed on a non-Google publisher URL.
+- [x] Detect when the browser already landed on a non-Google publisher URL.
   Run relevant tests after this task.
-- [ ] Add publisher URL extraction from final browser URL.
+- [x] Add publisher URL extraction from final browser URL.
   Run relevant tests after this task.
-- [ ] Add fallback extraction from `canonical`, `og:url`, JSON-LD, and other eligible links.
+- [x] Add fallback extraction from `canonical`, `og:url`, JSON-LD, and other eligible links.
   Run relevant tests after this task.
-- [ ] Reject Google-owned or unusable candidate URLs.
+- [x] Reject Google-owned or unusable candidate URLs.
   Run relevant tests after this task.
-- [ ] Save the chosen extraction source in the result object.
+- [x] Save the chosen extraction source in the result object.
   Run relevant tests after this task.
-- [ ] Save useful human-readable explanations in `details`.
+- [x] Save useful human-readable explanations in `details`.
   Run relevant tests after this task.
 
 Phase completion steps:
@@ -202,22 +202,22 @@ Phase completion steps:
 
 ## Phase 6 - Build Publisher Fetch And Content Extraction
 
-- [ ] Add direct HTTP publisher fetching.
+- [x] Add direct HTTP publisher fetching.
   Run relevant tests after this task.
-- [ ] Add fallback browser fetching for incomplete or unusable direct HTTP results.
+- [x] Add fallback browser fetching for incomplete or unusable direct HTTP results.
   Run relevant tests after this task.
-- [ ] Extract normalized title from the publisher page.
+- [x] Extract normalized title from the publisher page.
   Run relevant tests after this task.
-- [ ] Extract normalized article content from the publisher page.
+- [x] Extract normalized article content from the publisher page.
   Run relevant tests after this task.
-- [ ] Set `bodySource` based on the path that produced the final usable content.
+- [x] Set `bodySource` based on the path that produced the final usable content.
   Run relevant tests after this task.
-- [ ] Save human-readable `details` such as:
+- [x] Save human-readable `details` such as:
   1. `Direct HTTP returned usable publisher HTML`
   2. `Playwright fallback returned publisher HTML`
   3. `Publisher page returned anti-bot challenge`
   Run relevant tests after this task.
-- [ ] Set `failureType` for publisher fetch failures and blocked publisher outcomes.
+- [x] Set `failureType` for publisher fetch failures and blocked publisher outcomes.
   Run relevant tests after this task.
 
 Phase completion steps:
