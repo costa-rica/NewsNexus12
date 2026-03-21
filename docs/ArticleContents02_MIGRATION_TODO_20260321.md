@@ -81,7 +81,7 @@ The new scraper has already proven better in testing. The remaining work is repl
 4. Validate portal/article-detail behavior after this change.
    - Confirm article detail screens show the new content source correctly.
 
-## Phase 4. Assess `requestGoogleRss`
+## Phase 4. Assess and migrate `requestGoogleRss`
 
 1. Review the current `requestGoogleRss` storage behavior.
    - File to inspect:
@@ -91,20 +91,57 @@ The new scraper has already proven better in testing. The remaining work is repl
    1. `Articles.url`
    2. `ArticleContents`
 
-3. Assess whether its current lightweight content persistence should remain.
-   - Questions to answer:
-     1. Should RSS `content` or `description` still populate legacy `ArticleContents`?
-     2. Should that path start populating `ArticleContents02` instead?
-     3. Should `requestGoogleRss` stop writing content rows entirely and leave content acquisition to the new scraper flow?
+3. Migrate `requestGoogleRss` away from legacy `ArticleContents`.
+   - Stop writing new rows to `ArticleContents` from this flow.
+   - Use `ArticleContents02` as the single content table going forward.
 
-4. Assess whether `requestGoogleRss` is doing any HTML/content handling that duplicates old assumptions.
-   - If so, decide whether to:
-     1. keep it as temporary seed content
-     2. simplify it
-     3. align it with the `ArticleContents02` model
+4. Add RSS ingestion support to `ArticleContents02`.
+   - Add `rss-feed` to the allowed `bodySource` values.
+   - Confirm `googleRssUrl` is always populated from the RSS item link.
+   - Keep `url`, `googleFinalUrl`, and `publisherFinalUrl` nullable for RSS-seeded rows when publisher resolution has not happened yet.
 
-5. Document the decision before changing this flow.
-   - This area should be reviewed carefully because it seeds the articles that the new scraper later processes.
+5. Define `requestGoogleRss` ingestion behavior for rows with usable RSS content.
+   - If the RSS item includes usable content:
+     1. write or update `ArticleContents02`
+     2. set `status = success`
+     3. set `bodySource = rss-feed`
+     4. set `failureType = null`
+     5. set `details` to a simple final value such as `Seeded from Google RSS item content`
+   - Do not trigger the Google-to-publisher scraper in this case.
+
+6. Define `requestGoogleRss` ingestion behavior for rows without usable RSS content.
+   - If RSS content is missing or too short:
+     1. write or update `ArticleContents02`
+     2. set `status = fail`
+     3. set `bodySource = rss-feed` when short content exists, otherwise `none`
+     4. set a temporary `details` value indicating RSS content was missing or too short and that scraping is being triggered
+     5. immediately trigger the new Google-to-publisher scraper for that article
+   - Once scraping finishes, update the same row with the final scraper outcome and final `details` value.
+
+7. Enforce overwrite protection for `requestGoogleRss`.
+   - Never overwrite an existing usable successful `ArticleContents02` row for the same `articleId`.
+   - Only create or update rows that are incomplete, failed, or missing.
+
+8. Add a per-article scrape path for `requestGoogleRss`.
+   - Reuse the new `ArticleContents02` Google-to-publisher workflow for one article at a time.
+   - Avoid duplicating the scraper logic inside `requestGoogleRss`.
+
+9. Validate the integrated `requestGoogleRss` behavior.
+   - Test cases:
+     1. RSS item with usable content
+     2. RSS item with missing content
+     3. RSS item with short content
+     4. RSS item that triggers follow-up scrape success
+     5. RSS item that triggers follow-up scrape fail
+     6. RSS item for an article that already has a successful `ArticleContents02` row
+
+10. Review API-side Google RSS storage for consistency.
+   - File to inspect:
+     - `api/src/modules/newsOrgs/storageGoogleRss.ts`
+   - Decide whether it should:
+     1. also move to `ArticleContents02`
+     2. be deprecated
+     3. or be left as transitional legacy behavior temporarily
 
 ## Phase 5. Legacy route and legacy flow retirement
 
