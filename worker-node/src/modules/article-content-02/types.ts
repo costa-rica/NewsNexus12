@@ -94,3 +94,12 @@ export interface ArticleContent02WorkflowResult {
   googleStatusCode: number | null;
   publisherStatusCode: number | null;
 }
+
+export interface ArticleContent02WorkflowSummary {
+  articlesConsidered: number;
+  articlesSkipped: number;
+  successfulScrapes: number;
+  failedScrapes: number;
+  createdRows: number;
+  updatedRows: number;
+}

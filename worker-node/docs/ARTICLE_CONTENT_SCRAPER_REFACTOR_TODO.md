@@ -251,15 +251,15 @@ Phase completion steps:
 
 ## Phase 8 - Integrate With Worker-Node Jobs And Routes
 
-- [ ] Add a new workflow module for the `ArticleContents02` scraping flow.
+- [x] Add a new workflow module for the `ArticleContents02` scraping flow.
   Run relevant tests after this task.
-- [ ] Integrate the workflow with the existing queue/job system.
+- [x] Integrate the workflow with the existing queue/job system.
   Run relevant tests after this task.
-- [ ] Add a new route or job entrypoint for the new flow instead of replacing the old flow immediately.
+- [x] Add a new route or job entrypoint for the new flow instead of replacing the old flow immediately.
   Run relevant tests after this task.
-- [ ] Ensure the old article-content scraper flow remains available during validation.
+- [x] Ensure the old article-content scraper flow remains available during validation.
   Run relevant tests after this task.
-- [ ] Add logging for job start, per-article progress, success, fail, and summary results.
+- [x] Add logging for job start, per-article progress, success, fail, and summary results.
   Run relevant tests after this task.
 
 Phase completion steps:
