@@ -548,7 +548,8 @@ const storeRequestAndArticles = async (params: {
         {
           article: articleCandidate,
           signal: params.signal,
-          navigationSession: params.navigationSession
+          navigationSession: params.navigationSession,
+          bypassExistingRowSkip: true
         }
       );
     }

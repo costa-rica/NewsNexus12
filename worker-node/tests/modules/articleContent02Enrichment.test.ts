@@ -8,7 +8,7 @@ describe('article content 02 enrichment', () => {
     close: jest.fn().mockResolvedValue(undefined)
   });
 
-  it('skips articles that already have a usable success row', async () => {
+  it('skips articles that already have any canonical row', async () => {
     const session = createSession();
 
     const summary = await enrichArticleContent02(
@@ -28,7 +28,7 @@ describe('article content 02 enrichment', () => {
         createNavigationSession: jest.fn().mockResolvedValue(session),
         getSkipDecision: jest.fn().mockResolvedValue({
           shouldSkip: true,
-          reason: 'already have usable content',
+          reason: 'already have canonical row',
           existingRow: { id: 11 }
         }),
         persistResult: jest.fn()

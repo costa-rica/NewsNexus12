@@ -9,7 +9,6 @@ import { ArticleContent02StoredRow, ArticleContent02WorkflowResult } from './typ
 
 export interface ArticleContent02PersistenceDependencies {
   getCanonicalRow?: typeof getCanonicalArticleContent02Row;
-  hasSuccessfulRow?: typeof hasSuccessfulArticleContent02;
   createRow?: typeof createArticleContent02Row;
   updateRow?: typeof updateArticleContent02Row;
   toStoredRow?: typeof toArticleContent02StoredRow;
@@ -44,23 +43,22 @@ export const getArticleContent02SkipDecision = async (
   dependencies: ArticleContent02PersistenceDependencies = {}
 ): Promise<ArticleContent02SkipDecision> => {
   const getCanonicalRow = dependencies.getCanonicalRow ?? getCanonicalArticleContent02Row;
-  const hasSuccessfulRow = dependencies.hasSuccessfulRow ?? hasSuccessfulArticleContent02;
   const toStoredRow = dependencies.toStoredRow ?? toArticleContent02StoredRow;
 
   const existingRow = await getCanonicalRow(articleId);
   const storedRow = toStoredRow(existingRow);
 
-  if (hasSuccessfulRow(existingRow)) {
+  if (existingRow) {
     return {
       shouldSkip: true,
-      reason: 'Latest canonical ArticleContents02 row already has usable successful content',
+      reason: 'Canonical ArticleContents02 row already exists for this article',
       existingRow: storedRow
     };
   }
 
   return {
     shouldSkip: false,
-    reason: 'No usable successful ArticleContents02 row exists',
+    reason: 'No ArticleContents02 row exists for this article',
     existingRow: storedRow
   };
 };

@@ -37,6 +37,7 @@ export interface ProcessArticleContent02CandidateOptions {
   article: ArticleContent02Candidate;
   signal: AbortSignal;
   navigationSession?: GoogleNavigationSession;
+  bypassExistingRowSkip?: boolean;
 }
 
 const createEmptySummary = (): ArticleContent02WorkflowSummary => ({
@@ -111,9 +112,16 @@ export const processArticleContent02Candidate = async (
     };
   }
 
-  const skipDecision = await getSkipDecision(article.id);
+  const skipDecision = options.bypassExistingRowSkip
+    ? {
+        shouldSkip: false,
+        reason: 'Bypassed existing-row skip for initial requestGoogleRss follow-up scrape',
+        existingRow: null
+      }
+    : await getSkipDecision(article.id);
+
   if (skipDecision.shouldSkip) {
-    logger.info('Skipping article content 02 scrape because a usable row already exists', {
+    logger.info('Skipping article content 02 scrape because a canonical row already exists', {
       articleId: article.id,
       existingArticleContents02Id: skipDecision.existingRow?.id ?? null
     });

@@ -22,31 +22,30 @@ const baseWorkflowResult: ArticleContent02WorkflowResult = {
 };
 
 describe('article content 02 persistence', () => {
-  it('skips articles that already have a usable successful row', async () => {
+  it('skips articles that already have any canonical row', async () => {
     const decision = await getArticleContent02SkipDecision(101, {
       getCanonicalRow: jest.fn().mockResolvedValue({
         id: 10,
         articleId: 101,
-        status: 'success',
-        content: 'x'.repeat(220)
+        status: 'fail',
+        content: null
       } as never),
-      hasSuccessfulRow: jest.fn().mockReturnValue(true),
       toStoredRow: jest.fn().mockReturnValue({
         id: 10,
         articleId: 101,
-        status: 'success',
-        content: 'x'.repeat(220)
+        status: 'fail',
+        content: null
       } as never)
     });
 
     expect(decision).toEqual({
       shouldSkip: true,
-      reason: 'Latest canonical ArticleContents02 row already has usable successful content',
+      reason: 'Canonical ArticleContents02 row already exists for this article',
       existingRow: {
         id: 10,
         articleId: 101,
-        status: 'success',
-        content: 'x'.repeat(220)
+        status: 'fail',
+        content: null
       }
     });
   });
