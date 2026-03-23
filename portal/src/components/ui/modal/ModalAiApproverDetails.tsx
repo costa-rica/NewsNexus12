@@ -262,6 +262,12 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
                           current top
                         </span>
                       )}
+
+                      {score.isHumanApproved === false && (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300">
+                          human rejected
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-3 text-sm text-gray-700 dark:text-gray-300">
