@@ -511,7 +511,16 @@ router.post(
   "/approve/:articleId",
   authenticateToken,
   async (req: Request, res: Response) => {
-    const { articleId } = req.params;
+    const rawArticleId =
+      typeof req.params.articleId === "string" ? req.params.articleId : "";
+    const articleId = parseNumericId(rawArticleId);
+    if (articleId === null) {
+      return res.status(400).json({
+        result: false,
+        message: "Invalid articleId",
+      });
+    }
+
     const {
       // isApproved,
       headlineForPdfReport,
@@ -528,18 +537,32 @@ router.post(
     logger.info(`articleId ${articleId}: ${headlineForPdfReport}`);
     logger.info(`approvedStatus: ${approvedStatus}`);
 
+    const canonicalContentRow = await getCanonicalArticleContents02Row(articleId);
+    const preferredPublisherFinalUrl =
+      canonicalContentRow !== null &&
+      isSuccessfulArticleContents02Row(canonicalContentRow) &&
+      typeof canonicalContentRow.publisherFinalUrl === "string" &&
+      canonicalContentRow.publisherFinalUrl.trim() !== ""
+        ? canonicalContentRow.publisherFinalUrl.trim()
+        : null;
+
     const articleApprovedExists = await ArticleApproved.findOne({
       where: { articleId },
     });
 
     if (approvedStatus === "Approve") {
+      const approvalPayload = {
+        ...req.body,
+        urlForPdfReport: preferredPublisherFinalUrl ?? req.body.urlForPdfReport,
+      };
+
       if (articleApprovedExists) {
         // Update existing record to approved
         await ArticleApproved.update(
           {
             isApproved: true,
             userId: user.id,
-            ...req.body,
+            ...approvalPayload,
           },
           { where: { articleId } },
         );
@@ -549,10 +572,10 @@ router.post(
       } else {
         // Create new approval record
         await ArticleApproved.create({
-          articleId: articleId,
+          articleId,
           userId: user.id,
           isApproved: true,
-          ...req.body,
+          ...approvalPayload,
         });
         logger.info(
           `---- > created new approval record for articleId ${articleId}`,

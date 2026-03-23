@@ -60,11 +60,18 @@ const mockArticleModel = {
   findByPk: jest.fn(),
 };
 
+const mockArticleApprovedModel = {
+  findAll: jest.fn(),
+  findOne: jest.fn(),
+  update: jest.fn(),
+  create: jest.fn(),
+};
+
 jest.mock("@newsnexus/db-models", () => ({
   Article: mockArticleModel,
   State: {},
   ArticleIsRelevant: {},
-  ArticleApproved: {},
+  ArticleApproved: mockArticleApprovedModel,
   EntityWhoFoundArticle: {},
   ArticleStateContract: {},
   ArticleContents02: {},
@@ -279,6 +286,49 @@ describe("articles routes contract tests", () => {
       hasArticleContent: false,
       content: null,
       contentSource: null,
+    });
+  });
+
+  test("POST /articles/approve/:articleId stores publisherFinalUrl from successful scraped content", async () => {
+    mockGetCanonicalArticleContents02Row.mockResolvedValue({
+      id: 301,
+      articleId: 77,
+      status: "success",
+      content: "Stored article content",
+      publisherFinalUrl: "https://publisher.example.com/final-story",
+    });
+    mockArticleApprovedModel.findOne.mockResolvedValue(null);
+    mockArticleApprovedModel.create.mockResolvedValue({ id: 1 });
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/approve/77")
+      .send({
+        approvedStatus: "Approve",
+        headlineForPdfReport: "Article 77",
+        publicationNameForPdfReport: "Example News",
+        publicationDateForPdfReport: "2026-03-23",
+        textForPdfReport: "Approved content",
+        urlForPdfReport: "https://google.example.com/rss/story",
+        kmNotes: "",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      status: "articleId 77 is approved",
+    });
+    expect(mockArticleApprovedModel.create).toHaveBeenCalledWith({
+      articleId: 77,
+      userId: 1,
+      isApproved: true,
+      approvedStatus: "Approve",
+      headlineForPdfReport: "Article 77",
+      publicationNameForPdfReport: "Example News",
+      publicationDateForPdfReport: "2026-03-23",
+      textForPdfReport: "Approved content",
+      urlForPdfReport: "https://publisher.example.com/final-story",
+      kmNotes: "",
     });
   });
 });
