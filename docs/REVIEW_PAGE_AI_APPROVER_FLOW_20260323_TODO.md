@@ -261,27 +261,28 @@
 
 ## 6. phase 5 - portal one-off prompt form and prompt-picker table
 
-- [ ] Add a prompt form below the read-only content area in the new modal.
-- [ ] Start the form with a blank prompt body.
-- [ ] Add editable `name` input.
-- [ ] Do not expose editable `description` input in the modal.
-- [ ] Add a collapsable section below the form containing prompt rows from `/articles/automations/ai-approver-prompts`.
-- [ ] Reuse or adapt the existing prompt-row display patterns where practical.
-- [ ] Allow the user to pick an existing prompt row from the collapsable table.
-- [ ] When a prompt row is selected:
+- [x] Add a prompt form below the read-only content area in the new modal.
+- [x] Start the form with a blank prompt body.
+- [x] Add editable `name` input.
+- [x] Do not expose editable `description` input in the modal.
+- [x] Add a collapsable section below the form containing prompt rows from `/articles/automations/ai-approver-prompts`.
+- [x] Reuse or adapt the existing prompt-row display patterns where practical.
+- [x] Allow the user to pick an existing prompt row from the collapsable table.
+- [x] When a prompt row is selected:
   - copy its `promptInMarkdown` into the form
   - default the `name` to `<source prompt name>-articleId: <articleId>`
   - allow the user to further edit the name
-- [ ] Do not allow the user to set the one-off prompt active from this modal.
-- [ ] Add submit button behavior that sends only the one-off prompt request.
-- [ ] Show queue success feedback in the modal after submission.
-- [ ] Prevent accidental duplicate submits while the request is in flight.
-- [ ] Add clear error feedback for API or queue failures.
-- [ ] Run relevant verification for this phase.
+- [x] Do not allow the user to set the one-off prompt active from this modal.
+- [x] Add submit button behavior that sends only the one-off prompt request.
+- [x] Show queue success feedback in the modal after submission.
+- [x] Prevent accidental duplicate submits while the request is in flight.
+- [x] Add clear error feedback for API or queue failures.
+- [x] Run relevant verification for this phase.
   - `portal`: no test framework exists, so do not add tests
-  - `portal`: run existing verification command if it is usable in the current environment, such as `npm -C portal run lint`
-- [ ] If tests or verification pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/REVIEW_PAGE_AI_APPROVER_FLOW_20260323_TODO.md` and phase 5.
+  - `portal`: `portal/node_modules/.bin/tsc -p portal/tsconfig.json --noEmit`
+  - `portal`: `npm -C portal run lint` remains blocked by the existing `minimatch` / ESLint environment issue
+- [x] If tests or verification pass, check off completed tasks in this phase.
+- [x] Commit with a message that references `docs/REVIEW_PAGE_AI_APPROVER_FLOW_20260323_TODO.md` and phase 5.
 
 ## 7. phase 6 - score refresh and review-page integration
 

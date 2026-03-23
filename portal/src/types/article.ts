@@ -45,6 +45,15 @@ export interface ReviewArticleContentResponse {
 	contentSource: string | null;
 }
 
+export interface ReviewPageAiApproverStartJobResponse {
+	result: boolean;
+	jobId: string;
+	status: string;
+	endpointName: string;
+	promptVersionId: number;
+	articleId: number;
+}
+
 export interface AiApproverPromptVersion {
 	id: number;
 	name: string;
