@@ -39,6 +39,16 @@ export const hasUsableSeedContent = (value?: string | null): boolean => {
   return (normalized?.length ?? 0) >= ARTICLE_CONTENT_MIN_LENGTH;
 };
 
+export const hasStoredArticleContent = (value?: string | null): boolean => {
+  const normalized = normalizeSeedContent(value);
+  return (normalized?.length ?? 0) > 0;
+};
+
+export const isSuccessfulArticleContents02Row = (row: {
+  status?: string | null;
+  content?: string | null;
+}): boolean => row.status === "success" && hasStoredArticleContent(row.content);
+
 export const hasSuccessfulArticleContents02 = async (
   articleId: number,
 ): Promise<boolean> => {
@@ -47,9 +57,7 @@ export const hasSuccessfulArticleContents02 = async (
     order: [["id", "DESC"]],
   });
 
-  return rows.some(
-    (row) => row.status === "success" && hasUsableSeedContent(row.content),
-  );
+  return rows.some((row) => isSuccessfulArticleContents02Row(row));
 };
 
 export const getCanonicalArticleContents02Row = async (articleId: number) => {

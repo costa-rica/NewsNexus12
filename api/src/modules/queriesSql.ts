@@ -473,6 +473,7 @@ async function sqlQueryArticlesForWithRatingsRoute(
       a."publishedDate",
       a."publicationName",
       a."url",
+      ac2_publisher."publisherFinalUrl" AS "publisherFinalUrl",
 
       -- NewsApiRequest fields
       nar."andString" AS "NewsApiRequest.andString",
@@ -529,7 +530,21 @@ async function sqlQueryArticlesForWithRatingsRoute(
     LEFT JOIN (
       SELECT DISTINCT ac2."articleId"
       FROM "ArticleContents02" ac2
+      WHERE ac2."status" = 'success'
+        AND LENGTH(TRIM(COALESCE(ac2."content", ''))) > 0
     ) ac2_lookup ON ac2_lookup."articleId" = a.id
+    LEFT JOIN (
+      SELECT ac2_selected."articleId", ac2_selected."publisherFinalUrl"
+      FROM "ArticleContents02" ac2_selected
+      INNER JOIN (
+        SELECT ac2."articleId", MAX(ac2."id") AS "latestUsableId"
+        FROM "ArticleContents02" ac2
+        WHERE ac2."status" = 'success'
+          AND LENGTH(TRIM(COALESCE(ac2."content", ''))) > 0
+          AND LENGTH(TRIM(COALESCE(ac2."publisherFinalUrl", ''))) > 0
+        GROUP BY ac2."articleId"
+      ) ac2_latest ON ac2_latest."latestUsableId" = ac2_selected."id"
+    ) ac2_publisher ON ac2_publisher."articleId" = a.id
 
     LEFT JOIN "ArticleRevieweds" ar ON ar."articleId" = a.id
 
@@ -556,6 +571,7 @@ async function sqlQueryArticlesForWithRatingsRoute(
       description,
       publishedDate,
       url,
+      publisherFinalUrl,
       isRelevant,
       approvalCreatedAt,
       publicationName,
@@ -598,6 +614,7 @@ async function sqlQueryArticlesForWithRatingsRoute(
         description,
         publishedDate,
         url,
+        publisherFinalUrl,
         publicationName,
         isRelevant,
         approvalCreatedAt,

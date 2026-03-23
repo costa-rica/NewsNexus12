@@ -1,5 +1,9 @@
 import express from "express";
 import type { Request, Response } from "express";
+import {
+  getCanonicalArticleContents02Row,
+  isSuccessfulArticleContents02Row,
+} from "../modules/newsOrgs/articleContents02Seed";
 
 const router = express.Router();
 const {
@@ -34,6 +38,15 @@ const {
   sqlQueryArticleDetails,
 } = require("../modules/queriesSql");
 import logger from "../modules/logger";
+
+function parseNumericId(value: string): number | null {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isSafeInteger(numericValue) ? numericValue : null;
+}
 
 // NOTE: ---- > will need to refactor because sqlQueryArticles is changed
 // 🔹 POST /articles: filtered list of articles
@@ -977,6 +990,7 @@ router.post(
         publishedDate: article.publishedDate,
         publicationName: article.publicationName,
         url: article.url,
+        publisherFinalUrl: article.publisherFinalUrl ?? null,
         hasArticleContent: Boolean(article.hasArticleContent),
         States: article.States,
         statesStringCommaSeparated,
@@ -1071,6 +1085,51 @@ router.post(
     } catch (error) {
       logger.error("❌ Error in /articles/table-approved-by-request:", error);
       res.status(500).json({ error: "Failed to fetch request summary." });
+    }
+  },
+);
+
+router.get(
+  "/review-selected-content/:articleId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const rawArticleId =
+        typeof req.params.articleId === "string" ? req.params.articleId : "";
+      const articleId = parseNumericId(rawArticleId);
+      if (articleId === null) {
+        return res.status(400).json({
+          result: false,
+          message: "Invalid articleId",
+        });
+      }
+
+      const article = await Article.findByPk(articleId);
+      if (!article) {
+        return res.status(404).json({
+          result: false,
+          message: "Article not found",
+        });
+      }
+
+      const canonicalContentRow = await getCanonicalArticleContents02Row(articleId);
+      const hasArticleContent =
+        canonicalContentRow !== null &&
+        isSuccessfulArticleContents02Row(canonicalContentRow);
+
+      return res.status(200).json({
+        result: true,
+        articleId,
+        hasArticleContent,
+        content: hasArticleContent ? canonicalContentRow?.content ?? null : null,
+        contentSource: hasArticleContent ? "article-contents-02" : null,
+      });
+    } catch (error) {
+      logger.error("Error in GET /articles/review-selected-content/:articleId:", error);
+      return res.status(500).json({
+        result: false,
+        message: "Failed to fetch review selected article content",
+      });
     }
   },
 );

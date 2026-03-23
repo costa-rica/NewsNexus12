@@ -1,7 +1,10 @@
 import express from "express";
 import type { Request, Response } from "express";
 import axios from "axios";
-import { getCanonicalArticleContents02Row } from "../../modules/newsOrgs/articleContents02Seed";
+import {
+  getCanonicalArticleContents02Row,
+  isSuccessfulArticleContents02Row,
+} from "../../modules/newsOrgs/articleContents02Seed";
 
 const router = express.Router();
 const { authenticateToken } = require("../../modules/userAuthentication");
@@ -146,14 +149,17 @@ router.get(
       }
 
       const canonicalContentRow = await getCanonicalArticleContents02Row(articleId);
+      const hasArticleContent =
+        canonicalContentRow !== null &&
+        isSuccessfulArticleContents02Row(canonicalContentRow);
 
       return res.status(200).json({
         result: true,
         articleId,
         title: article.title,
-        hasArticleContent: canonicalContentRow !== null,
-        content: canonicalContentRow?.content ?? null,
-        contentSource: canonicalContentRow ? "article-contents-02" : null,
+        hasArticleContent,
+        content: hasArticleContent ? canonicalContentRow?.content ?? null : null,
+        contentSource: hasArticleContent ? "article-contents-02" : null,
       });
     } catch (error: unknown) {
       logger.error(

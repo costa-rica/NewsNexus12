@@ -26,6 +26,10 @@ const mockGetCanonicalArticleContents02Row = jest.fn();
 jest.mock("../../src/modules/newsOrgs/articleContents02Seed", () => ({
   getCanonicalArticleContents02Row: (...args: unknown[]) =>
     mockGetCanonicalArticleContents02Row(...args),
+  isSuccessfulArticleContents02Row: (row: { status?: string | null; content?: string | null }) =>
+    row.status === "success" &&
+    typeof row.content === "string" &&
+    row.content.trim().length > 0,
 }));
 
 const mockAiApproverPromptVersion = {
@@ -151,6 +155,7 @@ describe("analysis ai approver routes", () => {
     mockGetCanonicalArticleContents02Row.mockResolvedValue({
       id: 201,
       articleId: 77,
+      status: "success",
       content: "Stored article content",
     });
 
@@ -188,6 +193,34 @@ describe("analysis ai approver routes", () => {
       result: true,
       articleId: 78,
       title: "Article without scraped content",
+      hasArticleContent: false,
+      content: null,
+      contentSource: null,
+    });
+  });
+
+  test("GET /analysis/ai-approver/review-article-content/:articleId returns empty content shape when the canonical row is not successful", async () => {
+    mockArticle.findByPk.mockResolvedValue({
+      id: 79,
+      title: "Article with failed scraped content",
+    });
+    mockGetCanonicalArticleContents02Row.mockResolvedValue({
+      id: 301,
+      articleId: 79,
+      status: "fail",
+      content: "Some content that should not count",
+    });
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/analysis/ai-approver/review-article-content/79",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      articleId: 79,
+      title: "Article with failed scraped content",
       hasArticleContent: false,
       content: null,
       contentSource: null,

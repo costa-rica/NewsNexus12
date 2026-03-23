@@ -17,6 +17,7 @@ export interface Article {
 	publishedDate: string;
 	description: string;
 	url: string;
+	publisherFinalUrl?: string | null;
 	content?: string;
 	isApproved?: boolean;
 	isBeingReviewed?: boolean;

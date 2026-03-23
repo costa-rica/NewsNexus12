@@ -154,8 +154,8 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			columnHelper.accessor("url", {
 				header: "URL",
 				enableSorting: true,
-				cell: ({ getValue }) => {
-					const rawUrl = getValue();
+				cell: ({ getValue, row }) => {
+					const rawUrl = row.original.publisherFinalUrl || getValue();
 					if (!rawUrl) return null;
 
 					const strippedUrl = rawUrl

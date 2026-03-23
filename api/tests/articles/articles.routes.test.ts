@@ -22,6 +22,20 @@ const mockArticlesModule = {
 
 jest.mock("../../src/modules/articles", () => mockArticlesModule);
 
+const mockGetCanonicalArticleContents02Row = jest.fn();
+
+jest.mock("../../src/modules/newsOrgs/articleContents02Seed", () => ({
+  getCanonicalArticleContents02Row: (...args: unknown[]) =>
+    mockGetCanonicalArticleContents02Row(...args),
+  isSuccessfulArticleContents02Row: (row: {
+    status?: string | null;
+    content?: string | null;
+  }) =>
+    row.status === "success" &&
+    typeof row.content === "string" &&
+    row.content.trim().length > 0,
+}));
+
 const mockCommonModule = {
   getLastThursdayAt20hInNyTimeZone: jest.fn(),
 };
@@ -42,8 +56,12 @@ const mockQueriesSqlModule = {
 
 jest.mock("../../src/modules/queriesSql", () => mockQueriesSqlModule);
 
+const mockArticleModel = {
+  findByPk: jest.fn(),
+};
+
 jest.mock("@newsnexus/db-models", () => ({
-  Article: {},
+  Article: mockArticleModel,
   State: {},
   ArticleIsRelevant: {},
   ArticleApproved: {},
@@ -213,6 +231,54 @@ describe("articles routes contract tests", () => {
     expect(response.body).toMatchObject({
       id: 77,
       title: "Article 77",
+    });
+  });
+
+  test("GET /articles/review-selected-content/:articleId returns scraped content when canonical row is successful", async () => {
+    mockArticleModel.findByPk.mockResolvedValue({ id: 77 });
+    mockGetCanonicalArticleContents02Row.mockResolvedValue({
+      id: 201,
+      articleId: 77,
+      status: "success",
+      content: "Stored article content",
+    });
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/articles/review-selected-content/77",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      articleId: 77,
+      hasArticleContent: true,
+      content: "Stored article content",
+      contentSource: "article-contents-02",
+    });
+  });
+
+  test("GET /articles/review-selected-content/:articleId returns empty content when canonical row is not usable", async () => {
+    mockArticleModel.findByPk.mockResolvedValue({ id: 78 });
+    mockGetCanonicalArticleContents02Row.mockResolvedValue({
+      id: 202,
+      articleId: 78,
+      status: "fail",
+      content: "Stored article content",
+    });
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/articles/review-selected-content/78",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      articleId: 78,
+      hasArticleContent: false,
+      content: null,
+      contentSource: null,
     });
   });
 });
