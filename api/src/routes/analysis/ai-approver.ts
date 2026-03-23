@@ -1,9 +1,12 @@
 import express from "express";
 import type { Request, Response } from "express";
+import axios from "axios";
+import { getCanonicalArticleContents02Row } from "../../modules/newsOrgs/articleContents02Seed";
 
 const router = express.Router();
 const { authenticateToken } = require("../../modules/userAuthentication");
 const {
+  Article,
   AiApproverArticleScore,
   AiApproverPromptVersion,
 } = require("@newsnexus/db-models");
@@ -13,8 +16,77 @@ import {
   validatePromptActiveRequest,
   validatePromptCreateRequest,
   validatePromptHumanVerifyRequest,
+  validateReviewPageStartJobRequest,
   validateTopScoresRequest,
 } from "../../modules/analysis/ai-approver";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getWorkerPythonBaseUrl(): string | null {
+  const rawValue = process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER || "";
+  const trimmedValue = rawValue.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  return trimmedValue.replace(/\/+$/, "");
+}
+
+function getRequiredWorkerPythonBaseUrl(res: Response): string | null {
+  const workerPythonBaseUrl = getWorkerPythonBaseUrl();
+
+  if (!workerPythonBaseUrl) {
+    res.status(500).json({
+      result: false,
+      message: "URL_BASE_NEWS_NEXUS_PYTHON_QUEUER is not configured.",
+    });
+    return null;
+  }
+
+  return workerPythonBaseUrl;
+}
+
+function forwardWorkerPythonAxiosError(
+  res: Response,
+  error: unknown,
+): Response {
+  if (
+    axios.isAxiosError(error) &&
+    !error.response &&
+    error.code === "ECONNREFUSED"
+  ) {
+    return res.status(502).json({
+      result: false,
+      message:
+        "Unable to reach the worker-python app. Make sure the worker-python service is running and try again.",
+    });
+  }
+
+  if (axios.isAxiosError(error)) {
+    return res.status(error.response?.status || 500).json(
+      error.response?.data || {
+        result: false,
+        message: error.message,
+      },
+    );
+  }
+
+  return res.status(500).json({
+    result: false,
+    message: getErrorMessage(error),
+  });
+}
+
+function formatPromptDescriptionDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildReviewPagePromptDescription(userId: number, articleId: number): string {
+  return `userId:${userId}, articleId:${articleId}, date:${formatPromptDescriptionDate(new Date())}`;
+}
 
 router.get("/prompts", authenticateToken, async (_req: Request, res: Response) => {
   try {
@@ -38,6 +110,50 @@ router.get("/prompts", authenticateToken, async (_req: Request, res: Response) =
     });
   }
 });
+
+router.get(
+  "/review-article-content/:articleId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const articleId = parseNumericId(req.params.articleId);
+      if (articleId === null) {
+        return res.status(400).json({
+          result: false,
+          message: "Invalid articleId",
+        });
+      }
+
+      const article = await Article.findByPk(articleId);
+      if (!article) {
+        return res.status(404).json({
+          result: false,
+          message: "Article not found",
+        });
+      }
+
+      const canonicalContentRow = await getCanonicalArticleContents02Row(articleId);
+
+      return res.status(200).json({
+        result: true,
+        articleId,
+        title: article.title,
+        hasArticleContent: canonicalContentRow !== null,
+        content: canonicalContentRow?.content ?? null,
+        contentSource: canonicalContentRow ? "article-contents-02" : null,
+      });
+    } catch (error: unknown) {
+      logger.error(
+        "Error in GET /analysis/ai-approver/review-article-content/:articleId:",
+        error,
+      );
+      return res.status(500).json({
+        result: false,
+        message: "Failed to fetch review article content",
+      });
+    }
+  },
+);
 
 router.post("/prompts", authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -74,6 +190,77 @@ router.post("/prompts", authenticateToken, async (req: Request, res: Response) =
     });
   }
 });
+
+router.post(
+  "/review-page/start-job",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    const workerPythonBaseUrl = getRequiredWorkerPythonBaseUrl(res);
+    if (!workerPythonBaseUrl) {
+      return;
+    }
+
+    try {
+      const validation = validateReviewPageStartJobRequest(req.body || {});
+      if (!validation.isValid) {
+        return res.status(400).json({
+          result: false,
+          message: validation.error,
+        });
+      }
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          result: false,
+          message: "Authenticated user is required",
+        });
+      }
+
+      const articleId = req.body.articleId as number;
+      const article = await Article.findByPk(articleId);
+      if (!article) {
+        return res.status(404).json({
+          result: false,
+          message: "Article not found",
+        });
+      }
+
+      const prompt = await AiApproverPromptVersion.create({
+        name: (req.body.name as string).trim(),
+        description: buildReviewPagePromptDescription(req.user.id, articleId),
+        promptInMarkdown: (req.body.promptInMarkdown as string).trim(),
+        isActive: false,
+        endedAt: null,
+      });
+
+      const response = await axios.post(
+        `${workerPythonBaseUrl}/ai-approver/review-page/start-job`,
+        {
+          articleId,
+          promptVersionId: prompt.id,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      return res.status(response.status).json({
+        result: true,
+        ...response.data,
+        promptVersionId: prompt.id,
+        articleId,
+      });
+    } catch (error: unknown) {
+      logger.error(
+        "Error in POST /analysis/ai-approver/review-page/start-job:",
+        error,
+      );
+      return forwardWorkerPythonAxiosError(res, error);
+    }
+  },
+);
 
 router.post(
   "/prompts/:promptVersionId/copy",

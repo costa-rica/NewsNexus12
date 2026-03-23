@@ -172,39 +172,39 @@
 
 ## 3. phase 2 - api article-content endpoint and one-off submission endpoint
 
-- [ ] Add a dedicated API endpoint to fetch article content for the new review-page modal.
-- [ ] Do not modify existing content endpoints used elsewhere.
-- [ ] Add API logic to return:
+- [x] Add a dedicated API endpoint to fetch article content for the new review-page modal.
+- [x] Do not modify existing content endpoints used elsewhere.
+- [x] Add API logic to return:
   - `articleId`
   - `title`
   - whether `ArticleContents02` exists
   - the chosen content body for display
   - source metadata if useful for UI messaging
-- [ ] Ensure the content endpoint can read canonical `ArticleContents02` content directly for the modal.
-- [ ] Add a dedicated API endpoint to submit a one-off AI approver request for one article.
-- [ ] Validate required fields for one-off submission.
-- [ ] Generate the prompt description server-side using:
+- [x] Ensure the content endpoint can read canonical `ArticleContents02` content directly for the modal.
+- [x] Add a dedicated API endpoint to submit a one-off AI approver request for one article.
+- [x] Validate required fields for one-off submission.
+- [x] Generate the prompt description server-side using:
   - `userId:<id>, articleId:<id>, date:<YYYY-MM-DD>`
-- [ ] Create a new `AiApproverPromptVersions` row with:
+- [x] Create a new `AiApproverPromptVersions` row with:
   - user-provided `name`
   - generated `description`
   - submitted `promptInMarkdown`
   - `isActive = false`
   - `endedAt = null`
-- [ ] Ensure copied-prompt naming defaults can still be overridden by the user before submit.
-- [ ] Proxy the one-off submission request from `api` to the new worker-python route.
-- [ ] Return queue/job details needed by the portal modal.
-- [ ] Keep existing prompt CRUD and AI-approver endpoints unchanged unless the new flow requires additive shared helpers only.
-- [ ] Add API tests for:
+- [x] Ensure copied-prompt naming defaults can still be overridden by the user before submit.
+- [x] Proxy the one-off submission request from `api` to the new worker-python route.
+- [x] Return queue/job details needed by the portal modal.
+- [x] Keep existing prompt CRUD and AI-approver endpoints unchanged unless the new flow requires additive shared helpers only.
+- [x] Add API tests for:
   - article-content fetch success
   - one-off submission validation
   - generated description format
   - inactive prompt-row creation
   - worker-python proxy success and failure handling
-- [ ] Run relevant tests for this phase.
+- [x] Run relevant tests for this phase.
   - `api`: `npm -C api test`
-- [ ] If tests pass, check off completed tasks in this phase.
-- [ ] Commit with a message that references `docs/REVIEW_PAGE_AI_APPROVER_FLOW_20260323_TODO.md` and phase 2.
+- [x] If tests pass, check off completed tasks in this phase.
+- [x] Commit with a message that references `docs/REVIEW_PAGE_AI_APPROVER_FLOW_20260323_TODO.md` and phase 2.
 
 ## 4. phase 3 - worker-python one-off AI approver route and execution flow
 

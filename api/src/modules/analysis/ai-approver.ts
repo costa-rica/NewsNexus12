@@ -18,6 +18,13 @@ type TopScoresBody = {
   articleIds?: unknown;
 };
 
+type ReviewPageStartJobBody = {
+  articleId?: unknown;
+  name?: unknown;
+  promptInMarkdown?: unknown;
+  sourcePromptVersionId?: unknown;
+};
+
 export function validatePromptCreateRequest(body: PromptBody): {
   isValid: boolean;
   error?: string;
@@ -147,6 +154,51 @@ export function validateTopScoresRequest(body: TopScoresBody): {
     return {
       isValid: false,
       error: "articleIds must contain positive integers only",
+    };
+  }
+
+  return { isValid: true };
+}
+
+export function validateReviewPageStartJobRequest(
+  body: ReviewPageStartJobBody,
+): {
+  isValid: boolean;
+  error?: string;
+} {
+  if (!Number.isInteger(body.articleId) || Number(body.articleId) <= 0) {
+    return {
+      isValid: false,
+      error: "articleId must be a positive integer",
+    };
+  }
+
+  if (typeof body.name !== "string" || body.name.trim().length === 0) {
+    return {
+      isValid: false,
+      error: "name is required",
+    };
+  }
+
+  if (
+    typeof body.promptInMarkdown !== "string" ||
+    body.promptInMarkdown.trim().length === 0
+  ) {
+    return {
+      isValid: false,
+      error: "promptInMarkdown is required",
+    };
+  }
+
+  if (
+    body.sourcePromptVersionId !== undefined &&
+    body.sourcePromptVersionId !== null &&
+    (!Number.isInteger(body.sourcePromptVersionId) ||
+      Number(body.sourcePromptVersionId) <= 0)
+  ) {
+    return {
+      isValid: false,
+      error: "sourcePromptVersionId must be a positive integer if provided",
     };
   }
 

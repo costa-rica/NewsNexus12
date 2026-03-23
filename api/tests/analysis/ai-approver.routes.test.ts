@@ -8,7 +8,24 @@ jest.mock("../../src/modules/logger", () => ({
 }));
 
 jest.mock("../../src/modules/userAuthentication", () => ({
-  authenticateToken: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authenticateToken: (req: any, _res: unknown, next: () => void) => {
+    req.user = { id: 7, email: "tester@example.com" };
+    next();
+  },
+}));
+
+const mockAxios = {
+  isAxiosError: jest.fn(),
+  post: jest.fn(),
+};
+
+jest.mock("axios", () => mockAxios);
+
+const mockGetCanonicalArticleContents02Row = jest.fn();
+
+jest.mock("../../src/modules/newsOrgs/articleContents02Seed", () => ({
+  getCanonicalArticleContents02Row: (...args: unknown[]) =>
+    mockGetCanonicalArticleContents02Row(...args),
 }));
 
 const mockAiApproverPromptVersion = {
@@ -23,7 +40,12 @@ const mockAiApproverArticleScore = {
   findByPk: jest.fn(),
 };
 
+const mockArticle = {
+  findByPk: jest.fn(),
+};
+
 jest.mock("@newsnexus/db-models", () => ({
+  Article: mockArticle,
   AiApproverPromptVersion: mockAiApproverPromptVersion,
   AiApproverArticleScore: mockAiApproverArticleScore,
 }));
@@ -67,6 +89,7 @@ function buildScoreRow(overrides: Record<string, unknown> = {}) {
 describe("analysis ai approver routes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER = "http://worker-python";
   });
 
   test("GET /analysis/ai-approver/prompts returns prompt rows", async () => {
@@ -117,6 +140,162 @@ describe("analysis ai approver routes", () => {
       promptInMarkdown: "# Task",
       isActive: true,
       endedAt: null,
+    });
+  });
+
+  test("GET /analysis/ai-approver/review-article-content/:articleId returns article content from ArticleContents02", async () => {
+    mockArticle.findByPk.mockResolvedValue({
+      id: 77,
+      title: "Stored article title",
+    });
+    mockGetCanonicalArticleContents02Row.mockResolvedValue({
+      id: 201,
+      articleId: 77,
+      content: "Stored article content",
+    });
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/analysis/ai-approver/review-article-content/77",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      articleId: 77,
+      title: "Stored article title",
+      hasArticleContent: true,
+      content: "Stored article content",
+      contentSource: "article-contents-02",
+    });
+    expect(mockGetCanonicalArticleContents02Row).toHaveBeenCalledWith(77);
+  });
+
+  test("GET /analysis/ai-approver/review-article-content/:articleId returns empty content shape when no ArticleContents02 row exists", async () => {
+    mockArticle.findByPk.mockResolvedValue({
+      id: 78,
+      title: "Article without scraped content",
+    });
+    mockGetCanonicalArticleContents02Row.mockResolvedValue(null);
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/analysis/ai-approver/review-article-content/78",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      result: true,
+      articleId: 78,
+      title: "Article without scraped content",
+      hasArticleContent: false,
+      content: null,
+      contentSource: null,
+    });
+  });
+
+  test("POST /analysis/ai-approver/review-page/start-job validates required fields", async () => {
+    const app = buildApp();
+    const response = await request(app)
+      .post("/analysis/ai-approver/review-page/start-job")
+      .send({
+        articleId: 77,
+        name: "",
+        promptInMarkdown: "",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.result).toBe(false);
+  });
+
+  test("POST /analysis/ai-approver/review-page/start-job creates an inactive prompt row and proxies worker request", async () => {
+    mockArticle.findByPk.mockResolvedValue({
+      id: 77,
+      title: "Stored article title",
+    });
+    mockAiApproverPromptVersion.create.mockResolvedValue({
+      id: 456,
+    });
+    mockAxios.post.mockResolvedValue({
+      status: 202,
+      data: {
+        endpointName: "/ai-approver/review-page/start-job",
+        jobId: "job-123",
+        status: "queued",
+      },
+    });
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/analysis/ai-approver/review-page/start-job")
+      .send({
+        articleId: 77,
+        name: "Residential Fire-articleId: 77",
+        promptInMarkdown: "# Prompt",
+        sourcePromptVersionId: 15,
+      });
+
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      result: true,
+      endpointName: "/ai-approver/review-page/start-job",
+      jobId: "job-123",
+      status: "queued",
+      promptVersionId: 456,
+      articleId: 77,
+    });
+    expect(mockAiApproverPromptVersion.create).toHaveBeenCalledWith({
+      name: "Residential Fire-articleId: 77",
+      description: expect.stringMatching(
+        /^userId:7, articleId:77, date:\d{4}-\d{2}-\d{2}$/,
+      ),
+      promptInMarkdown: "# Prompt",
+      isActive: false,
+      endedAt: null,
+    });
+    expect(mockAxios.post).toHaveBeenCalledWith(
+      "http://worker-python/ai-approver/review-page/start-job",
+      {
+        articleId: 77,
+        promptVersionId: 456,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  });
+
+  test("POST /analysis/ai-approver/review-page/start-job returns worker-python unavailable message on connection refusal", async () => {
+    mockArticle.findByPk.mockResolvedValue({
+      id: 77,
+      title: "Stored article title",
+    });
+    mockAiApproverPromptVersion.create.mockResolvedValue({
+      id: 456,
+    });
+    mockAxios.isAxiosError.mockReturnValue(true);
+    mockAxios.post.mockRejectedValue({
+      code: "ECONNREFUSED",
+      message: "connect ECONNREFUSED 127.0.0.1:5000",
+      response: undefined,
+    });
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/analysis/ai-approver/review-page/start-job")
+      .send({
+        articleId: 77,
+        name: "Residential Fire-articleId: 77",
+        promptInMarkdown: "# Prompt",
+      });
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      result: false,
+      message:
+        "Unable to reach the worker-python app. Make sure the worker-python service is running and try again.",
     });
   });
 
