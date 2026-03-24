@@ -11,11 +11,28 @@ export interface LoggerConfig {
   logMaxFiles: number;
 }
 
-const loggerFormat = format.combine(format.timestamp(), format.errors({ stack: true }), format.json());
+const humanReadableLoggerFormat = format.combine(
+  format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  format.errors({ stack: true }),
+  format.printf(({ timestamp, level, message, stack, ...meta }) => {
+    const renderedMessage = stack ?? message;
+    const metaEntries = Object.entries(meta).filter(([, value]) => value !== undefined);
+    const renderedMeta =
+      metaEntries.length > 0
+        ? metaEntries
+            .map(([key, value]) => `${key}=${typeof value === 'string' ? value : JSON.stringify(value)}`)
+            .join(' ')
+        : '';
+
+    return renderedMeta
+      ? `${timestamp} [${level.toUpperCase()}] ${renderedMessage} ${renderedMeta}`
+      : `${timestamp} [${level.toUpperCase()}] ${renderedMessage}`;
+  })
+);
 
 const logger = createLogger({
   level: 'info',
-  format: loggerFormat,
+  format: humanReadableLoggerFormat,
   transports: [new transports.Console({ silent: true })]
 });
 
@@ -38,13 +55,16 @@ const buildFileTransport = (config: LoggerConfig): transports.FileTransportInsta
     filename: path.join(config.pathToLogs, `${config.nameApp}.log`),
     maxsize: config.logMaxSizeMb * 1024 * 1024,
     maxFiles: config.logMaxFiles,
-    tailable: true
+    tailable: true,
+    format: humanReadableLoggerFormat
   });
 
 const buildTransports = (
   config: LoggerConfig
 ): Array<transports.ConsoleTransportInstance | transports.FileTransportInstance> => {
-  const consoleTransport = new transports.Console();
+  const consoleTransport = new transports.Console({
+    format: humanReadableLoggerFormat
+  });
   const fileTransport = buildFileTransport(config);
 
   if (config.nodeEnv === 'development') {
@@ -82,7 +102,7 @@ export const initializeLogger = (config: LoggerConfig): Logger => {
 
   logger.configure({
     level: resolveLogLevel(config.nodeEnv),
-    format: loggerFormat,
+    format: humanReadableLoggerFormat,
     transports: buildTransports(config)
   });
 
@@ -91,5 +111,14 @@ export const initializeLogger = (config: LoggerConfig): Logger => {
 };
 
 export const isLoggerInitialized = (): boolean => loggerInitialized;
+
+export const logWorkflowStart = (workflowName: string, metadata?: Record<string, unknown>): void => {
+  logger.info('------------------------------------------------------------');
+  logger.info(`### Starting ${workflowName} ###`);
+
+  if (metadata && Object.keys(metadata).length > 0) {
+    logger.info(`${workflowName} context`, metadata);
+  }
+};
 
 export default logger;

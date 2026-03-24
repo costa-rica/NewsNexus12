@@ -7,7 +7,7 @@ import {
 } from '@newsnexus/db-models';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import logger from '../logger';
+import logger, { logWorkflowStart } from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
 import { ensureStateAssignerDirectories, StateAssignerDirectories } from '../startup/stateAssignerFiles';
 import ensureDbReady from '../db/ensureDbReady';
@@ -368,6 +368,12 @@ const runLegacyWorkflow = async (
     'selectArticles' | 'enrichContent02' | 'getCanonicalContent02Row'
   > = {}
 ): Promise<void> => {
+  logWorkflowStart('State Assigner', {
+    jobId: context.jobId,
+    targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
+    targetArticleStateReviewCount: context.targetArticleStateReviewCount
+  });
+
   await ensureDbReady();
   const stateAssignerDirectories = await ensureStateAssignerDirectories(
     context.pathToStateAssignerFiles

@@ -5,7 +5,7 @@ import {
   selectTargetArticles
 } from '../articleTargeting';
 import { enrichArticleContent02 } from '../article-content-02/enrichment';
-import logger from '../logger';
+import logger, { logWorkflowStart } from '../logger';
 
 export interface ArticleContentScraper02JobDependencies {
   ensureDb?: typeof ensureDbReady;
@@ -17,6 +17,15 @@ export const runArticleContentScraper02Workflow = async (
   input: ArticleAutomationTargetingInput & { signal: AbortSignal; jobId: string },
   dependencies: ArticleContentScraper02JobDependencies = {}
 ): Promise<void> => {
+  logWorkflowStart('ArticleContents02 Scraper', {
+    jobId: input.jobId,
+    requestedArticleIds: input.articleIds?.length ?? 0,
+    targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
+    targetArticleStateReviewCount: input.targetArticleStateReviewCount,
+    includeArticlesThatMightHaveBeenStateAssigned:
+      input.includeArticlesThatMightHaveBeenStateAssigned === true
+  });
+
   const ensureDb = dependencies.ensureDb ?? ensureDbReady;
   await ensureDb();
 

@@ -9,7 +9,7 @@ import {
   initModels,
   sequelize
 } from '@newsnexus/db-models';
-import logger from '../logger';
+import logger, { logWorkflowStart } from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
 import {
   GoogleNavigationSession,
@@ -581,6 +581,11 @@ const delay = async (ms: number, signal: AbortSignal): Promise<void> => {
 };
 
 const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<void> => {
+  logWorkflowStart('Request Google RSS', {
+    jobId: context.jobId,
+    spreadsheetPath: context.spreadsheetPath
+  });
+
   const delayBetweenRequestsMs = (() => {
     const envValue = process.env.MILISECONDS_IN_BETWEEN_REQUESTS;
     if (!envValue) {
