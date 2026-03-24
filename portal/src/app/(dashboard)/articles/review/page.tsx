@@ -408,11 +408,7 @@ export default function ReviewArticles() {
 			: articlesArray;
 
 		if (filteredArticles.length > 0) {
-			setSelectedArticle({
-				...filteredArticles[0],
-				content: filteredArticles[0].description,
-			});
-			updateStateArrayWithArticleState(filteredArticles[0]);
+			void handleSelectArticleFromTable(filteredArticles[0]);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [allowUpdateSelectedArticle, articlesArray, userReducer.hideIrrelevant]);
