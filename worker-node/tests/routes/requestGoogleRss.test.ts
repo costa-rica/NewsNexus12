@@ -159,7 +159,7 @@ describe('requestGoogleRss routes', () => {
     });
 
     const response = await request(app).post('/request-google-rss/start-job').send({
-      doNotRepeatRequestsWithinHours: 0
+      doNotRepeatRequestsWithinHours: -1
     });
 
     expect(response.status).toBe(400);
