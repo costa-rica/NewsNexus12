@@ -43,22 +43,22 @@ export function initArticle() {
         primaryKey: true,
       },
       publicationName: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       author: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       title: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       description: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       url: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       urlToImage: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       publishedDate: {
         type: DataTypes.DATEONLY,
