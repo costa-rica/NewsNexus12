@@ -50,8 +50,8 @@ async function sqlQueryArticlesSummaryStatistics(): Promise<SqlQueryRow[]> {
   FROM "Articles" a
   LEFT JOIN "ArticleIsRelevants" ar ON ar."articleId" = a.id
   LEFT JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
-  LEFT JOIN "ArticleStateContracts" asc ON asc."articleId" = a.id
-  LEFT JOIN "States" s ON s.id = asc."stateId"
+  LEFT JOIN "ArticleStateContracts" asct ON asct."articleId" = a.id
+  LEFT JOIN "States" s ON s.id = asct."stateId"
   LEFT JOIN "ArticleReportContracts" arc ON arc."articleId" = a.id;
 `;
 
@@ -202,8 +202,8 @@ async function sqlQueryArticlesOld({
         nar."orString",
         nar."notString"
       FROM "Articles" a
-      LEFT JOIN "ArticleStateContracts" asc ON a.id = asc."articleId"
-      LEFT JOIN "States" s ON asc."stateId" = s.id
+      LEFT JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
+      LEFT JOIN "States" s ON asct."stateId" = s.id
       LEFT JOIN "ArticleIsRelevants" ar ON ar."articleId" = a.id
       LEFT JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
       LEFT JOIN "NewsApiRequests" nar ON nar.id = a."newsApiRequestId"
@@ -247,7 +247,7 @@ async function sqlQueryArticles({
         a.description,
         a."publishedDate",
         a.url,
-        a.createdAt,
+        a."createdAt",
         nar."andString",
         nar."orString",
         nar."notString"
@@ -277,8 +277,8 @@ async function sqlQueryArticlesWithStates(): Promise<SqlQueryRow[]> {
         s.name AS "stateName",
         s.abbreviation
       FROM "Articles" a
-      INNER JOIN "ArticleStateContracts" asc ON a.id = asc."articleId"
-      LEFT JOIN "States" s ON asc."stateId" = s.id
+      INNER JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
+      LEFT JOIN "States" s ON asct."stateId" = s.id
       ORDER BY a.id;
     `;
 
@@ -297,15 +297,15 @@ async function sqlQueryArticlesWithStatesApprovedReportContract(): Promise<
       a.id AS "articleId",
       a.title,
       a.description,
-      a.publishedDate,
-      a.createdAt,
-      a.publicationName,
+      a."publishedDate",
+      a."createdAt",
+      a."publicationName",
       a.url,
       a.author,
-      a.urlToImage,
-      a.entityWhoFoundArticleId,
-      a.newsApiRequestId,
-      a.newsRssRequestId,
+      a."urlToImage",
+      a."entityWhoFoundArticleId",
+      a."newsApiRequestId",
+      a."newsRssRequestId",
       s.id AS "stateId",
       s.name AS "stateName",
       s.abbreviation AS "stateAbbreviation",
@@ -325,8 +325,8 @@ async function sqlQueryArticlesWithStatesApprovedReportContract(): Promise<
       arc."articleAcceptedByCpsc",
       arc."articleRejectionReason"
     FROM "Articles" a
-    LEFT JOIN "ArticleStateContracts" asc ON a.id = asc."articleId"
-    LEFT JOIN "States" s ON s.id = asc."stateId"
+    LEFT JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
+    LEFT JOIN "States" s ON s.id = asct."stateId"
     LEFT JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
     LEFT JOIN "ArticleReportContracts" arc ON arc."articleId" = a.id
     ORDER BY a.id;
@@ -522,8 +522,8 @@ async function sqlQueryArticlesForWithRatingsRoute(
     FROM "Articles" a
     LEFT JOIN "ArticleIsRelevants" air ON air."articleId" = a.id
     LEFT JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
-    LEFT JOIN "ArticleStateContracts" asc ON asc."articleId" = a.id
-    LEFT JOIN "States" s ON s.id = asc."stateId"
+    LEFT JOIN "ArticleStateContracts" asct ON asct."articleId" = a.id
+    LEFT JOIN "States" s ON s.id = asct."stateId"
 
     LEFT JOIN "NewsApiRequests" nar ON nar.id = a."newsApiRequestId"
     LEFT JOIN "NewsArticleAggregatorSources" nas ON nas.id = nar."newsArticleAggregatorSourceId"
@@ -737,15 +737,15 @@ async function sqlQueryArticlesReport(): Promise<SqlQueryRow[]> {
     a.id AS "articleId",
     a.title,
     a.description,
-    a.publishedDate,
-    a.createdAt,
-    a.publicationName,
+    a."publishedDate",
+    a."createdAt",
+    a."publicationName",
     a.url,
     a.author,
-    a.urlToImage,
-    a.entityWhoFoundArticleId,
-    a.newsApiRequestId,
-    a.newsRssRequestId,
+    a."urlToImage",
+    a."entityWhoFoundArticleId",
+    a."newsApiRequestId",
+    a."newsRssRequestId",
     arc.id AS "reportContractId",
     arc."reportId",
     r.id AS "reportId",
@@ -771,7 +771,7 @@ async function sqlQueryArticlesIsRelevant(): Promise<SqlQueryRow[]> {
       a.description,
       a."publishedDate",
       a.url,
-      a.createdAt,
+      a."createdAt",
       ar."isRelevant"
     FROM "Articles" a
     INNER JOIN "ArticleIsRelevants" ar ON ar."articleId" = a.id
@@ -838,7 +838,7 @@ async function sqlQueryArticleDetails(
           ac2.id DESC
         LIMIT 1
       ) AS "articleContent",
-      asc."stateId" AS "humanStateId",
+      asct."stateId" AS "humanStateId",
       s1.name AS "humanStateName",
       asc2."stateId" AS "aiStateId",
       s2.name AS "aiStateName",
@@ -846,8 +846,8 @@ async function sqlQueryArticleDetails(
       asc2."isHumanApproved" AS "aiIsHumanApproved",
       asc2."reasoning" AS "aiReasoning"
     FROM "Articles" a
-    LEFT JOIN "ArticleStateContracts" asc ON asc."articleId" = a.id
-    LEFT JOIN "States" s1 ON s1.id = asc."stateId"
+    LEFT JOIN "ArticleStateContracts" asct ON asct."articleId" = a.id
+    LEFT JOIN "States" s1 ON s1.id = asct."stateId"
     LEFT JOIN "ArticleStateContracts02" asc2 ON asc2."articleId" = a.id
     LEFT JOIN "States" s2 ON s2.id = asc2."stateId"
     WHERE a.id = :articleId;

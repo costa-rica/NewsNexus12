@@ -488,7 +488,7 @@ router.delete(
       const { model } = resolved;
 
       // Delete all records from the table
-      await model.destroy({ where: {}, truncate: true });
+      await model.destroy({ where: {} });
 
       res.json({
         result: true,

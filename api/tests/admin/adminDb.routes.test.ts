@@ -146,7 +146,6 @@ describe("adminDb routes", () => {
     expect(response.body.result).toBe(true);
     expect(dbMock.Keyword.destroy).toHaveBeenCalledWith({
       where: {},
-      truncate: true,
     });
   });
 
