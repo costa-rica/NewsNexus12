@@ -13,6 +13,7 @@
     "test:endpoints": "jest --runInBand tests/smoke"
   },
   "dependencies": {
+    "@newsnexus/db-models": "file:../db-models",
     "archiver": "^7.0.1",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
@@ -29,8 +30,7 @@
     "luxon": "^3.7.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "@newsnexus/db-models": "file:../db-models",
-    "nodemailer": "^7.0.10",
+    "nodemailer": "^8.0.5",
     "pdfkit": "^0.17.2",
     "sequelize": "^6.37.7",
     "tslib": "^2.8.1",

@@ -127,7 +127,7 @@ const getEmbedder = async (): Promise<
 > => {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const transformers = (await import('@xenova/transformers')) as {
+      const transformers = (await import('@huggingface/transformers')) as {
         pipeline: (
           task: 'feature-extraction',
           model: string
