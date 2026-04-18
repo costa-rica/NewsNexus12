@@ -5,7 +5,6 @@ This is the new FastAPI-based worker service for NewsNexus12.
 ## Current status
 
 - Worker API and deduper pipeline run in-process.
-- Legacy Flask service remains in `worker-python-flask/` for fallback.
 - Implementation and maintenance guidance is in `AGENT.md`.
 
 ## Quick start
