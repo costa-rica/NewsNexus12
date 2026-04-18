@@ -20,7 +20,13 @@ jest.mock("@newsnexus/db-models", () => ({
   },
   sequelize: {
     query: jest.fn(),
+    sync: jest.fn(),
+    transaction: jest.fn(async (callback: (transaction: object) => Promise<unknown>) =>
+      callback({}),
+    ),
   },
+  MODEL_LOAD_ORDER: ["Article", "User"],
+  resetAllSequences: jest.fn(),
   // Non-model exports
   initModels: jest.fn(),
 }));
@@ -49,6 +55,8 @@ describe("Zip import module", () => {
     (db.Article.bulkCreate as jest.Mock).mockReset();
     (db.User.bulkCreate as jest.Mock).mockReset();
     (db.sequelize.query as jest.Mock).mockReset();
+    (db.sequelize.sync as jest.Mock).mockReset();
+    (db.resetAllSequences as jest.Mock).mockReset();
   });
 
   describe("normalizeDateValue()", () => {
@@ -248,14 +256,15 @@ describe("Zip import module", () => {
           expect.objectContaining({ id: "1", title: "Article 1" }),
           expect.objectContaining({ id: "2", title: "Article 2" }),
         ]),
-        { ignoreDuplicates: true },
+        { ignoreDuplicates: true, transaction: {} },
       );
       expect(db.User.bulkCreate).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ id: "1", email: "user1@example.com" }),
         ]),
-        { ignoreDuplicates: true },
+        { ignoreDuplicates: true, transaction: {} },
       );
+      expect(db.resetAllSequences).toHaveBeenCalled();
     });
 
     it("reports skipped files when CSV filenames do not match any model", async () => {
@@ -276,7 +285,7 @@ describe("Zip import module", () => {
       expect(result.importedTables).not.toContain("UnknownModel");
     });
 
-    it("disables and re-enables foreign keys around the import", async () => {
+    it("rebuilds the schema before the import", async () => {
       const zipPath = path.join(tempDir, "data.zip");
       const zip = new AdmZip();
       zip.addFile("Article.csv", Buffer.from("id,title\n1,Article 1"));
@@ -288,14 +297,15 @@ describe("Zip import module", () => {
       await importZipFileToDatabase(zipPath);
 
       expect(db.sequelize.query).toHaveBeenCalledWith(
-        "PRAGMA foreign_keys = OFF;",
+        "DROP SCHEMA IF EXISTS public CASCADE;",
       );
       expect(db.sequelize.query).toHaveBeenCalledWith(
-        "PRAGMA foreign_keys = ON;",
+        "CREATE SCHEMA public;",
       );
+      expect(db.sequelize.sync).toHaveBeenCalled();
     });
 
-    it("re-enables foreign keys even when an error occurs during import", async () => {
+    it("propagates import errors after schema rebuild", async () => {
       const zipPath = path.join(tempDir, "data.zip");
       const zip = new AdmZip();
       zip.addFile("Article.csv", Buffer.from("id,title\n1,Article 1"));
@@ -309,13 +319,6 @@ describe("Zip import module", () => {
       await expect(importZipFileToDatabase(zipPath)).rejects.toThrow(
         "Database error",
       );
-
-      // Verify foreign keys were re-enabled in the catch block
-      const calls = (db.sequelize.query as jest.Mock).mock.calls;
-      const fkOnCalls = calls.filter((call) =>
-        call[0].includes("PRAGMA foreign_keys = ON"),
-      );
-      expect(fkOnCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     it("cleans up the temporary extraction directory after import", async () => {
@@ -356,11 +359,11 @@ describe("Zip import module", () => {
 
       await importZipFileToDatabase(zipPath);
 
-      expect(logger.info).toHaveBeenCalledWith(
-        "Disabling foreign key constraints for import",
+      expect(db.sequelize.query).toHaveBeenCalledWith(
+        "DROP SCHEMA IF EXISTS public CASCADE;",
       );
-      expect(logger.info).toHaveBeenCalledWith(
-        "Re-enabling foreign key constraints after import",
+      expect(db.sequelize.query).toHaveBeenCalledWith(
+        "CREATE SCHEMA public;",
       );
     });
 

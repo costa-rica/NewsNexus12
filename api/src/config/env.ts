@@ -49,8 +49,10 @@ export const env: AppEnv = {
 // Keep this list append-only for startup hard requirements.
 export const REQUIRED_STARTUP_ENV_VARS: string[] = [
   'PATH_TO_UTILITIES_ANALYSIS_SPREADSHEETS',
-  'PATH_DATABASE',
-  'NAME_DB',
+  'PG_HOST',
+  'PG_PORT',
+  'PG_DATABASE',
+  'PG_USER',
   'NAME_APP',
 ];
 

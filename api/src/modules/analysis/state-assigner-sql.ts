@@ -35,9 +35,15 @@ async function sqlQueryArticlesWithStateAssignments({
     targetArticleThresholdDaysOld !== undefined &&
     targetArticleThresholdDaysOld !== null
   ) {
-    whereClauses.push(
-      `a."publishedDate" > date('now', '-${targetArticleThresholdDaysOld} days')`,
+    const targetDate = new Date();
+    targetDate.setUTCDate(
+      targetDate.getUTCDate() - targetArticleThresholdDaysOld,
     );
+
+    whereClauses.push(
+      `a."publishedDate" > :targetPublishedDate`,
+    );
+    replacements.targetPublishedDate = targetDate.toISOString();
   }
 
   const whereString =

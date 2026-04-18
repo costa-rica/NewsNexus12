@@ -79,6 +79,9 @@ import { initUser, User } from "./User";
 import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
 
 import { applyAssociations } from "./_associations";
+import { MODEL_LOAD_ORDER } from "./_loadOrder";
+import { ensureSchemaReady } from "../utils/ensureSchemaReady";
+import { resetAllSequences } from "../utils/resetSequences";
 
 export function initModels() {
 	initAiApproverArticleScore();
@@ -149,6 +152,9 @@ export function initModels() {
 
 export {
 	sequelize,
+	MODEL_LOAD_ORDER,
+	ensureSchemaReady,
+	resetAllSequences,
 	AiApproverArticleScore,
 	AiApproverPromptVersion,
 	Article,

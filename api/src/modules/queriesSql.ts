@@ -74,7 +74,7 @@ async function sqlQueryArticlesApproved(): Promise<SqlQueryRow[]> {
       aa."userId" AS "approvedByUserId"
     FROM "Articles" a
     INNER JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
-    WHERE (aa."isApproved" = true OR aa."isApproved" = 1)
+    WHERE aa."isApproved" = true
     ORDER BY a.id;
   `;
 
@@ -798,12 +798,12 @@ async function sqlQueryArticlesApprovedForComponent(
       aa."publicationDateForPdfReport" AS "publicationDate",
       aa."createdAt",
       aa."updatedAt",
-      GROUP_CONCAT(s.abbreviation, ', ') AS "states"
+      STRING_AGG(s.abbreviation, ', ') AS "states"
     FROM "Articles" a
     INNER JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
-    LEFT JOIN "ArticleStateContracts" asc ON asc."articleId" = a.id
-    LEFT JOIN "States" s ON s.id = asc."stateId"
-    WHERE aa."userId" = :userId AND (aa."isApproved" = true OR aa."isApproved" = 1)
+    LEFT JOIN "ArticleStateContracts" asct ON asct."articleId" = a.id
+    LEFT JOIN "States" s ON s.id = asct."stateId"
+    WHERE aa."userId" = :userId AND aa."isApproved" = true
     GROUP BY a.id, aa."headlineForPdfReport", aa."textForPdfReport", aa."urlForPdfReport", aa."publicationNameForPdfReport", aa."publicationDateForPdfReport", aa."createdAt", aa."updatedAt"
     ORDER BY aa."updatedAt" DESC;
   `;

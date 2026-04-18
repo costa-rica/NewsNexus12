@@ -5,7 +5,7 @@ import path from "path";
 import logger from "./logger";
 import * as db from "@newsnexus/db-models";
 
-const { sequelize } = db;
+const { sequelize, MODEL_LOAD_ORDER } = db;
 
 import { promisify } from "util";
 import archiver from "archiver";
@@ -72,15 +72,27 @@ async function readAndAppendDbTables(backupFolderPath: string) {
     const csvFiles = await fs.promises.readdir(backupFolderPath);
     let totalRecordsImported = 0;
 
-    // Separate CSV files into four append batches
-    const appendBatch1: string[] = [];
+    // Order CSV files by the model load order so parent tables import before
+    // their children. This replaces the previous "disable FK constraints"
+    // approach which relied on SQLite PRAGMAs.
+    const csvFileSet = new Set(
+      csvFiles.filter((file) => file.endsWith(".csv")),
+    );
+    const orderedCsvFiles: string[] = [];
+    for (const tableName of MODEL_LOAD_ORDER) {
+      const fileName = `${tableName}.csv`;
+      if (csvFileSet.has(fileName)) {
+        orderedCsvFiles.push(fileName);
+        csvFileSet.delete(fileName);
+      }
+    }
+    // Append any remaining CSV files that aren't in MODEL_LOAD_ORDER (will be
+    // skipped inside processCSVFiles if they have no matching model).
+    for (const leftover of csvFileSet) {
+      orderedCsvFiles.push(leftover);
+    }
 
-    csvFiles.forEach((file) => {
-      if (!file.endsWith(".csv")) return; // Skip non-CSV files
-      appendBatch1.push(file);
-    });
-
-    logger.info(`Append Batch 1 (First): ${appendBatch1}`);
+    logger.info(`CSV import order: ${orderedCsvFiles.join(", ")}`);
 
     // Helper function to process CSV files
     async function processCSVFiles(files: string[]) {
@@ -129,17 +141,11 @@ async function readAndAppendDbTables(backupFolderPath: string) {
       return recordsImported;
     }
 
-    // 🔹 Disable foreign key constraints before importing
-    // ↪This allows us to append when necessary foreign keys are not yet populated.
-    logger.info("Disabling foreign key constraints...");
-    await sequelize.query("PRAGMA foreign_keys = OFF;");
-
-    // Process the batches in order
-    totalRecordsImported += await processCSVFiles(appendBatch1); // First batch
-
-    // 🔹 Re-enable foreign key constraints after importing
-    logger.info("Re-enabling foreign key constraints...");
-    await sequelize.query("PRAGMA foreign_keys = ON;");
+    // Import CSVs in dependency order so foreign key constraints are satisfied
+    // without needing to disable them (Postgres does not support SQLite's
+    // PRAGMA foreign_keys toggle, and db-manager's zipImport flow handles full
+    // rebuilds separately).
+    totalRecordsImported += await processCSVFiles(orderedCsvFiles);
 
     return {
       success: true,
@@ -147,9 +153,6 @@ async function readAndAppendDbTables(backupFolderPath: string) {
     };
   } catch (error: any) {
     logger.error("Error processing CSV files:", error);
-
-    // Ensure foreign key constraints are re-enabled even if an error occurs
-    await sequelize.query("PRAGMA foreign_keys = ON;");
 
     return {
       success: false,

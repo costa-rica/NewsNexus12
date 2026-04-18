@@ -48,8 +48,11 @@ LOG_MAX_SIZE=5
 LOG_MAX_FILES=5
 
 # Database configuration
-PATH_DATABASE=/absolute/path/to/database
-NAME_DB=newsnexus12.db
+PG_HOST=localhost
+PG_PORT=5432
+PG_DATABASE=newsnexus_dev
+PG_USER=postgres
+PG_PASSWORD=
 
 # Backup configuration (required for --create_backup)
 PATH_DB_BACKUPS=/absolute/path/to/backups

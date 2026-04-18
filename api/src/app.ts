@@ -4,7 +4,6 @@ import cors from "cors";
 import morgan from "morgan";
 import path from "path";
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
 import { env } from "./config/env";
 
 const app = express();
@@ -120,18 +119,11 @@ export async function initializeDatabase(): Promise<void> {
   }
 
   databaseInitialization = (async () => {
-    const dbDir = process.env.PATH_DATABASE;
-    if (dbDir && dbDir.trim() !== "") {
-      await mkdir(dbDir, { recursive: true });
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { initModels, sequelize, dropLegacyArticleContentsTable } = require("@newsnexus/db-models");
+    const { ensureSchemaReady, initModels, sequelize } = require("@newsnexus/db-models");
 
     initModels();
-    await sequelize.authenticate();
-    await sequelize.sync();
-    await dropLegacyArticleContentsTable();
+    await ensureSchemaReady(sequelize);
   })();
 
   return databaseInitialization;

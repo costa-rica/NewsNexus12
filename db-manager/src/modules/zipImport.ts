@@ -3,9 +3,9 @@ import csvParser from "csv-parser";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { DataTypes } from "sequelize";
+import { DataTypes, Transaction } from "sequelize";
 import * as db from "@newsnexus/db-models";
-import { sequelize } from "@newsnexus/db-models";
+import { MODEL_LOAD_ORDER, resetAllSequences, sequelize } from "@newsnexus/db-models";
 import { logger } from "../config/logger";
 
 type ImportZipResult = {
@@ -55,6 +55,38 @@ function getDateFields(model: { rawAttributes?: Record<string, unknown> }): Date
   }
 
   return results;
+}
+
+function getBooleanFields(model: { rawAttributes?: Record<string, unknown> }): string[] {
+  if (!model.rawAttributes) {
+    return [];
+  }
+
+  return Object.entries(model.rawAttributes)
+    .filter(([, attribute]) => {
+      const type = (attribute as { type?: { key?: string; constructor?: { name?: string } } }).type;
+      const key = type?.key ?? type?.constructor?.name;
+      return key === DataTypes.BOOLEAN.key;
+    })
+    .map(([field]) => field);
+}
+
+function getIntegerFields(model: { rawAttributes?: Record<string, unknown> }): string[] {
+  if (!model.rawAttributes) {
+    return [];
+  }
+
+  return Object.entries(model.rawAttributes)
+    .filter(([, attribute]) => {
+      const type = (attribute as { type?: { key?: string; constructor?: { name?: string } } }).type;
+      const key = type?.key ?? type?.constructor?.name;
+      return (
+        key === DataTypes.INTEGER.key ||
+        key === DataTypes.BIGINT.key ||
+        key === DataTypes.SMALLINT.key
+      );
+    })
+    .map(([field]) => field);
 }
 
 export function normalizeDateValue(value: unknown, typeKey: "DATE" | "DATEONLY"): string | null {
@@ -121,6 +153,60 @@ export function sanitizeDateFields(
   return sanitizedCount;
 }
 
+export function sanitizeIntegerFields(
+  records: Record<string, string | null>[],
+  integerFields: string[],
+): number {
+  if (integerFields.length === 0 || records.length === 0) {
+    return 0;
+  }
+
+  let sanitizedCount = 0;
+
+  for (const record of records) {
+    for (const field of integerFields) {
+      if (!(field in record)) {
+        continue;
+      }
+      if (record[field] === "") {
+        record[field] = null;
+        sanitizedCount += 1;
+      }
+    }
+  }
+
+  return sanitizedCount;
+}
+
+export function sanitizeBooleanFields(
+  records: Record<string, string | null>[],
+  booleanFields: string[],
+): number {
+  if (booleanFields.length === 0 || records.length === 0) {
+    return 0;
+  }
+
+  let normalizedCount = 0;
+
+  for (const record of records) {
+    for (const field of booleanFields) {
+      if (!(field in record)) {
+        continue;
+      }
+
+      if (record[field] === "1") {
+        record[field] = "true";
+        normalizedCount += 1;
+      } else if (record[field] === "0") {
+        record[field] = "false";
+        normalizedCount += 1;
+      }
+    }
+  }
+
+  return normalizedCount;
+}
+
 async function collectCsvFiles(rootDir: string): Promise<string[]> {
   const entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
   const results: string[] = [];
@@ -155,10 +241,14 @@ async function importCsvFileInBatches(
   filePath: string,
   tableName: string,
   model: { bulkCreate: Function; rawAttributes?: Record<string, unknown> },
-): Promise<{ importedCount: number; sanitizedDates: number }> {
+): Promise<{ importedCount: number; sanitizedDates: number; sanitizedBooleans: number }> {
   const dateFields = getDateFields(model);
+  const booleanFields = getBooleanFields(model);
+  const integerFields = getIntegerFields(model);
   let importedCount = 0;
   let sanitizedDates = 0;
+  let sanitizedBooleans = 0;
+  let sanitizedIntegers = 0;
   let batch: Record<string, string | null>[] = [];
   let nextProgressLogAt = INITIAL_PROGRESS_LOG_THRESHOLD;
 
@@ -168,7 +258,11 @@ async function importCsvFileInBatches(
     }
 
     sanitizedDates += sanitizeDateFields(batch, dateFields);
-    await model.bulkCreate(batch, { ignoreDuplicates: true });
+    sanitizedBooleans += sanitizeBooleanFields(batch, booleanFields);
+    sanitizedIntegers += sanitizeIntegerFields(batch, integerFields);
+    await sequelize.transaction(async (transaction: Transaction) => {
+      await model.bulkCreate(batch, { ignoreDuplicates: true, transaction });
+    });
     importedCount += batch.length;
     batch = [];
   };
@@ -219,7 +313,13 @@ async function importCsvFileInBatches(
     stream.on("error", handleError);
   });
 
-  return { importedCount, sanitizedDates };
+  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers };
+}
+
+async function rebuildSchema(): Promise<void> {
+  await sequelize.query("DROP SCHEMA IF EXISTS public CASCADE;");
+  await sequelize.query("CREATE SCHEMA public;");
+  await sequelize.sync();
 }
 
 export async function importZipFileToDatabase(
@@ -248,19 +348,26 @@ export async function importZipFileToDatabase(
       throw new Error("No CSV files found inside the zip file");
     }
 
-    logger.info("Disabling foreign key constraints for import");
-    await sequelize.query("PRAGMA foreign_keys = OFF;");
+    await rebuildSchema();
 
-    for (const csvFile of csvFiles) {
-      const tableName = path.basename(csvFile, ".csv");
+    const csvFileMap = new Map(
+      csvFiles.map((csvFile) => [path.basename(csvFile, ".csv"), csvFile] as const),
+    );
+
+    for (const tableName of MODEL_LOAD_ORDER) {
+      const csvFile = csvFileMap.get(tableName);
       const model = registry[tableName];
+
+      if (!csvFile) {
+        continue;
+      }
 
       if (!model) {
         skippedFiles.push(path.basename(csvFile));
         continue;
       }
 
-      const { importedCount, sanitizedDates } = await importCsvFileInBatches(
+      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers } = await importCsvFileInBatches(
         csvFile,
         tableName,
         model,
@@ -275,6 +382,16 @@ export async function importZipFileToDatabase(
           `Sanitized ${sanitizedDates} invalid date values to null for ${tableName}`,
         );
       }
+      if (sanitizedBooleans > 0) {
+        logger.warn(
+          `Sanitized ${sanitizedBooleans} SQLite boolean values for ${tableName}`,
+        );
+      }
+      if (sanitizedIntegers > 0) {
+        logger.warn(
+          `Sanitized ${sanitizedIntegers} empty-string integer values to null for ${tableName}`,
+        );
+      }
 
       totalRecords += importedCount;
       if (!importedTables.includes(tableName)) {
@@ -282,13 +399,16 @@ export async function importZipFileToDatabase(
       }
     }
 
-    logger.info("Re-enabling foreign key constraints after import");
-    await sequelize.query("PRAGMA foreign_keys = ON;");
+    for (const csvFile of csvFiles) {
+      const tableName = path.basename(csvFile, ".csv");
+      if (!MODEL_LOAD_ORDER.includes(tableName)) {
+        skippedFiles.push(path.basename(csvFile));
+      }
+    }
+
+    await resetAllSequences(sequelize);
 
     return { totalRecords, importedTables, skippedFiles };
-  } catch (error) {
-    await sequelize.query("PRAGMA foreign_keys = ON;");
-    throw error;
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
   }

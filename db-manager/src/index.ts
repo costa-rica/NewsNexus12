@@ -1,6 +1,4 @@
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
 import { QueryTypes } from "sequelize";
 import { DEFAULT_DELETE_DAYS, parseCliArgs } from "./modules/cli";
 import { DatabaseStatus } from "./types/status";
@@ -8,7 +6,7 @@ import { DatabaseStatus } from "./types/status";
 dotenv.config();
 
 const { logger } = require("./config/logger") as typeof import("./config/logger");
-const { initModels, sequelize } = require("@newsnexus/db-models") as typeof import("@newsnexus/db-models");
+const { ensureSchemaReady, initModels, sequelize } = require("@newsnexus/db-models") as typeof import("@newsnexus/db-models");
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,27 +30,28 @@ function logStatus(status: DatabaseStatus): void {
 }
 
 async function ensureDatabaseExists(): Promise<void> {
-  const dbDir = process.env.PATH_DATABASE;
-  const dbName = process.env.NAME_DB;
+  try {
+    await ensureSchemaReady(sequelize);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("Database schema is missing required table")) {
+      throw error;
+    }
 
-  if (!dbDir || !dbName) {
-    throw new Error("Missing PATH_DATABASE or NAME_DB environment variables");
-  }
-
-  const dbPath = path.join(dbDir, dbName);
-
-  if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-    logger.info(`🆕 Database not found. Creating new database at ${dbPath}`);
+    logger.info("🆕 Database schema not found. Creating schema with sequelize.sync().");
     await sequelize.sync();
   }
 }
 
 async function databaseHasData(): Promise<boolean> {
-  const tables = await sequelize.query<{ name: string }>(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';",
-    { type: QueryTypes.SELECT },
-  );
+  const queryInterface = sequelize.getQueryInterface();
+  const rawTables = await queryInterface.showAllTables();
+  const tables = rawTables.map((table) => ({
+    name:
+      typeof table === "string"
+        ? table
+        : String((table as { tableName?: string }).tableName ?? table),
+  }));
 
   for (const { name } of tables) {
     const rows = await sequelize.query(
@@ -92,21 +91,21 @@ async function databaseHasData(): Promise<boolean> {
       const hasData = await databaseHasData();
       if (hasData) {
         logger.warn(
-          "Zip import skipped because the database already contains data. Displaying status only.",
+          "Database already contains data. Import will rebuild the schema before restoring the zip.",
         );
-      } else {
-        logger.info(
-          `Importing database updates from zip: ${options.zipFilePath}`,
+      }
+
+      logger.info(
+        `Importing database updates from zip: ${options.zipFilePath}`,
+      );
+      const result = await importZipFileToDatabase(options.zipFilePath);
+      logger.info(
+        `Imported ${result.totalRecords} records across ${result.importedTables.length} tables`,
+      );
+      if (result.skippedFiles.length > 0) {
+        logger.warn(
+          `Skipped files with no matching model: ${result.skippedFiles.join(", ")}`,
         );
-        const result = await importZipFileToDatabase(options.zipFilePath);
-        logger.info(
-          `Imported ${result.totalRecords} records across ${result.importedTables.length} tables`,
-        );
-        if (result.skippedFiles.length > 0) {
-          logger.warn(
-            `Skipped files with no matching model: ${result.skippedFiles.join(", ")}`,
-          );
-        }
       }
     }
 
