@@ -406,6 +406,32 @@ async function rebuildSchema(): Promise<void> {
   await sequelize.query("DROP SCHEMA IF EXISTS public CASCADE;");
   await sequelize.query("CREATE SCHEMA public;");
   await sequelize.sync();
+
+  // Re-apply runtime grants if PG_APP_ROLE is configured.
+  // DROP SCHEMA CASCADE wipes ALTER DEFAULT PRIVILEGES that were set during
+  // initial setup, so the app role would otherwise lose access to every table
+  // created by sync().
+  const appRole = process.env.PG_APP_ROLE?.trim();
+  if (appRole) {
+    // Identifier comes from a controlled env var, not user input; quoting it
+    // with double-quotes guards against reserved words but not injection —
+    // treat PG_APP_ROLE as a trusted deployment configuration value.
+    const quotedRole = `"${appRole}"`;
+    await sequelize.query(`GRANT USAGE ON SCHEMA public TO ${quotedRole};`);
+    await sequelize.query(
+      `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${quotedRole};`,
+    );
+    await sequelize.query(
+      `GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${quotedRole};`,
+    );
+    await sequelize.query(
+      `ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${quotedRole};`,
+    );
+    await sequelize.query(
+      `ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${quotedRole};`,
+    );
+    logger.info(`Re-granted public schema access to app role: ${appRole}`);
+  }
 }
 
 export async function importZipFileToDatabase(
