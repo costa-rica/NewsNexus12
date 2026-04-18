@@ -28,10 +28,14 @@ jest.mock("../../src/middleware/fileSecurity", () => ({
 }));
 
 const mockAdminDbModule = {
-  readAndAppendDbTables: jest.fn(),
   createDatabaseBackupZipFile: jest.fn(),
 };
 jest.mock("../../src/modules/adminDb", () => mockAdminDbModule);
+
+const mockDbManager = {
+  importZipFileToDatabase: jest.fn(),
+};
+jest.mock("@newsnexus/db-manager", () => mockDbManager);
 
 function createModelMock() {
   return {

@@ -13,6 +13,7 @@
     "test:endpoints": "jest --runInBand tests/smoke"
   },
   "dependencies": {
+    "@newsnexus/db-manager": "file:../db-manager",
     "@newsnexus/db-models": "file:../db-models",
     "archiver": "^7.0.1",
     "axios": "^1.12.2",

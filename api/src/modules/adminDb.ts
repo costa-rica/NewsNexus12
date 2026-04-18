@@ -1,11 +1,7 @@
-import csvParser from "csv-parser";
 import fs from "fs";
 import path from "path";
-// const sequelize = require("../models/_connection"); // Import Sequelize instance
 import logger from "./logger";
 import * as db from "@newsnexus/db-models";
-
-const { sequelize, MODEL_LOAD_ORDER } = db;
 
 import { promisify } from "util";
 import archiver from "archiver";
@@ -29,137 +25,6 @@ function getModelRegistry(): ModelRegistry {
   }
 
   return registry;
-}
-
-function coerceCsvValue(value: unknown): unknown {
-  if (typeof value !== "string") {
-    return value;
-  }
-
-  const trimmed = value.trim();
-  if (trimmed === "") {
-    return null;
-  }
-
-  const lower = trimmed.toLowerCase();
-  if (lower === "true") return true;
-  if (lower === "false") return false;
-  if (lower === "null") return null;
-
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-    const num = Number(trimmed);
-    if (Number.isFinite(num)) return num;
-  }
-
-  return value;
-}
-
-function coerceCsvRow(row: Record<string, unknown>): Record<string, unknown> {
-  const output: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(row)) {
-    output[key] = coerceCsvValue(value);
-  }
-  return output;
-}
-
-async function readAndAppendDbTables(backupFolderPath: string) {
-  logger.info(`Processing CSV files from: ${backupFolderPath}`);
-  logger.info(`Sequelize instance: ${sequelize}`);
-  let currentTable: string | null = null;
-  const models = getModelRegistry();
-  try {
-    // Read all CSV files from the backup directory
-    const csvFiles = await fs.promises.readdir(backupFolderPath);
-    let totalRecordsImported = 0;
-
-    // Order CSV files by the model load order so parent tables import before
-    // their children. This replaces the previous "disable FK constraints"
-    // approach which relied on SQLite PRAGMAs.
-    const csvFileSet = new Set(
-      csvFiles.filter((file) => file.endsWith(".csv")),
-    );
-    const orderedCsvFiles: string[] = [];
-    for (const tableName of MODEL_LOAD_ORDER) {
-      const fileName = `${tableName}.csv`;
-      if (csvFileSet.has(fileName)) {
-        orderedCsvFiles.push(fileName);
-        csvFileSet.delete(fileName);
-      }
-    }
-    // Append any remaining CSV files that aren't in MODEL_LOAD_ORDER (will be
-    // skipped inside processCSVFiles if they have no matching model).
-    for (const leftover of csvFileSet) {
-      orderedCsvFiles.push(leftover);
-    }
-
-    logger.info(`CSV import order: ${orderedCsvFiles.join(", ")}`);
-
-    // Helper function to process CSV files
-    async function processCSVFiles(files: string[]) {
-      let recordsImported = 0;
-
-      for (const file of files) {
-        const tableName = file.replace(".csv", "");
-        if (!models[tableName]) {
-          logger.info(`Skipping ${file}, no matching table found.`);
-          continue;
-        }
-
-        logger.info(`Importing data into table: ${tableName}`);
-        currentTable = tableName;
-        const filePath = path.join(backupFolderPath, file);
-        const records: Record<string, any>[] = [];
-
-        // Read CSV file
-        await new Promise((resolve, reject) => {
-          fs.createReadStream(filePath)
-            .pipe(csvParser())
-            .on("data", (row: Record<string, any>) =>
-              records.push(coerceCsvRow(row)),
-            )
-            // .on("data", (row) => {
-            //   if (file === "Keyword.csv" && "isArchived" in row) {
-            //     convertIsArchivedNotOneToFalse(row);
-            //   }
-            //   records.push(row);
-            // })
-            .on("end", resolve)
-            .on("error", reject);
-        });
-
-        if (records.length > 0) {
-          await models[tableName].bulkCreate(records, {
-            ignoreDuplicates: true,
-          });
-          recordsImported += records.length;
-          logger.info(`Imported ${records.length} records into ${tableName}`);
-        } else {
-          logger.info(`No records found in ${file}`);
-        }
-      }
-
-      return recordsImported;
-    }
-
-    // Import CSVs in dependency order so foreign key constraints are satisfied
-    // without needing to disable them (Postgres does not support SQLite's
-    // PRAGMA foreign_keys toggle, and db-manager's zipImport flow handles full
-    // rebuilds separately).
-    totalRecordsImported += await processCSVFiles(orderedCsvFiles);
-
-    return {
-      success: true,
-      message: `Successfully imported ${totalRecordsImported} records.`,
-    };
-  } catch (error: any) {
-    logger.error("Error processing CSV files:", error);
-
-    return {
-      success: false,
-      error: error.message,
-      failedOnTableName: currentTable,
-    };
-  }
 }
 
 async function createDatabaseBackupZipFile(suffix = ""): Promise<string> {
@@ -221,12 +86,4 @@ async function createDatabaseBackupZipFile(suffix = ""): Promise<string> {
   }
 }
 
-function convertIsArchivedNotOneToFalse(row: Record<string, any>) {
-  if (row["isArchived"] !== "1") {
-    row["isArchived"] = false;
-  } else if (typeof row["isArchived"] === "string") {
-    row["isArchived"] = row["isArchived"].toLowerCase() === "true";
-  }
-}
-
-export { readAndAppendDbTables, createDatabaseBackupZipFile };
+export { createDatabaseBackupZipFile };

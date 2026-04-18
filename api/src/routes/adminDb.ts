@@ -3,10 +3,8 @@ import type { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
-import archiver from "archiver";
-import { Parser } from "json2csv";
 import multer from "multer";
-import unzipper from "unzipper";
+import { importZipFileToDatabase } from "@newsnexus/db-manager";
 
 const router = express.Router();
 const {
@@ -99,12 +97,9 @@ function resolveTableModel(tableNameParam: string | string[] | undefined): {
 
 const { safeFileExists } = require("../middleware/fileSecurity");
 const { databaseOperationLimiter } = require("../middleware/rateLimiting");
-// Promisify fs functions
-const mkdirAsync = promisify(fs.mkdir);
 const { authenticateToken } = require("../modules/userAuthentication");
 const unlinkAsync = promisify(fs.unlink);
 const {
-  readAndAppendDbTables,
   createDatabaseBackupZipFile,
 } = require("../modules/adminDb");
 
@@ -325,83 +320,32 @@ router.post(
   async (req: RequestWithUploadFile, res: Response) => {
     logger.info("- in POST /admin-db/import-db-backup");
 
+    const uploadedPath = req.file?.path;
     try {
-      if (!req.file) {
+      if (!req.file || !uploadedPath) {
         return res
           .status(400)
           .json({ result: false, message: "No file uploaded." });
       }
 
-      const backupDir = process.env.PATH_PROJECT_RESOURCES;
-      if (!backupDir) {
-        logger.info("*** no file ***");
-        return res.status(500).json({
-          result: false,
-          message: "Temporary directory not configured.",
-        });
-      }
-
-      const tempExtractPath = path.join(backupDir, "temp_db_import");
-
-      // Ensure the temp_db_import folder is clean before extracting
-      if (fs.existsSync(tempExtractPath)) {
-        logger.info("Previous temp_db_import folder found. Deleting...");
-        await fs.promises.rm(tempExtractPath, { recursive: true });
-        logger.info("Old temp_db_import folder deleted.");
-      }
-
-      await mkdirAsync(tempExtractPath, { recursive: true });
-
-      logger.info(`Extracting backup to: ${tempExtractPath}`);
-
-      // Unzip the uploaded file
-      await fs
-        .createReadStream(req.file.path)
-        .pipe(unzipper.Extract({ path: tempExtractPath }))
-        .promise();
-
-      logger.info("Backup extracted successfully.");
-
-      // Read all subfolders inside tempExtractPath
-      const extractedFolders = await fs.promises.readdir(tempExtractPath);
-
-      // Find the correct folder that starts with "db_backup_"
-      let backupFolder = extractedFolders.find(
-        (folder) => folder.startsWith("db_backup_") && folder !== "__MACOSX",
+      logger.info(`Importing backup zip: ${uploadedPath}`);
+      const result = await importZipFileToDatabase(uploadedPath);
+      logger.info(
+        `Imported ${result.totalRecords} records across ${result.importedTables.length} tables`,
       );
-
-      // Determine the path where CSV files should be searched
-      let backupFolderPath = backupFolder
-        ? path.join(tempExtractPath, backupFolder)
-        : tempExtractPath;
-
-      logger.info(`Using backup folder: ${backupFolderPath}`);
-
-      // Call the new function to read and append database tables
-      const status = await readAndAppendDbTables(backupFolderPath);
-
-      // Clean up temporary files
-      await fs.promises.rm(tempExtractPath, { recursive: true });
-      await fs.promises.unlink(req.file.path);
-      // await fs.promises.rm(
-      //   path.join(process.env.PATH_PROJECT_RESOURCES, "uploads/"),
-      //   { recursive: true }
-      // );
-      logger.info("Temporary files deleted.");
-
-      logger.info(status);
-      if (status?.failedOnTableName) {
-        res.status(500).json({
-          result: false,
-          error: status.error,
-          failedOnTableName: status.failedOnTableName,
-        });
-      } else {
-        res.json({
-          result: status.success,
-          message: status.message,
-        });
+      if (result.skippedFiles.length > 0) {
+        logger.warn(
+          `Skipped files with no matching model: ${result.skippedFiles.join(", ")}`,
+        );
       }
+
+      res.json({
+        result: true,
+        message: `Successfully imported ${result.totalRecords} records across ${result.importedTables.length} tables.`,
+        totalRecords: result.totalRecords,
+        importedTables: result.importedTables,
+        skippedFiles: result.skippedFiles,
+      });
     } catch (error) {
       logger.error("Error importing database backup:", error);
       res.status(500).json({
@@ -409,6 +353,16 @@ router.post(
         message: "Internal server error",
         error: getErrorMessage(error),
       });
+    } finally {
+      if (uploadedPath) {
+        try {
+          await fs.promises.unlink(uploadedPath);
+        } catch (cleanupError) {
+          logger.warn(
+            `Failed to clean up uploaded file ${uploadedPath}: ${getErrorMessage(cleanupError)}`,
+          );
+        }
+      }
     }
   },
 );
