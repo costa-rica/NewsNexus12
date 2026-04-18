@@ -8,8 +8,11 @@ from src.modules.deduper.errors import DeduperConfigError
 
 @pytest.mark.unit
 def test_config_from_env_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
+    monkeypatch.setenv("PG_PASSWORD", "")
     monkeypatch.setenv("DEDUPER_ENABLE_EMBEDDING", "true")
     monkeypatch.setenv("DEDUPER_BATCH_SIZE_LOAD", "1000")
     monkeypatch.setenv("DEDUPER_BATCH_SIZE_STATES", "1000")
@@ -19,27 +22,31 @@ def test_config_from_env_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
     config = DeduperConfig.from_env()
 
-    assert config.path_to_database == "/tmp/db"
-    assert config.name_db == "news.db"
+    assert config.pg_host == "localhost"
+    assert config.pg_database == "news.db"
     assert config.enable_embedding is True
-    assert config.sqlite_path == os.path.join("/tmp/db", "news.db")
+    assert "dbname=news.db" in config.dsn
     assert config.cache_max_entries > 0
     assert config.checkpoint_interval > 0
 
 
 @pytest.mark.unit
 def test_config_missing_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("PATH_DATABASE", raising=False)
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.delenv("PG_HOST", raising=False)
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
 
-    with pytest.raises(DeduperConfigError, match="PATH_DATABASE is required"):
+    with pytest.raises(DeduperConfigError, match="PG_HOST is required"):
         DeduperConfig.from_env()
 
 
 @pytest.mark.unit
 def test_config_invalid_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.setenv("DEDUPER_BATCH_SIZE_LOAD", "0")
 
     with pytest.raises(DeduperConfigError, match="DEDUPER_BATCH_SIZE_LOAD must be > 0"):
@@ -48,8 +55,10 @@ def test_config_invalid_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.unit
 def test_config_invalid_bool(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.setenv("DEDUPER_ENABLE_EMBEDDING", "sometimes")
 
     with pytest.raises(DeduperConfigError, match="DEDUPER_ENABLE_EMBEDDING must be a boolean-like value"):
@@ -60,7 +69,7 @@ def test_config_invalid_bool(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_startup_env_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.modules.deduper.config import validate_startup_env
 
-    for key in ("PATH_DATABASE", "NAME_DB", "NAME_APP", "PATH_TO_LOGS"):
+    for key in ("PG_HOST", "PG_PORT", "PG_DATABASE", "PG_USER"):
         monkeypatch.delenv(key, raising=False)
 
     with pytest.raises(DeduperConfigError, match="Missing required startup env vars"):

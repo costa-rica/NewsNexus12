@@ -120,15 +120,26 @@ Cancellation behavior:
 5. `KEY_OPEN_AI`
 6. `PATH_TO_STATE_ASSIGNER_FILES`
 7. `NAME_APP`
-8. `NAME_DB`
-9. `PATH_DATABASE`
-10. `PATH_UTILTIES`
+8. `PATH_UTILTIES`
+9. `PG_HOST`
+10. `PG_PORT`
+11. `PG_DATABASE`
+12. `PG_USER`
 
 Optional:
 
 1. `PORT` (default `3002`)
 2. `LOG_MAX_SIZE` (default `5` MB)
 3. `LOG_MAX_FILES` (default `5`)
+4. `PG_PASSWORD` (default empty for local trust-auth setups)
+5. `PG_SCHEMA` (default `public`)
+
+## Database
+
+- Type: Postgres 16 via Sequelize 6 in `@newsnexus/db-models`
+- Runtime workers do not run `sequelize.sync()` on startup or inside jobs
+- Expected local development database: `newsnexus_dev`
+- Expected worker test database: `newsnexus_test_worker_node`
 
 ## Scripts
 

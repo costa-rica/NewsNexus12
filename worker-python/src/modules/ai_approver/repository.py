@@ -1,9 +1,12 @@
-"""SQLite repository for AI approver workflow data access."""
+"""Postgres repository for AI approver workflow data access."""
 
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from src.modules.ai_approver.config import AiApproverConfig
 from src.modules.ai_approver.errors import AiApproverProcessorError
@@ -12,34 +15,45 @@ from src.modules.ai_approver.errors import AiApproverProcessorError
 class AiApproverRepository:
     def __init__(self, config: AiApproverConfig) -> None:
         self.config = config
-        self._connection: sqlite3.Connection | None = None
+        self._pool: ConnectionPool | None = None
+        self._connection: psycopg.Connection | None = None
 
-    def get_connection(self) -> sqlite3.Connection:
+    def get_connection(self) -> psycopg.Connection:
         if self._connection is None:
-            self._connection = sqlite3.connect(self.config.sqlite_path)
-            self._connection.row_factory = sqlite3.Row
+            if self._pool is None:
+                self._pool = ConnectionPool(
+                    conninfo=self.config.dsn,
+                    min_size=1,
+                    max_size=5,
+                    kwargs={"row_factory": dict_row},
+                )
+            self._connection = self._pool.getconn()
         return self._connection
 
     def close(self) -> None:
         if self._connection is not None:
-            self._connection.close()
+            if self._pool is not None:
+                self._pool.putconn(self._connection)
             self._connection = None
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
 
     def healthcheck(self) -> bool:
         try:
             conn = self.get_connection()
             conn.execute("SELECT 1")
             return True
-        except sqlite3.Error:
+        except psycopg.Error:
             return False
 
     def get_active_prompt_versions(self) -> list[dict[str, Any]]:
         conn = self.get_connection()
         rows = conn.execute(
             """
-            SELECT id, name, description, promptInMarkdown
-            FROM AiApproverPromptVersions
-            WHERE isActive = 1
+            SELECT id, name, description, "promptInMarkdown"
+            FROM "AiApproverPromptVersions"
+            WHERE "isActive" = TRUE
             ORDER BY id ASC
             """
         ).fetchall()
@@ -49,9 +63,9 @@ class AiApproverRepository:
         conn = self.get_connection()
         row = conn.execute(
             """
-            SELECT id, name, description, promptInMarkdown, isActive
-            FROM AiApproverPromptVersions
-            WHERE id = ?
+            SELECT id, name, description, "promptInMarkdown", "isActive"
+            FROM "AiApproverPromptVersions"
+            WHERE id = %s
             LIMIT 1
             """,
             (prompt_version_id,),
@@ -69,20 +83,20 @@ class AiApproverRepository:
         conn = self.get_connection()
 
         filters = [
-            "NOT EXISTS (SELECT 1 FROM AiApproverArticleScores aas WHERE aas.articleId = a.id)",
+            'NOT EXISTS (SELECT 1 FROM "AiApproverArticleScores" aas WHERE aas."articleId" = a.id)',
             """
             NOT EXISTS (
                 SELECT 1
-                FROM ArticleIsRelevants air
-                WHERE air.articleId = a.id
-                  AND air.isRelevant = 0
+                FROM "ArticleIsRelevants" air
+                WHERE air."articleId" = a.id
+                  AND air."isRelevant" = FALSE
             )
             """,
             """
             NOT EXISTS (
                 SELECT 1
-                FROM ArticleApproveds aa
-                WHERE aa.articleId = a.id
+                FROM "ArticleApproveds" aa
+                WHERE aa."articleId" = a.id
             )
             """,
         ]
@@ -93,25 +107,25 @@ class AiApproverRepository:
                 """
                 EXISTS (
                     SELECT 1
-                    FROM ArticleStateContracts02 asc2
-                    WHERE asc2.articleId = a.id
-                      AND asc2.stateId IS NOT NULL
-                      AND asc2.isDeterminedToBeError = 0
+                    FROM "ArticleStateContracts02" asc2
+                    WHERE asc2."articleId" = a.id
+                      AND asc2."stateId" IS NOT NULL
+                      AND asc2."isDeterminedToBeError" = FALSE
                 )
                 """
             )
 
         if state_ids:
-            placeholders = ",".join("?" for _ in state_ids)
+            placeholders = ",".join("%s" for _ in state_ids)
             filters.append(
                 f"""
                 EXISTS (
                     SELECT 1
-                    FROM ArticleStateContracts02 asc2
-                    WHERE asc2.articleId = a.id
-                      AND asc2.stateId IN ({placeholders})
-                      AND asc2.stateId IS NOT NULL
-                      AND asc2.isDeterminedToBeError = 0
+                    FROM "ArticleStateContracts02" asc2
+                    WHERE asc2."articleId" = a.id
+                      AND asc2."stateId" IN ({placeholders})
+                      AND asc2."stateId" IS NOT NULL
+                      AND asc2."isDeterminedToBeError" = FALSE
                 )
                 """
             )
@@ -128,8 +142,8 @@ class AiApproverRepository:
                 COALESCE(
                     (
                         SELECT ac2.content
-                        FROM ArticleContents02 ac2
-                        WHERE ac2.articleId = a.id
+                        FROM "ArticleContents02" ac2
+                        WHERE ac2."articleId" = a.id
                         ORDER BY
                             CASE WHEN ac2.status = 'success' THEN 2 ELSE 0 END DESC,
                             LENGTH(TRIM(COALESCE(ac2.content, ''))) DESC,
@@ -139,10 +153,10 @@ class AiApproverRepository:
                     a.description,
                     ''
                 ) AS content
-            FROM Articles a
+            FROM "Articles" a
             WHERE {where_clause}
             ORDER BY a.id DESC
-            LIMIT ?
+            LIMIT %s
             """,
             params,
         ).fetchall()
@@ -159,8 +173,8 @@ class AiApproverRepository:
                 COALESCE(
                     (
                         SELECT ac2.content
-                        FROM ArticleContents02 ac2
-                        WHERE ac2.articleId = a.id
+                        FROM "ArticleContents02" ac2
+                        WHERE ac2."articleId" = a.id
                         ORDER BY
                             CASE WHEN ac2.status = 'success' THEN 2 ELSE 0 END DESC,
                             LENGTH(TRIM(COALESCE(ac2.content, ''))) DESC,
@@ -173,14 +187,14 @@ class AiApproverRepository:
                 CASE
                     WHEN EXISTS (
                         SELECT 1
-                        FROM ArticleContents02 ac2
-                        WHERE ac2.articleId = a.id
+                        FROM "ArticleContents02" ac2
+                        WHERE ac2."articleId" = a.id
                     ) THEN 'article-contents-02'
                     WHEN LENGTH(TRIM(COALESCE(a.description, ''))) > 0 THEN 'article-description'
                     ELSE 'none'
-                END AS contentSource
-            FROM Articles a
-            WHERE a.id = ?
+                END AS "contentSource"
+            FROM "Articles" a
+            WHERE a.id = %s
             LIMIT 1
             """,
             (article_id,),
@@ -204,21 +218,21 @@ class AiApproverRepository:
         try:
             conn.execute(
                 """
-                INSERT INTO AiApproverArticleScores (
-                    articleId,
-                    promptVersionId,
-                    resultStatus,
+                INSERT INTO "AiApproverArticleScores" (
+                    "articleId",
+                    "promptVersionId",
+                    "resultStatus",
                     score,
                     reason,
-                    errorCode,
-                    errorMessage,
-                    isHumanApproved,
-                    reasonHumanRejected,
-                    jobId,
-                    createdAt,
-                    updatedAt
+                    "errorCode",
+                    "errorMessage",
+                    "isHumanApproved",
+                    "reasonHumanRejected",
+                    "jobId",
+                    "createdAt",
+                    "updatedAt"
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, datetime('now'), datetime('now'))
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 (
                     article_id,
@@ -232,7 +246,7 @@ class AiApproverRepository:
                 ),
             )
             conn.commit()
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise AiApproverProcessorError(
                 f"Failed to insert AI approver score row for article {article_id}"
             ) from exc

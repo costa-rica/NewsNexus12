@@ -20,24 +20,24 @@ This inventory tracks the SQLite-specific SQL and direct SQL call sites involved
 
 | Package | File | Pattern | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `worker-python` | `src/modules/deduper/repository.py` | `sqlite3`, `?`, `datetime('now')`, `lastrowid` | `pending` | Migrated to psycopg + `ConnectionPool` but still relies on a runtime `_normalize_query()` substitution (`?` → `%s`, `datetime('now')` → `CURRENT_TIMESTAMP`). Flagged as fragile; rewrite at source in Phase 2. |
-| `worker-python` | `src/modules/location_scorer/repository.py` | `sqlite3`, `?`, `datetime('now')` | `pending` | Full driver and SQL migration required. |
-| `worker-python` | `src/modules/ai_approver/repository.py` | `sqlite3`, `?`, `datetime('now')` | `pending` | Full driver and SQL migration required. |
-| `worker-python` | `src/standalone/setup_ai_approver_prompt.py` | `sqlite3`, `sqlite_master`, `?`, `datetime('now')` | `pending` | Needs Postgres-compatible implementation. |
+| `worker-python` | `src/modules/deduper/repository.py` | `sqlite3`, `?`, `datetime('now')`, `lastrowid` | `converted` | Rewritten to native psycopg SQL with `%s` placeholders, quoted Postgres identifiers, `CURRENT_TIMESTAMP`, and pooled connections. Covered by Postgres-backed repository, processor, job-manager, and route tests. |
+| `worker-python` | `src/modules/location_scorer/repository.py` | `sqlite3`, `?`, `datetime('now')` | `converted` | Rewritten to native psycopg SQL with `%s` placeholders, `ON CONFLICT DO NOTHING`, quoted identifiers, and pooled connections. Covered by Postgres-backed repository tests. |
+| `worker-python` | `src/modules/ai_approver/repository.py` | `sqlite3`, `?`, `datetime('now')` | `converted` | Rewritten to native psycopg SQL with quoted identifiers, `%s` placeholders, `CURRENT_TIMESTAMP`, and pooled connections. Covered by Postgres-backed repository tests. |
+| `worker-python` | `src/standalone/setup_ai_approver_prompt.py` | `sqlite3`, `sqlite_master`, `?`, `datetime('now')` | `converted` | Uses psycopg, `information_schema.tables`, `%s` placeholders, `CURRENT_TIMESTAMP`, and `RETURNING id`. |
 
 ## Runtime DDL call sites
 
 | Package | File | Pattern | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `api` | `src/app.ts` | `sequelize.sync()` | `converted` | Replaced with `ensureSchemaReady(sequelize)`. |
-| `worker-node` | `src/modules/db/ensureDbReady.ts` | `sequelize.sync()` | `pending` | Needs runtime DDL removal. |
-| `worker-node` | `src/modules/jobs/requestGoogleRssJob.ts` | `sequelize.sync()` | `pending` | Needs runtime DDL removal. |
-| `worker-node` | `src/modules/jobs/semanticScorerJob.ts` | `sequelize.sync()` | `pending` | Needs runtime DDL removal. |
+| `worker-node` | `src/modules/db/ensureDbReady.ts` | `sequelize.sync()` | `converted` | Runtime DDL removed; helper now keeps the public contract but calls `ensureSchemaReady(sequelize)`. |
+| `worker-node` | `src/modules/jobs/requestGoogleRssJob.ts` | `sequelize.sync()` | `converted` | Per-job runtime DDL removed; jobs assume schema bootstrap already happened. Covered by Postgres-backed worker-node tests. |
+| `worker-node` | `src/modules/jobs/semanticScorerJob.ts` | `sequelize.sync()` | `converted` | Per-job runtime DDL removed; jobs assume schema bootstrap already happened. Covered by Postgres-backed worker-node tests. |
 
 ## Inventory status summary
 
-- `converted`: 7
+- `converted`: 14
 - `ruled safe`: 3
-- `pending`: 7
+- `pending`: 0
 
-Phase 1 exit requires every Phase 1-relevant entry to be `converted` or `ruled safe`. Remaining `pending` entries are scoped to worker-python (Phase 2) and worker-node runtime DDL (Phase 3).
+All currently inventoried worker entries are now `converted` or `ruled safe`.

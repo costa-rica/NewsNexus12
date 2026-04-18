@@ -6,8 +6,10 @@ const REQUIRED_ENV_VARS = [
   "KEY_OPEN_AI",
   "PATH_TO_STATE_ASSIGNER_FILES",
   "NAME_APP",
-  "NAME_DB",
-  "PATH_DATABASE",
+  "PG_HOST",
+  "PG_PORT",
+  "PG_DATABASE",
+  "PG_USER",
   "PATH_UTILTIES",
 ] as const;
 
@@ -21,8 +23,10 @@ export interface AppConfig {
   keyOpenAi: string;
   pathToStateAssignerFiles: string;
   nameApp: string;
-  nameDb: string;
-  pathDatabase: string;
+  pgHost: string;
+  pgPort: number;
+  pgDatabase: string;
+  pgUser: string;
   pathUtilities: string;
   logMaxSizeMb: number;
   logMaxFiles: number;
@@ -136,8 +140,10 @@ export const loadAppConfig = (
       "PATH_TO_STATE_ASSIGNER_FILES",
     ),
     nameApp: readRequiredString(env, "NAME_APP"),
-    nameDb: readRequiredString(env, "NAME_DB"),
-    pathDatabase: readRequiredString(env, "PATH_DATABASE"),
+    pgHost: readRequiredString(env, "PG_HOST"),
+    pgPort: parsePositiveInteger(env.PG_PORT, 5432, "PG_PORT"),
+    pgDatabase: readRequiredString(env, "PG_DATABASE"),
+    pgUser: readRequiredString(env, "PG_USER"),
     pathUtilities: readRequiredString(env, "PATH_UTILTIES"),
     logMaxSizeMb,
     logMaxFiles,

@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from src.modules.location_scorer.config import (
@@ -11,8 +9,10 @@ from src.modules.location_scorer.errors import LocationScorerConfigError
 
 @pytest.mark.unit
 def test_config_from_env_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.setenv(
         "NAME_AI_ENTITY_LOCATION_SCORER",
         "NewsNexusClassifierLocationScorer01",
@@ -22,18 +22,20 @@ def test_config_from_env_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
     config = LocationScorerConfig.from_env()
 
-    assert config.path_database == "/tmp/db"
-    assert config.name_db == "news.db"
+    assert config.pg_host == "localhost"
+    assert config.pg_database == "news.db"
     assert config.ai_entity_name == "NewsNexusClassifierLocationScorer01"
     assert config.batch_size == 25
     assert config.checkpoint_interval == 50
-    assert config.sqlite_path == os.path.join("/tmp/db", "news.db")
+    assert "dbname=news.db" in config.dsn
 
 
 @pytest.mark.unit
 def test_config_missing_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.delenv("NAME_AI_ENTITY_LOCATION_SCORER", raising=False)
 
     with pytest.raises(
@@ -45,8 +47,10 @@ def test_config_missing_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.unit
 def test_config_invalid_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH_DATABASE", "/tmp/db")
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.setenv(
         "NAME_AI_ENTITY_LOCATION_SCORER",
         "NewsNexusClassifierLocationScorer01",
@@ -66,8 +70,10 @@ def test_validate_location_scorer_startup_env_logs_missing_keys(
 ) -> None:
     from src.modules.location_scorer import config as location_scorer_config
 
-    monkeypatch.delenv("PATH_DATABASE", raising=False)
-    monkeypatch.setenv("NAME_DB", "news.db")
+    monkeypatch.delenv("PG_HOST", raising=False)
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
     monkeypatch.delenv("NAME_AI_ENTITY_LOCATION_SCORER", raising=False)
 
     error_messages: list[str] = []
@@ -81,6 +87,6 @@ def test_validate_location_scorer_startup_env_logs_missing_keys(
         validate_location_scorer_startup_env()
 
     assert error_messages == [
-        "event=location_scorer_startup_env_missing env_var=PATH_DATABASE",
+        "event=location_scorer_startup_env_missing env_var=PG_HOST",
         "event=location_scorer_startup_env_missing env_var=NAME_AI_ENTITY_LOCATION_SCORER",
     ]

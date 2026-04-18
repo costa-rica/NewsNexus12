@@ -11,8 +11,10 @@ from src.modules.deduper.errors import DeduperConfigError
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 REQUIRED_STARTUP_ENV_KEYS = (
-    "PATH_DATABASE",
-    "NAME_DB",
+    "PG_HOST",
+    "PG_PORT",
+    "PG_DATABASE",
+    "PG_USER",
 )
 
 
@@ -39,8 +41,11 @@ def _parse_positive_int(value: str, key: str) -> int:
 
 @dataclass(slots=True)
 class DeduperConfig:
-    path_to_database: str
-    name_db: str
+    pg_host: str
+    pg_port: int
+    pg_database: str
+    pg_user: str
+    pg_password: str
     path_to_csv: str | None
     enable_embedding: bool
     batch_size_load: int
@@ -52,25 +57,40 @@ class DeduperConfig:
     checkpoint_interval: int
 
     @property
-    def sqlite_path(self) -> str:
-        return os.path.join(self.path_to_database, self.name_db)
+    def dsn(self) -> str:
+        return (
+            f"host={self.pg_host} "
+            f"port={self.pg_port} "
+            f"dbname={self.pg_database} "
+            f"user={self.pg_user} "
+            f"password={self.pg_password}"
+        )
 
     @classmethod
     def from_env(cls) -> "DeduperConfig":
-        path_to_database = os.getenv("PATH_DATABASE", "").strip()
-        name_db = os.getenv("NAME_DB", "").strip()
+        pg_host = os.getenv("PG_HOST", "").strip()
+        pg_port = os.getenv("PG_PORT", "").strip()
+        pg_database = os.getenv("PG_DATABASE", "").strip()
+        pg_user = os.getenv("PG_USER", "").strip()
 
-        if not path_to_database:
-            raise DeduperConfigError("PATH_DATABASE is required")
-        if not name_db:
-            raise DeduperConfigError("NAME_DB is required")
+        if not pg_host:
+            raise DeduperConfigError("PG_HOST is required")
+        if not pg_port:
+            raise DeduperConfigError("PG_PORT is required")
+        if not pg_database:
+            raise DeduperConfigError("PG_DATABASE is required")
+        if not pg_user:
+            raise DeduperConfigError("PG_USER is required")
 
         path_to_csv_raw = os.getenv("PATH_TO_CSV", "").strip()
         enable_embedding_raw = os.getenv("DEDUPER_ENABLE_EMBEDDING", "true")
 
         return cls(
-            path_to_database=path_to_database,
-            name_db=name_db,
+            pg_host=pg_host,
+            pg_port=_parse_positive_int(pg_port, "PG_PORT"),
+            pg_database=pg_database,
+            pg_user=pg_user,
+            pg_password=os.getenv("PG_PASSWORD", "").strip(),
             path_to_csv=path_to_csv_raw or None,
             enable_embedding=_parse_bool(enable_embedding_raw, "DEDUPER_ENABLE_EMBEDDING"),
             batch_size_load=_parse_positive_int(os.getenv("DEDUPER_BATCH_SIZE_LOAD", "1000"), "DEDUPER_BATCH_SIZE_LOAD"),

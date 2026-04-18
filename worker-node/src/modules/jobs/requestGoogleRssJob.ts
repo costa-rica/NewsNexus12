@@ -1,11 +1,11 @@
 import ExcelJS from 'exceljs';
 import { parseStringPromise } from 'xml2js';
 import {
-  dropLegacyArticleContentsTable,
   Article,
   EntityWhoFoundArticle,
   NewsApiRequest,
   NewsArticleAggregatorSource,
+  ensureSchemaReady,
   initModels,
   sequelize
 } from '@newsnexus/db-models';
@@ -98,9 +98,7 @@ const ensureDbReady = async (): Promise<void> => {
 
   dbReadyPromise = (async () => {
     initModels();
-    await sequelize.authenticate();
-    await sequelize.sync();
-    await dropLegacyArticleContentsTable();
+    await ensureSchemaReady(sequelize);
   })();
 
   return dbReadyPromise;

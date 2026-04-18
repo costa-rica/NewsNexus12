@@ -3,8 +3,11 @@ import os
 from fastapi.testclient import TestClient
 
 # Required startup env vars for src.main import.
-os.environ.setdefault("PATH_DATABASE", "/tmp")
-os.environ.setdefault("NAME_DB", "test.db")
+os.environ.setdefault("PG_HOST", "localhost")
+os.environ.setdefault("PG_PORT", "5432")
+os.environ.setdefault("PG_DATABASE", "newsnexus_test_worker_python")
+os.environ.setdefault("PG_USER", "nick")
+os.environ.setdefault("PG_PASSWORD", "")
 os.environ.setdefault("NAME_APP", "worker-python-tests")
 os.environ.setdefault("RUN_ENVIRONMENT", "testing")
 os.environ.setdefault("PATH_TO_LOGS", "/tmp")

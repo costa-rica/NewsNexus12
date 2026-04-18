@@ -1,120 +1,23 @@
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+import os
 
 import pytest
 
 from src.modules.deduper.config import DeduperConfig
+from src.modules.deduper.errors import DeduperDatabaseError
 from src.modules.deduper.repository import DeduperRepository
+from tests.postgres_test_utils import execute_many, execute_statements, reset_public_schema
 
 
-def _init_schema(db_path: Path) -> None:
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-
-    cur.executescript(
-        """
-        CREATE TABLE Articles (
-            id INTEGER PRIMARY KEY,
-            url TEXT,
-            title TEXT,
-            description TEXT,
-            publishedDate TEXT
-        );
-
-        CREATE TABLE ArticleApproveds (
-            articleId INTEGER,
-            isApproved INTEGER,
-            headlineForPdfReport TEXT,
-            textForPdfReport TEXT
-        );
-
-        CREATE TABLE ArticleReportContracts (
-            articleId INTEGER,
-            reportId INTEGER
-        );
-
-        CREATE TABLE States (
-            id INTEGER PRIMARY KEY,
-            abbreviation TEXT
-        );
-
-        CREATE TABLE ArticleStateContracts (
-            articleId INTEGER,
-            stateId INTEGER
-        );
-
-        CREATE TABLE ArticleDuplicateAnalyses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            articleIdNew INTEGER,
-            articleIdApproved INTEGER,
-            reportId INTEGER,
-            sameArticleIdFlag INTEGER,
-            articleNewState TEXT DEFAULT '',
-            articleApprovedState TEXT DEFAULT '',
-            sameStateFlag INTEGER DEFAULT 0,
-            urlCheck INTEGER DEFAULT 0,
-            contentHash REAL DEFAULT 0,
-            embeddingSearch REAL DEFAULT 0,
-            createdAt TEXT,
-            updatedAt TEXT
-        );
-
-        CREATE INDEX idx_adr_new ON ArticleDuplicateAnalyses(articleIdNew);
-        CREATE INDEX idx_adr_states ON ArticleDuplicateAnalyses(sameStateFlag);
-        CREATE INDEX idx_adr_url ON ArticleDuplicateAnalyses(urlCheck);
-        CREATE INDEX idx_adr_content ON ArticleDuplicateAnalyses(contentHash);
-        CREATE INDEX idx_adr_embedding ON ArticleDuplicateAnalyses(embeddingSearch);
-        """
-    )
-
-    cur.executemany(
-        "INSERT INTO Articles(id, url, title, description, publishedDate) VALUES(?, ?, ?, ?, ?)",
-        [
-            (1, "https://example.com/a1", "T1", "D1", "2026-01-01"),
-            (2, "https://example.com/a2", "T2", "D2", "2026-01-02"),
-            (3, "https://example.com/a3", "T3", "D3", "2026-01-03"),
-        ],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleApproveds(articleId, isApproved, headlineForPdfReport, textForPdfReport) VALUES(?, ?, ?, ?)",
-        [
-            (1, 1, "H1", "Text one"),
-            (2, 1, "H2", "Text two"),
-            (3, 0, "H3", "Text three"),
-        ],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleReportContracts(articleId, reportId) VALUES(?, ?)",
-        [(1, 10), (2, 10), (3, 11)],
-    )
-
-    cur.executemany(
-        "INSERT INTO States(id, abbreviation) VALUES(?, ?)",
-        [(1, "CA"), (2, "NY")],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleStateContracts(articleId, stateId) VALUES(?, ?)",
-        [(1, 1), (2, 2)],
-    )
-
-    conn.commit()
-    conn.close()
-
-
-@pytest.fixture
-def repo(tmp_path: Path) -> DeduperRepository:
-    db_file = tmp_path / "test.db"
-    _init_schema(db_file)
-
-    config = DeduperConfig(
-        path_to_database=str(tmp_path),
-        name_db="test.db",
-        path_to_csv=None,
+def _build_config(path_to_csv: str | None = None, pg_database: str | None = None) -> DeduperConfig:
+    return DeduperConfig(
+        pg_host=os.getenv("PG_HOST", "localhost"),
+        pg_port=int(os.getenv("PG_PORT", "5432")),
+        pg_database=pg_database or os.getenv("PG_DATABASE", "newsnexus_test_worker_python"),
+        pg_user=os.getenv("PG_USER", "nick"),
+        pg_password=os.getenv("PG_PASSWORD", ""),
+        path_to_csv=path_to_csv,
         enable_embedding=True,
         batch_size_load=1000,
         batch_size_states=1000,
@@ -125,7 +28,104 @@ def repo(tmp_path: Path) -> DeduperRepository:
         checkpoint_interval=100,
     )
 
-    repository = DeduperRepository(config)
+
+def _init_schema() -> None:
+    reset_public_schema()
+    execute_statements(
+        [
+            """
+            CREATE TABLE "Articles" (
+                id INTEGER PRIMARY KEY,
+                url TEXT,
+                title TEXT,
+                description TEXT,
+                "publishedDate" TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleApproveds" (
+                "articleId" INTEGER,
+                "isApproved" BOOLEAN,
+                "headlineForPdfReport" TEXT,
+                "textForPdfReport" TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleReportContracts" (
+                "articleId" INTEGER,
+                "reportId" INTEGER
+            )
+            """,
+            """
+            CREATE TABLE "States" (
+                id INTEGER PRIMARY KEY,
+                abbreviation TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleStateContracts" (
+                "articleId" INTEGER,
+                "stateId" INTEGER
+            )
+            """,
+            """
+            CREATE TABLE "ArticleDuplicateAnalyses" (
+                id SERIAL PRIMARY KEY,
+                "articleIdNew" INTEGER,
+                "articleIdApproved" INTEGER,
+                "reportId" INTEGER,
+                "sameArticleIdFlag" INTEGER,
+                "articleNewState" TEXT DEFAULT '',
+                "articleApprovedState" TEXT DEFAULT '',
+                "sameStateFlag" INTEGER DEFAULT 0,
+                "urlCheck" INTEGER DEFAULT 0,
+                "contentHash" DOUBLE PRECISION DEFAULT 0,
+                "embeddingSearch" DOUBLE PRECISION DEFAULT 0,
+                "createdAt" TIMESTAMPTZ,
+                "updatedAt" TIMESTAMPTZ
+            )
+            """,
+            'CREATE INDEX "idx_adr_new" ON "ArticleDuplicateAnalyses"("articleIdNew")',
+            'CREATE INDEX "idx_adr_states" ON "ArticleDuplicateAnalyses"("sameStateFlag")',
+            'CREATE INDEX "idx_adr_url" ON "ArticleDuplicateAnalyses"("urlCheck")',
+            'CREATE INDEX "idx_adr_content" ON "ArticleDuplicateAnalyses"("contentHash")',
+            'CREATE INDEX "idx_adr_embedding" ON "ArticleDuplicateAnalyses"("embeddingSearch")',
+        ]
+    )
+    execute_many(
+        'INSERT INTO "Articles"(id, url, title, description, "publishedDate") VALUES(%s, %s, %s, %s, %s)',
+        [
+            (1, "https://example.com/a1", "T1", "D1", "2026-01-01"),
+            (2, "https://example.com/a2", "T2", "D2", "2026-01-02"),
+            (3, "https://example.com/a3", "T3", "D3", "2026-01-03"),
+        ],
+    )
+    execute_many(
+        'INSERT INTO "ArticleApproveds"("articleId", "isApproved", "headlineForPdfReport", "textForPdfReport") VALUES(%s, %s, %s, %s)',
+        [
+            (1, True, "H1", "Text one"),
+            (2, True, "H2", "Text two"),
+            (3, False, "H3", "Text three"),
+        ],
+    )
+    execute_many(
+        'INSERT INTO "ArticleReportContracts"("articleId", "reportId") VALUES(%s, %s)',
+        [(1, 10), (2, 10), (3, 11)],
+    )
+    execute_many(
+        'INSERT INTO "States"(id, abbreviation) VALUES(%s, %s)',
+        [(1, "CA"), (2, "NY")],
+    )
+    execute_many(
+        'INSERT INTO "ArticleStateContracts"("articleId", "stateId") VALUES(%s, %s)',
+        [(1, 1), (2, 2)],
+    )
+
+
+@pytest.fixture
+def repo() -> DeduperRepository:
+    _init_schema()
+    repository = DeduperRepository(_build_config())
     yield repository
     repository.close()
 
@@ -133,6 +133,16 @@ def repo(tmp_path: Path) -> DeduperRepository:
 @pytest.mark.unit
 def test_repository_healthcheck(repo: DeduperRepository) -> None:
     assert repo.healthcheck() is True
+
+
+@pytest.mark.unit
+def test_repository_healthcheck_failure_for_missing_database() -> None:
+    repository = DeduperRepository(_build_config(pg_database="missing_worker_python_test_db"))
+
+    with pytest.raises(DeduperDatabaseError, match="Repository healthcheck failed"):
+        repository.healthcheck()
+
+    repository.close()
 
 
 @pytest.mark.unit
@@ -151,11 +161,13 @@ def test_insert_and_clear_scoped_rows(repo: DeduperRepository) -> None:
     )
     assert inserted == 2
 
-    rows = repo.execute_query("SELECT COUNT(*) AS c FROM ArticleDuplicateAnalyses")
+    rows = repo.execute_query('SELECT COUNT(*) AS c FROM "ArticleDuplicateAnalyses"')
     assert rows[0]["c"] == 2
 
     repo.clear_existing_analysis_for_articles([1])
-    rows_after = repo.execute_query("SELECT articleIdNew FROM ArticleDuplicateAnalyses ORDER BY articleIdNew")
+    rows_after = repo.execute_query(
+        'SELECT "articleIdNew" FROM "ArticleDuplicateAnalyses" ORDER BY "articleIdNew"'
+    )
     assert [r["articleIdNew"] for r in rows_after] == [2]
 
 
@@ -249,5 +261,5 @@ def test_clear_all_analysis_data(repo: DeduperRepository) -> None:
     deleted = repo.clear_all_analysis_data()
     assert deleted == 1
 
-    remaining = repo.execute_query("SELECT COUNT(*) AS c FROM ArticleDuplicateAnalyses")
+    remaining = repo.execute_query('SELECT COUNT(*) AS c FROM "ArticleDuplicateAnalyses"')
     assert remaining[0]["c"] == 0

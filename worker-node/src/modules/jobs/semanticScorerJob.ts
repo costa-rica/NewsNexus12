@@ -6,8 +6,8 @@ import {
   ArticleApproved,
   ArticleEntityWhoCategorizedArticleContract,
   ArtificialIntelligence,
-  dropLegacyArticleContentsTable,
   EntityWhoCategorizedArticle,
+  ensureSchemaReady,
   initModels,
   sequelize
 } from '@newsnexus/db-models';
@@ -74,9 +74,7 @@ const ensureDbReady = async (): Promise<void> => {
 
   dbReadyPromise = (async () => {
     initModels();
-    await sequelize.authenticate();
-    await sequelize.sync();
-    await dropLegacyArticleContentsTable();
+    await ensureSchemaReady(sequelize);
   })();
 
   return dbReadyPromise;

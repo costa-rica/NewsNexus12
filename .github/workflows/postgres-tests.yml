@@ -1,0 +1,65 @@
+name: Postgres Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ts-packages:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    strategy:
+      matrix:
+        package:
+          - db-models
+          - api
+          - worker-node
+          - db-manager
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install package dependencies
+        run: |
+          npm -C db-models install
+          npm -C api install
+          npm -C worker-node install
+          npm -C db-manager install
+      - name: Build db-models
+        env:
+          PG_HOST: localhost
+          PG_PORT: "5432"
+          PG_DATABASE: newsnexus_test_${{ matrix.package == 'db-models' && 'db_models' || matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
+          PG_USER: postgres
+          PG_PASSWORD: postgres
+        run: npm -C db-models run build
+      - name: Build package
+        env:
+          PG_HOST: localhost
+          PG_PORT: "5432"
+          PG_DATABASE: newsnexus_test_${{ matrix.package == 'db-models' && 'db_models' || matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
+          PG_USER: postgres
+          PG_PASSWORD: postgres
+        run: npm -C ${{ matrix.package }} run build
+      - name: Test package
+        if: matrix.package != 'db-models'
+        env:
+          PG_HOST: localhost
+          PG_PORT: "5432"
+          PG_DATABASE: newsnexus_test_${{ matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
+          PG_USER: postgres
+          PG_PASSWORD: postgres
+        run: npm -C ${{ matrix.package }} test

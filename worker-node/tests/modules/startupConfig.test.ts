@@ -1,3 +1,8 @@
+process.env.PG_HOST = "localhost";
+process.env.PG_PORT = "5432";
+process.env.PG_DATABASE = "newsnexus_test_worker_node";
+process.env.PG_USER = "nick";
+
 import { startServer } from "../../src/server";
 
 const requiredEnv = {
@@ -8,8 +13,10 @@ const requiredEnv = {
   KEY_OPEN_AI: "abc123",
   PATH_TO_STATE_ASSIGNER_FILES: "/tmp/chatgpt",
   NAME_APP: "worker-node",
-  NAME_DB: "newsnexus.sqlite",
-  PATH_DATABASE: "/tmp",
+  PG_HOST: "localhost",
+  PG_PORT: "5432",
+  PG_DATABASE: "newsnexus_test_worker_node",
+  PG_USER: "nick",
   PATH_UTILTIES: "/tmp/utilities",
 };
 

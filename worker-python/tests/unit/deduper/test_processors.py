@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+import os
 from pathlib import Path
 
 import pytest
@@ -13,6 +13,7 @@ from src.modules.deduper.processors.load import LoadProcessor
 from src.modules.deduper.processors.states import StatesProcessor
 from src.modules.deduper.processors.url_check import UrlCheckProcessor
 from src.modules.deduper.repository import DeduperRepository
+from tests.postgres_test_utils import execute_many, execute_statements, reset_public_schema
 
 
 class _FakeSentenceTransformer:
@@ -45,109 +46,14 @@ class _FakeNumpy:
         return [0.0] * dim
 
 
-def _init_schema(db_path: Path) -> None:
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-
-    cur.executescript(
-        """
-        CREATE TABLE Articles (
-            id INTEGER PRIMARY KEY,
-            url TEXT,
-            title TEXT,
-            description TEXT,
-            publishedDate TEXT
-        );
-
-        CREATE TABLE ArticleApproveds (
-            articleId INTEGER,
-            isApproved INTEGER,
-            headlineForPdfReport TEXT,
-            textForPdfReport TEXT
-        );
-
-        CREATE TABLE ArticleReportContracts (
-            articleId INTEGER,
-            reportId INTEGER
-        );
-
-        CREATE TABLE States (
-            id INTEGER PRIMARY KEY,
-            abbreviation TEXT
-        );
-
-        CREATE TABLE ArticleStateContracts (
-            articleId INTEGER,
-            stateId INTEGER
-        );
-
-        CREATE TABLE ArticleDuplicateAnalyses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            articleIdNew INTEGER,
-            articleIdApproved INTEGER,
-            reportId INTEGER,
-            sameArticleIdFlag INTEGER,
-            articleNewState TEXT DEFAULT '',
-            articleApprovedState TEXT DEFAULT '',
-            sameStateFlag INTEGER DEFAULT 0,
-            urlCheck INTEGER DEFAULT 0,
-            contentHash REAL DEFAULT 0,
-            embeddingSearch REAL DEFAULT 0,
-            createdAt TEXT,
-            updatedAt TEXT
-        );
-        """
-    )
-
-    cur.executemany(
-        "INSERT INTO Articles(id, url, title, description, publishedDate) VALUES(?, ?, ?, ?, ?)",
-        [
-            (1, "https://www.example.com/story?utm_source=x&id=1", "T1", "D1", "2026-01-01"),
-            (2, "http://example.com/story?id=1", "T2", "D2", "2026-01-02"),
-            (3, "https://example.com/story-b", "T3", "D3", "2026-01-03"),
-        ],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleApproveds(articleId, isApproved, headlineForPdfReport, textForPdfReport) VALUES(?, ?, ?, ?)",
-        [
-            (1, 1, "Major update announced", "The city council approved the same budget today."),
-            (2, 1, "Major update announced", "The city council approved the same budget today."),
-            (3, 1, "Weather report", "Heavy rain expected this weekend."),
-        ],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleReportContracts(articleId, reportId) VALUES(?, ?)",
-        [(1, 10), (2, 10)],
-    )
-
-    cur.executemany(
-        "INSERT INTO States(id, abbreviation) VALUES(?, ?)",
-        [(1, "CA"), (2, "CA"), (3, "NY")],
-    )
-
-    cur.executemany(
-        "INSERT INTO ArticleStateContracts(articleId, stateId) VALUES(?, ?)",
-        [(1, 1), (2, 2), (3, 3)],
-    )
-
-    conn.commit()
-    conn.close()
-
-
-@pytest.fixture
-def repo_and_config(tmp_path: Path):
-    db_file = tmp_path / "test.db"
-    _init_schema(db_file)
-
-    csv_file = tmp_path / "article_ids.csv"
-    csv_file.write_text("articleId\n1\n2\n", encoding="utf-8")
-
-    config = DeduperConfig(
-        path_to_database=str(tmp_path),
-        name_db="test.db",
-        path_to_csv=str(csv_file),
+def _build_config(path_to_csv: str) -> DeduperConfig:
+    return DeduperConfig(
+        pg_host=os.getenv("PG_HOST", "localhost"),
+        pg_port=int(os.getenv("PG_PORT", "5432")),
+        pg_database=os.getenv("PG_DATABASE", "newsnexus_test_worker_python"),
+        pg_user=os.getenv("PG_USER", "nick"),
+        pg_password=os.getenv("PG_PASSWORD", ""),
+        path_to_csv=path_to_csv,
         enable_embedding=True,
         batch_size_load=2,
         batch_size_states=2,
@@ -158,6 +64,103 @@ def repo_and_config(tmp_path: Path):
         checkpoint_interval=1,
     )
 
+
+def _init_schema() -> None:
+    reset_public_schema()
+    execute_statements(
+        [
+            """
+            CREATE TABLE "Articles" (
+                id INTEGER PRIMARY KEY,
+                url TEXT,
+                title TEXT,
+                description TEXT,
+                "publishedDate" TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleApproveds" (
+                "articleId" INTEGER,
+                "isApproved" BOOLEAN,
+                "headlineForPdfReport" TEXT,
+                "textForPdfReport" TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleReportContracts" (
+                "articleId" INTEGER,
+                "reportId" INTEGER
+            )
+            """,
+            """
+            CREATE TABLE "States" (
+                id INTEGER PRIMARY KEY,
+                abbreviation TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleStateContracts" (
+                "articleId" INTEGER,
+                "stateId" INTEGER
+            )
+            """,
+            """
+            CREATE TABLE "ArticleDuplicateAnalyses" (
+                id SERIAL PRIMARY KEY,
+                "articleIdNew" INTEGER,
+                "articleIdApproved" INTEGER,
+                "reportId" INTEGER,
+                "sameArticleIdFlag" INTEGER,
+                "articleNewState" TEXT DEFAULT '',
+                "articleApprovedState" TEXT DEFAULT '',
+                "sameStateFlag" INTEGER DEFAULT 0,
+                "urlCheck" INTEGER DEFAULT 0,
+                "contentHash" DOUBLE PRECISION DEFAULT 0,
+                "embeddingSearch" DOUBLE PRECISION DEFAULT 0,
+                "createdAt" TIMESTAMPTZ,
+                "updatedAt" TIMESTAMPTZ
+            )
+            """,
+        ]
+    )
+    execute_many(
+        'INSERT INTO "Articles"(id, url, title, description, "publishedDate") VALUES(%s, %s, %s, %s, %s)',
+        [
+            (1, "https://www.example.com/story?utm_source=x&id=1", "T1", "D1", "2026-01-01"),
+            (2, "http://example.com/story?id=1", "T2", "D2", "2026-01-02"),
+            (3, "https://example.com/story-b", "T3", "D3", "2026-01-03"),
+        ],
+    )
+    execute_many(
+        'INSERT INTO "ArticleApproveds"("articleId", "isApproved", "headlineForPdfReport", "textForPdfReport") VALUES(%s, %s, %s, %s)',
+        [
+            (1, True, "Major update announced", "The city council approved the same budget today."),
+            (2, True, "Major update announced", "The city council approved the same budget today."),
+            (3, True, "Weather report", "Heavy rain expected this weekend."),
+        ],
+    )
+    execute_many(
+        'INSERT INTO "ArticleReportContracts"("articleId", "reportId") VALUES(%s, %s)',
+        [(1, 10), (2, 10)],
+    )
+    execute_many(
+        'INSERT INTO "States"(id, abbreviation) VALUES(%s, %s)',
+        [(1, "CA"), (2, "CA"), (3, "NY")],
+    )
+    execute_many(
+        'INSERT INTO "ArticleStateContracts"("articleId", "stateId") VALUES(%s, %s)',
+        [(1, 1), (2, 2), (3, 3)],
+    )
+
+
+@pytest.fixture
+def repo_and_config(tmp_path: Path):
+    _init_schema()
+
+    csv_file = tmp_path / "article_ids.csv"
+    csv_file.write_text("articleId\n1\n2\n", encoding="utf-8")
+
+    config = _build_config(str(csv_file))
     repository = DeduperRepository(config)
     yield repository, config
     repository.close()
@@ -183,7 +186,7 @@ def test_load_processor_csv_mode(repo_and_config) -> None:
     summary = processor.execute()
 
     assert summary["empty"] is False
-    rows = repository.execute_query("SELECT COUNT(*) AS c FROM ArticleDuplicateAnalyses")
+    rows = repository.execute_query('SELECT COUNT(*) AS c FROM "ArticleDuplicateAnalyses"')
     assert rows[0]["c"] == 6
 
 

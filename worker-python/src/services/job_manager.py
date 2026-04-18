@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -108,13 +107,8 @@ class JobManager:
         return True, "Job cancelled successfully"
 
     def health_summary(self) -> dict[str, Any]:
-        path_to_database = os.getenv("PATH_DATABASE")
-        name_db = os.getenv("NAME_DB")
-        sqlite_path = (
-            str(Path(path_to_database) / name_db)
-            if path_to_database and name_db
-            else None
-        )
+        pg_host = os.getenv("PG_HOST")
+        pg_database = os.getenv("PG_DATABASE")
         jobs = self.queue_store.get_jobs()
         queue_summary = summarize_queue_jobs(jobs)
 
@@ -122,8 +116,8 @@ class JobManager:
             "status": "healthy",
             "timestamp": utc_now_iso(),
             "environment": {
-                "path_database_configured": bool(path_to_database),
-                "name_db_configured": bool(name_db),
+                "pg_host_configured": bool(pg_host),
+                "pg_database_configured": bool(pg_database),
             },
             "jobs": {
                 "total": queue_summary.totalJobs,
@@ -136,10 +130,8 @@ class JobManager:
             },
         }
 
-        if sqlite_path:
-            checks["environment"]["database_exists"] = Path(sqlite_path).exists()
-            if not checks["environment"]["database_exists"]:
-                checks["status"] = "unhealthy"
+        if not pg_host or not pg_database:
+            checks["status"] = "unhealthy"
 
         return checks
 

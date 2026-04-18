@@ -1,10 +1,12 @@
-"""SQLite repository for location scorer SQL operations."""
+"""Postgres repository for location scorer SQL operations."""
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
 from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from src.modules.location_scorer.config import LocationScorerConfig
 from src.modules.location_scorer.errors import LocationScorerDatabaseError
@@ -13,32 +15,44 @@ from src.modules.location_scorer.errors import LocationScorerDatabaseError
 class LocationScorerRepository:
     def __init__(self, config: LocationScorerConfig) -> None:
         self.config = config
-        self.sqlite_path = Path(self.config.sqlite_path)
-        self._connection: sqlite3.Connection | None = None
+        self._pool: ConnectionPool | None = None
+        self._connection: psycopg.Connection | None = None
 
-    def get_connection(self) -> sqlite3.Connection:
+    def get_connection(self) -> psycopg.Connection:
         if self._connection is None:
-            if not self.sqlite_path.exists():
-                raise LocationScorerDatabaseError(
-                    f"Database not found at {self.sqlite_path}"
+            if self._pool is None:
+                self._pool = ConnectionPool(
+                    conninfo=self.config.dsn,
+                    min_size=1,
+                    max_size=5,
+                    kwargs={"row_factory": dict_row},
                 )
-            self._connection = sqlite3.connect(str(self.sqlite_path))
-            self._connection.row_factory = sqlite3.Row
+            self._connection = self._pool.getconn()
 
         return self._connection
 
     def close(self) -> None:
         if self._connection is not None:
-            self._connection.close()
+            if self._pool is not None:
+                self._pool.putconn(self._connection)
             self._connection = None
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
+
+    @staticmethod
+    def _scalar(row: Any) -> Any:
+        if isinstance(row, dict):
+            return next(iter(row.values()))
+        return row[0]
 
     def healthcheck(self) -> bool:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
-            return cursor.fetchone()[0] == 1
-        except sqlite3.Error as exc:
+            return self._scalar(cursor.fetchone()) == 1
+        except psycopg.Error as exc:
             raise LocationScorerDatabaseError(
                 f"Repository healthcheck failed: {exc}"
             ) from exc
@@ -54,17 +68,17 @@ class LocationScorerRepository:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise LocationScorerDatabaseError(f"Query failed: {exc}") from exc
 
     def get_entity_who_categorized_article_id(self, ai_entity_name: str) -> int | None:
         rows = self.execute_query(
             """
             SELECT ewca.id
-            FROM ArtificialIntelligences ai
-            JOIN EntityWhoCategorizedArticles ewca
-                ON ewca.artificialIntelligenceId = ai.id
-            WHERE ai.name = ?
+            FROM "ArtificialIntelligences" ai
+            JOIN "EntityWhoCategorizedArticles" ewca
+                ON ewca."artificialIntelligenceId" = ai.id
+            WHERE ai.name = %s
             LIMIT 1
             """,
             (ai_entity_name,),
@@ -78,19 +92,19 @@ class LocationScorerRepository:
     ) -> list[dict[str, Any]]:
         query = """
         SELECT a.id, a.title, a.description
-        FROM Articles a
+        FROM "Articles" a
         WHERE NOT EXISTS (
             SELECT 1
-            FROM ArticleEntityWhoCategorizedArticleContracts contract
-            WHERE contract.articleId = a.id
-              AND contract.entityWhoCategorizesId = ?
+            FROM "ArticleEntityWhoCategorizedArticleContracts" contract
+            WHERE contract."articleId" = a.id
+              AND contract."entityWhoCategorizesId" = %s
         )
         ORDER BY a.id
         """
 
         params: tuple[Any, ...]
         if limit is not None:
-            query += "\nLIMIT ?"
+            query += "\nLIMIT %s"
             params = (entity_id, limit)
         else:
             params = (entity_id,)
@@ -112,31 +126,33 @@ class LocationScorerRepository:
 
         try:
             for score in scores:
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO ArticleEntityWhoCategorizedArticleContracts (
-                            articleId,
-                            entityWhoCategorizesId,
-                            keyword,
-                            keywordRating,
-                            createdAt,
-                            updatedAt
-                        ) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-                        """,
-                        (
-                            score["article_id"],
-                            entity_id,
-                            score["rating_for"],
-                            score["score"],
-                        ),
-                    )
-                    inserted += 1
-                except sqlite3.IntegrityError:
+                cursor.execute(
+                    """
+                    INSERT INTO "ArticleEntityWhoCategorizedArticleContracts" (
+                        "articleId",
+                        "entityWhoCategorizesId",
+                        keyword,
+                        "keywordRating",
+                        "createdAt",
+                        "updatedAt"
+                    ) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT DO NOTHING
+                    RETURNING "articleId"
+                    """,
+                    (
+                        score["article_id"],
+                        entity_id,
+                        score["rating_for"],
+                        score["score"],
+                    ),
+                )
+                if cursor.fetchone() is None:
                     duplicates += 1
+                else:
+                    inserted += 1
 
             conn.commit()
             return {"inserted": inserted, "duplicates": duplicates}
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             conn.rollback()
             raise LocationScorerDatabaseError(f"Batch insert failed: {exc}") from exc

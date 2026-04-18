@@ -1,70 +1,97 @@
 from __future__ import annotations
 
-import sqlite3
+import os
 
 from src.modules.ai_approver.config import AiApproverConfig
 from src.modules.ai_approver.repository import AiApproverRepository
+from tests.postgres_test_utils import execute_many, execute_statements, reset_public_schema
 
 
-def _create_repo(tmp_path) -> AiApproverRepository:
-    db_path = tmp_path / "test.db"
-    conn = sqlite3.connect(str(db_path))
-    conn.executescript(
-        """
-        CREATE TABLE Articles (
-            id INTEGER PRIMARY KEY,
-            title TEXT,
-            description TEXT
-        );
-        CREATE TABLE ArticleContents02 (
-            id INTEGER PRIMARY KEY,
-            articleId INTEGER,
-            content TEXT,
-            status TEXT
-        );
-        CREATE TABLE ArticleIsRelevants (
-            id INTEGER PRIMARY KEY,
-            articleId INTEGER,
-            isRelevant INTEGER
-        );
-        CREATE TABLE ArticleApproveds (
-            id INTEGER PRIMARY KEY,
-            articleId INTEGER,
-            isApproved INTEGER
-        );
-        CREATE TABLE ArticleStateContracts02 (
-            id INTEGER PRIMARY KEY,
-            articleId INTEGER,
-            stateId INTEGER,
-            isDeterminedToBeError INTEGER
-        );
-        CREATE TABLE AiApproverPromptVersions (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            description TEXT,
-            promptInMarkdown TEXT,
-            isActive INTEGER,
-            endedAt TEXT
-        );
-        CREATE TABLE AiApproverArticleScores (
-            id INTEGER PRIMARY KEY,
-            articleId INTEGER,
-            promptVersionId INTEGER,
-            resultStatus TEXT,
-            score REAL,
-            reason TEXT,
-            errorCode TEXT,
-            errorMessage TEXT,
-            isHumanApproved INTEGER,
-            reasonHumanRejected TEXT,
-            jobId TEXT,
-            createdAt TEXT,
-            updatedAt TEXT
-        );
-        """
+def _build_config() -> AiApproverConfig:
+    return AiApproverConfig(
+        pg_host=os.getenv("PG_HOST", "localhost"),
+        pg_port=int(os.getenv("PG_PORT", "5432")),
+        pg_database=os.getenv("PG_DATABASE", "newsnexus_test_worker_python"),
+        pg_user=os.getenv("PG_USER", "nick"),
+        pg_password=os.getenv("PG_PASSWORD", ""),
+        openai_api_key="secret",
+        model_name="gpt-4o-mini",
+        batch_size=10,
     )
-    conn.executemany(
-        "INSERT INTO Articles(id, title, description) VALUES (?, ?, ?)",
+
+
+def _create_repo() -> AiApproverRepository:
+    reset_public_schema()
+    execute_statements(
+        [
+            """
+            CREATE TABLE "Articles" (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                description TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleContents02" (
+                id INTEGER PRIMARY KEY,
+                "articleId" INTEGER,
+                content TEXT,
+                status TEXT
+            )
+            """,
+            """
+            CREATE TABLE "ArticleIsRelevants" (
+                id INTEGER PRIMARY KEY,
+                "articleId" INTEGER,
+                "isRelevant" BOOLEAN
+            )
+            """,
+            """
+            CREATE TABLE "ArticleApproveds" (
+                id INTEGER PRIMARY KEY,
+                "articleId" INTEGER,
+                "isApproved" BOOLEAN
+            )
+            """,
+            """
+            CREATE TABLE "ArticleStateContracts02" (
+                id INTEGER PRIMARY KEY,
+                "articleId" INTEGER,
+                "stateId" INTEGER,
+                "isDeterminedToBeError" BOOLEAN
+            )
+            """,
+            """
+            CREATE TABLE "AiApproverPromptVersions" (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                description TEXT,
+                "promptInMarkdown" TEXT,
+                "isActive" BOOLEAN,
+                "endedAt" TIMESTAMPTZ
+            )
+            """,
+            """
+            CREATE TABLE "AiApproverArticleScores" (
+                id SERIAL PRIMARY KEY,
+                "articleId" INTEGER,
+                "promptVersionId" INTEGER,
+                "resultStatus" TEXT,
+                score DOUBLE PRECISION,
+                reason TEXT,
+                "errorCode" TEXT,
+                "errorMessage" TEXT,
+                "isHumanApproved" BOOLEAN,
+                "reasonHumanRejected" TEXT,
+                "jobId" TEXT,
+                "createdAt" TIMESTAMPTZ,
+                "updatedAt" TIMESTAMPTZ
+            )
+            """,
+        ]
+    )
+    execute_many(
+        'INSERT INTO "Articles"(id, title, description) VALUES (%s, %s, %s)',
         [
             (1, "A1", "D1"),
             (2, "A2", "D2"),
@@ -73,57 +100,41 @@ def _create_repo(tmp_path) -> AiApproverRepository:
             (5, "A5", "D5"),
         ],
     )
-    conn.executemany(
-        "INSERT INTO ArticleContents02(id, articleId, content, status) VALUES (?, ?, ?, ?)",
+    execute_many(
+        'INSERT INTO "ArticleContents02"(id, "articleId", content, status) VALUES (%s, %s, %s, %s)',
         [(1, 1, "C1", "success"), (2, 2, "C2", "success")],
     )
-    conn.executemany(
-        "INSERT INTO ArticleIsRelevants(id, articleId, isRelevant) VALUES (?, ?, ?)",
-        [(1, 3, 0)],
+    execute_many(
+        'INSERT INTO "ArticleIsRelevants"(id, "articleId", "isRelevant") VALUES (%s, %s, %s)',
+        [(1, 3, False)],
     )
-    conn.executemany(
-        "INSERT INTO ArticleApproveds(id, articleId, isApproved) VALUES (?, ?, ?)",
-        [(1, 4, 1), (2, 5, 0)],
+    execute_many(
+        'INSERT INTO "ArticleApproveds"(id, "articleId", "isApproved") VALUES (%s, %s, %s)',
+        [(1, 4, True), (2, 5, False)],
     )
-    conn.executemany(
+    execute_many(
+        'INSERT INTO "ArticleStateContracts02"(id, "articleId", "stateId", "isDeterminedToBeError") VALUES (%s, %s, %s, %s)',
+        [(1, 1, 5, False), (2, 2, 7, False), (3, 3, None, False), (4, 4, 5, False)],
+    )
+    execute_many(
+        'INSERT INTO "AiApproverPromptVersions"(id, name, description, "promptInMarkdown", "isActive", "endedAt") VALUES (%s, %s, %s, %s, %s, %s)',
+        [(1, "P1", None, "# T1", True, None), (2, "P2", None, "# T2", False, None)],
+    )
+    execute_many(
         """
-        INSERT INTO ArticleStateContracts02(id, articleId, stateId, isDeterminedToBeError)
-        VALUES (?, ?, ?, ?)
-        """,
-        [(1, 1, 5, 0), (2, 2, 7, 0), (3, 3, None, 0), (4, 4, 5, 0)],
-    )
-    conn.executemany(
-        """
-        INSERT INTO AiApproverPromptVersions(id, name, description, promptInMarkdown, isActive, endedAt)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        [(1, "P1", None, "# T1", 1, None), (2, "P2", None, "# T2", 0, None)],
-    )
-    conn.executemany(
-        """
-        INSERT INTO AiApproverArticleScores(
-            id, articleId, promptVersionId, resultStatus, score, reason,
-            errorCode, errorMessage, isHumanApproved, reasonHumanRejected, jobId, createdAt, updatedAt
+        INSERT INTO "AiApproverArticleScores"(
+            id, "articleId", "promptVersionId", "resultStatus", score, reason,
+            "errorCode", "errorMessage", "isHumanApproved", "reasonHumanRejected", "jobId", "createdAt", "updatedAt"
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
-        [(1, 2, 1, "completed", 0.7, "done", None, None, None, None, "1")],
+        [(100, 2, 1, "completed", 0.7, "done", None, None, None, None, "1")],
     )
-    conn.commit()
-    conn.close()
-
-    config = AiApproverConfig(
-        path_database=str(tmp_path),
-        name_db="test.db",
-        openai_api_key="secret",
-        model_name="gpt-4o-mini",
-        batch_size=10,
-    )
-    return AiApproverRepository(config)
+    return AiApproverRepository(_build_config())
 
 
-def test_get_active_prompt_versions(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_active_prompt_versions() -> None:
+    repo = _create_repo()
     try:
         prompts = repo.get_active_prompt_versions()
     finally:
@@ -133,8 +144,8 @@ def test_get_active_prompt_versions(tmp_path) -> None:
     assert prompts[0]["id"] == 1
 
 
-def test_get_prompt_version_by_id_returns_prompt_row(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_prompt_version_by_id_returns_prompt_row() -> None:
+    repo = _create_repo()
     try:
         prompt = repo.get_prompt_version_by_id(1)
     finally:
@@ -145,8 +156,8 @@ def test_get_prompt_version_by_id_returns_prompt_row(tmp_path) -> None:
     assert prompt["promptInMarkdown"] == "# T1"
 
 
-def test_get_eligible_articles_filters_by_existing_scores_and_state(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_eligible_articles_filters_by_existing_scores_and_state() -> None:
+    repo = _create_repo()
     try:
         rows = repo.get_eligible_articles(
             limit=10,
@@ -160,8 +171,8 @@ def test_get_eligible_articles_filters_by_existing_scores_and_state(tmp_path) ->
     assert rows[0]["content"] == "C1"
 
 
-def test_get_eligible_articles_excludes_not_relevant_and_any_human_decision(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_eligible_articles_excludes_not_relevant_and_any_human_decision() -> None:
+    repo = _create_repo()
     try:
         rows = repo.get_eligible_articles(
             limit=10,
@@ -174,8 +185,8 @@ def test_get_eligible_articles_excludes_not_relevant_and_any_human_decision(tmp_
     assert [row["id"] for row in rows] == [1]
 
 
-def test_get_article_for_prompt_run_prefers_article_contents_02(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_article_for_prompt_run_prefers_article_contents_02() -> None:
+    repo = _create_repo()
     try:
         article = repo.get_article_for_prompt_run(1)
     finally:
@@ -187,8 +198,8 @@ def test_get_article_for_prompt_run_prefers_article_contents_02(tmp_path) -> Non
     assert article["contentSource"] == "article-contents-02"
 
 
-def test_get_article_for_prompt_run_falls_back_to_article_description(tmp_path) -> None:
-    repo = _create_repo(tmp_path)
+def test_get_article_for_prompt_run_falls_back_to_article_description() -> None:
+    repo = _create_repo()
     try:
         article = repo.get_article_for_prompt_run(5)
     finally:
@@ -198,3 +209,27 @@ def test_get_article_for_prompt_run_falls_back_to_article_description(tmp_path) 
     assert article["id"] == 5
     assert article["content"] == "D5"
     assert article["contentSource"] == "article-description"
+
+
+def test_insert_score_row_persists_result() -> None:
+    repo = _create_repo()
+    try:
+        repo.insert_score_row(
+            article_id=1,
+            prompt_version_id=1,
+            result_status="completed",
+            score=0.91,
+            reason="clear match",
+            error_code=None,
+            error_message=None,
+            job_id="job-1",
+        )
+        rows = repo.get_connection().execute(
+            'SELECT "articleId", "promptVersionId", "resultStatus", score, reason, "jobId" FROM "AiApproverArticleScores" WHERE "jobId" = %s',
+            ("job-1",),
+        ).fetchall()
+    finally:
+        repo.close()
+
+    assert len(rows) == 1
+    assert dict(rows[0])["articleId"] == 1

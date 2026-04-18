@@ -1,10 +1,12 @@
-"""SQLite repository for deduper SQL operations."""
+"""Postgres repository for deduper SQL operations."""
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
 from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from src.modules.deduper.config import DeduperConfig
 from src.modules.deduper.errors import DeduperDatabaseError
@@ -13,30 +15,44 @@ from src.modules.deduper.errors import DeduperDatabaseError
 class DeduperRepository:
     def __init__(self, config: DeduperConfig) -> None:
         self.config = config
-        self.sqlite_path = Path(self.config.sqlite_path)
-        self._connection: sqlite3.Connection | None = None
+        self._pool: ConnectionPool | None = None
+        self._connection: psycopg.Connection | None = None
 
-    def get_connection(self) -> sqlite3.Connection:
+    def get_connection(self) -> psycopg.Connection:
         if self._connection is None:
-            if not self.sqlite_path.exists():
-                raise DeduperDatabaseError(f"Database not found at {self.sqlite_path}")
-            self._connection = sqlite3.connect(str(self.sqlite_path))
-            self._connection.row_factory = sqlite3.Row
+            if self._pool is None:
+                self._pool = ConnectionPool(
+                    conninfo=self.config.dsn,
+                    min_size=1,
+                    max_size=5,
+                    kwargs={"row_factory": dict_row},
+                )
+            self._connection = self._pool.getconn()
 
         return self._connection
 
     def close(self) -> None:
         if self._connection is not None:
-            self._connection.close()
+            if self._pool is not None:
+                self._pool.putconn(self._connection)
             self._connection = None
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
+
+    @staticmethod
+    def _scalar(row: Any) -> Any:
+        if isinstance(row, dict):
+            return next(iter(row.values()))
+        return row[0]
 
     def healthcheck(self) -> bool:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
-            return cursor.fetchone()[0] == 1
-        except sqlite3.Error as exc:
+            return self._scalar(cursor.fetchone()) == 1
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Repository healthcheck failed: {exc}") from exc
 
     def execute_query(self, query: str, params: tuple = ()) -> list[dict[str, Any]]:
@@ -46,7 +62,7 @@ class DeduperRepository:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Query failed: {exc}") from exc
 
     def execute_insert(self, query: str, params: tuple = ()) -> int:
@@ -55,8 +71,11 @@ class DeduperRepository:
             cursor = conn.cursor()
             cursor.execute(query, params)
             conn.commit()
-            return cursor.lastrowid
-        except sqlite3.Error as exc:
+            row = cursor.fetchone()
+            if row is None:
+                return 0
+            return int(row["id"] if isinstance(row, dict) else row[0])
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Insert failed: {exc}") from exc
 
     def execute_many(self, query: str, params_list: list[tuple]) -> int:
@@ -66,17 +85,17 @@ class DeduperRepository:
             cursor.executemany(query, params_list)
             conn.commit()
             return cursor.rowcount
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Batch execution failed: {exc}") from exc
 
     def get_article_ids_from_csv_list(self, article_ids: list[int]) -> list[dict[str, Any]]:
         if not article_ids:
             return []
 
-        placeholders = ",".join(["?"] * len(article_ids))
+        placeholders = ",".join(["%s"] * len(article_ids))
         query = f"""
-        SELECT id, url, title, description, publishedDate
-        FROM Articles
+        SELECT id, url, title, description, "publishedDate"
+        FROM "Articles"
         WHERE id IN ({placeholders})
         """
         return self.execute_query(query, tuple(article_ids))
@@ -84,9 +103,10 @@ class DeduperRepository:
     def get_all_approved_article_ids(self) -> list[int]:
         rows = self.execute_query(
             """
-            SELECT DISTINCT articleId
-            FROM ArticleApproveds
-            WHERE isApproved = 1
+            SELECT DISTINCT "articleId"
+            FROM "ArticleApproveds"
+            WHERE "isApproved" = TRUE
+            ORDER BY "articleId"
             """
         )
         return [row["articleId"] for row in rows]
@@ -94,10 +114,10 @@ class DeduperRepository:
     def get_article_ids_by_report_id(self, report_id: int) -> list[int]:
         rows = self.execute_query(
             """
-            SELECT DISTINCT articleId
-            FROM ArticleReportContracts
-            WHERE reportId = ?
-            ORDER BY articleId
+            SELECT DISTINCT "articleId"
+            FROM "ArticleReportContracts"
+            WHERE "reportId" = %s
+            ORDER BY "articleId"
             """,
             (report_id,),
         )
@@ -108,12 +128,12 @@ class DeduperRepository:
             return 0
 
         query = """
-        INSERT INTO ArticleDuplicateAnalyses (
-            articleIdNew, articleIdApproved, reportId, sameArticleIdFlag,
-            articleNewState, articleApprovedState, sameStateFlag,
-            urlCheck, contentHash, embeddingSearch,
-            createdAt, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        INSERT INTO "ArticleDuplicateAnalyses" (
+            "articleIdNew", "articleIdApproved", "reportId", "sameArticleIdFlag",
+            "articleNewState", "articleApprovedState", "sameStateFlag",
+            "urlCheck", "contentHash", "embeddingSearch",
+            "createdAt", "updatedAt"
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
 
         params_list = [
@@ -138,38 +158,38 @@ class DeduperRepository:
         if not article_ids:
             return
 
-        placeholders = ",".join(["?"] * len(article_ids))
+        placeholders = ",".join(["%s"] * len(article_ids))
         query = f"""
-        DELETE FROM ArticleDuplicateAnalyses
-        WHERE articleIdNew IN ({placeholders})
+        DELETE FROM "ArticleDuplicateAnalyses"
+        WHERE "articleIdNew" IN ({placeholders})
         """
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             cursor.execute(query, tuple(article_ids))
             conn.commit()
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Failed to clear existing analysis: {exc}") from exc
 
     def clear_all_analysis_data(self) -> int:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM ArticleDuplicateAnalyses")
-            row_count = cursor.fetchone()[0]
+            cursor.execute('SELECT COUNT(*) FROM "ArticleDuplicateAnalyses"')
+            row_count = int(self._scalar(cursor.fetchone()))
 
-            cursor.execute("DELETE FROM ArticleDuplicateAnalyses")
+            cursor.execute('DELETE FROM "ArticleDuplicateAnalyses"')
             conn.commit()
             return row_count
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Failed to clear analysis table: {exc}") from exc
 
     def get_analysis_records_for_state_update(self) -> list[dict[str, Any]]:
         return self.execute_query(
             """
-            SELECT id, articleIdNew, articleIdApproved
-            FROM ArticleDuplicateAnalyses
-            WHERE articleNewState = '' OR articleApprovedState = '' OR sameStateFlag = 0
+            SELECT id, "articleIdNew", "articleIdApproved"
+            FROM "ArticleDuplicateAnalyses"
+            WHERE "articleNewState" = '' OR "articleApprovedState" = '' OR "sameStateFlag" = 0
             """
         )
 
@@ -177,10 +197,10 @@ class DeduperRepository:
         rows = self.execute_query(
             """
             SELECT s.abbreviation
-            FROM Articles a
-            JOIN ArticleStateContracts asc ON a.id = asc.articleId
-            JOIN States s ON asc.stateId = s.id
-            WHERE a.id = ?
+            FROM "Articles" a
+            JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
+            JOIN "States" s ON asct."stateId" = s.id
+            WHERE a.id = %s
             LIMIT 1
             """,
             (article_id,),
@@ -192,9 +212,9 @@ class DeduperRepository:
             return 0
 
         query = """
-        UPDATE ArticleDuplicateAnalyses
-        SET articleNewState = ?, articleApprovedState = ?, sameStateFlag = ?, updatedAt = datetime('now')
-        WHERE id = ?
+        UPDATE "ArticleDuplicateAnalyses"
+        SET "articleNewState" = %s, "articleApprovedState" = %s, "sameStateFlag" = %s, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = %s
         """
         params_list = [
             (
@@ -209,9 +229,9 @@ class DeduperRepository:
 
     def get_state_processing_stats(self) -> dict[str, int]:
         queries = {
-            "same_state_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE sameStateFlag = 1 AND articleNewState != ''",
-            "different_state_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE sameStateFlag = 0 AND articleNewState != '' AND articleApprovedState != ''",
-            "missing_state_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE articleNewState = '' OR articleApprovedState = ''",
+            "same_state_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "sameStateFlag" = 1 AND "articleNewState" != \'\'',
+            "different_state_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "sameStateFlag" = 0 AND "articleNewState" != \'\' AND "articleApprovedState" != \'\'',
+            "missing_state_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "articleNewState" = \'\' OR "articleApprovedState" = \'\'',
         }
 
         return self._count_queries(queries)
@@ -219,9 +239,9 @@ class DeduperRepository:
     def get_analysis_records_for_url_update(self) -> list[dict[str, Any]]:
         return self.execute_query(
             """
-            SELECT id, articleIdNew, articleIdApproved
-            FROM ArticleDuplicateAnalyses
-            WHERE urlCheck = 0
+            SELECT id, "articleIdNew", "articleIdApproved"
+            FROM "ArticleDuplicateAnalyses"
+            WHERE "urlCheck" = 0
             """
         )
 
@@ -229,8 +249,8 @@ class DeduperRepository:
         rows = self.execute_query(
             """
             SELECT url
-            FROM Articles
-            WHERE id = ?
+            FROM "Articles"
+            WHERE id = %s
             """,
             (article_id,),
         )
@@ -241,17 +261,17 @@ class DeduperRepository:
             return 0
 
         query = """
-        UPDATE ArticleDuplicateAnalyses
-        SET urlCheck = ?, updatedAt = datetime('now')
-        WHERE id = ?
+        UPDATE "ArticleDuplicateAnalyses"
+        SET "urlCheck" = %s, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = %s
         """
         params_list = [(update["urlCheck"], update["id"]) for update in updates]
         return self.execute_many(query, params_list)
 
     def get_url_check_processing_stats(self) -> dict[str, int]:
         queries = {
-            "url_match_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE urlCheck = 1",
-            "url_no_match_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE urlCheck = 0",
+            "url_match_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "urlCheck" = 1',
+            "url_no_match_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "urlCheck" = 0',
         }
 
         return self._count_queries(queries)
@@ -259,9 +279,9 @@ class DeduperRepository:
     def get_analysis_records_for_content_hash_update(self) -> list[dict[str, Any]]:
         return self.execute_query(
             """
-            SELECT id, articleIdNew, articleIdApproved
-            FROM ArticleDuplicateAnalyses
-            WHERE contentHash = 0
+            SELECT id, "articleIdNew", "articleIdApproved"
+            FROM "ArticleDuplicateAnalyses"
+            WHERE "contentHash" = 0
             """
         )
 
@@ -270,17 +290,17 @@ class DeduperRepository:
             """
             SELECT
                 adr.id,
-                adr.articleIdNew,
-                adr.articleIdApproved,
-                aa1.headlineForPdfReport AS headlineNew,
-                aa1.textForPdfReport AS textNew,
-                aa2.headlineForPdfReport AS headlineApproved,
-                aa2.textForPdfReport AS textApproved
-            FROM ArticleDuplicateAnalyses adr
-            JOIN ArticleApproveds aa1 ON aa1.articleId = adr.articleIdNew
-            JOIN ArticleApproveds aa2 ON aa2.articleId = adr.articleIdApproved
-            WHERE adr.contentHash = 0
-            LIMIT ?
+                adr."articleIdNew",
+                adr."articleIdApproved",
+                aa1."headlineForPdfReport" AS "headlineNew",
+                aa1."textForPdfReport" AS "textNew",
+                aa2."headlineForPdfReport" AS "headlineApproved",
+                aa2."textForPdfReport" AS "textApproved"
+            FROM "ArticleDuplicateAnalyses" adr
+            JOIN "ArticleApproveds" aa1 ON aa1."articleId" = adr."articleIdNew"
+            JOIN "ArticleApproveds" aa2 ON aa2."articleId" = adr."articleIdApproved"
+            WHERE adr."contentHash" = 0
+            LIMIT %s
             """,
             (limit,),
         )
@@ -288,9 +308,9 @@ class DeduperRepository:
     def get_article_content(self, article_id: int) -> str | None:
         rows = self.execute_query(
             """
-            SELECT textForPdfReport
-            FROM ArticleApproveds
-            WHERE articleId = ? AND isApproved = 1
+            SELECT "textForPdfReport"
+            FROM "ArticleApproveds"
+            WHERE "articleId" = %s AND "isApproved" = TRUE
             LIMIT 1
             """,
             (article_id,),
@@ -302,21 +322,21 @@ class DeduperRepository:
             return 0
 
         query = """
-        UPDATE ArticleDuplicateAnalyses
-        SET contentHash = ?, updatedAt = datetime('now')
-        WHERE id = ?
+        UPDATE "ArticleDuplicateAnalyses"
+        SET "contentHash" = %s, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = %s
         """
         params_list = [(float(update["contentHash"]), update["id"]) for update in updates]
         return self.execute_many(query, params_list)
 
     def get_content_hash_processing_stats(self) -> dict[str, int]:
         queries = {
-            "exact_match_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash = 1.0",
-            "high_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash >= 0.85 AND contentHash < 1.0",
-            "medium_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash >= 0.5 AND contentHash < 0.85",
-            "low_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash > 0.0 AND contentHash < 0.5",
-            "no_match_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash = 0.0",
-            "processed_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE contentHash > 0",
+            "exact_match_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" = 1.0',
+            "high_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" >= 0.85 AND "contentHash" < 1.0',
+            "medium_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" >= 0.5 AND "contentHash" < 0.85',
+            "low_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" > 0.0 AND "contentHash" < 0.5',
+            "no_match_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" = 0.0',
+            "processed_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "contentHash" > 0',
         }
 
         return self._count_queries(queries)
@@ -324,9 +344,9 @@ class DeduperRepository:
     def get_analysis_records_for_embedding_update(self) -> list[dict[str, Any]]:
         return self.execute_query(
             """
-            SELECT id, articleIdNew, articleIdApproved
-            FROM ArticleDuplicateAnalyses
-            WHERE embeddingSearch = 0
+            SELECT id, "articleIdNew", "articleIdApproved"
+            FROM "ArticleDuplicateAnalyses"
+            WHERE "embeddingSearch" = 0
             """
         )
 
@@ -335,19 +355,19 @@ class DeduperRepository:
             return 0
 
         query = """
-        UPDATE ArticleDuplicateAnalyses
-        SET embeddingSearch = ?, updatedAt = datetime('now')
-        WHERE id = ?
+        UPDATE "ArticleDuplicateAnalyses"
+        SET "embeddingSearch" = %s, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = %s
         """
         params_list = [(float(update["embeddingSearch"]), update["id"]) for update in updates]
         return self.execute_many(query, params_list)
 
     def get_embedding_processing_stats(self) -> dict[str, int]:
         queries = {
-            "high_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE embeddingSearch > 0.8",
-            "medium_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE embeddingSearch BETWEEN 0.5 AND 0.8",
-            "low_similarity_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE embeddingSearch < 0.5 AND embeddingSearch > 0",
-            "processed_count": "SELECT COUNT(*) FROM ArticleDuplicateAnalyses WHERE embeddingSearch > 0",
+            "high_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "embeddingSearch" > 0.8',
+            "medium_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "embeddingSearch" BETWEEN 0.5 AND 0.8',
+            "low_similarity_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "embeddingSearch" < 0.5 AND "embeddingSearch" > 0',
+            "processed_count": 'SELECT COUNT(*) FROM "ArticleDuplicateAnalyses" WHERE "embeddingSearch" > 0',
         }
 
         return self._count_queries(queries)
@@ -359,9 +379,9 @@ class DeduperRepository:
             stats: dict[str, int] = {}
             for key, query in queries.items():
                 cursor.execute(query)
-                stats[key] = cursor.fetchone()[0]
+                stats[key] = int(self._scalar(cursor.fetchone()))
             return stats
-        except sqlite3.Error as exc:
+        except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Failed to collect stats: {exc}") from exc
 
     def __enter__(self) -> "DeduperRepository":

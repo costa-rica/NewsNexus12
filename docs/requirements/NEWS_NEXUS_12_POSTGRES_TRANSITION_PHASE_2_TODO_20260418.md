@@ -12,69 +12,69 @@ Phase 2 moves the worker services onto Postgres after the Phase 1 database found
 
 ### 1. worker-node runtime cleanup
 
-- [ ] Rework `worker-node/src/modules/db/ensureDbReady.ts` to use `ensureSchemaReady(sequelize)` instead of `sequelize.sync()`.
-- [ ] Keep the existing helper name and public behavior stable so callers do not need to change.
-- [ ] Remove runtime `sequelize.sync()` from `worker-node/src/modules/jobs/requestGoogleRssJob.ts`.
-- [ ] Remove runtime `sequelize.sync()` from `worker-node/src/modules/jobs/semanticScorerJob.ts`.
-- [ ] Confirm worker jobs now assume schema bootstrap has already been completed.
-- [ ] Verify startup and job failures are clear when the schema is missing instead of trying to create it automatically.
+- [x] Rework `worker-node/src/modules/db/ensureDbReady.ts` to use `ensureSchemaReady(sequelize)` instead of `sequelize.sync()`.
+- [x] Keep the existing helper name and public behavior stable so callers do not need to change.
+- [x] Remove runtime `sequelize.sync()` from `worker-node/src/modules/jobs/requestGoogleRssJob.ts`.
+- [x] Remove runtime `sequelize.sync()` from `worker-node/src/modules/jobs/semanticScorerJob.ts`.
+- [x] Confirm worker jobs now assume schema bootstrap has already been completed.
+- [x] Verify startup and job failures are clear when the schema is missing instead of trying to create it automatically.
 
 ### 2. worker-node dialect audit
 
-- [ ] Audit `worker-node` code paths identified by the raw SQL inventory for SQLite-specific behavior.
-- [ ] Review scraper, RSS ingester, semantic scorer, and state assigner flows for SQL or data assumptions that relied on SQLite permissiveness.
+- [x] Audit `worker-node` code paths identified by the raw SQL inventory for SQLite-specific behavior.
+- [x] Review scraper, RSS ingester, semantic scorer, and state assigner flows for SQL or data assumptions that relied on SQLite permissiveness.
 - [ ] Confirm write-heavy paths use transactions appropriately so Postgres connections are not thrashed during bursts.
-- [ ] Remove any remaining SQLite-specific error handling or fallback behavior discovered during the audit.
+- [x] Remove any remaining SQLite-specific error handling or fallback behavior discovered during the audit.
 
 ### 3. worker-python driver migration
 
-- [ ] Replace `sqlite3` usage with `psycopg` v3 in:
-  - [ ] `worker-python/src/modules/deduper/repository.py`
-  - [ ] `worker-python/src/modules/location_scorer/repository.py`
-  - [ ] `worker-python/src/modules/ai_approver/repository.py`
-  - [ ] `worker-python/src/standalone/setup_ai_approver_prompt.py`
-- [ ] Add and configure `psycopg_pool.ConnectionPool` for worker runtime usage.
-- [ ] Size the worker-python connection pool according to the transition plan.
-- [ ] Confirm connection lifecycle and cleanup behavior still works for long-running jobs and one-off scripts.
+- [x] Replace `sqlite3` usage with `psycopg` v3 in:
+  - [x] `worker-python/src/modules/deduper/repository.py`
+  - [x] `worker-python/src/modules/location_scorer/repository.py`
+  - [x] `worker-python/src/modules/ai_approver/repository.py`
+  - [x] `worker-python/src/standalone/setup_ai_approver_prompt.py`
+- [x] Add and configure `psycopg_pool.ConnectionPool` for worker runtime usage.
+- [x] Size the worker-python connection pool according to the transition plan.
+- [x] Confirm connection lifecycle and cleanup behavior still works for long-running jobs and one-off scripts.
 
 ### 4. worker-python query conversion
 
-- [ ] Replace SQLite parameter placeholders `?` with Postgres-compatible `%s`.
-- [ ] Replace `INSERT OR IGNORE` with `INSERT ... ON CONFLICT DO NOTHING`.
-- [ ] Replace `cursor.lastrowid` usage with `RETURNING id` plus fetch logic.
-- [ ] Replace every `datetime('now')` call with `NOW()` or `CURRENT_TIMESTAMP`.
-- [ ] Review boolean handling so values are treated as real booleans instead of SQLite integer-style truth values.
-- [ ] Review limit clauses, ordering, and raw SQL expressions for any SQLite-only syntax.
+- [x] Replace SQLite parameter placeholders `?` with Postgres-compatible `%s`.
+- [x] Replace `INSERT OR IGNORE` with `INSERT ... ON CONFLICT DO NOTHING`.
+- [x] Replace `cursor.lastrowid` usage with `RETURNING id` plus fetch logic.
+- [x] Replace every `datetime('now')` call with `NOW()` or `CURRENT_TIMESTAMP`.
+- [x] Review boolean handling so values are treated as real booleans instead of SQLite integer-style truth values.
+- [x] Review limit clauses, ordering, and raw SQL expressions for any SQLite-only syntax.
 - [ ] Confirm the standalone AI approver prompt setup script works correctly against Postgres.
 
 ### 5. worker-python configuration and environment
 
-- [ ] Replace `sqlite_path`-style config with Postgres connection settings or DSN-based configuration.
-- [ ] Replace `PATH_DATABASE` and `NAME_DB` usage with:
-  - [ ] `PG_HOST`
-  - [ ] `PG_PORT`
-  - [ ] `PG_USER`
-  - [ ] `PG_PASSWORD`
-  - [ ] `PG_DATABASE`
-- [ ] Update any `.env.example` or worker-specific setup documentation touched by this phase.
-- [ ] Confirm startup validation errors are clear when required Postgres env vars are missing.
+- [x] Replace `sqlite_path`-style config with Postgres connection settings or DSN-based configuration.
+- [x] Replace `PATH_DATABASE` and `NAME_DB` usage with:
+  - [x] `PG_HOST`
+  - [x] `PG_PORT`
+  - [x] `PG_USER`
+  - [x] `PG_PASSWORD`
+  - [x] `PG_DATABASE`
+- [x] Update any `.env.example` or worker-specific setup documentation touched by this phase.
+- [x] Confirm startup validation errors are clear when required Postgres env vars are missing.
 
 ### 6. worker tests and fixtures
 
-- [ ] Update `worker-python/tests/conftest.py` to use `newsnexus_test_worker_python`.
-- [ ] Replace temp SQLite file fixtures with Postgres-backed test setup where required.
-- [ ] Update worker-python unit or integration fixtures that embed SQLite-specific SQL syntax.
-- [ ] Update any worker-node test assumptions affected by removing runtime `sync()` from startup or jobs.
-- [ ] Confirm the raw SQL inventory statuses are updated for all worker-related entries touched in this phase.
+- [x] Update `worker-python/tests/conftest.py` to use `newsnexus_test_worker_python`.
+- [x] Replace temp SQLite file fixtures with Postgres-backed test setup where required.
+- [x] Update worker-python unit or integration fixtures that embed SQLite-specific SQL syntax.
+- [x] Update any worker-node test assumptions affected by removing runtime `sync()` from startup or jobs.
+- [x] Confirm the raw SQL inventory statuses are updated for all worker-related entries touched in this phase.
 
 ### 7. Smoke-test critical worker flows
 
 - [ ] Smoke-test the main `worker-node` job paths against local Postgres:
-  - [ ] request Google RSS
-  - [ ] semantic scorer
-  - [ ] any other high-priority flow surfaced during implementation
+  - [x] request Google RSS
+  - [x] semantic scorer
+  - [x] any other high-priority flow surfaced during implementation
 - [ ] Smoke-test the main `worker-python` job paths against local Postgres:
-  - [ ] deduper
+  - [x] deduper
   - [ ] location scorer
   - [ ] AI approver path if still active
 - [ ] Confirm successful writes land in Postgres correctly for representative jobs.
@@ -83,12 +83,12 @@ Phase 2 moves the worker services onto Postgres after the Phase 1 database found
 
 ### 1. Required checks before marking the phase complete
 
-- [ ] `worker-node` builds successfully.
-- [ ] `worker-node` tests pass.
-- [ ] `worker-python` tests pass.
+- [x] `worker-node` builds successfully.
+- [x] `worker-node` tests pass.
+- [x] `worker-python` tests pass.
 - [ ] `worker-node` starts without runtime `sequelize.sync()` in startup or job paths.
-- [ ] `worker-python` runs against Postgres with no remaining `sqlite3` dependency in active code paths.
-- [ ] The raw SQL inventory is updated so all worker entries touched in this phase are marked converted or ruled safe.
+- [x] `worker-python` runs against Postgres with no remaining `sqlite3` dependency in active code paths.
+- [x] The raw SQL inventory is updated so all worker entries touched in this phase are marked converted or ruled safe.
 
 ### 2. Suggested commands to run during completion
 

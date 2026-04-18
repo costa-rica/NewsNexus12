@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import sqlite3
 from pathlib import Path
 import sys
 
 from dotenv import load_dotenv
 import os
+import psycopg
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -40,16 +40,27 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _resolve_database_path() -> Path:
-    path_database = os.getenv("PATH_DATABASE", "").strip()
-    name_db = os.getenv("NAME_DB", "").strip()
+def _resolve_dsn() -> str:
+    pg_host = os.getenv("PG_HOST", "").strip()
+    pg_port = os.getenv("PG_PORT", "").strip()
+    pg_database = os.getenv("PG_DATABASE", "").strip()
+    pg_user = os.getenv("PG_USER", "").strip()
 
-    if not path_database:
-        raise RuntimeError("PATH_DATABASE is required")
-    if not name_db:
-        raise RuntimeError("NAME_DB is required")
-
-    return Path(path_database).expanduser() / name_db
+    if not pg_host:
+        raise RuntimeError("PG_HOST is required")
+    if not pg_port:
+        raise RuntimeError("PG_PORT is required")
+    if not pg_database:
+        raise RuntimeError("PG_DATABASE is required")
+    if not pg_user:
+        raise RuntimeError("PG_USER is required")
+    return (
+        f"host={pg_host} "
+        f"port={pg_port} "
+        f"dbname={pg_database} "
+        f"user={pg_user} "
+        f"password={os.getenv('PG_PASSWORD', '').strip()}"
+    )
 
 
 def _read_prompt_file(path: Path) -> str:
@@ -62,12 +73,12 @@ def _read_prompt_file(path: Path) -> str:
     return content
 
 
-def _ensure_table_exists(conn: sqlite3.Connection) -> None:
+def _ensure_table_exists(conn: psycopg.Connection) -> None:
     exists = conn.execute(
         """
-        SELECT name
-        FROM sqlite_master
-        WHERE type = 'table' AND name = 'AiApproverPromptVersions'
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'AiApproverPromptVersions'
         """
     ).fetchone()
     if not exists:
@@ -77,7 +88,7 @@ def _ensure_table_exists(conn: sqlite3.Connection) -> None:
 
 
 def _insert_prompt(
-    conn: sqlite3.Connection,
+    conn: psycopg.Connection,
     *,
     name: str,
     description: str,
@@ -95,21 +106,25 @@ def _insert_prompt(
             createdAt,
             updatedAt
         )
-        VALUES (?, ?, ?, ?, NULL, datetime('now'), datetime('now'))
+        VALUES (%s, %s, %s, %s, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING id
         """,
-        (name, description or None, prompt_in_markdown, 1 if is_active else 0),
+        (name, description or None, prompt_in_markdown, is_active),
     )
     conn.commit()
-    return int(cursor.lastrowid)
+    row = cursor.fetchone()
+    if row is None:
+        raise RuntimeError("Prompt insert did not return an id")
+    return int(row[0])
 
 
 def main() -> int:
     args = _parse_args()
-    db_path = _resolve_database_path()
+    dsn = _resolve_dsn()
     prompt_path = Path(args.prompt_file).expanduser()
     prompt = _read_prompt_file(prompt_path)
 
-    conn = sqlite3.connect(str(db_path))
+    conn = psycopg.connect(dsn)
     try:
         _ensure_table_exists(conn)
         row_id = _insert_prompt(
