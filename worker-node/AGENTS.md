@@ -6,7 +6,7 @@ This file provides guidance to engineers and AI agents working in `worker-node`.
 
 `worker-node` is the internal Express + TypeScript execution service for absorbed NewsNexus Node workflows.
 
-In NewsNexus10, several workflows lived as separate Node microservices. In NewsNexus11, those workflows are being absorbed into this one service and exposed as queue-backed HTTP job starters.
+In NewsNexus10, several workflows lived as separate Node microservices. In NewsNexus12, those workflows are being absorbed into this one service and exposed as queue-backed HTTP job starters.
 
 Today, `worker-node` is responsible for:
 
@@ -206,7 +206,7 @@ Current implementation details:
   use this command:
 
 ```bash
-sudo -u limited_user bash -c "cd /home/limited_user/applications/NewsNexus11/worker-node && npx playwright install chromium"
+sudo -u limited_user bash -c "cd /home/limited_user/applications/NewsNexus12/worker-node && npx playwright install chromium"
 ```
 
 3. HTTP policy

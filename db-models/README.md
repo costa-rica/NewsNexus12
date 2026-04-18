@@ -1,6 +1,6 @@
 ![Logo](./docs/images/logoAndNameRound.png)
 
-A Sequelize SQLite module for the NewsNexus11Db and microservices suite of applications.
+A Sequelize SQLite module for the NewsNexus12Db and microservices suite of applications.
 
 ## Build Instructions
 
@@ -32,7 +32,7 @@ The build process will:
 
 ```bash
 # Install as local file dependency
-npm install file:../NewsNexus11Db
+npm install file:../NewsNexus12Db
 ```
 
 ```javascript

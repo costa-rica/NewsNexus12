@@ -41,7 +41,7 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.status(200).json({ ok: true, service: "newsnexus11api" });
+  res.status(200).json({ ok: true, service: "newsnexus12api" });
 });
 
 export function mountLegacyRouters(): void {

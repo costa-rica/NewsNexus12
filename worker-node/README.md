@@ -4,7 +4,7 @@ worker-node is an internal Express + TypeScript service that runs NewsNexus back
 
 ## Role in the monorepo
 
-In NewsNexus10 these were separate Node microservices. In NewsNexus11 they are grouped into one worker service with route-based job starters.
+In NewsNexus10 these were separate Node microservices. In NewsNexus12 they are grouped into one worker service with route-based job starters.
 
 1. request-google-rss workflow
 2. semantic-scorer workflow

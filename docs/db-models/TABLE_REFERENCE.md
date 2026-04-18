@@ -1,6 +1,6 @@
 # Table Reference
 
-Database table reference for NewsNexus11 (SQLite via Sequelize ORM).
+Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
 
 **Note**: All tables include `createdAt` and `updatedAt` timestamp fields (DATE, NOT NULL).
 

@@ -4,7 +4,7 @@ This file provides guidance to the engineers or AI agents when working with code
 
 ## Repository Overview
 
-NewsNexus11 is a monorepo for a news aggregation and analysis platform. It has no formal monorepo tooling (no Lerna/Nx/Turborepo) — packages are linked via local `file:` dependencies.
+NewsNexus12 is a monorepo for a news aggregation and analysis platform. It has no formal monorepo tooling (no Lerna/Nx/Turborepo) — packages are linked via local `file:` dependencies.
 
 ## Packages
 

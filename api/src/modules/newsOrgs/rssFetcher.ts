@@ -53,7 +53,7 @@ export async function fetchRssItems(url: string): Promise<FetchRssItemsResult> {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "NewsNexus11API/1.0",
+        "User-Agent": "NewsNexus12API/1.0",
       },
     });
 

@@ -4,7 +4,7 @@ This file provides guidance to AGENT Code (AGENT.ai/code) when working with code
 
 ## Project Overview
 
-NewsNexus11Portal is a Next.js 16 web application built with the App Router and Turbopack, serving as the modernized front end for the NewsNexus11Db and microservices suite. It uses Next.js conventions, TypeScript, TailwindCSS v4, and Redux Toolkit with persist for state management.
+NewsNexus12Portal is a Next.js 16 web application built with the App Router and Turbopack, serving as the modernized front end for the NewsNexus12Db and microservices suite. It uses Next.js conventions, TypeScript, TailwindCSS v4, and Redux Toolkit with persist for state management.
 
 The project architecture is heavily inspired by the free-nextjs-admin-dashboard-main template, providing a structured file system, reusable components, and responsive dashboard layouts.
 
@@ -97,7 +97,7 @@ SVG icons in `src/icons/` are imported as React components using `@svgr/webpack`
 
 ### Environment Variables
 
-- `NEXT_PUBLIC_API_BASE_URL`: Base URL for NewsNexus11API backend
+- `NEXT_PUBLIC_API_BASE_URL`: Base URL for NewsNexus12API backend
 - `NEXT_PUBLIC_MODE`: Set to "workstation" to prefill login form for development
 
 ### TypeScript Configuration

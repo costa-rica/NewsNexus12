@@ -9,7 +9,7 @@ describe("app bootstrap smoke tests", () => {
     expect(response.body).toEqual(
       expect.objectContaining({
         ok: true,
-        service: "newsnexus11api",
+        service: "newsnexus12api",
       }),
     );
   });

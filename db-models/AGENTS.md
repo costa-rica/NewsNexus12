@@ -4,7 +4,7 @@ This file provides guidance to AGENT Code (AGENT.ai/code) when working with code
 
 ## Project Overview
 
-NewsNexus11Db is a TypeScript Sequelize SQLite database module designed for news aggregation and microservices architectures. It provides strongly-typed database models with comprehensive relationships for managing news articles, user workflows, and content categorization.
+NewsNexus12Db is a TypeScript Sequelize SQLite database module designed for news aggregation and microservices architectures. It provides strongly-typed database models with comprehensive relationships for managing news articles, user workflows, and content categorization.
 
 ## Development Commands
 

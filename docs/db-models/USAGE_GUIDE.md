@@ -1,6 +1,6 @@
 # Database Usage Guide
 
-This guide explains how to use `@newsnexus/db-models` inside the NewsNexus11 monorepo. The package provides Sequelize models for SQLite, model associations, and TypeScript declarations.
+This guide explains how to use `@newsnexus/db-models` inside the NewsNexus12 monorepo. The package provides Sequelize models for SQLite, model associations, and TypeScript declarations.
 
 ## Package Description
 
@@ -29,7 +29,7 @@ db-models/
 
 ## Using This Package in an App
 
-Initialize the database before mounting routes or serving requests. In NewsNexus11 API, this happens during startup before `app.listen(...)`.
+Initialize the database before mounting routes or serving requests. In NewsNexus12 API, this happens during startup before `app.listen(...)`.
 
 ### Required startup sequence
 
@@ -77,8 +77,8 @@ Required:
 
 Example:
 
-- `PATH_DATABASE=/Users/nick/Documents/_databases/NewsNexus11/`
-- `NAME_DB=NewsNexus11.db`
+- `PATH_DATABASE=/Users/nick/Documents/_databases/NewsNexus12/`
+- `NAME_DB=newsnexus12.db`
 
 Filesystem requirement:
 

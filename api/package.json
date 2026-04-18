@@ -1,8 +1,8 @@
 {
-  "name": "newsnexus11api",
+  "name": "newsnexus12api",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeScript refactor of NewsNexus11API",
+  "description": "TypeScript refactor of NewsNexus12API",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",

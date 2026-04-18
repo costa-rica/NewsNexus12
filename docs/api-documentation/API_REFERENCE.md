@@ -1,4 +1,4 @@
-# NewsNexus11API Reference
+# NewsNexus12API Reference
 
 This API is a Node.js/Express JavaScript API that provides a RESTful interface for interacting with the SQLite database using Sequelize ORM.
 

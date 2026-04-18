@@ -1,6 +1,6 @@
 # NewsNexus Python Queuer (FastAPI)
 
-This is the new FastAPI-based worker service for NewsNexus11.
+This is the new FastAPI-based worker service for NewsNexus12.
 
 ## Current status
 

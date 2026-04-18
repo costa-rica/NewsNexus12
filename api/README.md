@@ -1,8 +1,8 @@
-# NewsNexus11API - Type Script
+# NewsNexus12API - Type Script
 
 ## Overview
 
-This project is the migration of the NewsNexus11API project to TypeScript
+This project is the migration of the NewsNexus12API project to TypeScript
 
 ## Tests
 

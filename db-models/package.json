@@ -1,7 +1,7 @@
 {
   "name": "@newsnexus/db-models",
   "version": "1.0.0",
-  "description": "A TypeScript Sequelize SQLite module for the NewsNexus11Db and microservices suite of applications",
+  "description": "A TypeScript Sequelize SQLite module for the NewsNexus12Db and microservices suite of applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

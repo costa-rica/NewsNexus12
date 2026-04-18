@@ -1,15 +1,10 @@
-# News Nexus 11 - Monorepo
+# News Nexus 12 - Monorepo
 
-This project is the monorepo of applicaitons that are part of the News Nexus 10 ecosystem. The focus is the website / database which includes the API / NextJS frontend, and custom database package. The News Nexus project makes use of node.js and python services. This mono repo will incorporate these microservices in queueing APIs one for Node.js app and another for Python apps, respectivly named: worker-node/ and worker-python.
+This project is the monorepo of applicaitons that are part of the News Nexus ecosystem. The focus is the website / database which includes the API / NextJS frontend, and custom database package. The News Nexus project makes use of node.js and python services. This mono repo will incorporate these microservices in queueing APIs one for Node.js app and another for Python apps, respectivly named: worker-node/ and worker-python.
 
-## Transition
+- This News Nexus 12 project is built off the News Nexus 11 project with changing database infrastructure from SQLite to PostGres.
 
-This project will include
-The NewsNexusPythonQueuer was the Python Flask API that queued the deduper (NewsNexusDeduper02). This workflow will be integrated into the worker-python/ subproject in the
 
-and was intended to queue jobs for the location classifier (NewsNexusClassifierLocationScorer01) two Python micro servcies.
-
-Other node.js microservices were triggered manually.
 
 ## Directory Structure
 
@@ -32,7 +27,7 @@ Other node.js microservices were triggered manually.
 │   ├── images/
 │   ├── references/
 │   ├── requirements/
-│   └── transition-to-newsnexus11/
+│   └── transition-to-newsnexus12/
 ├── portal/                         - Next.js frontend
 │   ├── components/
 │   ├── pages/

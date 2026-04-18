@@ -1,7 +1,7 @@
 {
   "name": "@newsnexus/db-manager",
   "version": "1.0.0",
-  "description": "Database management CLI tool for NewsNexus11 - handles status reporting, article cleanup, backup, and restore operations",
+  "description": "Database management CLI tool for NewsNexus12 - handles status reporting, article cleanup, backup, and restore operations",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

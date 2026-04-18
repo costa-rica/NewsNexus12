@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this package.
 
 ## Project Overview
 
-db-manager is a TypeScript CLI tool for managing the NewsNexus11 SQLite database. It handles article cleanup, database backups, and ZIP-based import/restore. It is part of the NewsNexus11 monorepo and depends on `@newsnexus/db-models` (local `file:../db-models` dependency).
+db-manager is a TypeScript CLI tool for managing the NewsNexus12 SQLite database. It handles article cleanup, database backups, and ZIP-based import/restore. It is part of the NewsNexus12 monorepo and depends on `@newsnexus/db-models` (local `file:../db-models` dependency).
 
 ## Development Commands
 
@@ -42,7 +42,7 @@ Flags can be combined. Execution order is always: backup, import, trim, delete, 
 The tool runs as user `limited_user`. To run in the background (survives logout):
 
 ```bash
-cd /home/limited_user/applications/NewsNexus11/db-manager && \
+cd /home/limited_user/applications/NewsNexus12/db-manager && \
 nohup sudo -u limited_user npm start -- --delete_articles > /dev/null 2>&1 &
 echo $!
 ```
@@ -81,14 +81,14 @@ Uses Winston with file rotation. Logs are written based on `NODE_ENV`:
 - **development:** Console only (colorized, `HH:mm:ss` format)
 - **testing / production:** File only (`YYYY-MM-DD HH:mm:ss` format)
 
-Log file: `{PATH_TO_LOGS}/{NAME_APP}.log` (currently `/home/limited_user/logs/NewsNexus11DbManager.log`)
+Log file: `{PATH_TO_LOGS}/{NAME_APP}.log` (currently `/home/limited_user/logs/NewsNexus12DbManager.log`)
 
 Rotation: `LOG_MAX_SIZE` MB per file (default 5), `LOG_MAX_FILES` rotated files (default 5).
 
 To follow logs in real time:
 
 ```bash
-tail -f /home/limited_user/logs/NewsNexus11DbManager.log
+tail -f /home/limited_user/logs/NewsNexus12DbManager.log
 ```
 
 ## Environment Variables
@@ -109,7 +109,7 @@ Configured via `.env` in the package root. See `.env.example` for the template.
 ## Database
 
 - **Type:** SQLite via Sequelize 6
-- **Path:** `{PATH_DATABASE}/{NAME_DB}` (currently `/home/limited_user/databases/NewsNexus11/newsnexus11.db`)
+- **Path:** `{PATH_DATABASE}/{NAME_DB}` (currently `/home/limited_user/databases/NewsNexus12/newsnexus12.db`)
 - **Models:** Imported from `@newsnexus/db-models`. Key tables: `Article`, `ArticleApproved`, `ArticleIsRelevant`
 - Models are initialized via `initModels()` from db-models
 

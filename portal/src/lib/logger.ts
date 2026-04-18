@@ -12,7 +12,7 @@ const isProduction = environment === "production";
 const appName =
   process.env.NEXT_PUBLIC_NAME_APP ||
   process.env.NAME_APP ||
-  "NewsNexus11Portal";
+  "NewsNexus12Portal";
 const logDir =
   process.env.NEXT_PUBLIC_PATH_TO_LOGS || process.env.PATH_TO_LOGS || "./logs";
 const maxSize = process.env.LOG_MAX_SIZE

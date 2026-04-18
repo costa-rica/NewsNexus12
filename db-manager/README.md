@@ -1,6 +1,6 @@
 # @newsnexus/db-manager
 
-Database management CLI tool for NewsNexus11 monorepo. Provides operations for database status reporting, article cleanup, backup creation, and database restoration from ZIP backups.
+Database management CLI tool for NewsNexus12 monorepo. Provides operations for database status reporting, article cleanup, backup creation, and database restoration from ZIP backups.
 
 ## Features
 
@@ -12,7 +12,7 @@ Database management CLI tool for NewsNexus11 monorepo. Provides operations for d
 
 ## Installation
 
-This package is part of the NewsNexus11 monorepo and depends on `@newsnexus/db-models`.
+This package is part of the NewsNexus12 monorepo and depends on `@newsnexus/db-models`.
 
 ```bash
 # Install dependencies
@@ -40,7 +40,7 @@ Copy `.env.example` to `.env` and configure the following variables:
 NODE_ENV=development
 
 # Application name (used for log file naming)
-NAME_APP=NewsNexus11DbManager
+NAME_APP=NewsNexus12DbManager
 
 # Logging configuration
 PATH_TO_LOGS=/absolute/path/to/logs
@@ -49,7 +49,7 @@ LOG_MAX_FILES=5
 
 # Database configuration
 PATH_DATABASE=/absolute/path/to/database
-NAME_DB=newsnexus11.db
+NAME_DB=newsnexus12.db
 
 # Backup configuration (required for --create_backup)
 PATH_DB_BACKUPS=/absolute/path/to/backups
@@ -89,26 +89,26 @@ npm start -- --zip_file /path/to/backup.zip
 
 **Note:** Import is skipped if the database already contains data (displays status only).
 
-Run the import as the same OS user that will later run the NewsNexus11 services. On the production server that user is `limited_user`.
+Run the import as the same OS user that will later run the NewsNexus12 services. On the production server that user is `limited_user`.
 
 Recommended production workflow:
 
 ```bash
-cd /home/limited_user/applications/NewsNexus11/db-manager
+cd /home/limited_user/applications/NewsNexus12/db-manager
 npm start -- --zip_file /path/to/backup.zip
 ```
 
 If the command must be launched from another account, run the process as `limited_user` instead of creating the database as a different user and changing ownership afterward:
 
 ```bash
-sudo -u limited_user -H bash -lc 'cd /home/limited_user/applications/NewsNexus11/db-manager && npm start -- --zip_file /path/to/backup.zip'
+sudo -u limited_user -H bash -lc 'cd /home/limited_user/applications/NewsNexus12/db-manager && npm start -- --zip_file /path/to/backup.zip'
 ```
 
 Why this matters:
 
-- SQLite may create temporary side files such as `newsnexus11.db-journal`, `newsnexus11.db-wal`, or `newsnexus11.db-shm`
+- SQLite may create temporary side files such as `newsnexus12.db-journal`, `newsnexus12.db-wal`, or `newsnexus12.db-shm`
 - Importing as a different user can leave the database or side files in a state that later causes `SQLITE_READONLY`
-- Changing ownership of only `newsnexus11.db` after the import may not fix those side files or related metadata
+- Changing ownership of only `newsnexus12.db` after the import may not fix those side files or related metadata
 
 ### Delete Old Articles
 
@@ -139,7 +139,7 @@ echo $!
 ps -p <PID> -o pid,stat,etime,cmd
 
 # Follow logs
-tail -f /home/limited_user/logs/NewsNexus11DbManager.log
+tail -f /home/limited_user/logs/NewsNexus12DbManager.log
 ```
 
 ### Trim Oldest Articles
@@ -299,4 +299,4 @@ ISC
 
 ## Contributing
 
-This package is part of the NewsNexus11 monorepo. Follow the monorepo's contribution guidelines.
+This package is part of the NewsNexus12 monorepo. Follow the monorepo's contribution guidelines.

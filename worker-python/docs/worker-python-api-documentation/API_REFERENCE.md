@@ -1,4 +1,4 @@
-# NewsNexus11 Worker Python API Reference
+# NewsNexus12 Worker Python API Reference
 
 This API provides a RESTful interface for creating, monitoring, and managing queued worker jobs.
 

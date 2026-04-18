@@ -1,6 +1,6 @@
 # Index API
 
-This router provides the home page endpoint for the NewsNexus11API.
+This router provides the home page endpoint for the NewsNexus12API.
 
 All endpoints are prefixed with `/`.
 
@@ -30,10 +30,10 @@ Returns HTML content from `/src/templates/index.html`
 <!DOCTYPE html>
 <html>
   <head>
-    <title>NewsNexus11API</title>
+    <title>NewsNexus12API</title>
   </head>
   <body>
-    <h1>Welcome to NewsNexus11API</h1>
+    <h1>Welcome to NewsNexus12API</h1>
     ...
   </body>
 </html>

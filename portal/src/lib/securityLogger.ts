@@ -107,7 +107,7 @@ export function logSecurityEvent(
 
   const logEntry: SecurityEvent = {
     timestamp: new Date().toISOString(),
-    app: "NewsNexus11Portal",
+    app: "NewsNexus12Portal",
     ...event,
     // Mark IP as client-side if not provided (can't get real IP from client)
     ip: event.ip || "client-side",
@@ -115,7 +115,7 @@ export function logSecurityEvent(
   };
 
   // SECURITY: Use console.warn for security events
-  // This makes them easy to filter: logs NewsNexus11Portal | grep SECURITY
+  // This makes them easy to filter: logs NewsNexus12Portal | grep SECURITY
   console.warn("[SECURITY]", JSON.stringify(logEntry));
 
   // OPTIONAL: In production, also send critical events to monitoring service

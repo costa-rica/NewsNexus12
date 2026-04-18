@@ -2,13 +2,13 @@
 
 ## Overview
 
-NewsNexus11Portal is the web interface for the NewsNexus11Db and microservices suite of applications.
-NewsNexus11Portal is a updated version of NewsNexusPortal09 - and complete modernization of the previous NewsNexus08Portal web app.
+NewsNexus12Portal is the web interface for the NewsNexus12Db and microservices suite of applications.
+NewsNexus12Portal is a updated version of NewsNexusPortal09 - and complete modernization of the previous NewsNexus08Portal web app.
 While v08 was built with plain JavaScript, minimal styling, and without Next.js conventions, v09 rebuilds the Portal from the ground up using Next.js (App Router), TailwindCSS, and TypeScript, ensuring long-term scalability, maintainability, and alignment with modern React best practices.
 
 This version starts from a clean npx create-next-app@latest base and adopts the architectural patterns and UI structure of the open-source free-nextjs-admin-dashboard-main project. That template provides a well-organized file system, reusable components, and responsive dashboard layouts — features that will serve as the foundation for implementing all existing NewsNexus08Portal content, workflows, and user interfaces in a structured, convention-driven way.
 
-The goal of NewsNexus11Portal is to faithfully re-create and enhance the functionality of the previous Portal within a modern Next.js environment, ultimately serving as the main front end for interacting with NewsNexus11API and the broader News Nexus 09 microservice suite.
+The goal of NewsNexus12Portal is to faithfully re-create and enhance the functionality of the previous Portal within a modern Next.js environment, ultimately serving as the main front end for interacting with NewsNexus12API and the broader News Nexus 09 microservice suite.
 
 ### Overview TL;DR
 
