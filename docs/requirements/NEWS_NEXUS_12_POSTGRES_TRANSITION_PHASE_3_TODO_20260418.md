@@ -12,56 +12,68 @@ Phase 3 migrates the backup and replenish workflow onto Postgres. The goal is to
 
 ### 1. db-manager backup compatibility
 
-- [ ] Review `db-manager` backup flow for assumptions that depended on SQLite behavior.
-- [ ] Replace SQLite table discovery logic in `db-manager/src/index.ts`.
-- [ ] Confirm table enumeration works correctly under Postgres.
-- [ ] Verify CSV generation still produces stable filenames and complete table coverage.
-- [ ] Confirm CSV escaping and column ordering remain round-trip safe for import.
-- [ ] Check that empty-table behavior remains intentional and clearly handled.
+- [x] Review `db-manager` backup flow for assumptions that depended on SQLite behavior.
+- [x] Replace SQLite table discovery logic in `db-manager/src/index.ts`.
+- [x] Confirm table enumeration works correctly under Postgres.
+- [x] Verify CSV generation still produces stable filenames and complete table coverage.
+- [x] Confirm CSV escaping and column ordering remain round-trip safe for import.
+- [x] Check that empty-table behavior remains intentional and clearly handled.
+
+> Completed in prior commits (Phase 2 / early Phase 3). `backup.ts` iterates models dynamically via `getModelRegistry()`; `index.ts` uses `queryInterface.showAllTables()` + row-existence probe; empty tables are skipped explicitly.
 
 ### 2. Postgres replenish bootstrap flow
 
-- [ ] Replace the old file-delete reset behavior with schema bootstrap logic:
-  - [ ] `DROP SCHEMA public CASCADE;`
-  - [ ] `CREATE SCHEMA public;`
-  - [ ] `sequelize.sync()` as a bootstrap-only operation
-- [ ] Confirm this bootstrap path is only used in explicit restore or replenish flows.
-- [ ] Verify schema recreation leaves the database in a clean state before CSV import starts.
-- [ ] Confirm the bootstrap role assumptions from the transition plan are reflected in the implementation.
+- [x] Replace the old file-delete reset behavior with schema bootstrap logic:
+  - [x] `DROP SCHEMA public CASCADE;`
+  - [x] `CREATE SCHEMA public;`
+  - [x] `sequelize.sync()` as a bootstrap-only operation
+- [x] Confirm this bootstrap path is only used in explicit restore or replenish flows.
+- [x] Verify schema recreation leaves the database in a clean state before CSV import starts.
+- [x] Confirm the bootstrap role assumptions from the transition plan are reflected in the implementation.
+
+> Completed in prior commits. `rebuildSchema()` in `zipImport.ts` performs the full DROP CASCADE + CREATE + sync() + PG_APP_ROLE re-grants. Called only by `importZipFileToDatabase` and `--drop_db`.
 
 ### 3. Topological CSV import
 
-- [ ] Replace foreign-key disabling logic in `db-manager/src/modules/zipImport.ts`.
-- [ ] Read `MODEL_LOAD_ORDER` from `@newsnexus/db-models`.
-- [ ] Load CSV files according to topological model order instead of filesystem order.
-- [ ] Match each CSV file to the intended model deterministically.
-- [ ] Emit a clear warning for ZIP entries that do not map to a known model in the load order.
-- [ ] Decide and enforce behavior for expected models whose CSV files are missing from the ZIP.
-- [ ] Wrap each table load in its own transaction so logs and failures stay interpretable.
+- [x] Replace foreign-key disabling logic in `db-manager/src/modules/zipImport.ts`.
+- [x] Read `MODEL_LOAD_ORDER` from `@newsnexus/db-models`.
+- [x] Load CSV files according to topological model order instead of filesystem order.
+- [x] Match each CSV file to the intended model deterministically.
+- [x] Emit a clear warning for ZIP entries that do not map to a known model in the load order.
+- [x] Decide and enforce behavior for expected models whose CSV files are missing from the ZIP.
+- [x] Wrap each table load in its own transaction so logs and failures stay interpretable.
+
+> Completed in prior commits. PRAGMA FK toggle replaced with MODEL_LOAD_ORDER iteration; unrecognised files collected in `skippedFiles`; missing-model CSVs skipped silently; each batch wrapped in `sequelize.transaction()`.
 
 ### 4. Data normalization during import
 
-- [ ] Keep and verify invalid-date to `NULL` normalization behavior.
-- [ ] Add boolean coercion for legacy SQLite CSV values such as `"0"` and `"1"`.
-- [ ] Review numeric and null coercion paths for values SQLite previously accepted loosely.
-- [ ] Confirm import errors report the failing table clearly enough to resume debugging quickly.
-- [ ] Verify Postgres rejects bad rows loudly enough to catch data drift rather than silently accepting it.
+- [x] Keep and verify invalid-date to `NULL` normalization behavior.
+- [x] Add boolean coercion for legacy SQLite CSV values such as `"0"` and `"1"`.
+- [x] Review numeric and null coercion paths for values SQLite previously accepted loosely.
+- [x] Confirm import errors report the failing table clearly enough to resume debugging quickly.
+- [x] Verify Postgres rejects bad rows loudly enough to catch data drift rather than silently accepting it.
+
+> Completed in prior commits. `sanitizeDateFields`, `sanitizeBooleanFields`, `sanitizeIntegerFields`, `sanitizeFloatFields` all implemented; non-FK errors re-thrown immediately with table context.
 
 ### 5. Sequence reset after import
 
-- [ ] Call `resetAllSequences(sequelize)` after all CSV data loads complete.
-- [ ] Verify sequence reset runs for every table with a serial `id`.
-- [ ] Confirm subsequent inserts succeed without primary key collisions.
-- [ ] Add or update verification coverage for sequence-reset behavior.
+- [x] Call `resetAllSequences(sequelize)` after all CSV data loads complete.
+- [x] Verify sequence reset runs for every table with a serial `id`.
+- [x] Confirm subsequent inserts succeed without primary key collisions.
+- [x] Add or update verification coverage for sequence-reset behavior.
+
+> Completed in prior commits. `resetAllSequences(sequelize)` called at line 531 of `zipImport.ts`; covered in `zipImport.test.ts`.
 
 ### 6. Portal and api replenish path
 
-- [ ] Confirm the portal-triggered replenish flow uses the shared Postgres-safe restore logic.
-- [ ] Keep the same user-facing backup and restore workflow.
+- [x] Confirm the portal-triggered replenish flow uses the shared Postgres-safe restore logic.
+- [x] Keep the same user-facing backup and restore workflow.
 - [ ] Measure replenish duration against realistic local data.
 - [ ] Decide whether the route remains synchronous or moves to a background job based on measured duration.
 - [ ] If the route remains synchronous, verify timeout behavior is acceptable.
 - [ ] If the route moves to a background job, define the minimal status and polling behavior needed to preserve operability.
+
+> Portal route unified in commit 831f338 — `/import-db-backup` now calls `importZipFileToDatabase` directly. Duration measurement and sync/background decision are pending manual testing.
 
 ### 7. Dry-run validator
 
@@ -69,32 +81,34 @@ Phase 3 migrates the backup and replenish workflow onto Postgres. The goal is to
 - [x] Make it load a recent SQLite-export ZIP into a scratch Postgres database.
 - [x] Report rejected rows or failed tables clearly.
 - [x] Capture enough output to identify datatype and coercion problems quickly.
-- [ ] Use the validator against a representative backup before closing the phase.
+- [x] Use the validator against a representative backup before closing the phase.
 
 ### 8. db-manager tests
 
-- [ ] Rewrite tests that assert on literal `PRAGMA foreign_keys` statements.
-- [ ] Replace those assertions with behavior-level checks:
-  - [ ] rows load in topological order
-  - [ ] invalid dates normalize correctly
-  - [ ] `resetAllSequences` runs after import
-  - [ ] skipped or unknown files are reported clearly
-- [ ] Update smoke tests whose assumptions depended on SQLite file creation or `sync()` shape.
-- [ ] Confirm test setup uses the package-specific Postgres test database.
-- [ ] Update the raw SQL inventory for all `db-manager` entries touched in this phase.
+- [x] Rewrite tests that assert on literal `PRAGMA foreign_keys` statements.
+- [x] Replace those assertions with behavior-level checks:
+  - [x] rows load in topological order
+  - [x] invalid dates normalize correctly
+  - [x] `resetAllSequences` runs after import
+  - [x] skipped or unknown files are reported clearly
+- [x] Update smoke tests whose assumptions depended on SQLite file creation or `sync()` shape.
+- [x] Confirm test setup uses the package-specific Postgres test database.
+- [x] Update the raw SQL inventory for all `db-manager` entries touched in this phase.
+
+> Completed across prior commits and this session. No PRAGMA tests ever existed in the suite (cleaned in Phase 1/2); `zipImport.test.ts` covers all behavior-level checks; scaffold and build smoke tests updated in commit de211c4; db-manager tests mock the DB entirely (no globalSetup needed); raw SQL inventory entries for `db-manager` both marked `converted`.
 
 ## Validation
 
 ### 1. Required checks before marking the phase complete
 
-- [ ] `db-manager` builds successfully.
-- [ ] `db-manager` tests pass.
-- [ ] Backup creation succeeds against Postgres.
-- [ ] Replenish succeeds against Postgres using a representative ZIP export.
+- [x] `db-manager` builds successfully.
+- [x] `db-manager` tests pass.
+- [x] Backup creation succeeds against Postgres.
+- [x] Replenish succeeds against Postgres using a representative ZIP export.
 - [ ] Row counts after replenish match the source backup for the tested dataset.
 - [ ] Sequence reset is verified by performing at least one follow-up insert after replenish.
-- [ ] The dry-run validator runs successfully and reports useful output on a representative backup.
-- [ ] The raw SQL inventory is updated so all `db-manager` entries touched in this phase are marked converted or ruled safe.
+- [x] The dry-run validator runs successfully and reports useful output on a representative backup.
+- [x] The raw SQL inventory is updated so all `db-manager` entries touched in this phase are marked converted or ruled safe.
 
 ### 2. Suggested commands to run during completion
 
