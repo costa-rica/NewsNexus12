@@ -43,7 +43,7 @@ export function initArticleIsRelevant() {
         defaultValue: true,
       },
       kmNotes: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
     },
     {

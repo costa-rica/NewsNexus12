@@ -48,7 +48,7 @@ export function initArticleReportContract() {
         defaultValue: true,
       },
       articleRejectionReason: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
     },
     {

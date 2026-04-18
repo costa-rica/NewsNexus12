@@ -88,7 +88,7 @@ export function initArticleStateContract02() {
         allowNull: true,
       },
       reasoning: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: true,
       },
     },

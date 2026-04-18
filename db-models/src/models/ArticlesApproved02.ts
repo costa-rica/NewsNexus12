@@ -53,7 +53,7 @@ export function initArticlesApproved02() {
         defaultValue: true,
       },
       headlineForPdfReport: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       publicationNameForPdfReport: {
         type: DataTypes.STRING,
@@ -62,13 +62,13 @@ export function initArticlesApproved02() {
         type: DataTypes.DATEONLY,
       },
       textForPdfReport: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       urlForPdfReport: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       kmNotes: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
     },
     {

@@ -69,16 +69,16 @@ export function initNewsApiRequest() {
       type: DataTypes.STRING,
     },
     url: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
     },
     andString: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
     },
     orString: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
     },
     notString: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
     },
     isFromAutomation: {
       type: DataTypes.BOOLEAN,
