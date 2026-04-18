@@ -6,6 +6,8 @@ const KNOWN_FLAGS = [
   "--delete_articles_trim",
   "--zip_file",
   "--create_backup",
+  "--dry_run",
+  "--drop_db",
 ];
 
 function parseNumber(value: string, flagName: string): number {
@@ -134,6 +136,24 @@ export function parseCliArgs(args: string[]): CliOptions {
       }
 
       options.createBackup = true;
+      continue;
+    }
+
+    if (arg.startsWith("--dry_run")) {
+      if (arg.includes("=") || (args[i + 1] && !args[i + 1].startsWith("--"))) {
+        throw new Error("--dry_run does not take a value");
+      }
+
+      options.dryRun = true;
+      continue;
+    }
+
+    if (arg.startsWith("--drop_db")) {
+      if (arg.includes("=") || (args[i + 1] && !args[i + 1].startsWith("--"))) {
+        throw new Error("--drop_db does not take a value");
+      }
+
+      options.dropDb = true;
       continue;
     }
 

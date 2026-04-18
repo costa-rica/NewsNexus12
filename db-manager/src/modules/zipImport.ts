@@ -402,7 +402,7 @@ async function importCsvFileInBatches(
   return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, skippedFkCount };
 }
 
-async function rebuildSchema(): Promise<void> {
+export async function rebuildSchema(): Promise<void> {
   await sequelize.query("DROP SCHEMA IF EXISTS public CASCADE;");
   await sequelize.query("CREATE SCHEMA public;");
   await sequelize.sync();

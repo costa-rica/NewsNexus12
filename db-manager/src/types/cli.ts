@@ -3,4 +3,6 @@ export type CliOptions = {
   deleteArticlesTrimCount?: number;
   zipFilePath?: string;
   createBackup?: boolean;
+  dryRun?: boolean;
+  dropDb?: boolean;
 };

@@ -69,7 +69,10 @@ describe("Build verification", () => {
 
   describe("TypeScript compilation", () => {
     it("produces JavaScript files without .ts extension in dist/", () => {
-      const tsFilesInDist = findFilesByExtension(distDir, ".ts");
+      // Declaration files (.d.ts) are intentionally emitted; only bare .ts files indicate a build error.
+      const tsFilesInDist = findFilesByExtension(distDir, ".ts").filter(
+        (f) => !f.endsWith(".d.ts"),
+      );
       expect(tsFilesInDist.length).toBe(0);
     });
 
@@ -102,8 +105,10 @@ describe("Build verification", () => {
         "PATH_TO_LOGS",
         "LOG_MAX_SIZE",
         "LOG_MAX_FILES",
-        "PATH_DATABASE",
-        "NAME_DB",
+        "PG_HOST",
+        "PG_PORT",
+        "PG_DATABASE",
+        "PG_USER",
         "PATH_DB_BACKUPS",
       ];
 

@@ -65,10 +65,10 @@ Phase 3 migrates the backup and replenish workflow onto Postgres. The goal is to
 
 ### 7. Dry-run validator
 
-- [ ] Build the Phase 3 dry-run validation tool described in the transition plan.
-- [ ] Make it load a recent SQLite-export ZIP into a scratch Postgres database.
-- [ ] Report rejected rows or failed tables clearly.
-- [ ] Capture enough output to identify datatype and coercion problems quickly.
+- [x] Build the Phase 3 dry-run validation tool described in the transition plan.
+- [x] Make it load a recent SQLite-export ZIP into a scratch Postgres database.
+- [x] Report rejected rows or failed tables clearly.
+- [x] Capture enough output to identify datatype and coercion problems quickly.
 - [ ] Use the validator against a representative backup before closing the phase.
 
 ### 8. db-manager tests

@@ -70,6 +70,16 @@ async function databaseHasData(): Promise<boolean> {
   try {
     const options = parseCliArgs(process.argv.slice(2));
 
+    if (options.dryRun) {
+      if (!options.zipFilePath) {
+        process.stderr.write("--dry_run requires --zip_file <path>\n");
+        process.exit(1);
+      }
+      const { runDryRunValidator } = await import("./modules/dryRunValidator");
+      const result = await runDryRunValidator(options.zipFilePath);
+      process.exit(result.success ? 0 : 1);
+    }
+
     initModels();
     await ensureDatabaseExists();
 
@@ -79,7 +89,15 @@ async function databaseHasData(): Promise<boolean> {
       deleteOldestEligibleArticles,
     } = await import("./modules/deleteArticles");
     const { createDatabaseBackupZipFile } = await import("./modules/backup");
-    const { importZipFileToDatabase } = await import("./modules/zipImport");
+    const { importZipFileToDatabase, rebuildSchema } = await import("./modules/zipImport");
+
+    if (options.dropDb) {
+      logger.warn("--drop_db: wiping all data and rebuilding empty schema. This cannot be undone.");
+      await rebuildSchema();
+      logger.info("--drop_db: schema rebuilt successfully. All tables are empty.");
+      await sequelize.close();
+      return;
+    }
 
     if (options.createBackup) {
       logger.info("Creating database backup zip file");

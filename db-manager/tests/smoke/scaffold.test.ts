@@ -20,7 +20,7 @@ describe("Phase 1: Package scaffolding", () => {
       const packageJson = JSON.parse(
         fs.readFileSync(packageJsonPath, "utf-8"),
       );
-      expect(packageJson.main).toBe("dist/index.js");
+      expect(packageJson.main).toBe("dist/lib.js");
     });
 
     it("has required scripts", () => {
