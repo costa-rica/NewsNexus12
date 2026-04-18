@@ -128,7 +128,9 @@ PG_SCHEMA=public
 
 ### db-manager/.env
 
-Same block as above, but with the **bootstrap role** because db-manager runs DDL:
+Same block as above, but with the **bootstrap role** because db-manager runs DDL.
+`PG_APP_ROLE` tells db-manager to re-grant privileges to the runtime role after
+every replenish — required because `DROP SCHEMA CASCADE` wipes default privileges:
 
 ```
 PG_HOST=localhost
@@ -137,6 +139,7 @@ PG_DATABASE=newsnexus_dev
 PG_USER=newsnexus_boot
 PG_PASSWORD=newsnexus_boot_dev
 PG_SCHEMA=public
+PG_APP_ROLE=newsnexus_app
 # PG_POOL_MAX=3
 ```
 

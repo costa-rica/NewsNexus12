@@ -89,7 +89,7 @@ Phase 1 sets up the Postgres foundation for the monorepo. The goal is to complet
 
 - [x] `db-models` builds successfully. _(`npm run build` in `db-models` succeeds.)_
 - [x] `api` builds successfully. _(`npm run build` in `api` succeeds.)_
-- [ ] `api` boots against local Postgres. _(requires an engineer to run locally after following `LOCAL_POSTGRES_SETUP.md`; cannot be automated without a provisioned database.)_
+- [x] `api` boots against local Postgres. _(verified: api starts cleanly, portal login confirmed working against local Postgres.)_
 - [x] Startup succeeds without runtime `sequelize.sync()` in `api`. _(`app.ts` calls `ensureSchemaReady(sequelize)` only.)_
 - [x] The raw SQL inventory file is committed and every entry relevant to Phase 1 is marked converted or ruled safe.
 - [x] Grep confirms `api` runtime startup no longer performs DDL. _(grep for `sequelize.sync` in `api/src` returns no matches.)_

@@ -36,7 +36,7 @@ export function initNewsArticleAggregatorSource() {
         type: DataTypes.STRING,
       },
       url: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
       },
       apiKey: {
         type: DataTypes.STRING,
