@@ -37,6 +37,15 @@ const IMPORT_BATCH_SIZE = 1000;
 const INITIAL_PROGRESS_LOG_THRESHOLD = 1000;
 const LARGE_PROGRESS_LOG_INTERVAL = 100000;
 
+function isForeignKeyViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  // Postgres error code 23503 — foreign_key_violation
+  return (
+    message.includes("violates foreign key constraint") ||
+    message.includes("23503")
+  );
+}
+
 function getDateFields(model: { rawAttributes?: Record<string, unknown> }): DateFieldInfo[] {
   if (!model.rawAttributes) {
     return [];
@@ -241,7 +250,7 @@ async function importCsvFileInBatches(
   filePath: string,
   tableName: string,
   model: { bulkCreate: Function; rawAttributes?: Record<string, unknown> },
-): Promise<{ importedCount: number; sanitizedDates: number; sanitizedBooleans: number }> {
+): Promise<{ importedCount: number; sanitizedDates: number; sanitizedBooleans: number; sanitizedIntegers: number; skippedFkCount: number }> {
   const dateFields = getDateFields(model);
   const booleanFields = getBooleanFields(model);
   const integerFields = getIntegerFields(model);
@@ -249,6 +258,7 @@ async function importCsvFileInBatches(
   let sanitizedDates = 0;
   let sanitizedBooleans = 0;
   let sanitizedIntegers = 0;
+  let skippedFkCount = 0;
   let batch: Record<string, string | null>[] = [];
   let nextProgressLogAt = INITIAL_PROGRESS_LOG_THRESHOLD;
 
@@ -260,10 +270,35 @@ async function importCsvFileInBatches(
     sanitizedDates += sanitizeDateFields(batch, dateFields);
     sanitizedBooleans += sanitizeBooleanFields(batch, booleanFields);
     sanitizedIntegers += sanitizeIntegerFields(batch, integerFields);
-    await sequelize.transaction(async (transaction: Transaction) => {
-      await model.bulkCreate(batch, { ignoreDuplicates: true, transaction });
-    });
-    importedCount += batch.length;
+
+    try {
+      await sequelize.transaction(async (transaction: Transaction) => {
+        await model.bulkCreate(batch, { ignoreDuplicates: true, transaction });
+      });
+      importedCount += batch.length;
+    } catch (batchError) {
+      if (!isForeignKeyViolation(batchError)) {
+        throw batchError;
+      }
+      // Batch contains at least one orphaned FK reference (data integrity issue
+      // carried over from SQLite, which did not enforce foreign keys). Fall back
+      // to row-by-row so we can skip only the bad records.
+      for (const record of batch) {
+        try {
+          await sequelize.transaction(async (transaction: Transaction) => {
+            await model.bulkCreate([record], { ignoreDuplicates: true, transaction });
+          });
+          importedCount += 1;
+        } catch (rowError) {
+          if (isForeignKeyViolation(rowError)) {
+            skippedFkCount += 1;
+          } else {
+            throw rowError;
+          }
+        }
+      }
+    }
+
     batch = [];
   };
 
@@ -313,7 +348,7 @@ async function importCsvFileInBatches(
     stream.on("error", handleError);
   });
 
-  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers };
+  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, skippedFkCount };
 }
 
 async function rebuildSchema(): Promise<void> {
@@ -367,13 +402,13 @@ export async function importZipFileToDatabase(
         continue;
       }
 
-      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers } = await importCsvFileInBatches(
+      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, skippedFkCount } = await importCsvFileInBatches(
         csvFile,
         tableName,
         model,
       );
 
-      if (importedCount === 0) {
+      if (importedCount === 0 && skippedFkCount === 0) {
         continue;
       }
 
@@ -390,6 +425,11 @@ export async function importZipFileToDatabase(
       if (sanitizedIntegers > 0) {
         logger.warn(
           `Sanitized ${sanitizedIntegers} empty-string integer values to null for ${tableName}`,
+        );
+      }
+      if (skippedFkCount > 0) {
+        logger.warn(
+          `Skipped ${skippedFkCount} orphaned records in ${tableName} (foreign key references missing parent rows — SQLite legacy data integrity issue)`,
         );
       }
 
