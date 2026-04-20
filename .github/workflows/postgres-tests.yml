@@ -54,7 +54,11 @@ jobs:
           PG_DATABASE: newsnexus_test_${{ matrix.package == 'db-models' && 'db_models' || matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
           PG_USER: postgres
           PG_PASSWORD: postgres
-        run: npm -C ${{ matrix.package }} run build
+        run: |
+          if [ "${{ matrix.package }}" = "api" ]; then
+            npm -C db-manager run build
+          fi
+          npm -C ${{ matrix.package }} run build
       - name: Test package
         if: matrix.package != 'db-models'
         env:
