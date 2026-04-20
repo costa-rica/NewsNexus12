@@ -33,20 +33,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install package dependencies
-        run: |
-          npm -C db-models install
-          npm -C api install
-          npm -C worker-node install
-          npm -C db-manager install
-      - name: Build db-models
+      - name: Install and build shared packages
         env:
           PG_HOST: localhost
           PG_PORT: "5432"
-          PG_DATABASE: newsnexus_test_${{ matrix.package == 'db-models' && 'db_models' || matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
+          PG_DATABASE: newsnexus_test_db_models
           PG_USER: postgres
           PG_PASSWORD: postgres
-        run: npm -C db-models run build
+        run: |
+          npm -C db-models install
+          npm -C db-models run build
+          npm -C db-manager install
+          npm -C db-manager run build
+      - name: Install package dependencies
+        run: |
+          if [ "${{ matrix.package }}" = "api" ]; then
+            npm -C api install
+          elif [ "${{ matrix.package }}" = "worker-node" ]; then
+            npm -C worker-node install
+          elif [ "${{ matrix.package }}" = "db-manager" ]; then
+            npm -C db-manager install
+          fi
       - name: Build package
         env:
           PG_HOST: localhost
@@ -54,11 +61,7 @@ jobs:
           PG_DATABASE: newsnexus_test_${{ matrix.package == 'db-models' && 'db_models' || matrix.package == 'worker-node' && 'worker_node' || matrix.package }}
           PG_USER: postgres
           PG_PASSWORD: postgres
-        run: |
-          if [ "${{ matrix.package }}" = "api" ]; then
-            npm -C db-manager run build
-          fi
-          npm -C ${{ matrix.package }} run build
+        run: npm -C ${{ matrix.package }} run build
       - name: Test package
         if: matrix.package != 'db-models'
         env:
