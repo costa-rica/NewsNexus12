@@ -31,8 +31,11 @@ class _Proc:
 @pytest.fixture
 def config() -> DeduperConfig:
     return DeduperConfig(
-        path_to_database="/tmp",
-        name_db="db.sqlite",
+        pg_host="localhost",
+        pg_port=5432,
+        pg_database="newsnexus_test_worker_python",
+        pg_user="nick",
+        pg_password="",
         path_to_csv=None,
         enable_embedding=False,
         batch_size_load=100,

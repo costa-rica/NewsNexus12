@@ -59,8 +59,11 @@ class _WriteProc:
 @pytest.fixture
 def config() -> LocationScorerConfig:
     return LocationScorerConfig(
-        path_database="/tmp",
-        name_db="db.sqlite",
+        pg_host="localhost",
+        pg_port=5432,
+        pg_database="newsnexus_test_worker_python",
+        pg_user="nick",
+        pg_password="",
         ai_entity_name="NewsNexusClassifierLocationScorer01",
         batch_size=10,
         checkpoint_interval=2,
