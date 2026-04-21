@@ -346,17 +346,6 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			// Add remaining common columns (only for review page)
 			if (showReviewedColumn || showRelevantColumn) {
 				allColumns.push(
-					columnHelper.accessor(
-						(row) => row.requestQueryString?.toString() ?? "",
-						{
-							id: "requestQueryString",
-							header: "Request Query String",
-							enableSorting: true,
-							cell: ({ getValue }) => {
-								return <div className="text-xs">{getValue()}</div>;
-							},
-						}
-					),
 					columnHelper.accessor("nameOfOrg", {
 						id: "nameOfOrg",
 						header: "Added by:",

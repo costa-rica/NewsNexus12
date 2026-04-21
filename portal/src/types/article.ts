@@ -24,7 +24,6 @@ export interface Article {
 	isRelevant?: boolean;
 	States?: Array<{ id: number; name: string }>;
 	statesStringCommaSeparated?: string;
-	requestQueryString?: string;
 	nameOfOrg?: string;
 	semanticRatingMax?: number | string;
 	locationClassifierScore?: number | string;

@@ -991,14 +991,6 @@ router.post(
           (entry: any) => entry.isApproved === true || entry.isApproved === 1,
         );
 
-      let requestQueryString = "";
-      if (article.NewsApiRequest?.andString)
-        requestQueryString += `AND ${article.NewsApiRequest.andString}`;
-      if (article.NewsApiRequest?.orString)
-        requestQueryString += ` OR ${article.NewsApiRequest.orString}`;
-      if (article.NewsApiRequest?.notString)
-        requestQueryString += ` NOT ${article.NewsApiRequest.notString}`;
-
       let nameOfOrg = "";
       if (article.NewsApiRequest?.NewsArticleAggregatorSource?.nameOfOrg) {
         nameOfOrg =
@@ -1019,7 +1011,6 @@ router.post(
         statesStringCommaSeparated,
         isRelevant,
         isApproved,
-        requestQueryString,
         nameOfOrg,
         semanticRatingMaxLabel: article.semanticRatingMaxLabel,
         semanticRatingMax: article.semanticRatingMax,

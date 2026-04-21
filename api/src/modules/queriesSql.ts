@@ -475,13 +475,6 @@ async function sqlQueryArticlesForWithRatingsRoute(
       a."url",
       ac2_publisher."publisherFinalUrl" AS "publisherFinalUrl",
 
-      -- NewsApiRequest fields
-      nar."andString" AS "NewsApiRequest.andString",
-      nar."orString" AS "NewsApiRequest.orString",
-      nar."notString" AS "NewsApiRequest.notString",
-      nar.id AS "NewsApiRequest.id",
-      nar."createdAt" AS "NewsApiRequest.createdAt",
-
       -- NewsArticleAggregatorSource fields
       nas.id AS "NewsApiRequest.NewsArticleAggregatorSource.id",
       nas."nameOfOrg" AS "NewsApiRequest.NewsArticleAggregatorSource.nameOfOrg",
@@ -577,13 +570,6 @@ async function sqlQueryArticlesForWithRatingsRoute(
       publicationName,
       hasArticleContent,
 
-      // NewsApiRequest
-      "NewsApiRequest.id": narId,
-      "NewsApiRequest.createdAt": narCreatedAt,
-      "NewsApiRequest.andString": andString,
-      "NewsApiRequest.orString": orString,
-      "NewsApiRequest.notString": notString,
-
       // Aggregator
       "NewsApiRequest.NewsArticleAggregatorSource.id": nasId,
       "NewsApiRequest.NewsArticleAggregatorSource.nameOfOrg": nasName,
@@ -620,11 +606,6 @@ async function sqlQueryArticlesForWithRatingsRoute(
         approvalCreatedAt,
         hasArticleContent: Boolean(hasArticleContent),
         NewsApiRequest: {
-          id: narId,
-          createdAt: narCreatedAt,
-          andString,
-          orString,
-          notString,
           NewsArticleAggregatorSource: {
             id: nasId,
             nameOfOrg: nasName,
