@@ -57,14 +57,14 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 
 ### Modules
 
-| Module | Path | Purpose |
-| --- | --- | --- |
-| **cli** | `src/modules/cli.ts` | CLI argument parser with Levenshtein distance typo suggestions |
+| Module             | Path                            | Purpose                                                                  |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------ |
+| **cli**            | `src/modules/cli.ts`            | CLI argument parser with Levenshtein distance typo suggestions           |
 | **deleteArticles** | `src/modules/deleteArticles.ts` | Article deletion (batch size: 5000). Protects approved/relevant articles |
-| **backup** | `src/modules/backup.ts` | ZIP/CSV backup creation (compression level 9) |
-| **zipImport** | `src/modules/zipImport.ts` | ZIP import with date sanitization (invalid dates become NULL) |
-| **status** | `src/modules/status.ts` | Database status reporting |
-| **logger** | `src/config/logger.ts` | Winston logger configuration |
+| **backup**         | `src/modules/backup.ts`         | ZIP/CSV backup creation (compression level 9)                            |
+| **zipImport**      | `src/modules/zipImport.ts`      | ZIP import with date sanitization (invalid dates become NULL)            |
+| **status**         | `src/modules/status.ts`         | Database status reporting                                                |
+| **logger**         | `src/config/logger.ts`          | Winston logger configuration                                             |
 
 ### Key Behaviors
 
@@ -95,21 +95,21 @@ tail -f /home/limited_user/logs/NewsNexus12DbManager.log
 
 Configured via `.env` in the package root. See `.env.example` for the template.
 
-| Variable | Required | Default | Purpose |
-| --- | --- | --- | --- |
-| `NODE_ENV` | Yes | -- | `development`, `testing`, or `production` |
-| `NAME_APP` | Yes | -- | App name (used in log filename) |
-| `PATH_TO_LOGS` | Yes | -- | Absolute path to logs directory |
-| `LOG_MAX_SIZE` | No | 5 | Max log file size in MB |
-| `LOG_MAX_FILES` | No | 5 | Max rotated log files |
-| `PATH_DATABASE` | Yes | -- | Absolute path to database directory |
-| `NAME_DB` | Yes | -- | Database filename |
-| `PATH_DB_BACKUPS` | Yes* | -- | Backup output directory (*only for `--create_backup`) |
+| Variable          | Required | Default | Purpose                                                |
+| ----------------- | -------- | ------- | ------------------------------------------------------ |
+| `NODE_ENV`        | Yes      | --      | `development`, `testing`, or `production`              |
+| `NAME_APP`        | Yes      | --      | App name (used in log filename)                        |
+| `PATH_TO_LOGS`    | Yes      | --      | Absolute path to logs directory                        |
+| `LOG_MAX_SIZE`    | No       | 5       | Max log file size in MB                                |
+| `LOG_MAX_FILES`   | No       | 5       | Max rotated log files                                  |
+| `PATH_DATABASE`   | Yes      | --      | Absolute path to database directory                    |
+| `NAME_DB`         | Yes      | --      | Database filename                                      |
+| `PATH_DB_BACKUPS` | Yes\*    | --      | Backup output directory (\*only for `--create_backup`) |
 
 ## Database
 
-- **Type:** SQLite via Sequelize 6
-- **Path:** `{PATH_DATABASE}/{NAME_DB}` (currently `/home/limited_user/databases/NewsNexus12/newsnexus12.db`)
+- **Type:** Postgres via Sequelize 6
+- `PS_` prefixed variables — Postgres database location (used by api and db-models)
 - **Models:** Imported from `@newsnexus/db-models`. Key tables: `Article`, `ArticleApproved`, `ArticleIsRelevant`
 - Models are initialized via `initModels()` from db-models
 

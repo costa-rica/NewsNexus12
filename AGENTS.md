@@ -10,14 +10,14 @@ NewsNexus12 is a monorepo for a news aggregation and analysis platform. It has n
 
 | Package           | Path             | Tech                                                                | Purpose                                                |
 | ----------------- | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------ |
-| **db-models**     | `/db-models`     | Sequelize 6 + SQLite + TypeScript                                   | Shared database models (`@newsnexus/db-models`)        |
+| **db-models**     | `/db-models`     | Sequelize 6 + Postgres + TypeScript                                 | Shared database models (`@newsnexus/db-models`)        |
 | **api**           | `/api`           | Express 5 + TypeScript                                              | REST API for articles, auth, analysis workflows        |
 | **portal**        | `/portal`        | Next.js 16 (App Router, Turbopack) + Redux Toolkit + TailwindCSS v4 | Frontend dashboard                                     |
 | **worker-python** | `/worker-python` | Flask 3                                                             | Queues Python microservices (deduper, location scorer) |
 | **worker-node**   | `/worker-node`   | Express 5 + TypeScript                                              | Queue-backed Node workflows and article scraping       |
 | **db-manager**    | `/db-manager`    | TypeScript CLI + Winston + Sequelize 6                              | Database maintenance (article cleanup, backup, import) |
 
-**Dependency graph:** `portal → (HTTP) → api → db-models → SQLite ← worker-python` and `portal → (HTTP) → api → worker-node → db-models`
+**Dependency graph:** `portal → (HTTP) → api → db-models → Postgres ← worker-python` and `portal → (HTTP) → api → worker-node → db-models`
 
 ## Build & Dev Commands
 
@@ -63,7 +63,7 @@ No test frameworks are configured for db-models, portal, or worker-python. db-ma
 ### db-models
 
 - Sequelize models in `src/models/`, each file exports a class + `initModelName()` function
-- `_connection.ts` — SQLite connection using `PATH_DATABASE` and `NAME_DB` env vars
+- `_connection.ts` — Postgres connection `PS_` environmental variables.
 - `_associations.ts` — all foreign keys and relationships (centralized)
 - `_index.ts` — calls all init functions, sets up associations, exports everything
 - Consuming apps call `initModels()` then `sequelize.sync()`
@@ -94,7 +94,7 @@ No test frameworks are configured for db-models, portal, or worker-python. db-ma
 - Flask blueprints: Deduper (`/deduper`) and Index (`/`)
 - Runs Python microservices (NewsNexusDeduper02, NewsNexusClassifierLocationScorer01) via `subprocess`
 - In-memory job storage (resets on restart); job output streams to terminal
-- Shares the same SQLite database as api
+- Shares the same Postgres database as api
 
 ### worker-node
 
@@ -108,7 +108,7 @@ No test frameworks are configured for db-models, portal, or worker-python. db-ma
 
 Each package reads from its own `.env`. Key variables:
 
-- `PATH_DATABASE` / `NAME_DB` — SQLite database location (used by api and db-models)
+- `PS_` prefixed variables — Postgres database location (used by api and db-models)
 - `JWT_SECRET` — API authentication
 - `NEXT_PUBLIC_API_BASE_URL` — portal's API endpoint
 - `NEXT_PUBLIC_MODE` — set to `"workstation"` to prefill login form in dev
@@ -118,7 +118,6 @@ Each package reads from its own `.env`. Key variables:
 ## Production
 
 - Deployed on Ubuntu VM behind reverse proxy
-- All services share the same SQLite database file
 
 ## Commit Message Guidance
 
