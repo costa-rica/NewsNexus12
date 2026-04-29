@@ -11,11 +11,12 @@ import {
 } from '@newsnexus/db-models';
 import logger, { logWorkflowStart } from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
-import {
-  GoogleNavigationSession,
-  createGoogleNavigationSession
-} from '../article-content-02/googleNavigator';
+import { createGoogleNavigationSession } from '../article-content-02/googleNavigator';
 import { processArticleContent02Candidate } from '../article-content-02/enrichment';
+import {
+  createGoogleNavigationSessionManager,
+  GoogleNavigationSessionManager
+} from '../article-content-02/navigationSessionManager';
 import {
   getArticleContent02SkipDecision,
   persistArticleContent02Result
@@ -494,7 +495,7 @@ const storeRequestAndArticles = async (params: {
   newsArticleAggregatorSourceId: number;
   entityWhoFoundArticleId: number;
   signal: AbortSignal;
-  navigationSession: GoogleNavigationSession;
+  navigationSessionManager: GoogleNavigationSessionManager;
 }): Promise<void> => {
   const dateEndOfRequest = new Date().toISOString().split('T')[0];
 
@@ -555,14 +556,16 @@ const storeRequestAndArticles = async (params: {
         publishedDate: article.publishedDate ?? ''
       };
 
-      await processArticleContent02Candidate(
+      const navigationSession = await params.navigationSessionManager.getSession();
+      const result = await processArticleContent02Candidate(
         {
           article: articleCandidate,
           signal: params.signal,
-          navigationSession: params.navigationSession,
+          navigationSession,
           bypassExistingRowSkip: true
         }
       );
+      await params.navigationSessionManager.recordResult(result.workflowResult);
     }
   }
 
@@ -620,7 +623,13 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
 
   const { newsArticleAggregatorSourceId, entityWhoFoundArticleId } =
     await ensureAggregatorSourceAndEntity();
-  const navigationSession = await createGoogleNavigationSession();
+  const navigationSessionManager = createGoogleNavigationSessionManager({
+    createNavigationSession: createGoogleNavigationSession,
+    logContext: {
+      workflow: 'request-google-rss',
+      jobId: context.jobId
+    }
+  });
 
   try {
     const rows = await readQuerySpreadsheet(context.spreadsheetPath);
@@ -670,13 +679,13 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         newsArticleAggregatorSourceId,
         entityWhoFoundArticleId,
         signal: context.signal,
-        navigationSession
+        navigationSessionManager
       });
 
       await delay(delayBetweenRequestsMs, context.signal);
     }
   } finally {
-    await navigationSession.close();
+    await navigationSessionManager.close();
   }
 };
 

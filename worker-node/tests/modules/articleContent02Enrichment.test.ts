@@ -1,4 +1,7 @@
-import { enrichArticleContent02 } from '../../src/modules/article-content-02/enrichment';
+import {
+  enrichArticleContent02,
+  processArticleContent02Candidate
+} from '../../src/modules/article-content-02/enrichment';
 
 describe('article content 02 enrichment', () => {
   const createSession = () => ({
@@ -328,5 +331,167 @@ describe('article content 02 enrichment', () => {
         bodySource: 'direct-http'
       })
     );
+  });
+
+  it('recycles Chromium after the configured article attempt count', async () => {
+    const sessions = [createSession(), createSession()];
+    const createNavigationSession = jest
+      .fn()
+      .mockResolvedValueOnce(sessions[0])
+      .mockResolvedValueOnce(sessions[1]);
+    const articles = Array.from({ length: 26 }, (_, index) => ({
+      id: index + 100,
+      title: `Story ${index + 1}`,
+      description: 'desc',
+      url: `https://news.google.com/rss/articles/attempt-${index + 1}`,
+      publishedDate: '2026-03-21'
+    }));
+
+    const summary = await enrichArticleContent02(
+      {
+        articles,
+        signal: new AbortController().signal
+      },
+      {
+        createNavigationSession,
+        getSkipDecision: jest.fn().mockResolvedValue({
+          shouldSkip: false,
+          reason: 'process',
+          existingRow: null
+        }),
+        navigateGoogleUrl: jest.fn().mockResolvedValue({
+          finalUrl: 'https://news.google.com/articles/no-publisher',
+          statusCode: 200,
+          html: '<html><body>no metadata</body></html>'
+        }),
+        classifyGooglePage: jest.fn().mockReturnValue({
+          isBlocked: false,
+          failureType: null,
+          details: 'No blocked-page patterns detected'
+        }),
+        extractPublisherUrlFromFinalUrl: jest.fn().mockReturnValue({
+          publisherUrl: null,
+          extractionSource: 'none',
+          failureType: 'no_publisher_url_found',
+          details: 'Final browser URL was missing or remained Google-owned'
+        }),
+        extractPublisherUrl: jest.fn().mockReturnValue({
+          publisherUrl: null,
+          extractionSource: 'none',
+          failureType: 'no_publisher_url_found',
+          details: 'No non-Google publisher URL found in Google page metadata'
+        }),
+        persistResult: jest.fn().mockResolvedValue({
+          persisted: true,
+          action: 'updated',
+          reason: 'updated',
+          row: { id: 22 }
+        })
+      }
+    );
+
+    expect(summary.failedScrapes).toBe(26);
+    expect(createNavigationSession).toHaveBeenCalledTimes(2);
+    expect(sessions[0].close).toHaveBeenCalledTimes(1);
+    expect(sessions[1].close).toHaveBeenCalledTimes(1);
+  });
+
+  it('recycles Chromium after consecutive navigation errors', async () => {
+    const sessions = [createSession(), createSession()];
+    const createNavigationSession = jest
+      .fn()
+      .mockResolvedValueOnce(sessions[0])
+      .mockResolvedValueOnce(sessions[1]);
+    const articles = Array.from({ length: 4 }, (_, index) => ({
+      id: index + 200,
+      title: `Story ${index + 1}`,
+      description: 'desc',
+      url: `https://news.google.com/rss/articles/nav-error-${index + 1}`,
+      publishedDate: '2026-03-21'
+    }));
+
+    const summary = await enrichArticleContent02(
+      {
+        articles,
+        signal: new AbortController().signal
+      },
+      {
+        createNavigationSession,
+        getSkipDecision: jest.fn().mockResolvedValue({
+          shouldSkip: false,
+          reason: 'process',
+          existingRow: null
+        }),
+        navigateGoogleUrl: jest.fn().mockRejectedValue(new Error('navigation failed')),
+        persistResult: jest.fn().mockResolvedValue({
+          persisted: true,
+          action: 'updated',
+          reason: 'updated',
+          row: { id: 22 }
+        })
+      }
+    );
+
+    expect(summary.failedScrapes).toBe(4);
+    expect(createNavigationSession).toHaveBeenCalledTimes(2);
+    expect(sessions[0].close).toHaveBeenCalledTimes(1);
+    expect(sessions[1].close).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists a failed result when the full article workflow times out', async () => {
+    jest.useFakeTimers();
+
+    try {
+      const persistResult = jest.fn().mockResolvedValue({
+        persisted: true,
+        action: 'created',
+        reason: 'created',
+        row: { id: 30 }
+      });
+      const navigationState: { signal?: AbortSignal } = {};
+
+      const resultPromise = processArticleContent02Candidate(
+        {
+          article: {
+            id: 30,
+            title: 'Slow story',
+            description: 'desc',
+            url: 'https://news.google.com/rss/articles/slow',
+            publishedDate: '2026-03-21'
+          },
+          signal: new AbortController().signal,
+          navigationSession: createSession() as never,
+          bypassExistingRowSkip: true
+        },
+        {
+          navigateGoogleUrl: jest.fn((_context, _url, signal) => {
+            navigationState.signal = signal;
+            return new Promise<never>(() => undefined);
+          }) as never,
+          persistResult
+        }
+      );
+
+      await jest.advanceTimersByTimeAsync(90_000);
+      const result = await resultPromise;
+
+      expect(navigationState.signal?.aborted).toBe(true);
+      expect(result.workflowResult).toMatchObject({
+        articleId: 30,
+        status: 'fail',
+        failureType: 'navigation_error',
+        details: 'Article content 02 scrape timed out after 90000ms'
+      });
+      expect(persistResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          articleId: 30,
+          status: 'fail',
+          failureType: 'navigation_error',
+          details: 'Article content 02 scrape timed out after 90000ms'
+        })
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -1,3 +1,28 @@
+const readPositiveIntegerEnv = ({
+  name,
+  defaultValue,
+  minimum
+}: {
+  name: string;
+  defaultValue: number;
+  minimum: number;
+}): number => {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsed) || parsed < minimum) {
+    process.emitWarning(
+      `Invalid ${name}: ${rawValue}. Must be an integer >= ${minimum}. Using ${defaultValue}.`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
+};
+
 export const ARTICLE_CONTENT_02_GOOGLE_NAVIGATION_TIMEOUT_MS = 30_000;
 export const ARTICLE_CONTENT_02_GOOGLE_POST_LOAD_WAIT_MS = 5_000;
 export const ARTICLE_CONTENT_02_GOOGLE_NAVIGATION_RETRY_COUNT = 2;
@@ -6,6 +31,21 @@ export const ARTICLE_CONTENT_02_PUBLISHER_POST_LOAD_WAIT_MS = 2_500;
 export const ARTICLE_CONTENT_02_PUBLISHER_FETCH_RETRY_COUNT = 2;
 export const ARTICLE_CONTENT_02_PUBLISHER_MIN_HTML_LENGTH = 500;
 export const ARTICLE_CONTENT_02_MIN_CONTENT_LENGTH = 200;
+export const ARTICLE_CONTENT_02_BROWSER_RECYCLE_ATTEMPTS = readPositiveIntegerEnv({
+  name: 'ARTICLE_CONTENT_02_BROWSER_RECYCLE_ATTEMPTS',
+  defaultValue: 25,
+  minimum: 1
+});
+export const ARTICLE_CONTENT_02_BROWSER_RECYCLE_NAVIGATION_ERRORS = readPositiveIntegerEnv({
+  name: 'ARTICLE_CONTENT_02_BROWSER_RECYCLE_NAVIGATION_ERRORS',
+  defaultValue: 3,
+  minimum: 1
+});
+export const ARTICLE_CONTENT_02_ARTICLE_TIMEOUT_MS = readPositiveIntegerEnv({
+  name: 'ARTICLE_CONTENT_02_ARTICLE_TIMEOUT_MS',
+  defaultValue: 90_000,
+  minimum: 10_000
+});
 
 export const ARTICLE_CONTENT_02_DESKTOP_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
