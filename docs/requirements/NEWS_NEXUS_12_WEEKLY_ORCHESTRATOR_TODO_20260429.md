@@ -33,16 +33,16 @@ Implementation of the weekly orchestrator described in `docs/20260429_ORCHESTRAT
 
 ## Phase 3: Absorb delete_articles into worker-node
 
-- [ ] Lift `db-manager/src/modules/deleteArticles.ts` into `worker-node/src/modules/jobs/deleteArticlesJob.ts` using the project logger and `ensureDbReady`.
-- [ ] Add `worker-node/src/routes/deleteArticles.ts` exposing `POST /delete-articles/start-job` accepting `daysOld` and `trimCount` arguments.
-- [ ] Job writes a structured `result` (`deletedCount`, `daysOldThreshold`, `trimCount`).
-- [ ] Mount the route in `app.ts`.
-- [ ] Add route contract tests.
-- [ ] Add module test exercising the deletion logic.
-- [ ] Run a parity check against db-manager CLI on a snapshot DB.
-- [ ] Update `worker-node/AGENTS.md` and the worker-node API reference.
-- [ ] Run `npm -C worker-node test` and `npm -C worker-node run build`.
-- [ ] Commit referencing this TODO and Phase 3.
+- [x] Lift `db-manager/src/modules/deleteArticles.ts` into `worker-node/src/modules/jobs/deleteArticlesJob.ts` using the project logger and `ensureDbReady`.
+- [x] Add `worker-node/src/routes/deleteArticles.ts` exposing `POST /delete-articles/start-job` accepting `daysOld` and `trimCount` arguments.
+- [x] Job writes a structured `result` (`deletedCount`, `daysOldThreshold`, `trimCount`).
+- [x] Mount the route in `app.ts`.
+- [x] Add route contract tests.
+- [x] Add module test exercising the deletion logic.
+- [x] Run a parity check against db-manager CLI on a snapshot DB.
+- [x] Update `worker-node/AGENTS.md` and the worker-node API reference.
+- [x] Run `npm -C worker-node test` and `npm -C worker-node run build`.
+- [x] Commit referencing this TODO and Phase 3.
 
 ## Phase 4: Google-RSS structured completion result
 
