@@ -16,6 +16,9 @@ export interface QueueJobRecord {
   startedAt?: string;
   endedAt?: string;
   failureReason?: string;
+  parameters?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  logs?: string[];
 }
 
 export interface QueueJobStoreData {

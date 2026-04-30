@@ -26,6 +26,9 @@ const parseJobRecord = (value: unknown): QueueJobRecord => {
   const startedAt = value.startedAt;
   const endedAt = value.endedAt;
   const failureReason = value.failureReason;
+  const parameters = value.parameters;
+  const result = value.result;
+  const logs = value.logs;
 
   if (typeof jobId !== 'string' || jobId.trim() === '') {
     throw new Error('Queue job record jobId must be a non-empty string');
@@ -48,6 +51,15 @@ const parseJobRecord = (value: unknown): QueueJobRecord => {
   if (failureReason !== undefined && typeof failureReason !== 'string') {
     throw new Error('Queue job record failureReason must be a string when provided');
   }
+  if (parameters !== undefined && (typeof parameters !== 'object' || parameters === null || Array.isArray(parameters))) {
+    throw new Error('Queue job record parameters must be an object when provided');
+  }
+  if (result !== undefined && (typeof result !== 'object' || result === null || Array.isArray(result))) {
+    throw new Error('Queue job record result must be an object when provided');
+  }
+  if (logs !== undefined && !Array.isArray(logs)) {
+    throw new Error('Queue job record logs must be an array when provided');
+  }
 
   return {
     jobId,
@@ -56,7 +68,10 @@ const parseJobRecord = (value: unknown): QueueJobRecord => {
     createdAt,
     ...(startedAt !== undefined ? { startedAt } : {}),
     ...(endedAt !== undefined ? { endedAt } : {}),
-    ...(failureReason !== undefined ? { failureReason } : {})
+    ...(failureReason !== undefined ? { failureReason } : {}),
+    ...(parameters !== undefined ? { parameters: parameters as Record<string, unknown> } : {}),
+    ...(result !== undefined ? { result: result as Record<string, unknown> } : {}),
+    ...(logs !== undefined ? { logs: (logs as unknown[]).map(String) } : {})
   };
 };
 
@@ -137,6 +152,26 @@ export class QueueJobStore {
       data.jobs = updatedJobs.map(parseJobRecord);
       await this.writeStoreToDisk(data);
       return [...data.jobs];
+    });
+  }
+
+  public async updateJobResult(
+    jobId: string,
+    result: Record<string, unknown>
+  ): Promise<QueueJobRecord | null> {
+    return this.updateJob(jobId, (job) => ({ ...job, result }));
+  }
+
+  public async appendJobLog(jobId: string, message: string): Promise<void> {
+    await this.withLock(async () => {
+      const data = await this.readStoreFromDisk();
+      const index = data.jobs.findIndex((job) => job.jobId === jobId);
+      if (index === -1) {
+        return;
+      }
+      const existing = data.jobs[index].logs ?? [];
+      data.jobs[index] = { ...data.jobs[index], logs: [...existing, message] };
+      await this.writeStoreToDisk(data);
     });
   }
 

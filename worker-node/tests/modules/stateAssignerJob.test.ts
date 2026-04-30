@@ -21,7 +21,8 @@ describe('stateAssigner job handler', () => {
       jobId: 'job-1',
       endpointName: '/state-assigner/start-job',
       signal: new AbortController().signal,
-      registerCancelableProcess: () => undefined
+      registerCancelableProcess: () => undefined,
+        updateResult: () => Promise.resolve()
     });
 
     expect(runLegacyWorkflow).toHaveBeenCalledWith({

@@ -16,7 +16,8 @@ describe('semanticScorer job handler', () => {
         jobId: 'job-1',
         endpointName: '/semantic-scorer/start-job',
         signal: new AbortController().signal,
-        registerCancelableProcess: () => undefined
+        registerCancelableProcess: () => undefined,
+        updateResult: () => Promise.resolve()
       })
     ).rejects.toThrow('Semantic scorer keywords workbook not found');
 

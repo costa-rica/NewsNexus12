@@ -13,6 +13,7 @@ export interface QueueExecutionContext {
   endpointName: string;
   signal: AbortSignal;
   registerCancelableProcess: (processHandle: CancelableProcessHandle) => void;
+  updateResult: (result: Record<string, unknown>) => Promise<void>;
 }
 
 export type QueueJobHandler = (context: QueueExecutionContext) => Promise<void>;
@@ -257,6 +258,9 @@ export class GlobalQueueEngine {
             return;
           }
           this.activeJob.processHandles.add(processHandle);
+        },
+        updateResult: async (result: Record<string, unknown>) => {
+          await this.store.updateJobResult(item.jobId, result);
         }
       });
 

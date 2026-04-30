@@ -122,4 +122,68 @@ describe('QueueJobStore', () => {
     const checkStatus = await getCheckStatusByJobId(store, 'job-failed');
     expect(checkStatus?.status).toBe('failed');
   });
+
+  it('stores and retrieves parameters, result, and logs fields', async () => {
+    const job = makeJob({ jobId: 'job-rich' });
+    await store.appendJob(job);
+
+    await store.updateJobResult('job-rich', { articlesAdded: 42, endingReason: 'queries_exhausted' });
+
+    const retrieved = await store.getJobById('job-rich');
+    expect(retrieved?.result).toEqual({ articlesAdded: 42, endingReason: 'queries_exhausted' });
+    expect(retrieved?.parameters).toBeUndefined();
+    expect(retrieved?.logs).toBeUndefined();
+  });
+
+  it('appends log entries to a job', async () => {
+    await store.appendJob(makeJob({ jobId: 'job-logs' }));
+    await store.appendJobLog('job-logs', 'Step 1 started');
+    await store.appendJobLog('job-logs', 'Step 2 finished');
+
+    const retrieved = await store.getJobById('job-logs');
+    expect(retrieved?.logs).toEqual(['Step 1 started', 'Step 2 finished']);
+  });
+
+  it('round-trips all optional fields through JSON serialization', async () => {
+    const jobWithAllFields = {
+      ...makeJob({ jobId: 'job-full' }),
+      parameters: { daysOld: 90 },
+      result: { deletedCount: 12 },
+      logs: ['started', 'finished']
+    };
+    await store.appendJob(jobWithAllFields);
+
+    const retrieved = await store.getJobById('job-full');
+    expect(retrieved?.parameters).toEqual({ daysOld: 90 });
+    expect(retrieved?.result).toEqual({ deletedCount: 12 });
+    expect(retrieved?.logs).toEqual(['started', 'finished']);
+  });
+
+  it('ignores updateJobResult for a non-existent job without throwing', async () => {
+    const result = await store.updateJobResult('no-such-job', { foo: 'bar' });
+    expect(result).toBeNull();
+  });
+
+  it('backwards-compatible: records without optional fields parse without error', async () => {
+    const rawRecord = JSON.stringify({
+      jobs: [
+        {
+          jobId: 'legacy-job',
+          endpointName: '/semantic-scorer/start-job',
+          status: 'completed',
+          createdAt: new Date('2026-01-01').toISOString(),
+          endedAt: new Date('2026-01-01T01:00:00Z').toISOString()
+        }
+      ]
+    });
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(storeFilePath, rawRecord, 'utf8');
+
+    const jobs = await store.getJobs();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].jobId).toBe('legacy-job');
+    expect(jobs[0].parameters).toBeUndefined();
+    expect(jobs[0].result).toBeUndefined();
+    expect(jobs[0].logs).toBeUndefined();
+  });
 });

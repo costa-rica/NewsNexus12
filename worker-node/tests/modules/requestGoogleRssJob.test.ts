@@ -20,7 +20,8 @@ describe('requestGoogleRss job handler', () => {
         jobId: 'job-1',
         endpointName: '/request-google-rss/start-job',
         signal: new AbortController().signal,
-        registerCancelableProcess: () => undefined
+        registerCancelableProcess: () => undefined,
+        updateResult: () => Promise.resolve()
       })
     ).rejects.toThrow('Spreadsheet file not found');
   });
@@ -43,7 +44,8 @@ describe('requestGoogleRss job handler', () => {
       jobId: 'job-2',
       endpointName: '/request-google-rss/start-job',
       signal: new AbortController().signal,
-      registerCancelableProcess: () => undefined
+      registerCancelableProcess: () => undefined,
+        updateResult: () => Promise.resolve()
     });
 
     expect(runLegacyWorkflow).toHaveBeenCalledWith({

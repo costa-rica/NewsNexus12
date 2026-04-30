@@ -4,15 +4,15 @@ Implementation of the weekly orchestrator described in `docs/20260429_ORCHESTRAT
 
 ## Phase 1: Worker-node queue result support
 
-- [ ] Extend `QueueJobRecord` with optional `parameters`, `result`, and `logs` fields.
-- [ ] Update `jobStore.ts` read/write to round-trip the new fields.
-- [ ] Add a queue execution helper that lets a running job update its own `result`.
-- [ ] Confirm existing jobs continue to function with the new fields absent.
-- [ ] Add tests for read/write of new queue record fields.
-- [ ] Add tests confirming backwards compatibility with prior records.
-- [ ] Run `npm -C worker-node test`.
-- [ ] Run `npm -C worker-node run build`.
-- [ ] Commit referencing this TODO and Phase 1.
+- [x] Extend `QueueJobRecord` with optional `parameters`, `result`, and `logs` fields.
+- [x] Update `jobStore.ts` read/write to round-trip the new fields.
+- [x] Add a queue execution helper that lets a running job update its own `result`.
+- [x] Confirm existing jobs continue to function with the new fields absent.
+- [x] Add tests for read/write of new queue record fields.
+- [x] Add tests confirming backwards compatibility with prior records.
+- [x] Run `npm -C worker-node test`.
+- [x] Run `npm -C worker-node run build`.
+- [x] Commit referencing this TODO and Phase 1.
 
 ## Phase 2: Article range targeting end-to-end
 
