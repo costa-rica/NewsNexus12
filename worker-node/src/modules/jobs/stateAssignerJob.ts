@@ -34,6 +34,10 @@ export interface StateAssignerJobInput {
   targetArticleStateReviewCount: number;
   keyOpenAi: string;
   pathToStateAssignerFiles: string;
+  articleIdMinExclusive?: number;
+  articleIdMaxInclusive?: number;
+  articleIds?: number[];
+  includeArticlesThatMightHaveBeenStateAssigned?: boolean;
 }
 
 export interface StateAssignerJobContext extends StateAssignerJobInput {
@@ -386,7 +390,11 @@ const runLegacyWorkflow = async (
   const prompt = await getPrompt();
   const candidateArticles = await selectArticles({
     targetArticleStateReviewCount: context.targetArticleStateReviewCount,
-    targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld
+    targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
+    articleIds: context.articleIds,
+    includeArticlesThatMightHaveBeenStateAssigned: context.includeArticlesThatMightHaveBeenStateAssigned,
+    articleIdMinExclusive: context.articleIdMinExclusive,
+    articleIdMaxInclusive: context.articleIdMaxInclusive
   });
 
   if (candidateArticles.length === 0) {
@@ -455,7 +463,11 @@ export const createStateAssignerJobHandler = (
       targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
       targetArticleStateReviewCount: input.targetArticleStateReviewCount,
       keyOpenAi: input.keyOpenAi,
-      pathToStateAssignerFiles: input.pathToStateAssignerFiles
+      pathToStateAssignerFiles: input.pathToStateAssignerFiles,
+      articleIds: input.articleIds,
+      includeArticlesThatMightHaveBeenStateAssigned: input.includeArticlesThatMightHaveBeenStateAssigned,
+      articleIdMinExclusive: input.articleIdMinExclusive,
+      articleIdMaxInclusive: input.articleIdMaxInclusive
     });
   };
 };

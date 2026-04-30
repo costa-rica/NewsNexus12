@@ -31,7 +31,13 @@ def test_ai_approver_contract_runtime_matches_spec(
     engine = _create_engine(tmp_path)
     monkeypatch.setattr(ai_approver_routes, "queue_engine", engine)
 
-    def fake_runner(limit: int, require_state_assignment: bool, state_ids: list[int] | None):
+    def fake_runner(
+        limit: int,
+        require_state_assignment: bool,
+        state_ids: list[int] | None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
+    ):
         def _run(context) -> None:
             return None
 

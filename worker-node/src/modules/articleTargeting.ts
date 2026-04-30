@@ -3,7 +3,8 @@ import {
   ArticleApproved,
   ArticleIsRelevant,
   ArticleStateContract,
-  ArticleStateContract02
+  ArticleStateContract02,
+  sequelize
 } from '@newsnexus/db-models';
 import { AppError } from './errors/appError';
 import logger from './logger';
@@ -13,6 +14,8 @@ export interface ArticleAutomationTargetingInput {
   targetArticleStateReviewCount: number;
   includeArticlesThatMightHaveBeenStateAssigned?: boolean;
   articleIds?: number[];
+  articleIdMinExclusive?: number;
+  articleIdMaxInclusive?: number;
 }
 
 export interface TargetArticleRecord {
@@ -64,16 +67,41 @@ const parseArticleIdsField = (value: unknown): number[] | null => {
   return [...new Set(normalizedIds)];
 };
 
+const parseOptionalPositiveIntegerField = (
+  value: unknown,
+  fieldName: string
+): number | null | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    logger.warn('Invalid optional article targeting field', { field: fieldName, value });
+    return null;
+  }
+  return value;
+};
+
 export const validateArticleAutomationTargetingInput = (
   body: unknown
 ): ArticleAutomationTargetingInput => {
   const candidate = body as Record<string, unknown>;
   const articleIds = parseArticleIdsField(candidate?.articleIds);
 
+  const articleIdMinExclusive = parseOptionalPositiveIntegerField(
+    candidate?.articleIdMinExclusive,
+    'articleIdMinExclusive'
+  );
+  const articleIdMaxInclusive = parseOptionalPositiveIntegerField(
+    candidate?.articleIdMaxInclusive,
+    'articleIdMaxInclusive'
+  );
+
   if (Array.isArray(candidate?.articleIds) && articleIds !== null) {
     return {
       ...ARTICLE_AUTOMATION_DEFAULTS,
-      articleIds
+      articleIds,
+      ...(typeof articleIdMinExclusive === 'number' ? { articleIdMinExclusive } : {}),
+      ...(typeof articleIdMaxInclusive === 'number' ? { articleIdMaxInclusive } : {})
     };
   }
 
@@ -102,6 +130,20 @@ export const validateArticleAutomationTargetingInput = (
     });
   }
 
+  if (articleIdMinExclusive === null) {
+    details.push({
+      field: 'articleIdMinExclusive',
+      message: 'articleIdMinExclusive must be a positive integer when provided'
+    });
+  }
+
+  if (articleIdMaxInclusive === null) {
+    details.push({
+      field: 'articleIdMaxInclusive',
+      message: 'articleIdMaxInclusive must be a positive integer when provided'
+    });
+  }
+
   if (details.length > 0) {
     if (candidate?.articleIds !== undefined && articleIds === null) {
       details.push({
@@ -116,7 +158,9 @@ export const validateArticleAutomationTargetingInput = (
   return {
     targetArticleThresholdDaysOld: thresholdDays!,
     targetArticleStateReviewCount: reviewCount!,
-    articleIds: articleIds ?? undefined
+    articleIds: articleIds ?? undefined,
+    ...(typeof articleIdMinExclusive === 'number' ? { articleIdMinExclusive } : {}),
+    ...(typeof articleIdMaxInclusive === 'number' ? { articleIdMaxInclusive } : {})
   };
 };
 
@@ -124,7 +168,9 @@ export const selectTargetArticles = async ({
   articleIds,
   includeArticlesThatMightHaveBeenStateAssigned = false,
   targetArticleStateReviewCount,
-  targetArticleThresholdDaysOld
+  targetArticleThresholdDaysOld,
+  articleIdMinExclusive,
+  articleIdMaxInclusive
 }: ArticleAutomationTargetingInput): Promise<TargetArticleRecord[]> => {
   if (articleIds && articleIds.length > 0) {
     const articles = await Article.findAll({
@@ -218,9 +264,31 @@ export const selectTargetArticles = async ({
     );
   }
 
+  const articleWhereRaw: string[] = [];
+  if (typeof articleIdMinExclusive === 'number') {
+    articleWhereRaw.push(`"Article"."id" > ${articleIdMinExclusive}`);
+  }
+  if (typeof articleIdMaxInclusive === 'number') {
+    articleWhereRaw.push(`"Article"."id" <= ${articleIdMaxInclusive}`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const articleWhere: any = articleWhereRaw.length > 0
+    ? sequelize.and(...articleWhereRaw.map((cond) => sequelize.literal(cond)))
+    : undefined;
+
   const articles = await Article.findAll({
+    where: articleWhere,
     order: [['id', 'DESC']]
   });
+
+  if (articleWhereRaw.length > 0) {
+    logger.info('Article targeting applying id range filter', {
+      articleIdMinExclusive,
+      articleIdMaxInclusive,
+      fetchedCount: articles.length
+    });
+  }
 
   const unassignedArticles = articles
     .filter((article) => Boolean(article.publishedDate) && article.publishedDate! >= cutoffDateString)

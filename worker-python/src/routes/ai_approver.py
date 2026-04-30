@@ -33,6 +33,8 @@ class AiApproverStartRequest(BaseModel):
     limit: int = Field(default=10, gt=0)
     requireStateAssignment: bool = True
     stateIds: list[int] | None = None
+    articleIdMinExclusive: int | None = Field(default=None, gt=0)
+    articleIdMaxInclusive: int | None = Field(default=None, gt=0)
 
 
 class AiApproverReviewPageStartRequest(BaseModel):
@@ -90,6 +92,8 @@ def create_ai_approver_runner(
     limit: int,
     require_state_assignment: bool,
     state_ids: list[int] | None,
+    article_id_min_exclusive: int | None = None,
+    article_id_max_inclusive: int | None = None,
 ):
     def _run(context: QueueExecutionContext) -> None:
         _append_job_log(context.jobId, "job_started", limit=limit)
@@ -104,6 +108,8 @@ def create_ai_approver_runner(
                 limit=limit,
                 require_state_assignment=require_state_assignment,
                 state_ids=state_ids,
+                article_id_min_exclusive=article_id_min_exclusive,
+                article_id_max_inclusive=article_id_max_inclusive,
                 job_id=context.jobId,
                 should_cancel=context.is_cancel_requested,
             )
@@ -271,6 +277,11 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
     if body.stateIds is not None:
         parameters["stateIds"] = body.stateIds
 
+    if body.articleIdMinExclusive is not None:
+        parameters["articleIdMinExclusive"] = body.articleIdMinExclusive
+    if body.articleIdMaxInclusive is not None:
+        parameters["articleIdMaxInclusive"] = body.articleIdMaxInclusive
+
     result = queue_engine.enqueue_job(
         EnqueueJobInput(
             endpointName=AI_APPROVER_ENDPOINT_NAME,
@@ -278,6 +289,8 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
                 body.limit,
                 body.requireStateAssignment,
                 body.stateIds,
+                body.articleIdMinExclusive,
+                body.articleIdMaxInclusive,
             ),
             parameters=parameters,
         )

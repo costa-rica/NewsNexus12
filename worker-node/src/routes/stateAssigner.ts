@@ -10,15 +10,15 @@ import {
   validateArticleAutomationTargetingInput
 } from '../modules/articleTargeting';
 
+export interface StateAssignerStartInput extends ArticleAutomationTargetingInput {
+  keyOpenAi: string;
+  pathToStateAssignerFiles: string;
+}
+
 interface StateAssignerRouteDependencies {
   queueEngine: GlobalQueueEngine;
   env: NodeJS.ProcessEnv;
-  buildJobHandler: (
-    input: ArticleAutomationTargetingInput & {
-      keyOpenAi: string;
-      pathToStateAssignerFiles: string;
-    }
-  ) => QueueJobHandler;
+  buildJobHandler: (input: StateAssignerStartInput) => QueueJobHandler;
 }
 
 const resolveOpenAiKey = (env: NodeJS.ProcessEnv): string => {
@@ -78,8 +78,7 @@ export const createStateAssignerRouter = (
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
         run: buildJobHandler({
-          targetArticleThresholdDaysOld: body.targetArticleThresholdDaysOld,
-          targetArticleStateReviewCount: body.targetArticleStateReviewCount,
+          ...body,
           keyOpenAi: openAiKey,
           pathToStateAssignerFiles
         })

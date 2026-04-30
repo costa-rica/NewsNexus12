@@ -14,10 +14,16 @@ import {
 import logger from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
 
+export interface SemanticScorerTargeting {
+  articleIdMinExclusive?: number;
+  articleIdMaxInclusive?: number;
+}
+
 export interface SemanticScorerJobContext {
   jobId: string;
   semanticScorerDir: string;
   signal: AbortSignal;
+  targeting?: SemanticScorerTargeting;
 }
 
 export interface SemanticScorerJobDependencies {
@@ -294,7 +300,8 @@ const resolveEntityWhoCategorizesId = async (): Promise<number> => {
 };
 
 const createFilteredArticlesArray = async (
-  entityWhoCategorizesId: number
+  entityWhoCategorizesId: number,
+  targeting?: SemanticScorerTargeting
 ): Promise<ScorableArticle[]> => {
   const existingContracts = await ArticleEntityWhoCategorizedArticleContract.findAll({
     where: { entityWhoCategorizesId },
@@ -312,7 +319,21 @@ const createFilteredArticlesArray = async (
     ArticleApproveds?: ArticleApproved[];
   };
 
+  const articleWhereRaw: string[] = [];
+  if (typeof targeting?.articleIdMinExclusive === 'number') {
+    articleWhereRaw.push(`"Article"."id" > ${targeting.articleIdMinExclusive}`);
+  }
+  if (typeof targeting?.articleIdMaxInclusive === 'number') {
+    articleWhereRaw.push(`"Article"."id" <= ${targeting.articleIdMaxInclusive}`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const articleWhere: any = articleWhereRaw.length > 0
+    ? sequelize.and(...articleWhereRaw.map((cond) => sequelize.literal(cond)))
+    : undefined;
+
   const allArticles = (await Article.findAll({
+    where: articleWhere,
     include: [{ model: ArticleApproved }]
   })) as ArticleWithApproved[];
 
@@ -409,7 +430,7 @@ const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<voi
   const entityWhoCategorizesId = await resolveEntityWhoCategorizesId();
   logger.info(`EntityWhoCategorizedArticle: ${entityWhoCategorizesId}`);
 
-  const articles = await createFilteredArticlesArray(entityWhoCategorizesId);
+  const articles = await createFilteredArticlesArray(entityWhoCategorizesId, context.targeting);
   logger.info(`Loaded articles: ${articles.length}`);
 
   const keywords = await loadKeywordsFromExcel(keywordsWorkbookPath);
@@ -439,6 +460,7 @@ const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<voi
 
 export const createSemanticScorerJobHandler = (
   semanticScorerDir: string,
+  targeting?: SemanticScorerTargeting,
   dependencies: SemanticScorerJobDependencies = {}
 ) => {
   const workflowRunner = dependencies.runLegacyWorkflow ?? runLegacyWorkflow;
@@ -450,7 +472,8 @@ export const createSemanticScorerJobHandler = (
     await workflowRunner({
       jobId: queueContext.jobId,
       semanticScorerDir,
-      signal: queueContext.signal
+      signal: queueContext.signal,
+      targeting
     });
   };
 };

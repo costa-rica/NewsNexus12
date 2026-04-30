@@ -32,6 +32,8 @@ class AiApproverOrchestrator:
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
         job_id: str | None,
         should_cancel,
     ) -> dict[str, Any]:
@@ -40,6 +42,8 @@ class AiApproverOrchestrator:
             limit=limit,
             require_state_assignment=require_state_assignment,
             state_ids=state_ids,
+            article_id_min_exclusive=article_id_min_exclusive,
+            article_id_max_inclusive=article_id_max_inclusive,
         )
 
         usage_totals = {

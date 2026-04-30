@@ -79,6 +79,8 @@ class AiApproverRepository:
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
     ) -> list[dict[str, Any]]:
         conn = self.get_connection()
 
@@ -130,6 +132,14 @@ class AiApproverRepository:
                 """
             )
             params.extend(state_ids)
+
+        if article_id_min_exclusive is not None:
+            filters.append('a.id > %s')
+            params.append(article_id_min_exclusive)
+
+        if article_id_max_inclusive is not None:
+            filters.append('a.id <= %s')
+            params.append(article_id_max_inclusive)
 
         where_clause = " AND ".join(filters) if filters else "1=1"
         params.append(limit)

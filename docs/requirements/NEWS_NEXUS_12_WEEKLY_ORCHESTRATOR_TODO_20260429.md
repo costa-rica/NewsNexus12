@@ -16,20 +16,20 @@ Implementation of the weekly orchestrator described in `docs/20260429_ORCHESTRAT
 
 ## Phase 2: Article range targeting end-to-end
 
-- [ ] Add `articleIdMinExclusive` and `articleIdMaxInclusive` to `worker-node/src/modules/articleTargeting.ts`.
-- [ ] Update state-assigner route to pass the full validated targeting object into the job (stop dropping `articleIds`, `includeArticlesThatMightHaveBeenStateAssigned`, etc.).
-- [ ] Wire range filter into state-assigner candidate-selection SQL.
-- [ ] Add request-body targeting to semantic-scorer route.
-- [ ] Wire range filter into semantic-scorer candidate-selection SQL.
-- [ ] Preserve current default behavior for semantic-scorer when targeting is absent.
-- [ ] Extend worker-python ai-approver request schema with `articleIdMinExclusive` and `articleIdMaxInclusive`.
-- [ ] Add SQL filter for the article id range to ai-approver.
-- [ ] Add tests for state-assigner default and range-limited paths.
-- [ ] Add tests for semantic-scorer default and range-limited paths.
-- [ ] Add tests for ai-approver default and range-limited paths.
-- [ ] Run `npm -C worker-node test` and `npm -C worker-node run build`.
-- [ ] Run worker-python test suite (if present) and verify it starts cleanly.
-- [ ] Commit referencing this TODO and Phase 2.
+- [x] Add `articleIdMinExclusive` and `articleIdMaxInclusive` to `worker-node/src/modules/articleTargeting.ts`.
+- [x] Update state-assigner route to pass the full validated targeting object into the job (stop dropping `articleIds`, `includeArticlesThatMightHaveBeenStateAssigned`, etc.).
+- [x] Wire range filter into state-assigner candidate-selection SQL.
+- [x] Add request-body targeting to semantic-scorer route.
+- [x] Wire range filter into semantic-scorer candidate-selection SQL.
+- [x] Preserve current default behavior for semantic-scorer when targeting is absent.
+- [x] Extend worker-python ai-approver request schema with `articleIdMinExclusive` and `articleIdMaxInclusive`.
+- [x] Add SQL filter for the article id range to ai-approver.
+- [x] Add tests for state-assigner default and range-limited paths.
+- [x] Add tests for semantic-scorer default and range-limited paths.
+- [x] Add tests for ai-approver default and range-limited paths.
+- [x] Run `npm -C worker-node test` and `npm -C worker-node run build`.
+- [x] Run worker-python test suite (if present) and verify it starts cleanly.
+- [x] Commit referencing this TODO and Phase 2.
 
 ## Phase 3: Absorb delete_articles into worker-node
 

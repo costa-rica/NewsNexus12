@@ -33,7 +33,13 @@ def test_start_job_returns_expected_shape(client, monkeypatch: pytest.MonkeyPatc
 
     engine, _store = ai_approver_queue_override
 
-    def fake_runner(limit: int, require_state_assignment: bool, state_ids: list[int] | None):
+    def fake_runner(
+        limit: int,
+        require_state_assignment: bool,
+        state_ids: list[int] | None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
+    ):
         assert limit == 5
         assert require_state_assignment is True
         assert state_ids == [1, 2]
@@ -125,7 +131,13 @@ def test_ai_approver_job_supports_queue_cancel(
     engine, _store = ai_approver_queue_override
     started_event = Event()
 
-    def fake_runner(limit: int, require_state_assignment: bool, state_ids: list[int] | None):
+    def fake_runner(
+        limit: int,
+        require_state_assignment: bool,
+        state_ids: list[int] | None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
+    ):
         def _run(context) -> None:
             started_event.set()
             while not context.is_cancel_requested():
