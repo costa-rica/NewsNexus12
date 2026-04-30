@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -5,8 +6,46 @@ import {
   createRequestGoogleRssJobHandler,
   createRssSeedResult,
   DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
+  GoogleRssJobResult,
   mapRssItems
 } from '../../src/modules/jobs/requestGoogleRssJob';
+
+const makeQueueContext = (overrides: Partial<{
+  jobId: string;
+  updateResult: jest.Mock;
+  signal: AbortSignal;
+}> = {}) => ({
+  jobId: overrides.jobId ?? 'job-1',
+  endpointName: '/request-google-rss/start-job',
+  signal: overrides.signal ?? new AbortController().signal,
+  registerCancelableProcess: () => undefined,
+  updateResult: overrides.updateResult ?? jest.fn(() => Promise.resolve())
+});
+
+const createTestSpreadsheet = async (dir: string): Promise<string> => {
+  const filePath = path.join(dir, 'queries.xlsx');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Queries');
+  sheet.addRow(['id', 'and_keywords', 'and_exact_phrases', 'or_keywords', 'or_exact_phrases', 'time_range']);
+  sheet.addRow([1, 'test news', '', '', '', '30d']);
+  await workbook.xlsx.writeFile(filePath);
+  return filePath;
+};
+
+const makeRssXml = (title = 'Test Article', link = 'https://example.com/article', content = 'x'.repeat(300)): string =>
+  `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Google News</title>
+    <item>
+      <title>${title}</title>
+      <link>${link}</link>
+      <pubDate>Wed, 29 Apr 2026 12:00:00 GMT</pubDate>
+      <source>Example News</source>
+      <content:encoded><![CDATA[${content}]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
 
 describe('requestGoogleRss job handler', () => {
   it('fails when spreadsheet file is missing', async () => {
@@ -16,17 +55,11 @@ describe('requestGoogleRss job handler', () => {
     });
 
     await expect(
-      handler({
-        jobId: 'job-1',
-        endpointName: '/request-google-rss/start-job',
-        signal: new AbortController().signal,
-        registerCancelableProcess: () => undefined,
-        updateResult: () => Promise.resolve()
-      })
+      handler(makeQueueContext())
     ).rejects.toThrow('Spreadsheet file not found');
   });
 
-  it('passes spreadsheet path to legacy workflow dependency', async () => {
+  it('passes spreadsheet path and updateResult to legacy workflow dependency', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'request-google-rss-job-'));
     const spreadsheetPath = path.join(tempDir, 'queries.xlsx');
     await fs.writeFile(spreadsheetPath, 'mock spreadsheet data', 'utf8');
@@ -40,19 +73,15 @@ describe('requestGoogleRss job handler', () => {
       { runLegacyWorkflow }
     );
 
-    await handler({
-      jobId: 'job-2',
-      endpointName: '/request-google-rss/start-job',
-      signal: new AbortController().signal,
-      registerCancelableProcess: () => undefined,
-        updateResult: () => Promise.resolve()
-    });
+    const updateResult = jest.fn(() => Promise.resolve());
+    await handler(makeQueueContext({ jobId: 'job-2', updateResult }));
 
     expect(runLegacyWorkflow).toHaveBeenCalledWith({
       jobId: 'job-2',
       spreadsheetPath,
       doNotRepeatRequestsWithinHours: 24,
-      signal: expect.any(Object)
+      signal: expect.any(Object),
+      updateResult: expect.any(Function)
     });
 
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -129,5 +158,106 @@ describe('requestGoogleRss job handler', () => {
       bodySource: 'none',
       content: null
     });
+  });
+});
+
+describe('requestGoogleRss terminal path results', () => {
+  let tempDir: string;
+  let spreadsheetPath: string;
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rss-terminal-'));
+    spreadsheetPath = await createTestSpreadsheet(tempDir);
+    fetchSpy = jest.spyOn(global, 'fetch');
+  });
+
+  afterEach(async () => {
+    fetchSpy.mockRestore();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('writes endingReason=queries_exhausted when all rows are processed', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeRssXml()
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({ endingReason: 'queries_exhausted' })
+    );
+  });
+
+  it('writes endingReason=rate_limited on HTTP 503 response', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => ''
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({ endingReason: 'rate_limited' })
+    );
+  });
+
+  it('writes endingReason=error when spreadsheet is unreadable', async () => {
+    // Write a file that ExcelJS cannot parse as a valid xlsx
+    const badSpreadsheet = path.join(tempDir, 'bad.xlsx');
+    await fs.writeFile(badSpreadsheet, 'not an xlsx file', 'utf8');
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({
+      spreadsheetPath: badSpreadsheet,
+      doNotRepeatRequestsWithinHours: 0
+    });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({ endingReason: 'error' })
+    );
+  });
+
+  it('writes endingReason=canceled when signal is pre-aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ signal: controller.signal, updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({ endingReason: 'canceled' })
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('includes articlesAddedCount in every result', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => ''
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining({ articlesAddedCount: expect.any(Number) })
+    );
   });
 });

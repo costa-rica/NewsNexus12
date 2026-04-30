@@ -46,11 +46,11 @@ Implementation of the weekly orchestrator described in `docs/20260429_ORCHESTRAT
 
 ## Phase 4: Google-RSS structured completion result
 
-- [ ] Update `requestGoogleRssJob` to write `result.endingReason` and `result.endingMessage` on every terminal path (queries exhausted, error, rate-limited, abort, completed).
-- [ ] Track and persist `result.articlesAddedCount` (best-effort tally).
-- [ ] Add tests confirming each terminal path writes a recognizable ending reason.
-- [ ] Run `npm -C worker-node test` and `npm -C worker-node run build`.
-- [ ] Commit referencing this TODO and Phase 4.
+- [x] Update `requestGoogleRssJob` to write `result.endingReason` and `result.endingMessage` on every terminal path (queries exhausted, error, rate-limited, abort, completed).
+- [x] Track and persist `result.articlesAddedCount` (best-effort tally).
+- [x] Add tests confirming each terminal path writes a recognizable ending reason.
+- [x] Run `npm -C worker-node test` and `npm -C worker-node run build`.
+- [x] Commit referencing this TODO and Phase 4.
 
 ## Phase 5: Orchestrator DB models and active-run guard
 

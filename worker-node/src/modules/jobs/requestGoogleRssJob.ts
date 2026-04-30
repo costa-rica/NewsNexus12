@@ -62,11 +62,25 @@ interface RssFetchResult {
   statusCode?: number;
 }
 
+export type GoogleRssEndingReason =
+  | 'queries_exhausted'
+  | 'rate_limited'
+  | 'error'
+  | 'canceled'
+  | 'aborted';
+
+export interface GoogleRssJobResult {
+  endingReason: GoogleRssEndingReason;
+  endingMessage: string;
+  articlesAddedCount: number;
+}
+
 export interface RequestGoogleRssJobContext {
   jobId: string;
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   signal: AbortSignal;
+  updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
 
 export interface RequestGoogleRssJobDependencies {
@@ -496,7 +510,7 @@ const storeRequestAndArticles = async (params: {
   entityWhoFoundArticleId: number;
   signal: AbortSignal;
   navigationSessionManager: GoogleNavigationSessionManager;
-}): Promise<void> => {
+}): Promise<number> => {
   const dateEndOfRequest = new Date().toISOString().split('T')[0];
 
   const request = await NewsApiRequest.create({
@@ -574,6 +588,7 @@ const storeRequestAndArticles = async (params: {
   });
 
   logger.info(`Stored ${savedCount} new articles for request ${request.id} (${params.items.length} received).`);
+  return savedCount;
 };
 
 const delay = async (ms: number, signal: AbortSignal): Promise<void> => {
@@ -631,13 +646,19 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     }
   });
 
+  let articlesAddedCount = 0;
+  let endingReason: GoogleRssEndingReason = 'queries_exhausted';
+  let endingMessage = 'All queries processed successfully.';
+
   try {
     const rows = await readQuerySpreadsheet(context.spreadsheetPath);
     logger.info(`Loaded ${rows.length} query rows from spreadsheet.`);
 
     for (const row of rows) {
       if (context.signal.aborted) {
-        return;
+        endingReason = 'canceled';
+        endingMessage = 'Job was canceled before processing all queries.';
+        break;
       }
 
       const queryResult = buildQuery(row);
@@ -664,13 +685,21 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       );
 
       const response = await fetchRssItems(requestUrl, context.signal);
-      if (response.statusCode === 503) {
-        const message = `HTTP 503 Service Unavailable (id: ${row.id}): ${requestUrl}. Google RSS rate limit likely exceeded. Try increasing MILISECONDS_IN_BETWEEN_REQUESTS (current: ${delayBetweenRequestsMs}ms).`;
-        logger.error(message);
-        throw new Error(message);
+
+      if (context.signal.aborted) {
+        endingReason = 'canceled';
+        endingMessage = 'Job was canceled during RSS fetch.';
+        break;
       }
 
-      await storeRequestAndArticles({
+      if (response.statusCode === 503) {
+        endingReason = 'rate_limited';
+        endingMessage = `HTTP 503 Service Unavailable (id: ${row.id}): ${requestUrl}. Google RSS rate limit likely exceeded. Try increasing MILISECONDS_IN_BETWEEN_REQUESTS (current: ${delayBetweenRequestsMs}ms).`;
+        logger.error(endingMessage);
+        break;
+      }
+
+      const savedThisRequest = await storeRequestAndArticles({
         requestUrl,
         andString: queryResult.andString,
         orString: queryResult.orString,
@@ -681,11 +710,26 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         signal: context.signal,
         navigationSessionManager
       });
+      articlesAddedCount += savedThisRequest;
 
       await delay(delayBetweenRequestsMs, context.signal);
+
+      if (context.signal.aborted) {
+        endingReason = 'canceled';
+        endingMessage = 'Job was canceled after processing a query.';
+        break;
+      }
     }
+  } catch (error) {
+    endingReason = 'error';
+    endingMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+    logger.error(`requestGoogleRss job failed: ${endingMessage}`);
   } finally {
     await navigationSessionManager.close();
+
+    const result: GoogleRssJobResult = { endingReason, endingMessage, articlesAddedCount };
+    logger.info('requestGoogleRss job ending', result);
+    await context.updateResult?.(result as unknown as Record<string, unknown>);
   }
 };
 
@@ -702,7 +746,8 @@ export const createRequestGoogleRssJobHandler = (
       jobId: queueContext.jobId,
       spreadsheetPath: input.spreadsheetPath,
       doNotRepeatRequestsWithinHours: input.doNotRepeatRequestsWithinHours,
-      signal: queueContext.signal
+      signal: queueContext.signal,
+      updateResult: queueContext.updateResult
     });
   };
 };
