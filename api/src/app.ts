@@ -68,6 +68,7 @@ export function mountLegacyRouters(): void {
     { prefix: "/website-domains", modulePath: "./routes/websiteDomains" },
     { prefix: "/reports", modulePath: "./routes/reports" },
     { prefix: "/automations", modulePath: "./routes/newsOrgs/automations" },
+    { prefix: "/automations/orchestrator", modulePath: "./routes/automations/orchestrator" },
     {
       prefix: "/artificial-intelligence",
       modulePath: "./routes/artificialIntelligence",

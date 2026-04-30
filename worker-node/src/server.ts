@@ -3,6 +3,7 @@ import { createApp } from './app';
 import logger, { initializeLogger, isLoggerInitialized } from './modules/logger';
 import { isStartupConfigError, loadAppConfig } from './modules/startup/config';
 import { ensureStateAssignerDirectories } from './modules/startup/stateAssignerFiles';
+import { runReconciliation } from './modules/orchestrator/coordinator';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -51,6 +52,11 @@ export const startServer = async (options: StartServerOptions = {}): Promise<voi
       pathToLogs: config.pathToLogs
     });
     await ensureStateAssignerDirectories(config.pathToStateAssignerFiles);
+    await runReconciliation().catch((err) => {
+      logger.warn('Orchestrator reconciliation failed at startup', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     const app = createApp();
     app.listen(config.port, () => {

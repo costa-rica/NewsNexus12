@@ -77,6 +77,10 @@ import { initReport, Report } from "./Report";
 import { initState, State } from "./State";
 import { initUser, User } from "./User";
 import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
+import { initOrchestratorRun, OrchestratorRun } from "./OrchestratorRun";
+import type { OrchestratorRunStatus } from "./OrchestratorRun";
+import { initOrchestratorRunStep, OrchestratorRunStep } from "./OrchestratorRunStep";
+import type { OrchestratorRunStepName, OrchestratorRunStepStatus } from "./OrchestratorRunStep";
 
 import { applyAssociations } from "./_associations";
 import { MODEL_LOAD_ORDER } from "./_loadOrder";
@@ -113,6 +117,8 @@ export function initModels() {
 	initState();
 	initUser();
 	initWebsiteDomain();
+	initOrchestratorRun();
+	initOrchestratorRunStep();
 
 	applyAssociations();
 
@@ -147,8 +153,12 @@ export function initModels() {
 		State,
 		User,
 		WebsiteDomain,
+		OrchestratorRun,
+		OrchestratorRunStep,
 	};
 }
+
+export type { OrchestratorRunStatus, OrchestratorRunStepName, OrchestratorRunStepStatus };
 
 export {
 	sequelize,
@@ -184,6 +194,8 @@ export {
 	State,
 	User,
 	WebsiteDomain,
+	OrchestratorRun,
+	OrchestratorRunStep,
 };
 
 export async function dropLegacyArticleContentsTable(): Promise<void> {

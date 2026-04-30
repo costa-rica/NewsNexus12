@@ -15,6 +15,7 @@ from src.modules.deduper.config import validate_startup_env
 from src.modules.ai_approver.config import validate_ai_approver_startup_env
 from src.modules.location_scorer.config import validate_location_scorer_startup_env
 from src.modules.queue.config import validate_queue_startup_env
+from src.modules.orchestrator.lock_middleware import OrchestratorLockMiddleware
 from src.routes.ai_approver import router as ai_approver_router
 from src.routes.deduper import router as deduper_router
 from src.routes.index import router as index_router
@@ -78,6 +79,7 @@ except Exception as exc:
 logger.info("event=startup_complete")
 
 app = FastAPI(title="NewsNexus Python Queuer", version="0.2.0")
+app.add_middleware(OrchestratorLockMiddleware)
 app.include_router(index_router)
 app.include_router(ai_approver_router)
 app.include_router(deduper_router)

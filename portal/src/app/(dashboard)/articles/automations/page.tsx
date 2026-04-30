@@ -5,6 +5,7 @@ import { AiApproverSection } from "@/components/automations/AiApproverSection";
 import { ArticleRequestSpreadsheetsSection } from "@/components/automations/ArticleRequestSpreadsheetsSection";
 import { GoogleRssSection } from "@/components/automations/GoogleRssSection";
 import { LocationScorerSection } from "@/components/automations/LocationScorerSection";
+import { OrchestratorSection } from "@/components/automations/OrchestratorSection";
 import { ScrapeArticleContentSection } from "@/components/automations/ScrapeArticleContentSection";
 import { SemanticScorerSection } from "@/components/automations/SemanticScorerSection";
 import { StateAssignerSection } from "@/components/automations/StateAssignerSection";
@@ -16,6 +17,7 @@ export default function ManageAutomation() {
         Manage Automations
       </h1>
 
+      <OrchestratorSection />
       <GoogleRssSection />
       <ScrapeArticleContentSection />
       <StateAssignerSection />

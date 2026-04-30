@@ -27,6 +27,8 @@ import { Report } from "./Report";
 import { State } from "./State";
 import { User } from "./User";
 import { WebsiteDomain } from "./WebsiteDomain";
+import { OrchestratorRun } from "./OrchestratorRun";
+import { OrchestratorRunStep } from "./OrchestratorRunStep";
 
 export function applyAssociations(): void {
 	// --- AI Approver associations ---
@@ -277,6 +279,18 @@ export function applyAssociations(): void {
 	});
 	ArticleStateContract02.belongsTo(EntityWhoCategorizedArticle, {
 		foreignKey: "entityWhoCategorizesId",
+	});
+
+	// --- OrchestratorRun associations ---
+	User.hasMany(OrchestratorRun, { foreignKey: "userId" });
+	OrchestratorRun.belongsTo(User, { foreignKey: "userId" });
+
+	OrchestratorRun.hasMany(OrchestratorRunStep, {
+		foreignKey: "orchestratorRunId",
+		as: "steps",
+	});
+	OrchestratorRunStep.belongsTo(OrchestratorRun, {
+		foreignKey: "orchestratorRunId",
 	});
 
 	console.log("✅ Associations have been set up");
