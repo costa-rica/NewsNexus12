@@ -99,6 +99,21 @@ describe('deleteArticles routes', () => {
     expect(receivedInput?.daysOld).toBeUndefined();
   });
 
+  it('passes batchSize to the job handler', async () => {
+    let receivedInput: DeleteArticlesJobInput | undefined;
+
+    const app = buildApp(queueEngine, (input) => {
+      receivedInput = input;
+      return async () => undefined;
+    });
+
+    const response = await request(app).post('/delete-articles/start-job').send({ batchSize: 250 });
+
+    expect(response.status).toBe(202);
+    await queueEngine.onIdle();
+    expect(receivedInput?.batchSize).toBe(250);
+  });
+
   it('returns 400 for invalid daysOld value', async () => {
     const app = buildApp(queueEngine);
 
@@ -116,6 +131,17 @@ describe('deleteArticles routes', () => {
     const response = await request(app)
       .post('/delete-articles/start-job')
       .send({ trimCount: 'lots' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 for invalid batchSize value', async () => {
+    const app = buildApp(queueEngine);
+
+    const response = await request(app)
+      .post('/delete-articles/start-job')
+      .send({ batchSize: 0 });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');

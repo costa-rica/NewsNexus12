@@ -76,6 +76,9 @@ export function initArticleApproved() {
       modelName: 'ArticleApproved',
       tableName: 'ArticleApproveds',
       timestamps: true,
+      indexes: [
+        { name: 'idx_article_approveds_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticleApproved;

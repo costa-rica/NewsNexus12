@@ -76,6 +76,9 @@ export function initArticlesApproved02() {
       modelName: 'ArticlesApproved02',
       tableName: 'ArticlesApproved02',
       timestamps: true,
+      indexes: [
+        { name: 'idx_articles_approved02_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticlesApproved02;

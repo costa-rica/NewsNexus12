@@ -97,6 +97,9 @@ export function initArticleStateContract02() {
       modelName: "ArticleStateContract02",
       tableName: "ArticleStateContracts02",
       timestamps: true,
+      indexes: [
+        { name: "idx_article_state_contracts02_article_id", fields: ["articleId"] },
+      ],
     }
   );
   return ArticleStateContract02;

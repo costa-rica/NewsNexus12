@@ -4,6 +4,7 @@ process.env.PG_DATABASE = "newsnexus_test_worker_node";
 process.env.PG_USER = "nick";
 
 import { startServer } from "../../src/server";
+import { loadAppConfig } from "../../src/modules/startup/config";
 
 const requiredEnv = {
   PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: "/tmp/input.xlsx",
@@ -22,6 +23,15 @@ const requiredEnv = {
 };
 
 describe("startup config validation", () => {
+  it("validates DELETE_ARTICLES_BATCH_SIZE when provided", () => {
+    expect(() =>
+      loadAppConfig({
+        ...requiredEnv,
+        DELETE_ARTICLES_BATCH_SIZE: "zero",
+      }),
+    ).toThrow("DELETE_ARTICLES_BATCH_SIZE");
+  });
+
   it("fails startup and exits when required env vars are missing", async () => {
     const stderrSpy = jest
       .spyOn(process.stderr, "write")

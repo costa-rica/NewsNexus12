@@ -33,6 +33,7 @@ export interface AppConfig {
   logMaxSizeMb: number;
   logMaxFiles: number;
   port: number;
+  deleteArticlesBatchSize: number;
 }
 
 export class StartupConfigError extends Error {
@@ -124,6 +125,11 @@ export const loadAppConfig = (
     5,
     "LOG_MAX_FILES",
   );
+  const deleteArticlesBatchSize = parsePositiveInteger(
+    env.DELETE_ARTICLES_BATCH_SIZE,
+    1000,
+    "DELETE_ARTICLES_BATCH_SIZE",
+  );
 
   return {
     pathAndFilenameForQuerySpreadsheetAutomated: readRequiredString(
@@ -154,6 +160,7 @@ export const loadAppConfig = (
     logMaxSizeMb,
     logMaxFiles,
     port,
+    deleteArticlesBatchSize,
   };
 };
 

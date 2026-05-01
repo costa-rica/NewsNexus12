@@ -46,6 +46,9 @@ export function initArticleKeywordContract() {
       modelName: 'ArticleKeywordContract',
       tableName: 'ArticleKeywordContracts',
       timestamps: true,
+      indexes: [
+        { name: 'idx_article_keyword_contracts_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticleKeywordContract;
