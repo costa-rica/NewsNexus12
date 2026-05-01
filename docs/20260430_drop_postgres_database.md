@@ -19,8 +19,6 @@ sudo systemctl stop newsnexus12-api.service
 sudo systemctl stop newsnexus12-worker-node.service
 sudo systemctl stop newsnexus12-worker-python.service
 sudo systemctl stop newsnexus12-portal.service
-sudo systemctl stop newsnexus12-db-manager.service
-sudo systemctl stop newsnexus12-db-manager.timer
 ```
 
 Verify nothing is still running:
@@ -102,7 +100,7 @@ Run the import pointing to the copied file:
 
 ```bash
 cd /home/limited_user/applications/NewsNexus12/db-manager && \
-nohup sudo -u limited_user npm start -- --zip_file /home/limited_user/db_backup_202603231656110.zip > /dev/null 2>&1 &
+nohup sudo -u limited_user npm start -- --zip_file /home/limited_user/db_backup_202605012035336.zip > /dev/null 2>&1 &
 echo $!
 ```
 
