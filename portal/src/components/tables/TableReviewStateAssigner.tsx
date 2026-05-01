@@ -199,23 +199,29 @@ const TableReviewStateAssigner: React.FC<TableReviewStateAssignerProps> = ({
 				cell: ({ row }) => {
 					const article = row.original;
 					const isApproved = article.stateAssignment.isHumanApproved;
+					const stateId = article.stateAssignment.stateId;
+					const canVerifyState = stateId !== null;
 
 					return (
 						<div className="flex justify-center">
 							<button
 								onClick={() =>
-									handleApproveReject(
-										article.id,
-										article.stateAssignment.stateId,
-										isApproved
-									)
+									canVerifyState &&
+									handleApproveReject(article.id, stateId, isApproved)
 								}
+								disabled={!canVerifyState}
 								className={`p-1 rounded transition-colors ${
 									isApproved
 										? "text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
 										: "text-gray-400 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-500"
-								}`}
-								title={isApproved ? "Approved - Click to reject" : "Unapproved - Click to approve"}
+								} disabled:cursor-not-allowed disabled:opacity-40`}
+								title={
+									canVerifyState
+										? isApproved
+											? "Approved - Click to reject"
+											: "Unapproved - Click to approve"
+										: "No AI state to approve"
+								}
 							>
 								<CheckCircleIcon className="w-6 h-6" />
 							</button>

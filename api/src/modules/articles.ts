@@ -64,7 +64,7 @@ type FormattedArticleDetails = {
     state: {
       id: number;
       name: string | null | undefined;
-    };
+    } | null;
   };
 };
 
@@ -241,15 +241,17 @@ export function formatArticleDetails(
     articleData.stateHumanApprovedArray = Array.from(humanStatesMap.values());
   }
 
-  if (firstRow.aiStateId) {
+  if (firstRow.aiPromptId) {
     articleData.stateAiApproved = {
       promptId: firstRow.aiPromptId,
       isHumanApproved: firstRow.aiIsHumanApproved,
       reasoning: firstRow.aiReasoning,
-      state: {
-        id: firstRow.aiStateId,
-        name: firstRow.aiStateName,
-      },
+      state: firstRow.aiStateId
+        ? {
+            id: firstRow.aiStateId,
+            name: firstRow.aiStateName,
+          }
+        : null,
     };
   }
 

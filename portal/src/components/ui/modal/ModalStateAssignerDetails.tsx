@@ -74,7 +74,7 @@ const ModalStateAssignerDetails: React.FC<ModalStateAssignerDetailsProps> = ({
   }, [articleId, token]);
 
   const handleApproveReject = async () => {
-    if (!articleDetails || !articleDetails.stateAiApproved) return;
+    if (!articleDetails || !articleDetails.stateAiApproved?.state) return;
 
     const action = articleDetails.stateAiApproved.isHumanApproved
       ? "reject"
@@ -200,11 +200,12 @@ const ModalStateAssignerDetails: React.FC<ModalStateAssignerDetailsProps> = ({
           {articleDetails.stateAiApproved && (
             <div className="mb-6 p-4 rounded-lg bg-blue-light-50 dark:bg-blue-light-900/20 border border-blue-light-200 dark:border-blue-light-800">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                AI Approved State: {articleDetails.stateAiApproved.state.name}
+                AI Approved State:{" "}
+                {articleDetails.stateAiApproved.state?.name ?? "No state"}
               </h4>
               <p className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-medium">Reasoning:</span>{" "}
-                {articleDetails.stateAiApproved.reasoning}
+                {articleDetails.stateAiApproved.reasoning || "No reasoning provided."}
               </p>
             </div>
           )}
@@ -264,7 +265,7 @@ const ModalStateAssignerDetails: React.FC<ModalStateAssignerDetailsProps> = ({
             </div>
           )}
 
-          {showFullDetails && articleDetails.stateAiApproved && (
+          {showFullDetails && articleDetails.stateAiApproved?.state && (
             <div className="flex justify-end">
               <button
                 type="button"

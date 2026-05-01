@@ -22,6 +22,7 @@ import { LoadingDots } from "../common/LoadingDots";
 // Create columnHelper outside component for stable reference
 const columnHelper = createColumnHelper<Article>();
 const UNASSIGNED_STATE_FILTER_VALUE = "__unassigned__";
+const NO_STATE_LABEL = "No state";
 
 const stateAssignmentFilterFn: FilterFn<Article> = (row, columnId, filterValue) => {
 	const selectedStates = Array.isArray(filterValue)
@@ -93,12 +94,16 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 
 	const stateFilterOptions = useMemo<StateFilterOption[]>(() => {
 		const stateCounts = new Map<string, number>();
-		let unassignedCount = 0;
+		let noStateCount = 0;
 
 		for (const article of data) {
 			const stateName = article.stateAssignment?.stateName?.trim();
+			if (article.stateAssignment && !stateName) {
+				noStateCount += 1;
+				continue;
+			}
+
 			if (!stateName) {
-				unassignedCount += 1;
 				continue;
 			}
 
@@ -113,11 +118,11 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			}))
 			.sort((a, b) => a.label.localeCompare(b.label));
 
-		if (unassignedCount > 0) {
+		if (noStateCount > 0) {
 			options.push({
-				value: UNASSIGNED_STATE_FILTER_VALUE,
-				label: "Unassigned",
-				count: unassignedCount,
+				value: NO_STATE_LABEL,
+				label: NO_STATE_LABEL,
+				count: noStateCount,
 			});
 		}
 
@@ -484,7 +489,14 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 						}
 					),
 					columnHelper.accessor(
-						(row) => row.stateAssignment?.stateName ?? undefined,
+						(row) => {
+							const stateName = row.stateAssignment?.stateName?.trim();
+							if (stateName) {
+								return stateName;
+							}
+
+							return row.stateAssignment ? NO_STATE_LABEL : undefined;
+						},
 						{
 							id: "stateAssignmentStateName",
 							header: () => (
@@ -587,7 +599,19 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 							filterFn: stateAssignmentFilterFn,
 							cell: ({ row }) => {
 								const stateName = row.original.stateAssignment?.stateName;
+								const hasAiStateReview = Boolean(row.original.stateAssignment);
 								if (!stateName) {
+									if (hasAiStateReview) {
+										return (
+											<button
+												onClick={() => onStateAssignmentClick?.(row.original.id)}
+												className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 hover:underline"
+											>
+												{NO_STATE_LABEL}
+											</button>
+										);
+									}
+
 									return <div className="text-xs text-gray-400">N/A</div>;
 								}
 								return (

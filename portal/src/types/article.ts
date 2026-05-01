@@ -3,10 +3,10 @@ export interface StateAssignment {
 	promptId: number;
 	isHumanApproved: boolean;
 	isDeterminedToBeError: boolean;
-	occuredInTheUS: boolean;
-	reasoning: string;
-	stateId: number;
-	stateName: string;
+	occuredInTheUS: boolean | null;
+	reasoning: string | null;
+	stateId: number | null;
+	stateName: string | null;
 }
 
 // Shared Article type for the application
@@ -182,10 +182,10 @@ export interface StateInfo {
 }
 
 export interface StateAiApproved {
-	promptId: number;
-	isHumanApproved: boolean;
-	reasoning: string;
-	state: StateInfo;
+	promptId: number | null;
+	isHumanApproved: boolean | null;
+	reasoning: string | null;
+	state: StateInfo | null;
 }
 
 export interface ArticleDetailsResponse {
