@@ -102,7 +102,7 @@ Run the import pointing to the copied file:
 
 ```bash
 cd /home/limited_user/applications/NewsNexus12/db-manager && \
-nohup sudo -u limited_user npm start -- --zip_file /home/limited_user/db_backup_202604291823277.zip > /dev/null 2>&1 &
+nohup sudo -u limited_user npm start -- --zip_file /home/limited_user/db_backup_202603231656110.zip > /dev/null 2>&1 &
 echo $!
 ```
 
@@ -123,7 +123,6 @@ sudo systemctl start newsnexus12-api.service
 sudo systemctl start newsnexus12-worker-node.service
 sudo systemctl start newsnexus12-worker-python.service
 sudo systemctl start newsnexus12-portal.service
-sudo systemctl enable --now newsnexus12-db-manager.timer
 ```
 
 Verify each one is active:
@@ -137,11 +136,11 @@ sudo systemctl status newsnexus12-worker-node.service
 
 ## Quick Reference
 
-| Variable         | Value                                               |
-|------------------|-----------------------------------------------------|
-| DB name          | `newsnexus_prod`                                    |
-| DB owner user    | `newsnexus_boot` (db-manager)                       |
-| DB app user      | `newsnexus_app` (api)                               |
-| DB port          | `5432`                                              |
-| DB host          | `localhost`                                         |
-| Log file         | `/home/limited_user/logs/NewsNexus12DbManager.log`  |
+| Variable      | Value                                              |
+| ------------- | -------------------------------------------------- |
+| DB name       | `newsnexus_prod`                                   |
+| DB owner user | `newsnexus_boot` (db-manager)                      |
+| DB app user   | `newsnexus_app` (api)                              |
+| DB port       | `5432`                                             |
+| DB host       | `localhost`                                        |
+| Log file      | `/home/limited_user/logs/NewsNexus12DbManager.log` |
