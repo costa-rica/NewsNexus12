@@ -183,10 +183,6 @@ export function OrchestratorSection() {
     Authorization: `Bearer ${token ?? ""}`,
     "Content-Type": "application/json",
   };
-  const canShowTestRun =
-    process.env.NEXT_PUBLIC_MODE === "development" ||
-    process.env.NEXT_PUBLIC_MODE === "testing";
-
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
   const fetchActiveRun = useCallback(async (): Promise<void> => {
@@ -399,16 +395,14 @@ export function OrchestratorSection() {
               {isStarting ? "Starting…" : "Start Orchestrator"}
             </button>
 
-            {canShowTestRun && (
-              <button
-                type="button"
-                onClick={() => void handleStart("abbreviated_test")}
-                disabled={isStarting || isStartingTest || isRunActive}
-                className="rounded-lg border border-brand-300 px-6 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
-              >
-                {isStartingTest ? "Starting…" : "Start Test Run"}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => void handleStart("abbreviated_test")}
+              disabled={isStarting || isStartingTest || isRunActive}
+              className="rounded-lg border border-brand-300 px-6 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
+            >
+              {isStartingTest ? "Starting…" : "Start Test Run"}
+            </button>
 
             {isRunActive && (
               <button

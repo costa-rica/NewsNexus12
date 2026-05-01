@@ -18,9 +18,6 @@ const DEFAULT_TEST_CONFIG: OrchestratorTestConfig = {
   downstreamArticleCount: 10,
 };
 
-const isAbbreviatedTestAllowed = (): boolean =>
-  process.env.NODE_ENV !== 'production' || process.env.ALLOW_ORCHESTRATOR_TEST_RUNS === 'true';
-
 const parseOptionalPositiveInteger = (
   value: unknown,
   field: string,
@@ -60,14 +57,6 @@ const parseStartConfig = (body: Record<string, unknown>): OrchestratorConfig => 
 
   if (mode !== 'abbreviated_test') {
     return { mode, aiApproverEnabled, semanticScorerEnabled };
-  }
-
-  if (!isAbbreviatedTestAllowed()) {
-    throw new AppError({
-      status: 403,
-      code: 'FORBIDDEN',
-      message: 'Abbreviated orchestrator test runs are not allowed in this environment.',
-    });
   }
 
   const details: Array<{ field: string; message: string }> = [];

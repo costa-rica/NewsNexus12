@@ -92,6 +92,37 @@ describe('orchestrator routes', () => {
       );
     });
 
+    it('allows abbreviated test runs in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+        mockGetActiveRunId.mockResolvedValueOnce(null);
+        mockStartCoordinator.mockResolvedValueOnce(44);
+
+        const res = await request(buildApp())
+          .post('/orchestrator/start')
+          .send({ mode: 'abbreviated_test' });
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ runId: 44 });
+        expect(mockStartCoordinator).toHaveBeenCalledWith(
+          {
+            mode: 'abbreviated_test',
+            aiApproverEnabled: true,
+            semanticScorerEnabled: true,
+            testConfig: {
+              deleteTrimCount: 100,
+              targetArticlesAddedCount: 10,
+              downstreamArticleCount: 10,
+            },
+          },
+          null
+        );
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
     it('validates abbreviated test run limits', async () => {
       mockGetActiveRunId.mockResolvedValueOnce(null);
 
