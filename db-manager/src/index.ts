@@ -81,7 +81,6 @@ async function databaseHasData(): Promise<boolean> {
     }
 
     initModels();
-    await ensureDatabaseExists();
 
     const { getDatabaseStatus } = await import("./modules/status");
     const {
@@ -97,6 +96,14 @@ async function databaseHasData(): Promise<boolean> {
       logger.info("--drop_db: schema rebuilt successfully. All tables are empty.");
       await sequelize.close();
       return;
+    }
+
+    // --zip_file and --drop_db both call rebuildSchema() which creates the schema from
+    // scratch, so ensureDatabaseExists() is both unnecessary and actively harmful for
+    // those paths (it fails when the schema has been dropped). All other paths need a
+    // healthy schema before they can run.
+    if (!options.zipFilePath) {
+      await ensureDatabaseExists();
     }
 
     if (options.createBackup) {
