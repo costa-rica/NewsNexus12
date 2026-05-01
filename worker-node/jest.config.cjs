@@ -9,6 +9,9 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tests/tsconfig.json' }]
   },
+  moduleNameMapper: {
+    '^uuid$': '<rootDir>/tests/mocks/uuid.cjs'
+  },
   moduleFileExtensions: ['ts', 'js', 'json'],
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts'],

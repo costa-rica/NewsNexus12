@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+type WebpackRule = {
+	test?: {
+		test?: (path: string) => boolean;
+	};
+	exclude?: RegExp;
+};
+
 const nextConfig: NextConfig = {
 	/**
 	 * SECURITY HEADERS CONFIGURATION
@@ -95,7 +102,7 @@ const nextConfig: NextConfig = {
 	 * Configures webpack to load SVG files as React components using @svgr/webpack
 	 */
 	webpack(config) {
-		const assetRule = config.module.rules.find((r: any) =>
+		const assetRule = config.module.rules.find((r: WebpackRule) =>
 			r.test?.test?.(".svg")
 		);
 		if (assetRule) assetRule.exclude = /\.svg$/i;

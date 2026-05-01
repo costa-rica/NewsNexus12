@@ -267,11 +267,11 @@ const AppSidebar: React.FC = () => {
       const items = menuType === "main" ? navItems : othersItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main" | "others",
-                index,
+	          nav.subItems.forEach((subItem) => {
+	            if (isActive(subItem.path)) {
+	              setOpenSubmenu({
+	                type: menuType as "main" | "others",
+	                index,
               });
               submenuMatched = true;
             }
@@ -280,10 +280,11 @@ const AppSidebar: React.FC = () => {
       });
     });
 
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
+	    // If no submenu item matches, close the open submenu
+	    if (!submenuMatched) {
+	      // eslint-disable-next-line react-hooks/set-state-in-effect
+	      setOpenSubmenu(null);
+	    }
   }, [pathname, isActive]);
 
   useEffect(() => {

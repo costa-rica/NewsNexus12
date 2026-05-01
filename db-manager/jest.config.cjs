@@ -6,6 +6,9 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   setupFiles: ['<rootDir>/tests/setupEnv.js'],
+  moduleNameMapper: {
+    '^uuid$': '<rootDir>/tests/mocks/uuid.cjs'
+  },
   moduleFileExtensions: ['ts', 'js', 'json'],
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts'],
