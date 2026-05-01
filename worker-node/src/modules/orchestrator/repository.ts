@@ -54,6 +54,16 @@ export const updateRunStatus = async (
   );
 };
 
+export const updateRunReportFilePath = async (
+  runId: number,
+  reportFilePath: string
+): Promise<void> => {
+  await OrchestratorRun.update(
+    { reportFilePath },
+    { where: { id: runId } }
+  );
+};
+
 export const updateStepStatus = async (
   stepId: number,
   status: OrchestratorRunStepStatus,

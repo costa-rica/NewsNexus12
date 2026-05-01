@@ -131,6 +131,31 @@ describe('requestGoogleRss routes', () => {
     });
   });
 
+  it('passes targetArticlesAddedCount to the job handler', async () => {
+    const spreadsheetPath = path.join(tempDirPath, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
+    const buildJobHandler = jest.fn(() => async () => undefined);
+
+    const app = buildApp(
+      queueEngine,
+      {
+        PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath
+      },
+      buildJobHandler
+    );
+
+    const response = await request(app).post('/request-google-rss/start-job').send({
+      targetArticlesAddedCount: 10
+    });
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith({
+      spreadsheetPath,
+      doNotRepeatRequestsWithinHours: DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
+      targetArticlesAddedCount: 10
+    });
+  });
+
   it('returns validation error when spreadsheet env var is missing', async () => {
     const app = buildApp(queueEngine, {});
 
@@ -171,6 +196,32 @@ describe('requestGoogleRss routes', () => {
         {
           field: 'doNotRepeatRequestsWithinHours',
           message: 'doNotRepeatRequestsWithinHours must be a non-negative integer'
+        }
+      ]
+    });
+  });
+
+  it('returns validation error when targetArticlesAddedCount is invalid', async () => {
+    const spreadsheetPath = path.join(tempDirPath, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
+
+    const app = buildApp(queueEngine, {
+      PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath
+    });
+
+    const response = await request(app).post('/request-google-rss/start-job').send({
+      targetArticlesAddedCount: 0
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Request validation failed',
+      status: 400,
+      details: [
+        {
+          field: 'targetArticlesAddedCount',
+          message: 'targetArticlesAddedCount must be a positive integer when provided'
         }
       ]
     });

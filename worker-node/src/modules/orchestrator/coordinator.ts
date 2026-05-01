@@ -4,15 +4,17 @@ import { invalidateActiveRunCache } from './activeRunGuard';
 import { startNodeJob, startPythonJob } from './childJobClient';
 import {
   createRun,
-  getRunById,
+  getRunWithSteps,
   getStepByName,
   reconcileOrphanedRuns,
+  updateRunReportFilePath,
   updateRunStatus,
   updateStepStatus,
 } from './repository';
 import { writeReport } from './reportWriter';
 import type {
   OrchestratorConfig,
+  OrchestratorTestConfig,
   OrchestratorRunRow,
   OrchestratorRunStepRow,
   OrchestratorRunStatus,
@@ -23,6 +25,14 @@ import { STEP_DEFAULTS } from './types';
 import logger from '../logger';
 
 const POLL_INTERVAL_MS = 60_000;
+const DEFAULT_ARTICLE_THRESHOLD_DAYS_OLD = 180;
+const DEFAULT_ARTICLE_REVIEW_COUNT = 100;
+
+const DEFAULT_TEST_CONFIG: OrchestratorTestConfig = {
+  deleteTrimCount: 100,
+  targetArticlesAddedCount: 10,
+  downstreamArticleCount: 10,
+};
 
 interface RunningCoordinator {
   runId: number;
@@ -49,13 +59,14 @@ export const startCoordinator = async (
 
   const steps = buildStepList(config);
   const { run, runSteps } = await createRun(config, steps, userId);
+  await writeJobsReportSnapshot(run.id);
 
   invalidateActiveRunCache();
 
   const ac = new AbortController();
   activeCoordinator = { runId: run.id, abortController: ac };
 
-  void runCoordinator(run.id, runSteps, steps, ac.signal).catch((err) => {
+  void runCoordinator(run.id, runSteps, steps, config, ac.signal).catch((err) => {
     logger.error('coordinator: unhandled error in run loop', {
       runId: run.id,
       error: err instanceof Error ? err.message : String(err),
@@ -75,10 +86,16 @@ export const runReconciliation = async (): Promise<void> => {
 };
 
 const buildStepList = (config: OrchestratorConfig): StepConfig[] => {
+  const isAbbreviatedTest = config.mode === 'abbreviated_test';
+
   return STEP_DEFAULTS.map((s) => {
-    if (s.stepName === 'ai_approver') return { ...s, enabled: config.aiApproverEnabled };
-    if (s.stepName === 'semantic_scorer') return { ...s, enabled: config.semanticScorerEnabled };
-    return { ...s, enabled: true };
+    const timeoutSeconds = isAbbreviatedTest
+      ? Math.min(s.timeoutSeconds, 30 * 60)
+      : s.timeoutSeconds;
+
+    if (s.stepName === 'ai_approver') return { ...s, timeoutSeconds, enabled: config.aiApproverEnabled };
+    if (s.stepName === 'semantic_scorer') return { ...s, timeoutSeconds, enabled: config.semanticScorerEnabled };
+    return { ...s, timeoutSeconds, enabled: true };
   });
 };
 
@@ -125,21 +142,95 @@ const captureMaxArticleId = async (): Promise<number> => {
   return Number(row.max_id ?? 0);
 };
 
+const writeJobsReportSnapshot = async (runId: number): Promise<void> => {
+  try {
+    const snapshot = await getRunWithSteps(runId);
+    if (!snapshot) return;
+
+    const reportPath = await writeReport(snapshot.run, snapshot.steps, { includeArticles: false });
+    if (reportPath !== null) {
+      await updateRunReportFilePath(runId, reportPath);
+    }
+  } catch (err) {
+    logger.warn('coordinator: jobs report snapshot failed', {
+      runId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const normalizeTestConfig = (config: OrchestratorConfig): OrchestratorTestConfig => ({
+  ...DEFAULT_TEST_CONFIG,
+  ...(config.testConfig ?? {}),
+});
+
+const buildCursorBody = (
+  articleIdMinExclusive: number | null,
+  articleIdMaxInclusive: number | null
+): Record<string, number> => ({
+  ...(articleIdMinExclusive !== null ? { articleIdMinExclusive } : {}),
+  ...(articleIdMaxInclusive !== null ? { articleIdMaxInclusive } : {}),
+});
+
+const buildStepRequestBody = (
+  stepConfig: StepConfig,
+  config: OrchestratorConfig,
+  articleIdMinExclusive: number | null,
+  articleIdMaxInclusive: number | null
+): Record<string, unknown> => {
+  const cursorBody = buildCursorBody(articleIdMinExclusive, articleIdMaxInclusive);
+  const isAbbreviatedTest = config.mode === 'abbreviated_test';
+  const testConfig = normalizeTestConfig(config);
+
+  switch (stepConfig.stepName) {
+    case 'delete_articles':
+      return isAbbreviatedTest ? { trimCount: testConfig.deleteTrimCount } : {};
+    case 'google_rss':
+      return isAbbreviatedTest
+        ? {
+            targetArticlesAddedCount: testConfig.targetArticlesAddedCount,
+            ...(testConfig.doNotRepeatRequestsWithinHours !== undefined
+              ? { doNotRepeatRequestsWithinHours: testConfig.doNotRepeatRequestsWithinHours }
+              : {}),
+          }
+        : {};
+    case 'state_assigner':
+      return {
+        targetArticleThresholdDaysOld: DEFAULT_ARTICLE_THRESHOLD_DAYS_OLD,
+        targetArticleStateReviewCount: isAbbreviatedTest
+          ? testConfig.downstreamArticleCount
+          : DEFAULT_ARTICLE_REVIEW_COUNT,
+        ...cursorBody,
+      };
+    case 'ai_approver':
+      return {
+        limit: isAbbreviatedTest ? testConfig.downstreamArticleCount : DEFAULT_ARTICLE_REVIEW_COUNT,
+        ...cursorBody,
+      };
+    case 'semantic_scorer':
+      return cursorBody;
+    case 'report':
+      return {};
+  }
+};
+
 const startChildJob = async (
   stepConfig: StepConfig,
   runId: number,
+  body: Record<string, unknown>,
   _signal: AbortSignal
 ): Promise<ChildJobHandle> => {
   if (stepConfig.worker === 'python') {
-    return startPythonJob(stepConfig.endpointName, {}, runId);
+    return startPythonJob(stepConfig.endpointName, body, runId);
   }
-  return startNodeJob(stepConfig.endpointName, {}, runId);
+  return startNodeJob(stepConfig.endpointName, body, runId);
 };
 
 const runCoordinator = async (
   runId: number,
   runSteps: OrchestratorRunStepRow[],
   stepConfigs: StepConfig[],
+  config: OrchestratorConfig,
   signal: AbortSignal
 ): Promise<void> => {
   let articleIdMinExclusive: number | null = null;
@@ -156,25 +247,36 @@ const runCoordinator = async (
 
       if (!stepConfig.enabled) {
         await updateStepStatus(stepRow.id, 'skipped');
+        await writeJobsReportSnapshot(runId);
         continue;
       }
 
       if (signal.aborted) {
         await updateStepStatus(stepRow.id, 'canceled');
+        await writeJobsReportSnapshot(runId);
         continue;
       }
 
       logger.info('coordinator: starting step', { runId, step: stepConfig.stepName });
       await updateStepStatus(stepRow.id, 'running', { startedAt: new Date() });
+      await writeJobsReportSnapshot(runId);
 
       if (stepConfig.stepName === 'google_rss') {
         articleIdMinExclusive = await captureMaxArticleId();
         await updateRunStatus(runId, 'running', { articleIdMinExclusive });
+        await writeJobsReportSnapshot(runId);
       }
+
+      const stepRequestBody = buildStepRequestBody(
+        stepConfig,
+        config,
+        articleIdMinExclusive,
+        articleIdMaxInclusive
+      );
 
       let handle: ChildJobHandle;
       try {
-        handle = await startChildJob(stepConfig, runId, signal);
+        handle = await startChildJob(stepConfig, runId, stepRequestBody, signal);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error('coordinator: failed to start child job', { runId, step: stepConfig.stepName, error: msg });
@@ -183,12 +285,14 @@ const runCoordinator = async (
           endingReason: 'start_failed',
           endingMessage: msg,
         });
+        await writeJobsReportSnapshot(runId);
         finalStatus = 'failed';
         failureReason = `Step ${stepConfig.stepName} failed to start: ${msg}`;
         break;
       }
 
       await updateStepStatus(stepRow.id, 'running', { childJobId: handle.jobId });
+      await writeJobsReportSnapshot(runId);
 
       const pollResult = await pollUntilDone(handle, stepConfig.timeoutSeconds, signal);
 
@@ -200,6 +304,7 @@ const runCoordinator = async (
           endingReason: 'timeout',
           endingMessage: `Step exceeded ${stepConfig.timeoutSeconds}s timeout`,
         });
+        await writeJobsReportSnapshot(runId);
         finalStatus = 'timed_out';
         failureReason = `Step ${stepConfig.stepName} timed out`;
         break;
@@ -209,6 +314,7 @@ const runCoordinator = async (
         logger.info('coordinator: step canceled', { runId, step: stepConfig.stepName });
         await handle.cancel().catch(() => undefined);
         await updateStepStatus(stepRow.id, 'canceled', { endedAt: new Date() });
+        await writeJobsReportSnapshot(runId);
         finalStatus = 'canceled';
         break;
       }
@@ -220,21 +326,30 @@ const runCoordinator = async (
           endingReason: 'job_failed',
           endingMessage: pollResult.reason,
         });
+        await writeJobsReportSnapshot(runId);
         finalStatus = 'failed';
         failureReason = `Step ${stepConfig.stepName} failed: ${pollResult.reason}`;
         break;
       }
 
       const stepResult = 'result' in pollResult ? (pollResult.result ?? undefined) : undefined;
+      const result = {
+        ...(stepResult != null ? stepResult as Record<string, unknown> : {}),
+        ...(config.mode === 'abbreviated_test'
+          ? { orchestratorMode: 'abbreviated_test', requestBody: stepRequestBody }
+          : {}),
+      };
       await updateStepStatus(stepRow.id, 'completed', {
         endedAt: new Date(),
         endingReason: 'completed',
-        ...(stepResult != null ? { result: stepResult as Record<string, unknown> } : {}),
+        ...(Object.keys(result).length > 0 ? { result } : {}),
       });
+      await writeJobsReportSnapshot(runId);
 
       if (stepConfig.stepName === 'google_rss') {
         articleIdMaxInclusive = await captureMaxArticleId();
         await updateRunStatus(runId, 'running', { articleIdMaxInclusive });
+        await writeJobsReportSnapshot(runId);
 
         if (articleIdMaxInclusive === articleIdMinExclusive) {
           logger.info('coordinator: google-rss added no new articles, early exit', { runId });
@@ -244,6 +359,7 @@ const runCoordinator = async (
           for (const remaining of remainingSteps) {
             await updateStepStatus(remaining.id, 'skipped');
           }
+          await writeJobsReportSnapshot(runId);
           finalStatus = 'completed_no_new_articles';
           break;
         }
@@ -255,10 +371,10 @@ const runCoordinator = async (
     finalStatus = 'failed';
     failureReason = msg;
   } finally {
-    const run = await getRunById(runId);
-    if (run) {
+    const snapshot = await getRunWithSteps(runId);
+    if (snapshot) {
       try {
-        const reportPath = await writeReport(run as unknown as OrchestratorRunRow, runSteps);
+        const reportPath = await writeReport(snapshot.run as unknown as OrchestratorRunRow, snapshot.steps);
         await updateRunStatus(runId, finalStatus, {
           endedAt: new Date(),
           ...(failureReason !== undefined ? { failureReason } : {}),
@@ -266,7 +382,7 @@ const runCoordinator = async (
           ...(articleIdMinExclusive !== null ? { articleIdMinExclusive } : {}),
           ...(articleIdMaxInclusive !== null ? { articleIdMaxInclusive } : {}),
         });
-        const reportStep = runSteps.find((s) => s.stepName === 'report');
+        const reportStep = snapshot.steps.find((s) => s.stepName === 'report');
         if (reportStep) {
           await updateStepStatus(reportStep.id, 'completed', {
             startedAt: new Date(),

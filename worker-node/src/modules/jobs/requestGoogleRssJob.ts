@@ -64,6 +64,7 @@ interface RssFetchResult {
 
 export type GoogleRssEndingReason =
   | 'queries_exhausted'
+  | 'target_articles_collected'
   | 'rate_limited'
   | 'error'
   | 'canceled'
@@ -79,6 +80,7 @@ export interface RequestGoogleRssJobContext {
   jobId: string;
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
+  targetArticlesAddedCount?: number;
   signal: AbortSignal;
   updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
@@ -90,6 +92,7 @@ export interface RequestGoogleRssJobDependencies {
 export interface RequestGoogleRssJobInput {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
+  targetArticlesAddedCount?: number;
 }
 
 const REQUIRED_HEADERS = [
@@ -613,7 +616,8 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
   logWorkflowStart('Request Google RSS', {
     jobId: context.jobId,
     spreadsheetPath: context.spreadsheetPath,
-    doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours
+    doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours,
+    targetArticlesAddedCount: context.targetArticlesAddedCount
   });
 
   const delayBetweenRequestsMs = (() => {
@@ -712,6 +716,16 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       });
       articlesAddedCount += savedThisRequest;
 
+      if (
+        context.targetArticlesAddedCount !== undefined &&
+        articlesAddedCount >= context.targetArticlesAddedCount
+      ) {
+        endingReason = 'target_articles_collected';
+        endingMessage = `Collected ${articlesAddedCount} articles, meeting target ${context.targetArticlesAddedCount}.`;
+        logger.info(endingMessage);
+        break;
+      }
+
       await delay(delayBetweenRequestsMs, context.signal);
 
       if (context.signal.aborted) {
@@ -746,6 +760,9 @@ export const createRequestGoogleRssJobHandler = (
       jobId: queueContext.jobId,
       spreadsheetPath: input.spreadsheetPath,
       doNotRepeatRequestsWithinHours: input.doNotRepeatRequestsWithinHours,
+      ...(input.targetArticlesAddedCount !== undefined
+        ? { targetArticlesAddedCount: input.targetArticlesAddedCount }
+        : {}),
       signal: queueContext.signal,
       updateResult: queueContext.updateResult
     });

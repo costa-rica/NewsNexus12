@@ -5,6 +5,15 @@ export type { OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunS
 export interface OrchestratorConfig {
   aiApproverEnabled: boolean;
   semanticScorerEnabled: boolean;
+  mode?: 'weekly' | 'abbreviated_test';
+  testConfig?: OrchestratorTestConfig;
+}
+
+export interface OrchestratorTestConfig {
+  deleteTrimCount: number;
+  targetArticlesAddedCount: number;
+  downstreamArticleCount: number;
+  doNotRepeatRequestsWithinHours?: number;
 }
 
 export interface StepConfig {

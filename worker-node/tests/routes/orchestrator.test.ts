@@ -63,9 +63,53 @@ describe('orchestrator routes', () => {
       expect(res.status).toBe(202);
       expect(res.body).toEqual({ runId: 42 });
       expect(mockStartCoordinator).toHaveBeenCalledWith(
-        { aiApproverEnabled: true, semanticScorerEnabled: false },
+        { mode: 'weekly', aiApproverEnabled: true, semanticScorerEnabled: false },
         null
       );
+    });
+
+    it('starts an abbreviated test run with default limits', async () => {
+      mockGetActiveRunId.mockResolvedValueOnce(null);
+      mockStartCoordinator.mockResolvedValueOnce(43);
+
+      const res = await request(buildApp())
+        .post('/orchestrator/start')
+        .send({ mode: 'abbreviated_test', aiApproverEnabled: true, semanticScorerEnabled: true });
+
+      expect(res.status).toBe(202);
+      expect(mockStartCoordinator).toHaveBeenCalledWith(
+        {
+          mode: 'abbreviated_test',
+          aiApproverEnabled: true,
+          semanticScorerEnabled: true,
+          testConfig: {
+            deleteTrimCount: 100,
+            targetArticlesAddedCount: 10,
+            downstreamArticleCount: 10,
+          },
+        },
+        null
+      );
+    });
+
+    it('validates abbreviated test run limits', async () => {
+      mockGetActiveRunId.mockResolvedValueOnce(null);
+
+      const res = await request(buildApp())
+        .post('/orchestrator/start')
+        .send({
+          mode: 'abbreviated_test',
+          testConfig: { targetArticlesAddedCount: 0 },
+        });
+
+      expect(res.status).toBe(400);
+      expect(mockStartCoordinator).not.toHaveBeenCalled();
+      expect(res.body.error.details).toEqual([
+        {
+          field: 'testConfig.targetArticlesAddedCount',
+          message: 'testConfig.targetArticlesAddedCount must be a positive integer when provided',
+        },
+      ]);
     });
   });
 

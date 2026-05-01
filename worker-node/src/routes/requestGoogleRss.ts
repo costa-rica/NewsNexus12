@@ -60,6 +60,35 @@ const resolveDoNotRepeatRequestsWithinHours = (body: unknown): number => {
   return parsed;
 };
 
+const resolveTargetArticlesAddedCount = (body: unknown): number | undefined => {
+  const rawValue =
+    typeof body === 'object' && body !== null && 'targetArticlesAddedCount' in body
+      ? body.targetArticlesAddedCount
+      : undefined;
+
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return undefined;
+  }
+
+  const parsed =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number.parseInt(rawValue, 10)
+        : Number.NaN;
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw AppError.validation([
+      {
+        field: 'targetArticlesAddedCount',
+        message: 'targetArticlesAddedCount must be a positive integer when provided'
+      }
+    ]);
+  }
+
+  return parsed;
+};
+
 export const createRequestGoogleRssRouter = (
   dependencies: RequestGoogleRssRouteDependencies = {
     queueEngine: globalQueueEngine,
@@ -75,19 +104,22 @@ export const createRequestGoogleRssRouter = (
       const endpointName = '/request-google-rss/start-job';
       const spreadsheetPath = resolveSpreadsheetPathFromEnv(env);
       const doNotRepeatRequestsWithinHours = resolveDoNotRepeatRequestsWithinHours(req.body);
+      const targetArticlesAddedCount = resolveTargetArticlesAddedCount(req.body);
       await verifySpreadsheetFileExists(spreadsheetPath);
 
       logger.info('Received Request Google RSS start request', {
         endpointName,
         spreadsheetPath,
-        doNotRepeatRequestsWithinHours
+        doNotRepeatRequestsWithinHours,
+        targetArticlesAddedCount
       });
 
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
         run: buildJobHandler({
           spreadsheetPath,
-          doNotRepeatRequestsWithinHours
+          doNotRepeatRequestsWithinHours,
+          ...(targetArticlesAddedCount !== undefined ? { targetArticlesAddedCount } : {})
         })
       });
 
@@ -95,7 +127,8 @@ export const createRequestGoogleRssRouter = (
         endpointName,
         jobId: enqueueResult.jobId,
         status: enqueueResult.status,
-        doNotRepeatRequestsWithinHours
+        doNotRepeatRequestsWithinHours,
+        targetArticlesAddedCount
       });
 
       return res.status(202).json({

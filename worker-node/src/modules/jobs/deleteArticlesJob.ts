@@ -109,7 +109,7 @@ async function deleteOldUnapprovedArticles(
     const batchStart = Date.now();
     await Article.destroy({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      where: sequelize.literal(`"Article"."id" IN (${ids.join(',')})`) as unknown as any
+      where: sequelize.literal(`"id" IN (${ids.join(',')})`) as unknown as any
     });
     const batchDurationMs = Date.now() - batchStart;
     deletedCount += ids.length;
@@ -175,7 +175,7 @@ async function trimOldestEligibleArticles(
     const batchIds = ids.slice(i, i + DELETE_BATCH_SIZE);
     await Article.destroy({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      where: sequelize.literal(`"Article"."id" IN (${batchIds.join(',')})`) as unknown as any
+      where: sequelize.literal(`"id" IN (${batchIds.join(',')})`) as unknown as any
     });
     deletedCount += batchIds.length;
     logger.info(`Deleted ${deletedCount} of ${trimFound} trim articles (batch ${batchNumber}).`);

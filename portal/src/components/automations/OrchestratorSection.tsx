@@ -171,6 +171,7 @@ export function OrchestratorSection() {
   const [aiApproverEnabled, setAiApproverEnabled] = useState(true);
   const [semanticScorerEnabled, setSemanticScorerEnabled] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStartingTest, setIsStartingTest] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
   const [alertModal, setAlertModal] = useState<AlertModalState>(DEFAULT_ALERT);
 
@@ -182,6 +183,9 @@ export function OrchestratorSection() {
     Authorization: `Bearer ${token ?? ""}`,
     "Content-Type": "application/json",
   };
+  const canShowTestRun =
+    process.env.NEXT_PUBLIC_MODE === "development" ||
+    process.env.NEXT_PUBLIC_MODE === "testing";
 
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
@@ -247,13 +251,32 @@ export function OrchestratorSection() {
 
   // ── Actions ────────────────────────────────────────────────────────────────────
 
-  const handleStart = async () => {
-    setIsStarting(true);
+  const handleStart = async (mode: "weekly" | "abbreviated_test" = "weekly") => {
+    if (mode === "abbreviated_test") {
+      setIsStartingTest(true);
+    } else {
+      setIsStarting(true);
+    }
+
     try {
+      const requestBody =
+        mode === "abbreviated_test"
+          ? {
+              mode,
+              aiApproverEnabled,
+              semanticScorerEnabled,
+              testConfig: {
+                deleteTrimCount: 100,
+                targetArticlesAddedCount: 10,
+                downstreamArticleCount: 10,
+              },
+            }
+          : { aiApproverEnabled, semanticScorerEnabled };
+
       const res = await fetch(`${apiBase}/automations/orchestrator/start`, {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ aiApproverEnabled, semanticScorerEnabled }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) {
@@ -279,7 +302,11 @@ export function OrchestratorSection() {
         variant: "error",
       });
     } finally {
-      setIsStarting(false);
+      if (mode === "abbreviated_test") {
+        setIsStartingTest(false);
+      } else {
+        setIsStarting(false);
+      }
     }
   };
 
@@ -362,15 +389,26 @@ export function OrchestratorSection() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => void handleStart()}
-              disabled={isStarting || isRunActive}
+              onClick={() => void handleStart("weekly")}
+              disabled={isStarting || isStartingTest || isRunActive}
               className="rounded-lg bg-brand-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
             >
               {isStarting ? "Starting…" : "Start Orchestrator"}
             </button>
+
+            {canShowTestRun && (
+              <button
+                type="button"
+                onClick={() => void handleStart("abbreviated_test")}
+                disabled={isStarting || isStartingTest || isRunActive}
+                className="rounded-lg border border-brand-300 px-6 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
+              >
+                {isStartingTest ? "Starting…" : "Start Test Run"}
+              </button>
+            )}
 
             {isRunActive && (
               <button

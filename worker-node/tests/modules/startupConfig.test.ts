@@ -18,6 +18,7 @@ const requiredEnv = {
   PG_DATABASE: "newsnexus_test_worker_node",
   PG_USER: "nick",
   PATH_UTILTIES: "/tmp/utilities",
+  URL_BASE_NEWS_NEXUS_WORKER_PYTHON: "http://worker-python",
 };
 
 describe("startup config validation", () => {

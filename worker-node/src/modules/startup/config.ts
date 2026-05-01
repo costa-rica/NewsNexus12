@@ -11,6 +11,7 @@ const REQUIRED_ENV_VARS = [
   "PG_DATABASE",
   "PG_USER",
   "PATH_UTILTIES",
+  "URL_BASE_NEWS_NEXUS_WORKER_PYTHON",
 ] as const;
 
 export type RuntimeNodeEnv = "development" | "testing" | "production";
@@ -28,6 +29,7 @@ export interface AppConfig {
   pgDatabase: string;
   pgUser: string;
   pathUtilities: string;
+  urlBaseNewsNexusWorkerPython: string;
   logMaxSizeMb: number;
   logMaxFiles: number;
   port: number;
@@ -145,6 +147,10 @@ export const loadAppConfig = (
     pgDatabase: readRequiredString(env, "PG_DATABASE"),
     pgUser: readRequiredString(env, "PG_USER"),
     pathUtilities: readRequiredString(env, "PATH_UTILTIES"),
+    urlBaseNewsNexusWorkerPython: readRequiredString(
+      env,
+      "URL_BASE_NEWS_NEXUS_WORKER_PYTHON",
+    ),
     logMaxSizeMb,
     logMaxFiles,
     port,

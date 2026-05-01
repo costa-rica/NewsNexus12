@@ -39,7 +39,11 @@ const getArticleRows = async (
       ac.status AS "scrapeStatus",
       s.name AS "aiAssignedState",
       aas.score AS "aiApproverScore",
-      ak.max_score AS "semanticRating"
+      (
+        SELECT MAX(aecc."keywordRating")
+        FROM "ArticleEntityWhoCategorizedArticleContracts" AS aecc
+        WHERE aecc."articleId" = a.id
+      ) AS "semanticRating"
     FROM "Articles" AS a
     LEFT JOIN LATERAL (
       SELECT status FROM "ArticleContents02" WHERE "articleId" = a.id ORDER BY id DESC LIMIT 1
@@ -53,9 +57,6 @@ const getArticleRows = async (
     LEFT JOIN LATERAL (
       SELECT score FROM "AiApproverArticleScores" WHERE "articleId" = a.id ORDER BY id DESC LIMIT 1
     ) aas ON true
-    LEFT JOIN LATERAL (
-      SELECT MAX(score) AS max_score FROM "ArticleKeywordContracts" WHERE "articleId" = a.id
-    ) ak ON true
     WHERE a.id > :minExclusive AND a.id <= :maxInclusive
     ORDER BY a.id ASC
     `,
@@ -77,8 +78,10 @@ const getOutputPath = (startedAt: Date): string => {
 
 export const writeReport = async (
   run: OrchestratorRunRow,
-  steps: OrchestratorRunStepRow[]
+  steps: OrchestratorRunStepRow[],
+  options: { includeArticles?: boolean } = {}
 ): Promise<string | null> => {
+  const includeArticles = options.includeArticles ?? true;
   const outputPath = getOutputPath(run.startedAt);
   const tmpPath = `${outputPath}.tmp`;
   const outputDir = path.dirname(outputPath);
@@ -117,7 +120,7 @@ export const writeReport = async (
       });
     }
 
-    if (run.articleIdMinExclusive !== null && run.articleIdMaxInclusive !== null) {
+    if (includeArticles && run.articleIdMinExclusive !== null && run.articleIdMaxInclusive !== null) {
       const articlesSheet = workbook.addWorksheet('Articles');
       articlesSheet.columns = [
         { header: 'Article ID', key: 'articleId', width: 12 },

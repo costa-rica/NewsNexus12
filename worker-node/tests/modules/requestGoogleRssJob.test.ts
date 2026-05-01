@@ -87,6 +87,35 @@ describe('requestGoogleRss job handler', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
+  it('passes targetArticlesAddedCount to legacy workflow dependency', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'request-google-rss-job-'));
+    const spreadsheetPath = path.join(tempDir, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'mock spreadsheet data', 'utf8');
+
+    const runLegacyWorkflow = jest.fn(async () => undefined);
+    const handler = createRequestGoogleRssJobHandler(
+      {
+        spreadsheetPath,
+        doNotRepeatRequestsWithinHours: 0,
+        targetArticlesAddedCount: 10
+      },
+      { runLegacyWorkflow }
+    );
+
+    await handler(makeQueueContext({ jobId: 'job-target' }));
+
+    expect(runLegacyWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: 'job-target',
+        spreadsheetPath,
+        doNotRepeatRequestsWithinHours: 0,
+        targetArticlesAddedCount: 10
+      })
+    );
+
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
   it('maps RSS item content from content:encoded', () => {
     const items = mapRssItems([
       {

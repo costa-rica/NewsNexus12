@@ -4,8 +4,8 @@ import type { ChildJobHandle, ChildJobPollResult } from './types';
 import logger from '../logger';
 
 const getWorkerPythonBaseUrl = (): string => {
-  const url = (process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER ?? '').trim().replace(/\/+$/, '');
-  if (!url) throw new Error('URL_BASE_NEWS_NEXUS_PYTHON_QUEUER is not configured');
+  const url = (process.env.URL_BASE_NEWS_NEXUS_WORKER_PYTHON ?? '').trim().replace(/\/+$/, '');
+  if (!url) throw new Error('URL_BASE_NEWS_NEXUS_WORKER_PYTHON is not configured');
   return url;
 };
 
@@ -33,7 +33,9 @@ const mapNodeStatus = (status: NodeJobStatus, failureReason?: string): ChildJobP
 const fetchJson = async <T>(url: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} from ${url}`);
+    const responseBody = await response.text().catch(() => '');
+    const detail = responseBody.trim() !== '' ? `: ${responseBody}` : '';
+    throw new Error(`HTTP ${response.status} from ${url}${detail}`);
   }
   return response.json() as Promise<T>;
 };
@@ -126,7 +128,7 @@ export const startPythonJob = async (
     },
     cancel: async (): Promise<void> => {
       try {
-        const cancelUrl = `${baseUrl}/queue-info/cancel_job/${jobId}`;
+        const cancelUrl = `${baseUrl}/queue-info/cancel-job/${jobId}`;
         await fetchJson(cancelUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       } catch (err) {
         logger.warn('childJobClient: cancel python job failed', {
