@@ -17,6 +17,10 @@ The deduper workflow from NewsNexusDeduper02 is already absorbed internally unde
 
 The location scorer workflow from NewsNexusClassifierLocationScorer01 is now absorbed internally under `src/modules/location_scorer`.
 
+The AI approver workflow is absorbed internally under `src/modules/ai_approver`.
+It scores articles against active prompt rows and writes reviewable score rows
+back to Postgres.
+
 ## Runtime architecture
 
 1. Application bootstrap
@@ -29,6 +33,7 @@ The location scorer workflow from NewsNexusClassifierLocationScorer01 is now abs
 - `src/routes/index.py`
 - `src/routes/deduper.py`
 - `src/routes/location_scorer.py`
+- `src/routes/ai_approver.py`
 - `src/routes/queue_info.py`
 
 3. Shared queue infrastructure
@@ -75,6 +80,14 @@ The location scorer workflow from NewsNexusClassifierLocationScorer01 is now abs
 - `src/modules/location_scorer/processors/load.py`
 - `src/modules/location_scorer/processors/classify.py`
 - `src/modules/location_scorer/processors/write.py`
+
+9. AI approver workflow
+
+- `src/modules/ai_approver/config.py`
+- `src/modules/ai_approver/repository.py`
+- `src/modules/ai_approver/orchestrator.py`
+- `src/modules/ai_approver/client.py`
+- `src/modules/ai_approver/errors.py`
 
 ## Queue model
 
@@ -174,6 +187,115 @@ The queue is the backbone of worker status reporting used by the portal automati
 - `GET /queue-info/latest-job?endpointName=/location-scorer/start-job`
 - `POST /queue-info/cancel-job/{job_id}`
 
+### AI approver create and execute flow
+
+1. API, portal, or worker-node orchestrator callers create a queued AI approver
+   job at:
+
+- `POST /ai-approver/start-job`
+
+2. The route accepts:
+
+- `limit`, default `10`
+- `requireStateAssignment`, default `true`
+- `stateIds`, optional list of `ArticleStateContracts02.stateId` values
+- `articleIdMinExclusive`, optional article ID lower cursor
+- `articleIdMaxInclusive`, optional article ID upper cursor
+
+3. `src/routes/ai_approver.py` enqueues a shared queue job with endpoint name:
+
+- `/ai-approver/start-job`
+
+4. The route runner creates:
+
+- `AiApproverConfig`
+- `AiApproverRepository`
+- `AiApproverOpenAIClient`
+- `AiApproverOrchestrator`
+
+5. `AiApproverOrchestrator.run_score(...)` executes the scoring loop:
+
+- loads active prompts from `AiApproverPromptVersions`
+- loads eligible articles from `Articles`
+- uses `ArticleContents02.content` when available, otherwise
+  `Articles.description`
+- builds each prompt by replacing `{articleTitle}` and `{articleContent}`
+- calls OpenAI with `response_format={"type": "json_object"}`
+- inserts one score row per article/prompt attempt into
+  `AiApproverArticleScores`
+
+6. Eligibility filters in the batch path exclude articles that:
+
+- already have any `AiApproverArticleScores` row
+- have an `ArticleIsRelevants` row with `"isRelevant" = FALSE`
+- have any `ArticleApproveds` row
+- lack a valid non-error `ArticleStateContracts02` row when
+  `requireStateAssignment` is true
+- are outside the optional article ID cursor bounds
+- are outside the optional `stateIds` filter
+
+7. Queue result payload fields include:
+
+- `exitCode`
+- `error`
+- `stderr`
+- `stdout`
+- `statusText`
+- `promptCount`
+- `articleCount`
+- `attemptCount`
+- `usagePromptTokens`
+- `usageCompletionTokens`
+- `usageTotalTokens`
+
+8. Latest job and cancel operations reuse the same queue-info routes:
+
+- `GET /queue-info/latest-job?endpointName=/ai-approver/start-job`
+- `POST /queue-info/cancel-job/{job_id}`
+
+### AI approver review-page one-off flow
+
+1. The review modal/API creates a queued one-off score at:
+
+- `POST /ai-approver/review-page/start-job`
+
+2. The route accepts:
+
+- `articleId`
+- `promptVersionId`
+
+3. The route enqueues endpoint name:
+
+- `/ai-approver/review-page/start-job`
+
+4. `AiApproverOrchestrator.run_single_score(...)`:
+
+- loads the prompt by ID from `AiApproverPromptVersions`
+- does not require the prompt to be active
+- loads article content with the same `ArticleContents02` preference and
+  `Articles.description` fallback
+- writes one `AiApproverArticleScores` row
+- includes `contentSource` in the queue result
+
+### AI approver prompts and scoring agents
+
+Each active `AiApproverPromptVersions` row functions as one scoring agent. The
+worker does not route between agents by category; it runs every active prompt
+against every eligible batch article. Prompt text is stored in
+`promptInMarkdown` and must include `{articleTitle}` and `{articleContent}` if
+the article fields should be injected.
+
+The OpenAI client expects prompt output as JSON. Valid responses have numeric
+`score` and non-empty `reason`. Invalid JSON shapes are persisted as
+`invalid_response`; OpenAI/runtime exceptions are persisted as `failed`.
+
+The current client uses:
+
+- `OPENAI_API_KEY`
+- `AI_APPROVER_MODEL_NAME`, default `gpt-4o-mini`
+- `temperature=0.2`
+- JSON object response format
+
 ## Environment variables
 
 Required:
@@ -194,6 +316,26 @@ Required:
 
 - AI entity name used by the location scorer to resolve `ArtificialIntelligences` and `EntityWhoCategorizedArticles`.
 - Worker startup fails if this value is missing.
+
+5. `PG_HOST`
+
+- Postgres host used by the AI approver.
+
+6. `PG_PORT`
+
+- Postgres port used by the AI approver.
+
+7. `PG_DATABASE`
+
+- Postgres database used by the AI approver.
+
+8. `PG_USER`
+
+- Postgres user used by the AI approver.
+
+9. `OPENAI_API_KEY`
+
+- Required by AI approver startup validation and by OpenAI scoring calls.
 
 Optional:
 
@@ -223,6 +365,15 @@ Optional:
 
 - `LOCATION_SCORER_BATCH_SIZE` default `10`
 - `LOCATION_SCORER_CHECKPOINT_INTERVAL` default `10`
+
+6. AI approver tuning
+
+- `PG_PASSWORD` default empty
+- `AI_APPROVER_MODEL_NAME` default `gpt-4o-mini`
+- `AI_APPROVER_BATCH_SIZE` default `10`
+
+`AI_APPROVER_BATCH_SIZE` is validated by config but current route execution
+uses the request `limit` for article selection.
 
 Deprecated in the absorbed runtime path:
 
@@ -260,24 +411,54 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 - Ensure the location scorer AI entity env var is set in `worker-python/.env`.
 - Ensure the referenced AI entity and related `EntityWhoCategorizedArticles` row exist in the shared database.
 
-4. Common issue: `job not found`
+4. Common issue: worker fails at startup with `PG_HOST`, `PG_PORT`,
+   `PG_DATABASE`, `PG_USER`, or `OPENAI_API_KEY` missing
+
+- Ensure `worker-python/.env` is present.
+- Ensure the AI approver Postgres and OpenAI variables are populated.
+- Do not print secrets in logs or documentation when troubleshooting.
+
+5. Common issue: `job not found`
 
 - Usually caused by polling with `reportId` instead of `jobId`.
 - Queue and deduper status routes require the job ID returned at creation time.
 
-5. Common issue: completed location scorer job but no rows
+6. Common issue: completed location scorer job but no rows
 
 - Confirm the `ArtificialIntelligences` row exists for `NAME_AI_ENTITY_LOCATION_SCORER`.
 - Confirm the related `EntityWhoCategorizedArticles` row exists.
 - Confirm there are unscored `Articles` for that entity.
 
-6. Common issue: completed job but no deduper rows
+7. Common issue: completed AI approver job with zero articles or attempts
+
+- Check `AiApproverPromptVersions` for active prompt rows.
+- Check whether target articles already have `AiApproverArticleScores` rows.
+- Check `ArticleIsRelevants`, `ArticleApproveds`, and
+  `ArticleStateContracts02` filters.
+- Check the request `stateIds`, `articleIdMinExclusive`, and
+  `articleIdMaxInclusive` bounds.
+
+8. Common issue: AI approver rows have `invalid_response`
+
+- Inspect the corresponding `AiApproverPromptVersions.promptInMarkdown`.
+- Confirm the prompt asks for JSON only with numeric `score` and non-empty
+  `reason`.
+- The OpenAI client uses JSON object response format, but the worker still
+  validates the returned payload shape.
+
+9. Common issue: AI approver rows have `failed`
+
+- Inspect `AiApproverArticleScores.errorCode` and `errorMessage`.
+- Check OpenAI connectivity, model name, and API key configuration.
+- Check whether prompt output was invalid JSON that raised during parsing.
+
+10. Common issue: completed job but no deduper rows
 
 - Validate source rows for the report in the shared SQLite database.
 - Validate approved rows exist for the target report.
 - Validate worker-python points at the intended DB file.
 
-7. Cancellation behavior
+11. Cancellation behavior
 
 - Cancellation is cooperative, not force-kill based.
 - Processors must check `should_cancel` at checkpoints between batches or units of work.
@@ -296,6 +477,7 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 3. Keep SQL in repository modules.
 
 - Processors and routes should not issue raw SQL directly.
+- AI approver SQL belongs in `src/modules/ai_approver/repository.py`.
 
 4. Keep processors stage-focused.
 
@@ -305,6 +487,8 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 5. Preserve workflow endpoint names.
 
 - Endpoint names such as `/deduper/start-job` are part of the status lookup contract used by API and portal clients.
+- AI approver endpoint names `/ai-approver/start-job` and
+  `/ai-approver/review-page/start-job` are also status lookup contracts.
 
 6. Keep docs updated with code changes.
 
