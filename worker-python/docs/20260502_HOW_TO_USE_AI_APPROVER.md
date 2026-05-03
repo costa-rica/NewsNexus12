@@ -29,7 +29,7 @@ The review-page one-off endpoint is:
 POST /ai-approver/review-page/start-job
 ```
 
-The weekly worker-node orchestrator calls `/ai-approver/start-job` through worker-python. It currently sends the article limit and article ID cursor bounds, but it does not explicitly send `mode`, so normal weekly automation uses the worker-python environment value `AI_APPROVER_MODE`.
+The weekly worker-node orchestrator calls `/ai-approver/start-job` through worker-python. It sends an article limit based on the number of articles added during that orchestrator run plus article ID cursor bounds, but it does not explicitly send `mode`, so normal weekly automation uses the worker-python environment value `AI_APPROVER_MODE`.
 
 ## Prompt roles
 

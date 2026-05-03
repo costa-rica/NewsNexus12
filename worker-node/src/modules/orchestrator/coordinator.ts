@@ -26,7 +26,7 @@ import logger from '../logger';
 
 const POLL_INTERVAL_MS = 60_000;
 const DEFAULT_ARTICLE_THRESHOLD_DAYS_OLD = 180;
-const DEFAULT_ARTICLE_REVIEW_COUNT = 100;
+const FALLBACK_ARTICLE_REVIEW_COUNT = 100;
 
 const DEFAULT_TEST_CONFIG: OrchestratorTestConfig = {
   deleteTrimCount: 100,
@@ -172,11 +172,66 @@ const buildCursorBody = (
   ...(articleIdMaxInclusive !== null ? { articleIdMaxInclusive } : {}),
 });
 
-const buildStepRequestBody = (
+export const calculateArticlesAddedCount = (
+  articleIdMinExclusive: number | null,
+  articleIdMaxInclusive: number | null,
+  runId?: number
+): number | null => {
+  const validMin =
+    typeof articleIdMinExclusive === 'number' &&
+    Number.isInteger(articleIdMinExclusive) &&
+    articleIdMinExclusive >= 0;
+  const validMax =
+    typeof articleIdMaxInclusive === 'number' &&
+    Number.isInteger(articleIdMaxInclusive) &&
+    articleIdMaxInclusive >= 0;
+
+  if (!validMin || !validMax || articleIdMaxInclusive! < articleIdMinExclusive!) {
+    logger.warn('coordinator: unable to calculate articles added from id bounds', {
+      runId,
+      articleIdMinExclusive,
+      articleIdMaxInclusive,
+    });
+    return null;
+  }
+
+  return articleIdMaxInclusive! - articleIdMinExclusive!;
+};
+
+const resolveDownstreamArticleCount = (
+  config: OrchestratorConfig,
+  articlesAddedCount: number | null,
+  stepName: StepConfig['stepName']
+): number => {
+  const isAbbreviatedTest = config.mode === 'abbreviated_test';
+  const testConfig = normalizeTestConfig(config);
+
+  if (isAbbreviatedTest) {
+    return testConfig.downstreamArticleCount;
+  }
+
+  if (
+    typeof articlesAddedCount === 'number' &&
+    Number.isInteger(articlesAddedCount) &&
+    articlesAddedCount > 0
+  ) {
+    return articlesAddedCount;
+  }
+
+  logger.warn('coordinator: using fallback downstream article count', {
+    step: stepName,
+    articlesAddedCount,
+    fallbackArticleCount: FALLBACK_ARTICLE_REVIEW_COUNT,
+  });
+  return FALLBACK_ARTICLE_REVIEW_COUNT;
+};
+
+export const buildStepRequestBody = (
   stepConfig: StepConfig,
   config: OrchestratorConfig,
   articleIdMinExclusive: number | null,
-  articleIdMaxInclusive: number | null
+  articleIdMaxInclusive: number | null,
+  articlesAddedCount: number | null
 ): Record<string, unknown> => {
   const cursorBody = buildCursorBody(articleIdMinExclusive, articleIdMaxInclusive);
   const isAbbreviatedTest = config.mode === 'abbreviated_test';
@@ -197,14 +252,16 @@ const buildStepRequestBody = (
     case 'state_assigner':
       return {
         targetArticleThresholdDaysOld: DEFAULT_ARTICLE_THRESHOLD_DAYS_OLD,
-        targetArticleStateReviewCount: isAbbreviatedTest
-          ? testConfig.downstreamArticleCount
-          : DEFAULT_ARTICLE_REVIEW_COUNT,
+        targetArticleStateReviewCount: resolveDownstreamArticleCount(
+          config,
+          articlesAddedCount,
+          stepConfig.stepName
+        ),
         ...cursorBody,
       };
     case 'ai_approver':
       return {
-        limit: isAbbreviatedTest ? testConfig.downstreamArticleCount : DEFAULT_ARTICLE_REVIEW_COUNT,
+        limit: resolveDownstreamArticleCount(config, articlesAddedCount, stepConfig.stepName),
         ...cursorBody,
       };
     case 'semantic_scorer':
@@ -235,6 +292,7 @@ const runCoordinator = async (
 ): Promise<void> => {
   let articleIdMinExclusive: number | null = null;
   let articleIdMaxInclusive: number | null = null;
+  let articlesAddedCount: number | null = null;
   let finalStatus: OrchestratorRunStatus = 'completed';
   let failureReason: string | undefined;
 
@@ -271,7 +329,8 @@ const runCoordinator = async (
         stepConfig,
         config,
         articleIdMinExclusive,
-        articleIdMaxInclusive
+        articleIdMaxInclusive,
+        articlesAddedCount
       );
 
       let handle: ChildJobHandle;
@@ -348,10 +407,17 @@ const runCoordinator = async (
 
       if (stepConfig.stepName === 'google_rss') {
         articleIdMaxInclusive = await captureMaxArticleId();
+        const reportedArticlesAddedCount = stepResult?.articlesAddedCount;
+        articlesAddedCount =
+          typeof reportedArticlesAddedCount === 'number' &&
+          Number.isInteger(reportedArticlesAddedCount) &&
+          reportedArticlesAddedCount >= 0
+            ? reportedArticlesAddedCount
+            : calculateArticlesAddedCount(articleIdMinExclusive, articleIdMaxInclusive, runId);
         await updateRunStatus(runId, 'running', { articleIdMaxInclusive });
         await writeJobsReportSnapshot(runId);
 
-        if (articleIdMaxInclusive === articleIdMinExclusive) {
+        if (articlesAddedCount === 0) {
           logger.info('coordinator: google-rss added no new articles, early exit', { runId });
           const remainingSteps = runSteps.filter(
             (s) => ['state_assigner', 'ai_approver', 'semantic_scorer'].includes(s.stepName)
