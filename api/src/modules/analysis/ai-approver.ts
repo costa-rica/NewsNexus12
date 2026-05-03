@@ -3,10 +3,16 @@ type PromptBody = {
   description?: unknown;
   promptInMarkdown?: unknown;
   isActive?: unknown;
+  promptRole?: unknown;
+  promptKey?: unknown;
+  pipelineVersion?: unknown;
+  responseSchemaVersion?: unknown;
+  modelName?: unknown;
 };
 
 type ActiveBody = {
   isActive?: unknown;
+  confirmActivateGatekeeper?: unknown;
 };
 
 type HumanVerifyBody = {
@@ -23,7 +29,37 @@ type ReviewPageStartJobBody = {
   name?: unknown;
   promptInMarkdown?: unknown;
   sourcePromptVersionId?: unknown;
+  promptRole?: unknown;
+  promptKey?: unknown;
+  pipelineVersion?: unknown;
+  responseSchemaVersion?: unknown;
+  modelName?: unknown;
 };
+
+const ALLOWED_PROMPT_ROLES = new Set([
+  "category_score",
+  "legacy_category_score",
+  "gatekeeper",
+]);
+
+export function normalizePromptRole(value: unknown): string {
+  return typeof value === "string" && value.trim() !== ""
+    ? value.trim()
+    : "category_score";
+}
+
+function validateOptionalString(
+  value: unknown,
+  fieldName: string,
+): { isValid: boolean; error?: string } {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    return {
+      isValid: false,
+      error: `${fieldName} must be a string if provided`,
+    };
+  }
+  return { isValid: true };
+}
 
 export function validatePromptCreateRequest(body: PromptBody): {
   isValid: boolean;
@@ -64,6 +100,26 @@ export function validatePromptCreateRequest(body: PromptBody): {
     };
   }
 
+  const promptRole = normalizePromptRole(body.promptRole);
+  if (!ALLOWED_PROMPT_ROLES.has(promptRole)) {
+    return {
+      isValid: false,
+      error: "promptRole must be category_score, legacy_category_score, or gatekeeper",
+    };
+  }
+
+  for (const [fieldName, value] of [
+    ["promptKey", body.promptKey],
+    ["pipelineVersion", body.pipelineVersion],
+    ["responseSchemaVersion", body.responseSchemaVersion],
+    ["modelName", body.modelName],
+  ] as const) {
+    const validation = validateOptionalString(value, fieldName);
+    if (!validation.isValid) {
+      return validation;
+    }
+  }
+
   return { isValid: true };
 }
 
@@ -75,6 +131,16 @@ export function validatePromptActiveRequest(body: ActiveBody): {
     return {
       isValid: false,
       error: "isActive must be a boolean",
+    };
+  }
+
+  if (
+    body.confirmActivateGatekeeper !== undefined &&
+    typeof body.confirmActivateGatekeeper !== "boolean"
+  ) {
+    return {
+      isValid: false,
+      error: "confirmActivateGatekeeper must be a boolean if provided",
     };
   }
 
@@ -200,6 +266,26 @@ export function validateReviewPageStartJobRequest(
       isValid: false,
       error: "sourcePromptVersionId must be a positive integer if provided",
     };
+  }
+
+  const promptRole = normalizePromptRole(body.promptRole);
+  if (!ALLOWED_PROMPT_ROLES.has(promptRole)) {
+    return {
+      isValid: false,
+      error: "promptRole must be category_score, legacy_category_score, or gatekeeper",
+    };
+  }
+
+  for (const [fieldName, value] of [
+    ["promptKey", body.promptKey],
+    ["pipelineVersion", body.pipelineVersion],
+    ["responseSchemaVersion", body.responseSchemaVersion],
+    ["modelName", body.modelName],
+  ] as const) {
+    const validation = validateOptionalString(value, fieldName);
+    if (!validation.isValid) {
+      return validation;
+    }
   }
 
   return { isValid: true };

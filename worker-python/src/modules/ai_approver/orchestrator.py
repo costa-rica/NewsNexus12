@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from src.modules.ai_approver.client import AiApproverOpenAIClient
@@ -26,6 +27,224 @@ class AiApproverOrchestrator:
         self.repository = repository
         self.client = client
 
+    def _empty_usage_totals(self) -> dict[str, int]:
+        return {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    def _add_usage(self, usage_totals: dict[str, int], usage: dict[str, Any]) -> None:
+        for key in usage_totals:
+            value = usage.get(key)
+            if isinstance(value, int):
+                usage_totals[key] += value
+
+    def _parse_category_payload(
+        self,
+        payload: dict[str, Any],
+    ) -> tuple[str, float | None, str | None, str | None, str | None]:
+        score = payload.get("score")
+        reason = payload.get("reason")
+        if isinstance(score, (int, float)) and isinstance(reason, str) and reason.strip():
+            return "completed", float(score), reason.strip(), None, None
+
+        return (
+            "invalid_response",
+            None,
+            None,
+            str(payload.get("errorCode") or "invalid_response"),
+            str(payload.get("errorMessage") or f"Unsupported payload: {json.dumps(payload)}"),
+        )
+
+    def _parse_gatekeeper_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        reject_confidence_threshold: float,
+    ) -> dict[str, Any]:
+        decision = payload.get("decision")
+        confidence = payload.get("confidence")
+        reason = payload.get("reason")
+        reason_code = payload.get("reasonCode")
+        signals = payload.get("signals")
+
+        if (
+            decision not in ("pass", "reject", "manual_review")
+            or not isinstance(confidence, (int, float))
+            or not math.isfinite(float(confidence))
+            or float(confidence) < 0
+            or float(confidence) > 1
+            or not isinstance(reason, str)
+            or not reason.strip()
+        ):
+            return {
+                "result_status": "invalid_response",
+                "decision": "error",
+                "confidence": None,
+                "reason": None,
+                "reason_code": None,
+                "error_code": str(payload.get("errorCode") or "invalid_response"),
+                "error_message": str(
+                    payload.get("errorMessage")
+                    or f"Unsupported gatekeeper payload: {json.dumps(payload)}"
+                ),
+                "metadata": {"rawPayload": payload},
+            }
+
+        normalized_decision = str(decision)
+        normalized_confidence = float(confidence)
+        if normalized_decision == "reject" and normalized_confidence < reject_confidence_threshold:
+            normalized_decision = "manual_review"
+
+        metadata: dict[str, Any] = {
+            "rawDecision": decision,
+            "rejectConfidenceThreshold": reject_confidence_threshold,
+        }
+        if isinstance(signals, dict):
+            metadata["signals"] = signals
+
+        return {
+            "result_status": "completed",
+            "decision": normalized_decision,
+            "confidence": normalized_confidence,
+            "reason": reason.strip(),
+            "reason_code": reason_code.strip()
+            if isinstance(reason_code, str) and reason_code.strip()
+            else None,
+            "error_code": None,
+            "error_message": None,
+            "metadata": metadata,
+        }
+
+    def _should_run_categories(
+        self,
+        *,
+        mode: str,
+        gatekeeper_result: dict[str, Any] | None,
+    ) -> bool:
+        if mode in ("legacy", "shadow"):
+            return True
+        if gatekeeper_result is None:
+            return False
+        return (
+            gatekeeper_result.get("resultStatus") == "completed"
+            and gatekeeper_result.get("decision") == "pass"
+        )
+
+    def _run_category_prompt_for_article(
+        self,
+        *,
+        article: dict[str, Any],
+        prompt_version: dict[str, Any],
+        usage_totals: dict[str, int],
+        job_id: str | None,
+    ) -> None:
+        prompt_role = prompt_version.get("promptRole") or "category_score"
+        prompt = build_prompt(
+            prompt_version["promptInMarkdown"],
+            article.get("title", ""),
+            article.get("content", ""),
+        )
+
+        try:
+            response = self.client.score_article(prompt)
+            payload = response.get("payload", {})
+            self._add_usage(usage_totals, response.get("usage", {}))
+            result_status, score, reason, error_code, error_message = (
+                self._parse_category_payload(payload)
+            )
+            self.repository.insert_score_row(
+                article_id=int(article["id"]),
+                prompt_version_id=int(prompt_version["id"]),
+                result_status=result_status,
+                score=score,
+                reason=reason,
+                error_code=error_code,
+                error_message=error_message,
+                job_id=job_id,
+                prompt_role=prompt_role,
+                pipeline_version=prompt_version.get("pipelineVersion"),
+            )
+        except Exception as exc:
+            self.repository.insert_score_row(
+                article_id=int(article["id"]),
+                prompt_version_id=int(prompt_version["id"]),
+                result_status="failed",
+                score=None,
+                reason=None,
+                error_code="execution_failed",
+                error_message=str(exc),
+                job_id=job_id,
+                prompt_role=prompt_role,
+                pipeline_version=prompt_version.get("pipelineVersion"),
+            )
+
+    def _run_gatekeeper_for_article(
+        self,
+        *,
+        article: dict[str, Any],
+        prompt_version: dict[str, Any],
+        usage_totals: dict[str, int],
+        job_id: str | None,
+        reject_confidence_threshold: float,
+    ) -> dict[str, Any]:
+        prompt = build_prompt(
+            prompt_version["promptInMarkdown"],
+            article.get("title", ""),
+            article.get("content", ""),
+        )
+
+        try:
+            response = self.client.score_article(prompt)
+            payload = response.get("payload", {})
+            self._add_usage(usage_totals, response.get("usage", {}))
+            parsed = self._parse_gatekeeper_payload(
+                payload,
+                reject_confidence_threshold=reject_confidence_threshold,
+            )
+            self.repository.insert_score_row(
+                article_id=int(article["id"]),
+                prompt_version_id=int(prompt_version["id"]),
+                result_status=parsed["result_status"],
+                score=None,
+                reason=parsed["reason"],
+                error_code=parsed["error_code"],
+                error_message=parsed["error_message"],
+                job_id=job_id,
+                prompt_role="gatekeeper",
+                pipeline_version=prompt_version.get("pipelineVersion"),
+                decision=parsed["decision"],
+                confidence=parsed["confidence"],
+                reason_code=parsed["reason_code"],
+                metadata=parsed["metadata"],
+            )
+            return {
+                "resultStatus": parsed["result_status"],
+                "decision": parsed["decision"],
+                "confidence": parsed["confidence"],
+            }
+        except Exception as exc:
+            self.repository.insert_score_row(
+                article_id=int(article["id"]),
+                prompt_version_id=int(prompt_version["id"]),
+                result_status="failed",
+                score=None,
+                reason=None,
+                error_code="execution_failed",
+                error_message=str(exc),
+                job_id=job_id,
+                prompt_role="gatekeeper",
+                pipeline_version=prompt_version.get("pipelineVersion"),
+                decision="error",
+                metadata={"errorType": exc.__class__.__name__},
+            )
+            return {
+                "resultStatus": "failed",
+                "decision": "error",
+                "confidence": None,
+            }
+
     def run_score(
         self,
         *,
@@ -36,89 +255,124 @@ class AiApproverOrchestrator:
         article_id_max_inclusive: int | None = None,
         job_id: str | None,
         should_cancel,
+        mode: str = "legacy",
+        gatekeeper_reject_confidence_threshold: float = 0.85,
     ) -> dict[str, Any]:
-        prompt_versions = self.repository.get_active_prompt_versions()
+        category_prompt_versions = self.repository.get_active_category_prompt_versions()
+        gatekeeper_prompt_version = None
+        if mode != "legacy":
+            gatekeeper_prompt_version = self.repository.get_active_gatekeeper_prompt_version()
+            if gatekeeper_prompt_version is None:
+                raise AiApproverProcessorError(
+                    f"AI approver mode {mode} requires one active gatekeeper prompt"
+                )
+
         articles = self.repository.get_eligible_articles(
             limit=limit,
             require_state_assignment=require_state_assignment,
             state_ids=state_ids,
+            mode=mode,
+            gatekeeper_prompt_version_id=(
+                int(gatekeeper_prompt_version["id"]) if gatekeeper_prompt_version else None
+            ),
+            category_prompt_version_ids=[
+                int(prompt_version["id"]) for prompt_version in category_prompt_versions
+            ],
             article_id_min_exclusive=article_id_min_exclusive,
             article_id_max_inclusive=article_id_max_inclusive,
         )
 
-        usage_totals = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-        attempts = 0
+        usage_totals = self._empty_usage_totals()
+        gatekeeper_attempts = 0
+        category_attempts = 0
+        gatekeeper_pass_count = 0
+        gatekeeper_reject_count = 0
+        gatekeeper_manual_review_count = 0
+        gatekeeper_invalid_response_count = 0
+        gatekeeper_failed_count = 0
+        category_skipped_count = 0
+        estimated_category_calls_avoided = 0
 
         for article in articles:
-            for prompt_version in prompt_versions:
+            gatekeeper_result = None
+            if gatekeeper_prompt_version is not None:
                 if should_cancel():
                     raise RuntimeError("AI approver pipeline cancelled")
-
-                prompt = build_prompt(
-                    prompt_version["promptInMarkdown"],
-                    article.get("title", ""),
-                    article.get("content", ""),
+                gatekeeper_result = self.repository.get_score_result(
+                    article_id=int(article["id"]),
+                    prompt_version_id=int(gatekeeper_prompt_version["id"]),
                 )
-
-                try:
-                    response = self.client.score_article(prompt)
-                    payload = response.get("payload", {})
-                    usage = response.get("usage", {})
-                    for key in usage_totals:
-                        value = usage.get(key)
-                        if isinstance(value, int):
-                            usage_totals[key] += value
-
-                    score = payload.get("score")
-                    reason = payload.get("reason")
-                    if isinstance(score, (int, float)) and isinstance(reason, str) and reason.strip():
-                        self.repository.insert_score_row(
-                            article_id=int(article["id"]),
-                            prompt_version_id=int(prompt_version["id"]),
-                            result_status="completed",
-                            score=float(score),
-                            reason=reason.strip(),
-                            error_code=None,
-                            error_message=None,
-                            job_id=job_id,
-                        )
-                    else:
-                        self.repository.insert_score_row(
-                            article_id=int(article["id"]),
-                            prompt_version_id=int(prompt_version["id"]),
-                            result_status="invalid_response",
-                            score=None,
-                            reason=None,
-                            error_code=str(payload.get("errorCode") or "invalid_response"),
-                            error_message=str(
-                                payload.get("errorMessage")
-                                or f"Unsupported payload: {json.dumps(payload)}"
-                            ),
-                            job_id=job_id,
-                        )
-                except Exception as exc:
-                    self.repository.insert_score_row(
-                        article_id=int(article["id"]),
-                        prompt_version_id=int(prompt_version["id"]),
-                        result_status="failed",
-                        score=None,
-                        reason=None,
-                        error_code="execution_failed",
-                        error_message=str(exc),
+                if gatekeeper_result is None:
+                    gatekeeper_result = self._run_gatekeeper_for_article(
+                        article=article,
+                        prompt_version=gatekeeper_prompt_version,
+                        usage_totals=usage_totals,
                         job_id=job_id,
+                        reject_confidence_threshold=gatekeeper_reject_confidence_threshold,
                     )
+                    gatekeeper_attempts += 1
 
-                attempts += 1
+                if gatekeeper_result.get("resultStatus") == "completed":
+                    if gatekeeper_result.get("decision") == "pass":
+                        gatekeeper_pass_count += 1
+                    elif gatekeeper_result.get("decision") == "reject":
+                        gatekeeper_reject_count += 1
+                        estimated_category_calls_avoided += len(category_prompt_versions)
+                    elif gatekeeper_result.get("decision") == "manual_review":
+                        gatekeeper_manual_review_count += 1
+                elif gatekeeper_result.get("resultStatus") == "invalid_response":
+                    gatekeeper_invalid_response_count += 1
+                elif gatekeeper_result.get("resultStatus") == "failed":
+                    gatekeeper_failed_count += 1
+
+            should_run_categories = self._should_run_categories(
+                mode=mode,
+                gatekeeper_result=gatekeeper_result,
+            )
+            if not should_run_categories:
+                category_skipped_count += len(category_prompt_versions)
+                continue
+
+            for prompt_version in category_prompt_versions:
+                if should_cancel():
+                    raise RuntimeError("AI approver pipeline cancelled")
+                existing_category_result = self.repository.get_score_result(
+                    article_id=int(article["id"]),
+                    prompt_version_id=int(prompt_version["id"]),
+                )
+                if existing_category_result is not None:
+                    continue
+
+                self._run_category_prompt_for_article(
+                    article=article,
+                    prompt_version=prompt_version,
+                    usage_totals=usage_totals,
+                    job_id=job_id,
+                )
+                category_attempts += 1
 
         return {
-            "promptCount": len(prompt_versions),
+            "mode": mode,
+            "promptCount": len(category_prompt_versions)
+            + (1 if gatekeeper_prompt_version is not None else 0),
             "articleCount": len(articles),
-            "attemptCount": attempts,
+            "attemptCount": gatekeeper_attempts + category_attempts,
             "usage": usage_totals,
+            "gatekeeperPromptVersionId": (
+                int(gatekeeper_prompt_version["id"]) if gatekeeper_prompt_version else None
+            ),
+            "gatekeeperAttemptCount": gatekeeper_attempts,
+            "gatekeeperPassCount": gatekeeper_pass_count,
+            "gatekeeperRejectCount": gatekeeper_reject_count,
+            "gatekeeperManualReviewCount": gatekeeper_manual_review_count,
+            "gatekeeperInvalidResponseCount": gatekeeper_invalid_response_count,
+            "gatekeeperFailedCount": gatekeeper_failed_count,
+            "categoryPromptCount": len(category_prompt_versions),
+            "categoryAttemptCount": category_attempts,
+            "categorySkippedCount": category_skipped_count,
+            "estimatedCategoryCallsAvoided": (
+                estimated_category_calls_avoided if mode == "shadow" else category_skipped_count
+            ),
         }
 
     def run_single_score(
@@ -142,63 +396,21 @@ class AiApproverOrchestrator:
         if article is None:
             raise AiApproverProcessorError(f"Article {article_id} was not found")
 
-        usage_totals = {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        }
-
-        prompt = build_prompt(
-            prompt_version["promptInMarkdown"],
-            article.get("title", ""),
-            article.get("content", ""),
-        )
-
-        try:
-            response = self.client.score_article(prompt)
-            payload = response.get("payload", {})
-            usage = response.get("usage", {})
-            for key in usage_totals:
-                value = usage.get(key)
-                if isinstance(value, int):
-                    usage_totals[key] += value
-
-            score = payload.get("score")
-            reason = payload.get("reason")
-            if isinstance(score, (int, float)) and isinstance(reason, str) and reason.strip():
-                self.repository.insert_score_row(
-                    article_id=article_id,
-                    prompt_version_id=prompt_version_id,
-                    result_status="completed",
-                    score=float(score),
-                    reason=reason.strip(),
-                    error_code=None,
-                    error_message=None,
-                    job_id=job_id,
-                )
-            else:
-                self.repository.insert_score_row(
-                    article_id=article_id,
-                    prompt_version_id=prompt_version_id,
-                    result_status="invalid_response",
-                    score=None,
-                    reason=None,
-                    error_code=str(payload.get("errorCode") or "invalid_response"),
-                    error_message=str(
-                        payload.get("errorMessage")
-                        or f"Unsupported payload: {json.dumps(payload)}"
-                    ),
-                    job_id=job_id,
-                )
-        except Exception as exc:
-            self.repository.insert_score_row(
-                article_id=article_id,
-                prompt_version_id=prompt_version_id,
-                result_status="failed",
-                score=None,
-                reason=None,
-                error_code="execution_failed",
-                error_message=str(exc),
+        usage_totals = self._empty_usage_totals()
+        prompt_role = prompt_version.get("promptRole") or "category_score"
+        if prompt_role == "gatekeeper":
+            self._run_gatekeeper_for_article(
+                article=article,
+                prompt_version=prompt_version,
+                usage_totals=usage_totals,
+                job_id=job_id,
+                reject_confidence_threshold=0.85,
+            )
+        else:
+            self._run_category_prompt_for_article(
+                article=article,
+                prompt_version=prompt_version,
+                usage_totals=usage_totals,
                 job_id=job_id,
             )
 

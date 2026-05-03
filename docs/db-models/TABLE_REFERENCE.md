@@ -190,11 +190,17 @@ Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
 | isHumanApproved     | BOOLEAN | NULL, DEFAULT null                   | Human validation state: approved, rejected, or undetermined  |
 | reasonHumanRejected | TEXT    | NULL                                 | Required by API flow when a human rejects a score            |
 | jobId               | STRING  | NULL                                 | Queue/job identifier for tracing workflow runs               |
+| promptRole          | STRING  | NOT NULL, DEFAULT `category_score`   | Distinguishes gatekeeper attempts from category score rows   |
+| pipelineVersion     | STRING  | NULL                                 | Pipeline version that produced the result                    |
+| decision            | STRING  | NULL                                 | Gatekeeper decision such as `pass`, `reject`, `manual_review`, or `error` |
+| confidence          | FLOAT   | NULL                                 | Gatekeeper confidence when applicable                        |
+| reasonCode          | STRING  | NULL                                 | Machine-readable gatekeeper reason code                      |
+| metadata            | JSONB   | NULL                                 | Structured gatekeeper signals and parser/provider metadata   |
 
 **Indexes**:
 
 - Unique composite index on (`articleId`, `promptVersionId`)
-- Non-unique indexes on `articleId`, `promptVersionId`, and `resultStatus`
+- Non-unique indexes on `articleId`, `promptVersionId`, `resultStatus`, (`articleId`, `promptRole`), (`promptRole`, `decision`), and `pipelineVersion`
 
 **Relationships**:
 
@@ -215,10 +221,15 @@ Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
 | promptInMarkdown | TEXT    | NOT NULL                   | Full prompt body stored in Markdown             |
 | isActive         | BOOLEAN | NOT NULL, DEFAULT false    | Used to mark active prompt versions             |
 | endedAt          | DATE    | NULL                       | Set by the API when a prompt version is ended   |
+| promptRole       | STRING  | NOT NULL, DEFAULT `category_score` | Prompt role such as `category_score`, `gatekeeper`, or `legacy_category_score` |
+| promptKey        | STRING  | NULL                       | Stable machine key for a prompt family          |
+| pipelineVersion  | STRING  | NULL                       | Pipeline version associated with this prompt    |
+| responseSchemaVersion | STRING | NULL                    | Expected output schema, such as `score_reason_v1` or `gatekeeper_json_v1` |
+| modelName        | STRING  | NULL                       | Optional intended model name for audit          |
 
 **Indexes**:
 
-- Non-unique indexes on `isActive` and `name`
+- Non-unique indexes on `isActive`, `name`, `promptRole`, `promptKey`, and `pipelineVersion`
 
 **Relationships**:
 

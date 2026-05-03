@@ -8,12 +8,25 @@ interface AiApproverPromptVersionAttributes {
   promptInMarkdown: string;
   isActive: boolean;
   endedAt: Date | null;
+  promptRole: string;
+  promptKey: string | null;
+  pipelineVersion: string | null;
+  responseSchemaVersion: string | null;
+  modelName: string | null;
 }
 
 interface AiApproverPromptVersionCreationAttributes
   extends Optional<
     AiApproverPromptVersionAttributes,
-    "id" | "description" | "isActive" | "endedAt"
+    | "id"
+    | "description"
+    | "isActive"
+    | "endedAt"
+    | "promptRole"
+    | "promptKey"
+    | "pipelineVersion"
+    | "responseSchemaVersion"
+    | "modelName"
   > {}
 
 export class AiApproverPromptVersion
@@ -29,6 +42,11 @@ export class AiApproverPromptVersion
   public promptInMarkdown!: string;
   public isActive!: boolean;
   public endedAt!: Date | null;
+  public promptRole!: string;
+  public promptKey!: string | null;
+  public pipelineVersion!: string | null;
+  public responseSchemaVersion!: string | null;
+  public modelName!: string | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -63,6 +81,27 @@ export function initAiApproverPromptVersion() {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      promptRole: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "category_score",
+      },
+      promptKey: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      pipelineVersion: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      responseSchemaVersion: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      modelName: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     },
     {
       sequelize,
@@ -75,6 +114,15 @@ export function initAiApproverPromptVersion() {
         },
         {
           fields: ["name"],
+        },
+        {
+          fields: ["promptRole"],
+        },
+        {
+          fields: ["promptKey"],
+        },
+        {
+          fields: ["pipelineVersion"],
         },
       ],
     }

@@ -31,6 +31,24 @@ type AiApproverTopScoreMap = Record<
 		score: number | null;
 		resultStatus: string;
 		promptName: string | null;
+		promptRole?: string | null;
+	}
+>;
+
+type AiApproverGatekeeperMap = Record<
+	string,
+	{
+		id: number;
+		articleId: number;
+		promptVersionId: number;
+		resultStatus: string;
+		decision: string | null;
+		confidence: number | null;
+		reasonCode: string | null;
+		reason?: string | null;
+		errorCode?: string | null;
+		errorMessage?: string | null;
+		promptName?: string | null;
 	}
 >;
 
@@ -263,9 +281,14 @@ export default function ReviewArticles() {
 	};
 
 	const mergeAiApproverTopScores = useCallback(
-		(articles: Article[], topScores: AiApproverTopScoreMap = {}) =>
+		(
+			articles: Article[],
+			topScores: AiApproverTopScoreMap = {},
+			gatekeeperResults: AiApproverGatekeeperMap = {}
+		) =>
 			articles.map((article) => {
 				const scoreRow = topScores[String(article.id)];
+				const gatekeeperRow = gatekeeperResults[String(article.id)];
 				return {
 					...article,
 					aiApproverTopScore: scoreRow?.score ?? null,
@@ -273,6 +296,11 @@ export default function ReviewArticles() {
 					aiApproverTopPromptVersionId: scoreRow?.promptVersionId ?? null,
 					aiApproverTopPromptName: scoreRow?.promptName ?? null,
 					aiApproverTopResultStatus: scoreRow?.resultStatus ?? null,
+					aiApproverGatekeeperDecision: gatekeeperRow?.decision ?? null,
+					aiApproverGatekeeperConfidence: gatekeeperRow?.confidence ?? null,
+					aiApproverGatekeeperReasonCode: gatekeeperRow?.reasonCode ?? null,
+					aiApproverGatekeeperResultStatus: gatekeeperRow?.resultStatus ?? null,
+					aiApproverGatekeeperScoreId: gatekeeperRow?.id ?? null,
 				};
 			}),
 		[]
@@ -302,7 +330,10 @@ export default function ReviewArticles() {
 			}
 
 			const result = await response.json();
-			return (result.topScores || {}) as AiApproverTopScoreMap;
+			return {
+				topScores: (result.topScores || {}) as AiApproverTopScoreMap,
+				gatekeeperResults: (result.gatekeeperResults || {}) as AiApproverGatekeeperMap,
+			};
 		},
 		[token]
 	);
@@ -348,8 +379,15 @@ export default function ReviewArticles() {
 
 			if (result.articlesArray && Array.isArray(result.articlesArray)) {
 				const articleIds = result.articlesArray.map((article: Article) => article.id);
-				const topScores = await fetchAiApproverTopScores(articleIds);
-				setArticlesArray(mergeAiApproverTopScores(result.articlesArray, topScores));
+				const { topScores, gatekeeperResults } =
+					await fetchAiApproverTopScores(articleIds);
+				setArticlesArray(
+					mergeAiApproverTopScores(
+						result.articlesArray,
+						topScores,
+						gatekeeperResults
+					)
+				);
 			} else {
 				setArticlesArray([]);
 			}
@@ -368,7 +406,11 @@ export default function ReviewArticles() {
 			try {
 				const topScores = await fetchAiApproverTopScores([articleId]);
 				setArticlesArray((prevArray) =>
-					mergeAiApproverTopScores(prevArray, topScores)
+					mergeAiApproverTopScores(
+						prevArray,
+						topScores.topScores,
+						topScores.gatekeeperResults
+					)
 				);
 			} catch (error) {
 				console.error("Error refreshing AI approver top score:", error);

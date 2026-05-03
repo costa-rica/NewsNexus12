@@ -69,6 +69,7 @@ function getErrorMessage(errorBody: string): string {
 export function AiApproverSection() {
   const { token, stateArray = [] } = useAppSelector((state) => state.user);
   const [articleCount, setArticleCount] = useState("25");
+  const [mode, setMode] = useState("legacy");
   const [requireStateAssignment, setRequireStateAssignment] = useState(true);
   const [selectedStateValues, setSelectedStateValues] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -94,10 +95,12 @@ export function AiApproverSection() {
       const body: {
         limit: number;
         requireStateAssignment: boolean;
+        mode: string;
         stateIds?: number[];
       } = {
         limit: Number(articleCount),
         requireStateAssignment,
+        mode,
       };
 
       if (selectedStateValues.length > 0) {
@@ -176,6 +179,28 @@ export function AiApproverSection() {
                   onChange={(event) => setArticleCount(event.target.value)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="aiApproverMode"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Mode
+                </label>
+                <select
+                  id="aiApproverMode"
+                  value={mode}
+                  onChange={(event) => setMode(event.target.value)}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="legacy">legacy</option>
+                  <option value="shadow">shadow</option>
+                  <option value="gatekeeper_with_manual_review">
+                    gatekeeper_with_manual_review
+                  </option>
+                  <option value="gatekeeper">gatekeeper</option>
+                </select>
               </div>
 
               <div className="flex items-end">

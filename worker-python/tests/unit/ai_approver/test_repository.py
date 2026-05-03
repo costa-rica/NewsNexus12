@@ -68,7 +68,12 @@ def _create_repo() -> AiApproverRepository:
                 description TEXT,
                 "promptInMarkdown" TEXT,
                 "isActive" BOOLEAN,
-                "endedAt" TIMESTAMPTZ
+                "endedAt" TIMESTAMPTZ,
+                "promptRole" TEXT DEFAULT 'category_score',
+                "promptKey" TEXT,
+                "pipelineVersion" TEXT,
+                "responseSchemaVersion" TEXT,
+                "modelName" TEXT
             )
             """,
             """
@@ -84,6 +89,12 @@ def _create_repo() -> AiApproverRepository:
                 "isHumanApproved" BOOLEAN,
                 "reasonHumanRejected" TEXT,
                 "jobId" TEXT,
+                "promptRole" TEXT DEFAULT 'category_score',
+                "pipelineVersion" TEXT,
+                decision TEXT,
+                confidence DOUBLE PRECISION,
+                "reasonCode" TEXT,
+                metadata JSONB,
                 "createdAt" TIMESTAMPTZ,
                 "updatedAt" TIMESTAMPTZ
             )
@@ -117,8 +128,11 @@ def _create_repo() -> AiApproverRepository:
         [(1, 1, 5, False), (2, 2, 7, False), (3, 3, None, False), (4, 4, 5, False)],
     )
     execute_many(
-        'INSERT INTO "AiApproverPromptVersions"(id, name, description, "promptInMarkdown", "isActive", "endedAt") VALUES (%s, %s, %s, %s, %s, %s)',
-        [(1, "P1", None, "# T1", True, None), (2, "P2", None, "# T2", False, None)],
+        'INSERT INTO "AiApproverPromptVersions"(id, name, description, "promptInMarkdown", "isActive", "endedAt", "promptRole") VALUES (%s, %s, %s, %s, %s, %s, %s)',
+        [
+            (1, "P1", None, "# T1", True, None, "category_score"),
+            (2, "P2", None, "# T2", False, None, "category_score"),
+        ],
     )
     execute_many(
         """

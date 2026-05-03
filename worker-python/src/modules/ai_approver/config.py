@@ -18,6 +18,13 @@ REQUIRED_STARTUP_ENV_KEYS = (
     "OPENAI_API_KEY",
 )
 
+AI_APPROVER_ALLOWED_MODES = (
+    "legacy",
+    "shadow",
+    "gatekeeper",
+    "gatekeeper_with_manual_review",
+)
+
 
 def _parse_positive_int(value: str, key: str) -> int:
     try:
@@ -27,6 +34,26 @@ def _parse_positive_int(value: str, key: str) -> int:
 
     if parsed <= 0:
         raise AiApproverConfigError(f"{key} must be > 0")
+
+    return parsed
+
+
+def parse_ai_approver_mode(value: str | None, *, key: str = "AI_APPROVER_MODE") -> str:
+    mode = (value or "legacy").strip() or "legacy"
+    if mode not in AI_APPROVER_ALLOWED_MODES:
+        allowed = ", ".join(AI_APPROVER_ALLOWED_MODES)
+        raise AiApproverConfigError(f"{key} must be one of: {allowed}")
+    return mode
+
+
+def _parse_confidence_threshold(value: str, key: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise AiApproverConfigError(f"{key} must be a number") from exc
+
+    if parsed < 0 or parsed > 1:
+        raise AiApproverConfigError(f"{key} must be between 0 and 1")
 
     return parsed
 
@@ -41,6 +68,8 @@ class AiApproverConfig:
     openai_api_key: str
     model_name: str
     batch_size: int
+    default_mode: str
+    gatekeeper_reject_confidence_threshold: float
 
     @property
     def dsn(self) -> str:
@@ -83,6 +112,11 @@ class AiApproverConfig:
             batch_size=_parse_positive_int(
                 os.getenv("AI_APPROVER_BATCH_SIZE", "10"),
                 "AI_APPROVER_BATCH_SIZE",
+            ),
+            default_mode=parse_ai_approver_mode(os.getenv("AI_APPROVER_MODE")),
+            gatekeeper_reject_confidence_threshold=_parse_confidence_threshold(
+                os.getenv("AI_APPROVER_GATEKEEPER_REJECT_CONFIDENCE_THRESHOLD", "0.85"),
+                "AI_APPROVER_GATEKEEPER_REJECT_CONFIDENCE_THRESHOLD",
             ),
         )
 

@@ -36,7 +36,13 @@ type SourcePromptState = {
 
 type PageSizeOption = 5 | 10 | 20;
 
-type SortColumn = "id" | "name" | "description" | "isActive" | "endedAt";
+type SortColumn =
+	| "id"
+	| "name"
+	| "description"
+	| "promptRole"
+	| "isActive"
+	| "endedAt";
 
 type SortDirection = "asc" | "desc";
 
@@ -62,6 +68,11 @@ export default function AiApproverPromptsPage() {
 		description: "",
 		promptInMarkdown: "",
 		isActive: false,
+		promptRole: "category_score",
+		promptKey: "",
+		pipelineVersion: "",
+		responseSchemaVersion: "",
+		modelName: "",
 	});
 	const [feedbackModal, setFeedbackModal] = useState<FeedbackModalState>(
 		DEFAULT_FEEDBACK_MODAL_STATE
@@ -83,6 +94,11 @@ export default function AiApproverPromptsPage() {
 			description: "",
 			promptInMarkdown: "",
 			isActive: false,
+			promptRole: "category_score",
+			promptKey: "",
+			pipelineVersion: "",
+			responseSchemaVersion: "",
+			modelName: "",
 		});
 		setSourcePrompt(null);
 	}, []);
@@ -150,6 +166,10 @@ export default function AiApproverPromptsPage() {
 					return left.name.localeCompare(right.name) * sortMultiplier;
 				case "description":
 					return (left.description || "").localeCompare(right.description || "") * sortMultiplier;
+				case "promptRole":
+					return (left.promptRole || "category_score").localeCompare(
+						right.promptRole || "category_score"
+					) * sortMultiplier;
 				case "isActive":
 					return (
 						(Number(left.isActive) - Number(right.isActive)) * sortMultiplier
@@ -261,7 +281,12 @@ export default function AiApproverPromptsPage() {
 			name: prompt.name,
 			description: prompt.description || "",
 			promptInMarkdown: prompt.promptInMarkdown,
-			isActive: prompt.isActive,
+			isActive: false,
+			promptRole: prompt.promptRole || "category_score",
+			promptKey: prompt.promptKey || "",
+			pipelineVersion: prompt.pipelineVersion || "",
+			responseSchemaVersion: prompt.responseSchemaVersion || "",
+			modelName: prompt.modelName || "",
 		});
 	};
 
@@ -275,6 +300,24 @@ export default function AiApproverPromptsPage() {
 
 		try {
 			setIsSubmitting(true);
+			const confirmActivateGatekeeper =
+				!currentIsActive &&
+				prompts.find((prompt) => prompt.id === promptVersionId)?.promptRole ===
+					"gatekeeper"
+					? window.confirm(
+							"Activate this gatekeeper prompt? Worker modes other than legacy can use it to route downstream AI approver calls."
+					  )
+					: false;
+			if (
+				!currentIsActive &&
+				prompts.find((prompt) => prompt.id === promptVersionId)?.promptRole ===
+					"gatekeeper" &&
+				!confirmActivateGatekeeper
+			) {
+				setIsSubmitting(false);
+				return;
+			}
+
 			const response = await fetch(
 				`${process.env.NEXT_PUBLIC_API_BASE_URL}/analysis/ai-approver/prompts/${promptVersionId}/active`,
 				{
@@ -285,6 +328,7 @@ export default function AiApproverPromptsPage() {
 					},
 					body: JSON.stringify({
 						isActive: !currentIsActive,
+						confirmActivateGatekeeper,
 					}),
 				}
 			);
@@ -426,6 +470,99 @@ export default function AiApproverPromptsPage() {
 						</div>
 					</div>
 
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Prompt Role
+							</label>
+							<select
+								value={createForm.promptRole}
+								onChange={(event) =>
+									setCreateForm((current) => ({
+										...current,
+										promptRole: event.target.value,
+										isActive:
+											event.target.value === "gatekeeper" ? false : current.isActive,
+									}))
+								}
+								className="h-11 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+							>
+								<option value="category_score">category_score</option>
+								<option value="gatekeeper">gatekeeper</option>
+								<option value="legacy_category_score">legacy_category_score</option>
+							</select>
+						</div>
+
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Prompt Key
+							</label>
+							<Input
+								type="text"
+								value={createForm.promptKey}
+								onChange={(event) =>
+									setCreateForm((current) => ({
+										...current,
+										promptKey: event.target.value,
+									}))
+								}
+								placeholder="consumer_product_gatekeeper_v1"
+							/>
+						</div>
+
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Pipeline Version
+							</label>
+							<Input
+								type="text"
+								value={createForm.pipelineVersion}
+								onChange={(event) =>
+									setCreateForm((current) => ({
+										...current,
+										pipelineVersion: event.target.value,
+									}))
+								}
+								placeholder="ai_approver_gatekeeper_v1"
+							/>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Response Schema Version
+							</label>
+							<Input
+								type="text"
+								value={createForm.responseSchemaVersion}
+								onChange={(event) =>
+									setCreateForm((current) => ({
+										...current,
+										responseSchemaVersion: event.target.value,
+									}))
+								}
+								placeholder="score_reason_v1"
+							/>
+						</div>
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Model Name
+							</label>
+							<Input
+								type="text"
+								value={createForm.modelName}
+								onChange={(event) =>
+									setCreateForm((current) => ({
+										...current,
+										modelName: event.target.value,
+									}))
+								}
+								placeholder="Optional model override/audit name"
+							/>
+						</div>
+					</div>
+
 					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div>
 							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -488,9 +625,13 @@ export default function AiApproverPromptsPage() {
 								onChange={(event) =>
 									setCreateForm((current) => ({
 										...current,
-										isActive: event.target.checked,
+										isActive:
+											current.promptRole === "gatekeeper"
+												? false
+												: event.target.checked,
 									}))
 								}
+								disabled={createForm.promptRole === "gatekeeper"}
 								className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
 							/>
 							Set active immediately
@@ -639,6 +780,15 @@ export default function AiApproverPromptsPage() {
 									<th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700 dark:text-gray-300">
 										<button
 											type="button"
+											onClick={() => handleSort("promptRole")}
+											className="flex items-center gap-1 hover:text-brand-500"
+										>
+											Role{getSortIndicator("promptRole")}
+										</button>
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700 dark:text-gray-300">
+										<button
+											type="button"
 											onClick={() => handleSort("isActive")}
 											className="flex items-center gap-1 hover:text-brand-500"
 										>
@@ -683,6 +833,9 @@ export default function AiApproverPromptsPage() {
 										</td>
 										<td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
 											{prompt.description || "N/A"}
+										</td>
+										<td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
+											{prompt.promptRole || "category_score"}
 										</td>
 										<td className="px-4 py-4 text-sm">
 											<span

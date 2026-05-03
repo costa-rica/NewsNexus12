@@ -6,7 +6,9 @@
       "expected_status": 202,
       "required_json_keys": ["jobId", "status", "endpointName"],
       "request_json": {
-        "limit": 3
+        "limit": 3,
+        "mode": "legacy",
+        "gatekeeperRejectConfidenceThreshold": 0.85
       }
     },
     {

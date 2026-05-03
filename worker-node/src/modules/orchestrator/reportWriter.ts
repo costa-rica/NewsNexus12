@@ -11,6 +11,9 @@ interface ArticleReportRow {
   scrapeStatus: string | null;
   aiAssignedState: string | null;
   aiApproverScore: number | null;
+  aiGatekeeperDecision: string | null;
+  aiGatekeeperConfidence: number | null;
+  aiGatekeeperReasonCode: string | null;
   semanticRating: number | null;
 }
 
@@ -39,6 +42,9 @@ const getArticleRows = async (
       ac.status AS "scrapeStatus",
       s.name AS "aiAssignedState",
       aas.score AS "aiApproverScore",
+      gk.decision AS "aiGatekeeperDecision",
+      gk.confidence AS "aiGatekeeperConfidence",
+      gk."reasonCode" AS "aiGatekeeperReasonCode",
       (
         SELECT MAX(aecc."keywordRating")
         FROM "ArticleEntityWhoCategorizedArticleContracts" AS aecc
@@ -55,8 +61,25 @@ const getArticleRows = async (
       ORDER BY asc2.id DESC LIMIT 1
     ) s ON true
     LEFT JOIN LATERAL (
-      SELECT score FROM "AiApproverArticleScores" WHERE "articleId" = a.id ORDER BY id DESC LIMIT 1
+      SELECT aas.score
+      FROM "AiApproverArticleScores" aas
+      LEFT JOIN "AiApproverPromptVersions" apv ON apv.id = aas."promptVersionId"
+      WHERE aas."articleId" = a.id
+        AND COALESCE(aas."promptRole", apv."promptRole", 'category_score') IN ('category_score', 'legacy_category_score')
+        AND aas."resultStatus" = 'completed'
+        AND aas.score IS NOT NULL
+      ORDER BY aas.score DESC, aas.id ASC
+      LIMIT 1
     ) aas ON true
+    LEFT JOIN LATERAL (
+      SELECT aas.decision, aas.confidence, aas."reasonCode"
+      FROM "AiApproverArticleScores" aas
+      LEFT JOIN "AiApproverPromptVersions" apv ON apv.id = aas."promptVersionId"
+      WHERE aas."articleId" = a.id
+        AND COALESCE(aas."promptRole", apv."promptRole", 'category_score') = 'gatekeeper'
+      ORDER BY aas.id DESC
+      LIMIT 1
+    ) gk ON true
     WHERE a.id > :minExclusive AND a.id <= :maxInclusive
     ORDER BY a.id ASC
     `,
@@ -128,6 +151,9 @@ export const writeReport = async (
         { header: 'Scrape Status', key: 'scrapeStatus', width: 18 },
         { header: 'AI Assigned State', key: 'aiAssignedState', width: 22 },
         { header: 'AI Approver Score', key: 'aiApproverScore', width: 18 },
+        { header: 'AI Gatekeeper Decision', key: 'aiGatekeeperDecision', width: 24 },
+        { header: 'AI Gatekeeper Confidence', key: 'aiGatekeeperConfidence', width: 24 },
+        { header: 'AI Gatekeeper Reason Code', key: 'aiGatekeeperReasonCode', width: 28 },
         { header: 'Semantic Rating', key: 'semanticRating', width: 16 },
       ];
 

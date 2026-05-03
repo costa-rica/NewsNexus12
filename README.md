@@ -5,6 +5,15 @@ This project is the monorepo of applicaitons that are part of the News Nexus eco
 - This News Nexus 12 project is built off the News Nexus 11 project with changing database infrastructure from SQLite to PostGres.
 
 
+## Root npm Workspace Workflow
+
+```bash
+npm install
+npm run build
+```
+
+Root-level npm commands apply to all Node apps in the workspace list: db-models, db-manager, api, worker-node, and portal. worker-python is not included in the npm workspace flow.
+
 
 ## Directory Structure
 

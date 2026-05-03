@@ -24,7 +24,13 @@ type FeedbackState = {
 	variant: "error" | "success";
 } | null;
 
-type SortColumn = "id" | "name" | "description" | "isActive" | "endedAt";
+type SortColumn =
+	| "id"
+	| "name"
+	| "description"
+	| "promptRole"
+	| "isActive"
+	| "endedAt";
 type SortDirection = "asc" | "desc";
 
 const DEFAULT_SORT: {
@@ -57,6 +63,11 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 	const [selectedPromptSource, setSelectedPromptSource] = useState<{
 		id: number;
 		name: string;
+		promptRole: string;
+		promptKey: string | null;
+		pipelineVersion: string | null;
+		responseSchemaVersion: string | null;
+		modelName: string | null;
 	} | null>(null);
 	const [formName, setFormName] = useState("");
 	const [promptInMarkdown, setPromptInMarkdown] = useState("");
@@ -158,6 +169,10 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 					return left.name.localeCompare(right.name) * sortMultiplier;
 				case "description":
 					return (left.description || "").localeCompare(right.description || "") * sortMultiplier;
+				case "promptRole":
+					return (left.promptRole || "category_score").localeCompare(
+						right.promptRole || "category_score"
+					) * sortMultiplier;
 				case "isActive":
 					return (Number(left.isActive) - Number(right.isActive)) * sortMultiplier;
 				case "endedAt": {
@@ -204,6 +219,11 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 		setSelectedPromptSource({
 			id: prompt.id,
 			name: prompt.name,
+			promptRole: prompt.promptRole || "category_score",
+			promptKey: prompt.promptKey,
+			pipelineVersion: prompt.pipelineVersion,
+			responseSchemaVersion: prompt.responseSchemaVersion,
+			modelName: prompt.modelName,
 		});
 		setFormName(`${prompt.name}-articleId: ${articleId}`);
 		setPromptInMarkdown(prompt.promptInMarkdown);
@@ -243,6 +263,12 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 						name: formName,
 						promptInMarkdown,
 						sourcePromptVersionId: selectedPromptSource?.id ?? null,
+						promptRole: selectedPromptSource?.promptRole ?? "category_score",
+						promptKey: selectedPromptSource?.promptKey ?? null,
+						pipelineVersion: selectedPromptSource?.pipelineVersion ?? null,
+						responseSchemaVersion:
+							selectedPromptSource?.responseSchemaVersion ?? null,
+						modelName: selectedPromptSource?.modelName ?? null,
 					}),
 				}
 			);
@@ -582,6 +608,7 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 																["id", "ID"],
 																["name", "Name"],
 																["description", "Description"],
+																["promptRole", "Role"],
 																["isActive", "Active"],
 																["endedAt", "Ended At"],
 															].map(([column, label]) => (
@@ -622,6 +649,9 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 																</td>
 																<td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
 																	{prompt.description || "N/A"}
+																</td>
+																<td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+																	{prompt.promptRole || "category_score"}
 																</td>
 																<td className="px-4 py-3 text-sm">
 																	<span

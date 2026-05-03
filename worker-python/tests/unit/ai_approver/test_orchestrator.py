@@ -82,6 +82,8 @@ def test_run_single_score_inserts_completed_row() -> None:
             "error_code": None,
             "error_message": None,
             "job_id": "job-1",
+            "prompt_role": "category_score",
+            "pipeline_version": None,
         }
     ]
 
@@ -125,6 +127,8 @@ def test_run_single_score_inserts_invalid_response_row() -> None:
             "error_code": "bad_payload",
             "error_message": "Missing score",
             "job_id": "job-2",
+            "prompt_role": "category_score",
+            "pipeline_version": None,
         }
     ]
 
@@ -159,5 +163,70 @@ def test_run_single_score_inserts_failed_row_on_client_error() -> None:
             "error_code": "execution_failed",
             "error_message": "OpenAI failure",
             "job_id": "job-3",
+            "prompt_role": "category_score",
+            "pipeline_version": None,
+        }
+    ]
+
+
+def test_run_single_score_inserts_gatekeeper_result() -> None:
+    repository = FakeRepository(
+        article={
+            "title": "Article title",
+            "content": "Article content",
+            "contentSource": "article-contents-02",
+        },
+        prompt_version={
+            "promptInMarkdown": "Content: {articleContent}",
+            "promptRole": "gatekeeper",
+            "pipelineVersion": "ai_approver_gatekeeper_v1",
+        },
+    )
+    client = FakeClient(
+        response={
+            "payload": {
+                "decision": "reject",
+                "confidence": 0.95,
+                "reasonCode": "advertisement",
+                "reason": "Article is a shopping guide with no safety incident.",
+                "signals": {"likelyAdvertisement": True},
+            },
+            "usage": {
+                "prompt_tokens": 8,
+                "completion_tokens": 6,
+                "total_tokens": 14,
+            },
+        }
+    )
+
+    orchestrator = AiApproverOrchestrator(repository, client)
+    summary = orchestrator.run_single_score(
+        article_id=100,
+        prompt_version_id=13,
+        job_id="job-4",
+        should_cancel=lambda: False,
+    )
+
+    assert summary["usage"]["total_tokens"] == 14
+    assert repository.insert_calls == [
+        {
+            "article_id": 100,
+            "prompt_version_id": 13,
+            "result_status": "completed",
+            "score": None,
+            "reason": "Article is a shopping guide with no safety incident.",
+            "error_code": None,
+            "error_message": None,
+            "job_id": "job-4",
+            "prompt_role": "gatekeeper",
+            "pipeline_version": "ai_approver_gatekeeper_v1",
+            "decision": "reject",
+            "confidence": 0.95,
+            "reason_code": "advertisement",
+            "metadata": {
+                "rawDecision": "reject",
+                "rejectConfidenceThreshold": 0.85,
+                "signals": {"likelyAdvertisement": True},
+            },
         }
     ]

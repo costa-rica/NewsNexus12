@@ -32,6 +32,11 @@ export interface Article {
 	aiApproverTopPromptVersionId?: number | null;
 	aiApproverTopPromptName?: string | null;
 	aiApproverTopResultStatus?: string | null;
+	aiApproverGatekeeperDecision?: string | null;
+	aiApproverGatekeeperConfidence?: number | null;
+	aiApproverGatekeeperReasonCode?: string | null;
+	aiApproverGatekeeperResultStatus?: string | null;
+	aiApproverGatekeeperScoreId?: number | null;
 	hasArticleContent?: boolean;
 	stateAssignment?: StateAssignment | null;
 }
@@ -61,6 +66,11 @@ export interface AiApproverPromptVersion {
 	promptInMarkdown: string;
 	isActive: boolean;
 	endedAt: string | null;
+	promptRole: "category_score" | "legacy_category_score" | "gatekeeper" | string;
+	promptKey: string | null;
+	pipelineVersion: string | null;
+	responseSchemaVersion: string | null;
+	modelName: string | null;
 }
 
 export interface AiApproverScoreRow {
@@ -74,6 +84,12 @@ export interface AiApproverScoreRow {
 	errorMessage: string | null;
 	isHumanApproved: boolean | null;
 	reasonHumanRejected: string | null;
+	promptRole: "category_score" | "legacy_category_score" | "gatekeeper" | string;
+	pipelineVersion: string | null;
+	decision: "pass" | "reject" | "manual_review" | "error" | string | null;
+	confidence: number | null;
+	reasonCode: string | null;
+	metadata: Record<string, unknown> | null;
 	createdAt: string;
 	updatedAt: string;
 	promptVersion: AiApproverPromptVersion | null;
@@ -83,6 +99,10 @@ export interface AiApproverArticleDetailsResponse {
 	result: boolean;
 	articleId: number;
 	topEligibleScoreId: number | null;
+	latestGatekeeperResultId: number | null;
+	gatekeeperResults: AiApproverScoreRow[];
+	categoryScores: AiApproverScoreRow[];
+	legacyCategoryScores: AiApproverScoreRow[];
 	scores: AiApproverScoreRow[];
 }
 

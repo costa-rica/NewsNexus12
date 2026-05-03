@@ -6,6 +6,7 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from src.modules.ai_approver.config import AiApproverConfig
@@ -47,23 +48,73 @@ class AiApproverRepository:
         except psycopg.Error:
             return False
 
-    def get_active_prompt_versions(self) -> list[dict[str, Any]]:
+    def get_active_prompt_versions_by_role(self, prompt_role: str) -> list[dict[str, Any]]:
         conn = self.get_connection()
         rows = conn.execute(
             """
-            SELECT id, name, description, "promptInMarkdown"
+            SELECT
+                id,
+                name,
+                description,
+                "promptInMarkdown",
+                COALESCE("promptRole", 'category_score') AS "promptRole",
+                "promptKey",
+                "pipelineVersion",
+                "responseSchemaVersion",
+                "modelName"
             FROM "AiApproverPromptVersions"
             WHERE "isActive" = TRUE
+              AND COALESCE("promptRole", 'category_score') = %s
+            ORDER BY id ASC
+            """,
+            (prompt_role,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_active_prompt_versions(self) -> list[dict[str, Any]]:
+        return self.get_active_category_prompt_versions()
+
+    def get_active_category_prompt_versions(self) -> list[dict[str, Any]]:
+        conn = self.get_connection()
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                name,
+                description,
+                "promptInMarkdown",
+                COALESCE("promptRole", 'category_score') AS "promptRole",
+                "promptKey",
+                "pipelineVersion",
+                "responseSchemaVersion",
+                "modelName"
+            FROM "AiApproverPromptVersions"
+            WHERE "isActive" = TRUE
+              AND COALESCE("promptRole", 'category_score') IN ('category_score', 'legacy_category_score')
             ORDER BY id ASC
             """
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_active_gatekeeper_prompt_version(self) -> dict[str, Any] | None:
+        prompts = self.get_active_prompt_versions_by_role("gatekeeper")
+        return prompts[0] if prompts else None
+
     def get_prompt_version_by_id(self, prompt_version_id: int) -> dict[str, Any] | None:
         conn = self.get_connection()
         row = conn.execute(
             """
-            SELECT id, name, description, "promptInMarkdown", "isActive"
+            SELECT
+                id,
+                name,
+                description,
+                "promptInMarkdown",
+                "isActive",
+                COALESCE("promptRole", 'category_score') AS "promptRole",
+                "promptKey",
+                "pipelineVersion",
+                "responseSchemaVersion",
+                "modelName"
             FROM "AiApproverPromptVersions"
             WHERE id = %s
             LIMIT 1
@@ -79,13 +130,23 @@ class AiApproverRepository:
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        mode: str = "legacy",
+        gatekeeper_prompt_version_id: int | None = None,
+        category_prompt_version_ids: list[int] | None = None,
         article_id_min_exclusive: int | None = None,
         article_id_max_inclusive: int | None = None,
     ) -> list[dict[str, Any]]:
         conn = self.get_connection()
+        category_ids = (
+            category_prompt_version_ids
+            if category_prompt_version_ids is not None
+            else [
+                int(prompt["id"])
+                for prompt in self.get_active_category_prompt_versions()
+            ]
+        )
 
         filters = [
-            'NOT EXISTS (SELECT 1 FROM "AiApproverArticleScores" aas WHERE aas."articleId" = a.id)',
             """
             NOT EXISTS (
                 SELECT 1
@@ -103,6 +164,96 @@ class AiApproverRepository:
             """,
         ]
         params: list[Any] = []
+
+        if mode == "legacy":
+            if not category_ids:
+                return []
+            filters.append(
+                """
+                (
+                    SELECT COUNT(DISTINCT aas."promptVersionId")
+                    FROM "AiApproverArticleScores" aas
+                    WHERE aas."articleId" = a.id
+                      AND aas."promptVersionId" = ANY(%s)
+                ) < %s
+                """
+            )
+            params.extend([category_ids, len(category_ids)])
+        elif mode == "shadow":
+            if gatekeeper_prompt_version_id is None:
+                return []
+            filters.append(
+                """
+                (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM "AiApproverArticleScores" aas
+                        WHERE aas."articleId" = a.id
+                          AND aas."promptVersionId" = %s
+                    )
+                    OR (
+                        %s > 0
+                        AND (
+                            SELECT COUNT(DISTINCT aas."promptVersionId")
+                            FROM "AiApproverArticleScores" aas
+                            WHERE aas."articleId" = a.id
+                              AND aas."promptVersionId" = ANY(%s)
+                        ) < %s
+                    )
+                )
+                """
+            )
+            params.extend(
+                [
+                    gatekeeper_prompt_version_id,
+                    len(category_ids),
+                    category_ids,
+                    len(category_ids),
+                ]
+            )
+        elif mode in ("gatekeeper", "gatekeeper_with_manual_review"):
+            if gatekeeper_prompt_version_id is None:
+                return []
+            filters.append(
+                """
+                (
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM "AiApproverArticleScores" aas
+                        WHERE aas."articleId" = a.id
+                          AND aas."promptVersionId" = %s
+                    )
+                    OR (
+                        %s > 0
+                        AND EXISTS (
+                            SELECT 1
+                            FROM "AiApproverArticleScores" aas
+                            WHERE aas."articleId" = a.id
+                              AND aas."promptVersionId" = %s
+                              AND aas."resultStatus" = 'completed'
+                              AND aas.decision = 'pass'
+                        )
+                        AND (
+                            SELECT COUNT(DISTINCT aas."promptVersionId")
+                            FROM "AiApproverArticleScores" aas
+                            WHERE aas."articleId" = a.id
+                              AND aas."promptVersionId" = ANY(%s)
+                        ) < %s
+                    )
+                )
+                """
+            )
+            params.extend(
+                [
+                    gatekeeper_prompt_version_id,
+                    len(category_ids),
+                    gatekeeper_prompt_version_id,
+                    category_ids,
+                    len(category_ids),
+                ]
+            )
+        else:
+            raise AiApproverProcessorError(f"Unsupported AI approver mode: {mode}")
 
         if require_state_assignment:
             filters.append(
@@ -173,6 +324,39 @@ class AiApproverRepository:
 
         return [dict(row) for row in rows]
 
+    def get_score_result(
+        self,
+        *,
+        article_id: int,
+        prompt_version_id: int,
+    ) -> dict[str, Any] | None:
+        conn = self.get_connection()
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                "articleId",
+                "promptVersionId",
+                "resultStatus",
+                score,
+                reason,
+                "errorCode",
+                "errorMessage",
+                COALESCE("promptRole", 'category_score') AS "promptRole",
+                "pipelineVersion",
+                decision,
+                confidence,
+                "reasonCode",
+                metadata
+            FROM "AiApproverArticleScores"
+            WHERE "articleId" = %s
+              AND "promptVersionId" = %s
+            LIMIT 1
+            """,
+            (article_id, prompt_version_id),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
     def get_article_for_prompt_run(self, article_id: int) -> dict[str, Any] | None:
         conn = self.get_connection()
         row = conn.execute(
@@ -223,6 +407,12 @@ class AiApproverRepository:
         error_code: str | None,
         error_message: str | None,
         job_id: str | None,
+        prompt_role: str = "category_score",
+        pipeline_version: str | None = None,
+        decision: str | None = None,
+        confidence: float | None = None,
+        reason_code: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         conn = self.get_connection()
         try:
@@ -239,10 +429,16 @@ class AiApproverRepository:
                     "isHumanApproved",
                     "reasonHumanRejected",
                     "jobId",
+                    "promptRole",
+                    "pipelineVersion",
+                    decision,
+                    confidence,
+                    "reasonCode",
+                    metadata,
                     "createdAt",
                     "updatedAt"
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 (
                     article_id,
@@ -253,6 +449,12 @@ class AiApproverRepository:
                     error_code,
                     error_message,
                     job_id,
+                    prompt_role,
+                    pipeline_version,
+                    decision,
+                    confidence,
+                    reason_code,
+                    Jsonb(metadata) if metadata is not None else None,
                 ),
             )
             conn.commit()

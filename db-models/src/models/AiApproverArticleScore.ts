@@ -13,6 +13,12 @@ interface AiApproverArticleScoreAttributes {
   isHumanApproved: boolean | null;
   reasonHumanRejected: string | null;
   jobId: string | null;
+  promptRole: string;
+  pipelineVersion: string | null;
+  decision: string | null;
+  confidence: number | null;
+  reasonCode: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 interface AiApproverArticleScoreCreationAttributes
@@ -26,6 +32,12 @@ interface AiApproverArticleScoreCreationAttributes
     | "isHumanApproved"
     | "reasonHumanRejected"
     | "jobId"
+    | "promptRole"
+    | "pipelineVersion"
+    | "decision"
+    | "confidence"
+    | "reasonCode"
+    | "metadata"
   > {}
 
 export class AiApproverArticleScore
@@ -46,6 +58,12 @@ export class AiApproverArticleScore
   public isHumanApproved!: boolean | null;
   public reasonHumanRejected!: string | null;
   public jobId!: string | null;
+  public promptRole!: string;
+  public pipelineVersion!: string | null;
+  public decision!: string | null;
+  public confidence!: number | null;
+  public reasonCode!: string | null;
+  public metadata!: Record<string, unknown> | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -100,6 +118,31 @@ export function initAiApproverArticleScore() {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      promptRole: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "category_score",
+      },
+      pipelineVersion: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      decision: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      confidence: {
+        type: DataTypes.FLOAT,
+        allowNull: true,
+      },
+      reasonCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
     },
     {
       sequelize,
@@ -119,6 +162,15 @@ export function initAiApproverArticleScore() {
         },
         {
           fields: ["resultStatus"],
+        },
+        {
+          fields: ["articleId", "promptRole"],
+        },
+        {
+          fields: ["promptRole", "decision"],
+        },
+        {
+          fields: ["pipelineVersion"],
         },
       ],
     }

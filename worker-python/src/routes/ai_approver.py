@@ -3,10 +3,13 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.modules.ai_approver.client import AiApproverOpenAIClient
-from src.modules.ai_approver.config import AiApproverConfig
+from src.modules.ai_approver.config import (
+    AiApproverConfig,
+    parse_ai_approver_mode,
+)
 from src.modules.ai_approver.errors import AiApproverConfigError
 from src.modules.ai_approver.orchestrator import AiApproverOrchestrator
 from src.modules.ai_approver.repository import AiApproverRepository
@@ -35,6 +38,15 @@ class AiApproverStartRequest(BaseModel):
     stateIds: list[int] | None = None
     articleIdMinExclusive: int | None = Field(default=None, gt=0)
     articleIdMaxInclusive: int | None = Field(default=None, gt=0)
+    mode: str | None = None
+    gatekeeperRejectConfidenceThreshold: float | None = Field(default=None, ge=0, le=1)
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return parse_ai_approver_mode(value, key="mode")
 
 
 class AiApproverReviewPageStartRequest(BaseModel):
@@ -92,15 +104,23 @@ def create_ai_approver_runner(
     limit: int,
     require_state_assignment: bool,
     state_ids: list[int] | None,
+    mode: str | None = None,
+    gatekeeper_reject_confidence_threshold: float | None = None,
     article_id_min_exclusive: int | None = None,
     article_id_max_inclusive: int | None = None,
 ):
     def _run(context: QueueExecutionContext) -> None:
-        _append_job_log(context.jobId, "job_started", limit=limit)
+        _append_job_log(context.jobId, "job_started", limit=limit, mode=mode or "env")
         repository: AiApproverRepository | None = None
 
         try:
             config = AiApproverConfig.from_env()
+            resolved_mode = mode or config.default_mode
+            reject_threshold = (
+                gatekeeper_reject_confidence_threshold
+                if gatekeeper_reject_confidence_threshold is not None
+                else config.gatekeeper_reject_confidence_threshold
+            )
             repository = AiApproverRepository(config)
             client = AiApproverOpenAIClient(config)
             orchestrator = AiApproverOrchestrator(repository, client)
@@ -112,6 +132,8 @@ def create_ai_approver_runner(
                 article_id_max_inclusive=article_id_max_inclusive,
                 job_id=context.jobId,
                 should_cancel=context.is_cancel_requested,
+                mode=resolved_mode,
+                gatekeeper_reject_confidence_threshold=reject_threshold,
             )
         except AiApproverConfigError as exc:
             _update_job_result_fields(
@@ -158,6 +180,18 @@ def create_ai_approver_runner(
                 "promptCount": int(summary["promptCount"]),
                 "articleCount": int(summary["articleCount"]),
                 "attemptCount": int(summary["attemptCount"]),
+                "mode": str(summary["mode"]),
+                "gatekeeperPromptVersionId": summary["gatekeeperPromptVersionId"],
+                "gatekeeperAttemptCount": int(summary["gatekeeperAttemptCount"]),
+                "gatekeeperPassCount": int(summary["gatekeeperPassCount"]),
+                "gatekeeperRejectCount": int(summary["gatekeeperRejectCount"]),
+                "gatekeeperManualReviewCount": int(summary["gatekeeperManualReviewCount"]),
+                "gatekeeperInvalidResponseCount": int(summary["gatekeeperInvalidResponseCount"]),
+                "gatekeeperFailedCount": int(summary["gatekeeperFailedCount"]),
+                "categoryPromptCount": int(summary["categoryPromptCount"]),
+                "categoryAttemptCount": int(summary["categoryAttemptCount"]),
+                "categorySkippedCount": int(summary["categorySkippedCount"]),
+                "estimatedCategoryCallsAvoided": int(summary["estimatedCategoryCallsAvoided"]),
                 "usagePromptTokens": int(summary["usage"]["prompt_tokens"]),
                 "usageCompletionTokens": int(summary["usage"]["completion_tokens"]),
                 "usageTotalTokens": int(summary["usage"]["total_tokens"]),
@@ -276,6 +310,12 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
     }
     if body.stateIds is not None:
         parameters["stateIds"] = body.stateIds
+    if body.mode is not None:
+        parameters["mode"] = body.mode
+    if body.gatekeeperRejectConfidenceThreshold is not None:
+        parameters["gatekeeperRejectConfidenceThreshold"] = (
+            body.gatekeeperRejectConfidenceThreshold
+        )
 
     if body.articleIdMinExclusive is not None:
         parameters["articleIdMinExclusive"] = body.articleIdMinExclusive
@@ -289,6 +329,8 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
                 body.limit,
                 body.requireStateAssignment,
                 body.stateIds,
+                body.mode,
+                body.gatekeeperRejectConfidenceThreshold,
                 body.articleIdMinExclusive,
                 body.articleIdMaxInclusive,
             ),

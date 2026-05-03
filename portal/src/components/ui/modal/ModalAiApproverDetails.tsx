@@ -44,6 +44,30 @@ function scoreCircleStyle(score: number) {
   };
 }
 
+function getPromptRole(score: AiApproverScoreRow): string {
+  return score.promptRole || score.promptVersion?.promptRole || "category_score";
+}
+
+function MetadataSignals({ metadata }: { metadata: Record<string, unknown> | null }) {
+  const signals = metadata?.signals;
+  if (!signals || typeof signals !== "object" || Array.isArray(signals)) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+      {Object.entries(signals as Record<string, unknown>).map(([key, value]) => (
+        <div
+          key={key}
+          className="rounded-lg bg-gray-50 px-3 py-2 text-gray-600 dark:bg-gray-800/60 dark:text-gray-300"
+        >
+          <span className="font-medium">{key}:</span> {String(value)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
   articleId,
   onClose,
@@ -104,6 +128,39 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
     return (
       details.scores.find((score) => score.id === details.topEligibleScoreId) ?? null
     );
+  }, [details]);
+
+  const groupedScores = useMemo(() => {
+    const gatekeeperResults = (
+      details?.gatekeeperResults ??
+      details?.scores.filter((score) => getPromptRole(score) === "gatekeeper") ??
+      []
+    ).filter(
+      (score) =>
+        score.resultStatus !== "failed" &&
+        score.resultStatus !== "invalid_response",
+    );
+    const categoryScores = (
+      details?.categoryScores ??
+      details?.scores.filter((score) => getPromptRole(score) !== "gatekeeper") ??
+      []
+    ).filter(
+        (score) =>
+          score.resultStatus !== "failed" &&
+          score.resultStatus !== "invalid_response",
+      );
+    const failedAttempts =
+      details?.scores.filter(
+        (score) =>
+          score.resultStatus === "failed" || score.resultStatus === "invalid_response",
+      ) ?? [];
+
+    return {
+      gatekeeperResults,
+      categoryScores,
+      legacyCategoryScores: details?.legacyCategoryScores ?? [],
+      failedAttempts,
+    };
   }, [details]);
 
   useEffect(() => {
@@ -212,85 +269,122 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {details.scores.length === 0 ? (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300">
                 No AI approver scores found for this article.
               </div>
             ) : (
-              details.scores.map((score: AiApproverScoreRow) => {
-                const isExpanded = expandedPromptIds.includes(score.id);
-                const isTopEligible = score.id === details.topEligibleScoreId;
+              [
+                ["Gatekeeper Results", groupedScores.gatekeeperResults],
+                ["Category Scores", groupedScores.categoryScores],
+                ["Legacy Category Scores", groupedScores.legacyCategoryScores],
+                ["Failed/Invalid Attempts", groupedScores.failedAttempts],
+              ].map(([title, rows]) => {
+                const scoreRows = rows as AiApproverScoreRow[];
+                if (scoreRows.length === 0) return null;
 
                 return (
-                  <div
-                    key={score.id}
-                    className={`rounded-xl border p-4 ${
-                      isTopEligible
-                        ? "border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/10"
-                        : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/20"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex justify-center">
-                        {score.score !== null ? (
-                          <span
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold"
-                            style={scoreCircleStyle(score.score)}
-                          >
-                            {Math.round(score.score * 100)}%
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">N/A</span>
-                        )}
-                      </div>
+                  <section key={title as string} className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {title as string}
+                    </h3>
+                    {scoreRows.map((score: AiApproverScoreRow) => {
+                      const isExpanded = expandedPromptIds.includes(score.id);
+                      const isTopEligible = score.id === details.topEligibleScoreId;
+                      const isGatekeeper = getPromptRole(score) === "gatekeeper";
 
-                      <button
-                        type="button"
-                        onClick={() => togglePrompt(score.id)}
-                        className="text-sm font-semibold text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
-                      >
-                        {score.promptVersion?.name || `Prompt ${score.promptVersionId}`}
-                      </button>
+                      return (
+                        <div
+                          key={`${title}-${score.id}`}
+                          className={`rounded-xl border p-4 ${
+                            isTopEligible
+                              ? "border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/10"
+                              : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/20"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex justify-center">
+                              {score.score !== null ? (
+                                <span
+                                  className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold"
+                                  style={scoreCircleStyle(score.score)}
+                                >
+                                  {Math.round(score.score * 100)}%
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                  {isGatekeeper ? "GK" : "N/A"}
+                                </span>
+                              )}
+                            </div>
 
-                      <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                        {score.resultStatus}
-                      </span>
+                            <button
+                              type="button"
+                              onClick={() => togglePrompt(score.id)}
+                              className="text-sm font-semibold text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
+                            >
+                              {score.promptVersion?.name || `Prompt ${score.promptVersionId}`}
+                            </button>
 
-                      {isTopEligible && (
-                        <span className="rounded-full bg-brand-500 px-2.5 py-1 text-xs text-white">
-                          current top
-                        </span>
-                      )}
+                            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              {score.resultStatus}
+                            </span>
 
-                      {score.isHumanApproved === false && (
-                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300">
-                          human rejected
-                        </span>
-                      )}
-                    </div>
+                            {isGatekeeper && score.decision && (
+                              <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">
+                                {score.decision}
+                                {typeof score.confidence === "number"
+                                  ? ` ${Math.round(score.confidence * 100)}%`
+                                  : ""}
+                              </span>
+                            )}
 
-                    <div className="mt-3 text-sm text-gray-700 dark:text-gray-300">
-                      {score.reason ? (
-                        <p>{score.reason}</p>
-                      ) : (
-                        <p className="italic text-gray-500 dark:text-gray-400">
-                          {score.errorMessage || "No reason provided."}
-                        </p>
-                      )}
-                    </div>
+                            {isGatekeeper && score.reasonCode && (
+                              <span className="rounded-full bg-gray-50 px-2.5 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                {score.reasonCode}
+                              </span>
+                            )}
 
-                    {isExpanded && score.promptVersion?.promptInMarkdown && (
-                      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          Prompt
-                        </p>
-                        <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
-                          {score.promptVersion.promptInMarkdown}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
+                            {isTopEligible && (
+                              <span className="rounded-full bg-brand-500 px-2.5 py-1 text-xs text-white">
+                                current top
+                              </span>
+                            )}
+
+                            {score.isHumanApproved === false && (
+                              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300">
+                                human rejected
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-3 text-sm text-gray-700 dark:text-gray-300">
+                            {score.reason ? (
+                              <p>{score.reason}</p>
+                            ) : (
+                              <p className="italic text-gray-500 dark:text-gray-400">
+                                {score.errorMessage || "No reason provided."}
+                              </p>
+                            )}
+                          </div>
+
+                          {isGatekeeper && <MetadataSignals metadata={score.metadata} />}
+
+                          {isExpanded && score.promptVersion?.promptInMarkdown && (
+                            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Prompt
+                              </p>
+                              <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                                {score.promptVersion.promptInMarkdown}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </section>
                 );
               })
             )}
@@ -366,7 +460,9 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
               </div>
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                No eligible score row is available for human validation.
+                {groupedScores.gatekeeperResults.length > 0
+                  ? "AI analysis exists for this article, but no eligible tier-2 category score is available for human validation."
+                  : "No eligible score row is available for human validation."}
               </p>
             )}
           </div>

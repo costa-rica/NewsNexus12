@@ -1,6 +1,7 @@
 import express from "express";
 import type { Request, Response } from "express";
 import axios from "axios";
+import { Op } from "sequelize";
 import {
   getCanonicalArticleContents02Row,
   isSuccessfulArticleContents02Row,
@@ -16,6 +17,7 @@ const {
 import logger from "../../modules/logger";
 import {
   parseNumericId,
+  normalizePromptRole,
   validatePromptActiveRequest,
   validatePromptCreateRequest,
   validatePromptHumanVerifyRequest,
@@ -95,13 +97,35 @@ function isEligibleTopScoreRow(row: {
   isHumanApproved?: boolean | null;
   resultStatus?: string | null;
   score?: number | null;
+  promptRole?: string | null;
+  AiApproverPromptVersion?: { promptRole?: string | null } | null;
+  promptVersion?: { promptRole?: string | null } | null;
 }): boolean {
+  const promptRole = getScorePromptRole(row);
   return (
+    promptRole !== "gatekeeper" &&
     row.isHumanApproved !== false &&
     row.resultStatus === "completed" &&
     typeof row.score === "number" &&
     Number.isFinite(row.score)
   );
+}
+
+function getScorePromptRole(row: {
+  promptRole?: string | null;
+  AiApproverPromptVersion?: { promptRole?: string | null } | null;
+  promptVersion?: { promptRole?: string | null } | null;
+}): string {
+  return (
+    row.promptRole ||
+    row.AiApproverPromptVersion?.promptRole ||
+    row.promptVersion?.promptRole ||
+    "category_score"
+  );
+}
+
+function cleanOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
 router.get("/prompts", authenticateToken, async (_req: Request, res: Response) => {
@@ -184,7 +208,25 @@ router.post("/prompts", authenticateToken, async (req: Request, res: Response) =
       });
     }
 
-    const { name, description, promptInMarkdown, isActive } = req.body;
+    const {
+      name,
+      description,
+      promptInMarkdown,
+      isActive,
+      promptRole,
+      promptKey,
+      pipelineVersion,
+      responseSchemaVersion,
+      modelName,
+    } = req.body;
+    const normalizedPromptRole = normalizePromptRole(promptRole);
+    if (Boolean(isActive) && normalizedPromptRole === "gatekeeper") {
+      return res.status(400).json({
+        result: false,
+        message:
+          "Gatekeeper prompts must be created inactive, then explicitly activated.",
+      });
+    }
     const prompt = await AiApproverPromptVersion.create({
       name: name.trim(),
       description:
@@ -194,6 +236,11 @@ router.post("/prompts", authenticateToken, async (req: Request, res: Response) =
       promptInMarkdown: promptInMarkdown.trim(),
       isActive: Boolean(isActive),
       endedAt: null,
+      promptRole: normalizedPromptRole,
+      promptKey: cleanOptionalString(promptKey),
+      pipelineVersion: cleanOptionalString(pipelineVersion),
+      responseSchemaVersion: cleanOptionalString(responseSchemaVersion),
+      modelName: cleanOptionalString(modelName),
     });
 
     return res.status(201).json({
@@ -244,12 +291,35 @@ router.post(
         });
       }
 
+      const sourcePromptVersionId = req.body.sourcePromptVersionId as
+        | number
+        | null
+        | undefined;
+      const sourcePrompt = sourcePromptVersionId
+        ? await AiApproverPromptVersion.findByPk(sourcePromptVersionId)
+        : null;
+
       const prompt = await AiApproverPromptVersion.create({
         name: (req.body.name as string).trim(),
         description: buildReviewPagePromptDescription(req.user.id, articleId),
         promptInMarkdown: (req.body.promptInMarkdown as string).trim(),
         isActive: false,
         endedAt: null,
+        promptRole: normalizePromptRole(
+          req.body.promptRole ?? sourcePrompt?.promptRole,
+        ),
+        promptKey:
+          cleanOptionalString(req.body.promptKey) ?? sourcePrompt?.promptKey ?? null,
+        pipelineVersion:
+          cleanOptionalString(req.body.pipelineVersion) ??
+          sourcePrompt?.pipelineVersion ??
+          null,
+        responseSchemaVersion:
+          cleanOptionalString(req.body.responseSchemaVersion) ??
+          sourcePrompt?.responseSchemaVersion ??
+          null,
+        modelName:
+          cleanOptionalString(req.body.modelName) ?? sourcePrompt?.modelName ?? null,
       });
 
       const response = await axios.post(
@@ -308,6 +378,11 @@ router.post(
         promptInMarkdown: sourcePrompt.promptInMarkdown,
         isActive: false,
         endedAt: null,
+        promptRole: sourcePrompt.promptRole || "category_score",
+        promptKey: sourcePrompt.promptKey || null,
+        pipelineVersion: sourcePrompt.pipelineVersion || null,
+        responseSchemaVersion: sourcePrompt.responseSchemaVersion || null,
+        modelName: sourcePrompt.modelName || null,
       });
 
       return res.status(201).json({
@@ -358,6 +433,30 @@ router.patch(
       }
 
       const shouldBeActive = Boolean(req.body.isActive);
+      if (shouldBeActive && normalizePromptRole(prompt.promptRole) === "gatekeeper") {
+        if (req.body.confirmActivateGatekeeper !== true) {
+          return res.status(400).json({
+            result: false,
+            message:
+              "Activating a gatekeeper prompt requires confirmActivateGatekeeper=true.",
+          });
+        }
+
+        const activeGatekeeperCount = await AiApproverPromptVersion.count({
+          where: {
+            id: { [Op.ne]: promptVersionId },
+            isActive: true,
+            promptRole: "gatekeeper",
+          },
+        });
+        if (activeGatekeeperCount > 0) {
+          return res.status(409).json({
+            result: false,
+            message: "Only one gatekeeper prompt can be active at a time.",
+          });
+        }
+      }
+
       await prompt.update({
         isActive: shouldBeActive,
         endedAt: shouldBeActive ? null : new Date(),
@@ -467,6 +566,12 @@ router.get(
         errorMessage: scoreRow.errorMessage,
         isHumanApproved: scoreRow.isHumanApproved,
         reasonHumanRejected: scoreRow.reasonHumanRejected,
+        promptRole: scoreRow.promptRole || "category_score",
+        pipelineVersion: scoreRow.pipelineVersion,
+        decision: scoreRow.decision,
+        confidence: scoreRow.confidence,
+        reasonCode: scoreRow.reasonCode,
+        metadata: scoreRow.metadata,
         createdAt: scoreRow.createdAt,
         updatedAt: scoreRow.updatedAt,
         promptVersion: scoreRow.AiApproverPromptVersion
@@ -478,16 +583,43 @@ router.get(
                 scoreRow.AiApproverPromptVersion.promptInMarkdown,
               isActive: scoreRow.AiApproverPromptVersion.isActive,
               endedAt: scoreRow.AiApproverPromptVersion.endedAt,
+              promptRole:
+                scoreRow.AiApproverPromptVersion.promptRole || "category_score",
+              promptKey: scoreRow.AiApproverPromptVersion.promptKey,
+              pipelineVersion: scoreRow.AiApproverPromptVersion.pipelineVersion,
+              responseSchemaVersion:
+                scoreRow.AiApproverPromptVersion.responseSchemaVersion,
+              modelName: scoreRow.AiApproverPromptVersion.modelName,
             }
           : null,
       }));
 
       const topEligible = scoreRows.find((row: any) => isEligibleTopScoreRow(row));
+      const gatekeeperResults = scoreRows.filter(
+        (row: any) => getScorePromptRole(row) === "gatekeeper",
+      );
+      const categoryScores = scoreRows.filter(
+        (row: any) => getScorePromptRole(row) !== "gatekeeper",
+      );
+      const legacyCategoryScores = categoryScores.filter(
+        (row: any) =>
+          row.promptRole === "legacy_category_score" ||
+          row.promptVersion?.promptRole === "legacy_category_score",
+      );
+      const latestGatekeeperResult = gatekeeperResults.reduce(
+        (latest: any | null, row: any) =>
+          latest === null || row.id > latest.id ? row : latest,
+        null,
+      );
 
       return res.status(200).json({
         result: true,
         articleId,
         topEligibleScoreId: topEligible?.id ?? null,
+        latestGatekeeperResultId: latestGatekeeperResult?.id ?? null,
+        gatekeeperResults,
+        categoryScores,
+        legacyCategoryScores,
         scores: scoreRows,
       });
     } catch (error: unknown) {
@@ -528,8 +660,35 @@ router.post(
       });
 
       const topScoresByArticleId = new Map<number, Record<string, unknown>>();
+      const gatekeeperResultsByArticleId = new Map<number, Record<string, unknown>>();
       for (const row of rows) {
         const rowAny = row as any;
+        const promptRole = getScorePromptRole(rowAny);
+        if (promptRole === "gatekeeper") {
+          const currentGatekeeper = gatekeeperResultsByArticleId.get(
+            rowAny.articleId,
+          );
+          if (
+            !currentGatekeeper ||
+            Number(rowAny.id) > Number(currentGatekeeper.id)
+          ) {
+            gatekeeperResultsByArticleId.set(rowAny.articleId, {
+              id: rowAny.id,
+              articleId: rowAny.articleId,
+              promptVersionId: rowAny.promptVersionId,
+              resultStatus: rowAny.resultStatus,
+              decision: rowAny.decision,
+              confidence: rowAny.confidence,
+              reasonCode: rowAny.reasonCode,
+              reason: rowAny.reason,
+              errorCode: rowAny.errorCode,
+              errorMessage: rowAny.errorMessage,
+              promptName: rowAny.AiApproverPromptVersion?.name ?? null,
+              promptRole,
+            });
+          }
+          continue;
+        }
         if (!isEligibleTopScoreRow(rowAny)) {
           continue;
         }
@@ -543,12 +702,14 @@ router.post(
           score: rowAny.score,
           resultStatus: rowAny.resultStatus,
           promptName: rowAny.AiApproverPromptVersion?.name ?? null,
+          promptRole,
         });
       }
 
       return res.status(200).json({
         result: true,
         topScores: Object.fromEntries(topScoresByArticleId),
+        gatekeeperResults: Object.fromEntries(gatekeeperResultsByArticleId),
       });
     } catch (error: unknown) {
       logger.error("Error in POST /analysis/ai-approver/top-scores:", error);
@@ -581,16 +742,25 @@ router.patch(
         });
       }
 
-      const scoreRow = await AiApproverArticleScore.findByPk(scoreId);
+      const scoreRow = await AiApproverArticleScore.findByPk(scoreId, {
+        include: [{ model: AiApproverPromptVersion }],
+      });
       if (!scoreRow) {
         return res.status(404).json({
           result: false,
           message: "AI approver score row not found",
         });
       }
+      if (getScorePromptRole(scoreRow as any) === "gatekeeper") {
+        return res.status(409).json({
+          result: false,
+          message: "Human validation is only available for category score rows.",
+        });
+      }
 
       const articleScores = await AiApproverArticleScore.findAll({
         where: { articleId: scoreRow.articleId },
+        include: [{ model: AiApproverPromptVersion }],
         order: [
           ["score", "DESC"],
           ["id", "ASC"],
