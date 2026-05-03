@@ -4,6 +4,8 @@ import logger, { initializeLogger, isLoggerInitialized } from './modules/logger'
 import { isStartupConfigError, loadAppConfig } from './modules/startup/config';
 import { ensureStateAssignerDirectories } from './modules/startup/stateAssignerFiles';
 import { runReconciliation } from './modules/orchestrator/coordinator';
+import { QueueJobStore, resolveDefaultQueueStorePath } from './modules/queue/jobStore';
+import { runQueueStartupMaintenance } from './modules/startup/queueMaintenance';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -49,9 +51,13 @@ export const startServer = async (options: StartServerOptions = {}): Promise<voi
       databaseUser: config.pgUser,
       pathToStateAssignerFiles: config.pathToStateAssignerFiles,
       pathToSemanticScorerDir: config.pathToSemanticScorerDir,
-      pathToLogs: config.pathToLogs
+      pathToLogs: config.pathToLogs,
+      deleteArticlesBatchSize: config.deleteArticlesBatchSize
     });
     await ensureStateAssignerDirectories(config.pathToStateAssignerFiles);
+    const queueStore = new QueueJobStore(resolveDefaultQueueStorePath(config.pathUtilities));
+    const queueMaintenanceResult = await runQueueStartupMaintenance(queueStore);
+    logger.info('Queue startup maintenance completed', queueMaintenanceResult);
     await runReconciliation().catch((err) => {
       logger.warn('Orchestrator reconciliation failed at startup', {
         error: err instanceof Error ? err.message : String(err),

@@ -133,6 +133,7 @@ Optional:
 3. `LOG_MAX_FILES` (default `5`)
 4. `PG_PASSWORD` (default empty for local trust-auth setups)
 5. `PG_SCHEMA` (default `public`)
+6. `DELETE_ARTICLES_BATCH_SIZE` (default `1000`)
 
 ## Database
 

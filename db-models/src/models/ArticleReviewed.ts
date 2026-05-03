@@ -51,6 +51,9 @@ export function initArticleReviewed() {
       modelName: 'ArticleReviewed',
       tableName: 'ArticleRevieweds',
       timestamps: true,
+      indexes: [
+        { name: 'idx_article_revieweds_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticleReviewed;

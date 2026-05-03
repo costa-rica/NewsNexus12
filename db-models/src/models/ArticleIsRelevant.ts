@@ -51,6 +51,9 @@ export function initArticleIsRelevant() {
       modelName: 'ArticleIsRelevant',
       tableName: 'ArticleIsRelevants',
       timestamps: true,
+      indexes: [
+        { name: 'idx_article_is_relevants_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticleIsRelevant;

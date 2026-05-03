@@ -42,16 +42,18 @@ export const createDeleteArticlesRouter = (
 
       const daysOld = parseOptionalPositiveInt(body.daysOld, 'daysOld');
       const trimCount = parseOptionalPositiveInt(body.trimCount, 'trimCount');
+      const batchSize = parseOptionalPositiveInt(body.batchSize, 'batchSize');
 
       logger.info('Received delete articles start request', {
         endpointName,
         daysOld,
-        trimCount
+        trimCount,
+        batchSize
       });
 
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
-        run: buildJobHandler({ daysOld, trimCount })
+        run: buildJobHandler({ daysOld, trimCount, batchSize })
       });
 
       logger.info('Queued delete articles job', {

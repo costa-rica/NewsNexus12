@@ -132,7 +132,10 @@ export function initArticleContents02() {
       sequelize,
       modelName: 'ArticleContents02',
       tableName: 'ArticleContents02',
-      timestamps: true
+      timestamps: true,
+      indexes: [
+        { name: 'idx_article_contents02_article_id', fields: ['articleId'] },
+      ]
     }
   );
 

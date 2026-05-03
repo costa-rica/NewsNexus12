@@ -56,6 +56,9 @@ export function initArticleReportContract() {
       modelName: 'ArticleReportContract',
       tableName: 'ArticleReportContracts',
       timestamps: true,
+      indexes: [
+        { name: 'idx_article_report_contracts_article_id', fields: ['articleId'] },
+      ],
     }
   );
   return ArticleReportContract;

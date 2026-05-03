@@ -88,6 +88,16 @@ export function initArticleDuplicateAnalysis() {
 			modelName: "ArticleDuplicateAnalysis",
 			tableName: "ArticleDuplicateAnalyses",
 			timestamps: true,
+			indexes: [
+				{
+					name: "idx_article_duplicate_analyses_article_id_new",
+					fields: ["articleIdNew"],
+				},
+				{
+					name: "idx_article_duplicate_analyses_article_id_approved",
+					fields: ["articleIdApproved"],
+				},
+			],
 		}
 	);
 	return ArticleDuplicateAnalysis;

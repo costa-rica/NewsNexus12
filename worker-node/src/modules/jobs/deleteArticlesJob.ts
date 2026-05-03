@@ -8,13 +8,14 @@ import ensureDbReady from '../db/ensureDbReady';
 import logger from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
 
-const DELETE_BATCH_SIZE = 5000;
+const DEFAULT_DELETE_BATCH_SIZE = 1000;
 const DELETE_SAMPLE_SIZE = 1000;
 const DEFAULT_DAYS_OLD_THRESHOLD = 180;
 
 export interface DeleteArticlesJobInput {
   daysOld?: number;
   trimCount?: number;
+  batchSize?: number;
 }
 
 export interface DeleteArticlesJobResult {
@@ -22,7 +23,22 @@ export interface DeleteArticlesJobResult {
   cutoffDate?: string;
   trimRequested?: number;
   trimFound?: number;
+  batchSize: number;
 }
+
+const parsePositiveInteger = (value: string | undefined): number | undefined => {
+  if (value === undefined || value.trim() === '') {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const resolveDeleteBatchSize = (inputBatchSize?: number): number =>
+  inputBatchSize ??
+  parsePositiveInteger(process.env.DELETE_ARTICLES_BATCH_SIZE) ??
+  DEFAULT_DELETE_BATCH_SIZE;
 
 function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -48,6 +64,7 @@ async function getProtectedIds(): Promise<number[]> {
 
 async function deleteOldUnapprovedArticles(
   daysOldThreshold: number,
+  batchSize: number,
   signal: AbortSignal
 ): Promise<{ deletedCount: number; cutoffDate: string }> {
   const cutoffDate = new Date();
@@ -82,8 +99,8 @@ async function deleteOldUnapprovedArticles(
   while (deletedCount < totalToDelete) {
     if (signal.aborted) break;
     batchNumber += 1;
-    const batchSize =
-      !didSampleEstimate && totalToDelete > DELETE_BATCH_SIZE ? DELETE_SAMPLE_SIZE : DELETE_BATCH_SIZE;
+    const currentBatchSize =
+      !didSampleEstimate && totalToDelete > batchSize ? Math.min(DELETE_SAMPLE_SIZE, batchSize) : batchSize;
 
     const rows = await Article.findAll({
       attributes: ['id'],
@@ -94,7 +111,7 @@ async function deleteOldUnapprovedArticles(
         ...(protectedIds.length > 0 ? [sequelize.literal(`"Article"."id" NOT IN (${protectedIds.join(',')})`)] : [])
       ) as unknown as any,
       order: [['id', 'ASC']],
-      limit: batchSize,
+      limit: currentBatchSize,
       raw: true
     });
 
@@ -115,7 +132,7 @@ async function deleteOldUnapprovedArticles(
     deletedCount += ids.length;
     lastId = ids[ids.length - 1];
 
-    if (!didSampleEstimate && batchSize === DELETE_SAMPLE_SIZE) {
+    if (!didSampleEstimate && currentBatchSize === DELETE_SAMPLE_SIZE) {
       didSampleEstimate = true;
       const perItemMs = batchDurationMs / ids.length;
       const remaining = totalToDelete - deletedCount;
@@ -133,6 +150,7 @@ async function deleteOldUnapprovedArticles(
 
 async function trimOldestEligibleArticles(
   requestedCount: number,
+  batchSize: number,
   signal: AbortSignal
 ): Promise<{ trimRequested: number; trimFound: number; deletedCount: number }> {
   const protectedIds = await getProtectedIds();
@@ -169,10 +187,10 @@ async function trimOldestEligibleArticles(
   let deletedCount = 0;
   let batchNumber = 0;
 
-  for (let i = 0; i < ids.length; i += DELETE_BATCH_SIZE) {
+  for (let i = 0; i < ids.length; i += batchSize) {
     if (signal.aborted) break;
     batchNumber += 1;
-    const batchIds = ids.slice(i, i + DELETE_BATCH_SIZE);
+    const batchIds = ids.slice(i, i + batchSize);
     await Article.destroy({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       where: sequelize.literal(`"id" IN (${batchIds.join(',')})`) as unknown as any
@@ -188,24 +206,26 @@ export const createDeleteArticlesJobHandler = (input: DeleteArticlesJobInput) =>
   return async (queueContext: QueueExecutionContext): Promise<void> => {
     const { signal } = queueContext;
     const daysOld = input.daysOld ?? DEFAULT_DAYS_OLD_THRESHOLD;
+    const batchSize = resolveDeleteBatchSize(input.batchSize);
 
     logger.info('Delete articles job started', {
       jobId: queueContext.jobId,
       daysOld,
-      trimCount: input.trimCount
+      trimCount: input.trimCount,
+      batchSize
     });
 
     await ensureDbReady();
 
-    const result: DeleteArticlesJobResult = { deletedCount: 0 };
+    const result: DeleteArticlesJobResult = { deletedCount: 0, batchSize };
 
     if (input.trimCount !== undefined && input.trimCount > 0) {
-      const trimResult = await trimOldestEligibleArticles(input.trimCount, signal);
+      const trimResult = await trimOldestEligibleArticles(input.trimCount, batchSize, signal);
       result.deletedCount = trimResult.deletedCount;
       result.trimRequested = trimResult.trimRequested;
       result.trimFound = trimResult.trimFound;
     } else {
-      const deleteResult = await deleteOldUnapprovedArticles(daysOld, signal);
+      const deleteResult = await deleteOldUnapprovedArticles(daysOld, batchSize, signal);
       result.deletedCount = deleteResult.deletedCount;
       result.cutoffDate = deleteResult.cutoffDate;
     }
@@ -213,6 +233,7 @@ export const createDeleteArticlesJobHandler = (input: DeleteArticlesJobInput) =>
     await queueContext.updateResult({
       deletedCount: result.deletedCount,
       daysOldThreshold: daysOld,
+      batchSize,
       ...(result.cutoffDate !== undefined ? { cutoffDate: result.cutoffDate } : {}),
       ...(result.trimRequested !== undefined ? { trimRequested: result.trimRequested } : {}),
       ...(result.trimFound !== undefined ? { trimFound: result.trimFound } : {})
