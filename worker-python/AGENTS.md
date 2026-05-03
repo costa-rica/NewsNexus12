@@ -19,7 +19,9 @@ The location scorer workflow from NewsNexusClassifierLocationScorer01 is now abs
 
 The AI approver workflow is absorbed internally under `src/modules/ai_approver`.
 It scores articles against active prompt rows and writes reviewable score rows
-back to Postgres.
+back to Postgres. See `docs/20260502_HOW_TO_USE_AI_APPROVER.md` for operator
+setup, prompt roles, gatekeeper rollout, weekly automation behavior, queue result
+checks, and portal `N/A` troubleshooting.
 
 ## Runtime architecture
 
@@ -200,7 +202,18 @@ The queue is the backbone of worker status reporting used by the portal automati
 - `requireStateAssignment`, default `true`
 - `stateIds`, optional list of `ArticleStateContracts02.stateId` values
 - `articleIdMinExclusive`, optional article ID lower cursor
-- `articleIdMaxInclusive`, optional article ID upper cursor
+- `articleIdMaxInclusive`, optional upper article ID cursor
+- `mode`, optional AI approver mode override; otherwise `AI_APPROVER_MODE` from `.env`
+- `gatekeeperRejectConfidenceThreshold`, optional override for gatekeeper reject normalization
+
+AI approver modes:
+
+- `legacy` — default; category prompts only, no gatekeeper required or run.
+- `shadow` — requires one active gatekeeper, records gatekeeper decisions, and still runs category prompts regardless of decision.
+- `gatekeeper` — requires one active gatekeeper and runs category prompts only on `decision = "pass"`.
+- `gatekeeper_with_manual_review` — currently same category execution behavior as `gatekeeper`; `manual_review` does not run categories.
+
+The weekly worker-node orchestrator does not explicitly send `mode`, so weekly runs follow worker-python `AI_APPROVER_MODE`. Use `shadow` for the first gatekeeper rollout test, then test `gatekeeper` once shadow-mode decisions look correct.
 
 3. `src/routes/ai_approver.py` enqueues a shared queue job with endpoint name:
 
@@ -247,6 +260,18 @@ The queue is the backbone of worker status reporting used by the portal automati
 - `usagePromptTokens`
 - `usageCompletionTokens`
 - `usageTotalTokens`
+- `mode`
+- `gatekeeperPromptVersionId`
+- `gatekeeperAttemptCount`
+- `gatekeeperPassCount`
+- `gatekeeperRejectCount`
+- `gatekeeperManualReviewCount`
+- `gatekeeperInvalidResponseCount`
+- `gatekeeperFailedCount`
+- `categoryPromptCount`
+- `categoryAttemptCount`
+- `categorySkippedCount`
+- `estimatedCategoryCallsAvoided`
 
 8. Latest job and cancel operations reuse the same queue-info routes:
 

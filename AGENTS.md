@@ -60,6 +60,8 @@ No test frameworks are configured for db-models, portal, or worker-python. db-ma
 
 ## Architecture Details
 
+For AI Approver setup and gatekeeper operations, read `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md`. It documents prompt roles, `AI_APPROVER_MODE`, gatekeeper rollout, weekly automation behavior, and why portal review rows may show `N/A`.
+
 ### db-models
 
 - Sequelize models in `src/models/`, each file exports a class + `initModelName()` function

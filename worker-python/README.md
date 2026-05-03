@@ -58,6 +58,8 @@ workflow code must check the queue execution context between units of work.
 
 ## AI Approver flow
 
+Full operator guidance for prompt setup, gatekeeper rollout, weekly automation behavior, queue result checks, and `N/A` troubleshooting is in `docs/20260502_HOW_TO_USE_AI_APPROVER.md`.
+
 The AI approver has two worker-python entry points:
 
 - `POST /ai-approver/start-job`
@@ -141,7 +143,7 @@ active and reports `contentSource` in the queue job result.
 
 ### AI Approver result rows
 
-Successful model payloads must include:
+Successful category prompt payloads must include:
 
 ```json
 {
@@ -157,6 +159,31 @@ Rows are written to `AiApproverArticleScores` with:
   match the expected shape.
 - `resultStatus = 'failed'` when the OpenAI call or response parsing raises.
 - `jobId` set to the queue job ID.
+
+Successful gatekeeper prompt payloads must include JSON with:
+
+```json
+{
+  "decision": "pass",
+  "confidence": 0.92,
+  "reason": "Brief explanation",
+  "reasonCode": "optional_reason_code",
+  "signals": {}
+}
+```
+
+Allowed `decision` values are `pass`, `reject`, and `manual_review`. `confidence` must be between `0` and `1`. Invalid gatekeeper payloads are persisted as `invalid_response`.
+
+### AI Approver modes
+
+The worker supports four modes through request body `mode` or `AI_APPROVER_MODE` in `worker-python/.env`:
+
+- `legacy` — default; runs active category prompts only and does not require or run a gatekeeper.
+- `shadow` — requires one active gatekeeper prompt, records gatekeeper decisions, and still runs category prompts regardless of the decision.
+- `gatekeeper` — requires one active gatekeeper prompt and runs category prompts only when the gatekeeper returns `decision = "pass"`.
+- `gatekeeper_with_manual_review` — currently behaves like `gatekeeper` for category execution; `manual_review` does not run category prompts.
+
+Weekly automation does not explicitly pass `mode`, so it follows `AI_APPROVER_MODE` from worker-python. Use `shadow` for the first gatekeeper rollout test, then test `gatekeeper` once shadow results look correct.
 
 ## AI Approver prompt setup
 
@@ -213,6 +240,8 @@ Optional:
 - `PG_PASSWORD`
 - `AI_APPROVER_MODEL_NAME`, default `gpt-4o-mini`
 - `AI_APPROVER_BATCH_SIZE`, default `10`
+- `AI_APPROVER_MODE`, default `legacy`; allowed values are `legacy`, `shadow`, `gatekeeper`, and `gatekeeper_with_manual_review`.
+- `AI_APPROVER_GATEKEEPER_REJECT_CONFIDENCE_THRESHOLD`, default `0.85`.
 
 The batch size setting is parsed and validated by config, but the current batch
 orchestrator uses the request `limit` as the article count.

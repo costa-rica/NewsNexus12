@@ -14,6 +14,10 @@ npm run build
 
 Root-level npm commands apply to all Node apps in the workspace list: db-models, db-manager, api, worker-node, and portal. worker-python is not included in the npm workspace flow.
 
+## Key Documentation
+
+- `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` — AI Approver setup, prompt roles, gatekeeper modes, weekly automation behavior, and `N/A` troubleshooting.
+
 
 ## Directory Structure
 
