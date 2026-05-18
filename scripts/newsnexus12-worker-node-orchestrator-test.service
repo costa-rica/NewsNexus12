@@ -1,0 +1,14 @@
+[Unit]
+Description=NewsNexus12 worker-node abbreviated test orchestration trigger
+Documentation=file:/home/limited_user/applications/NewsNexus12/scripts/newsnexus12-worker-node-orchestrator-test.service
+Requires=newsnexus12-worker-node.service
+After=network-online.target newsnexus12-worker-node.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=limited_user
+Group=limited_user
+WorkingDirectory=/home/limited_user/applications/NewsNexus12/worker-node
+Environment="WORKER_NODE_URL=http://127.0.0.1:8003"
+ExecStart=/usr/bin/curl --fail-with-body --show-error --silent --max-time 30 --retry 2 --retry-delay 5 --header Content-Type:application/json --request POST --data {"mode":"abbreviated_test","aiApproverEnabled":true,"semanticScorerEnabled":true,"testConfig":{"deleteTrimCount":100,"targetArticlesAddedCount":10,"downstreamArticleCount":10,"doNotRepeatRequestsWithinHours":0}} ${WORKER_NODE_URL}/orchestrator/start

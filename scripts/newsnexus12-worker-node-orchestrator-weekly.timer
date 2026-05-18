@@ -1,0 +1,12 @@
+[Unit]
+Description=Run NewsNexus12 worker-node weekly orchestration every Friday at noon
+Documentation=file:/home/limited_user/applications/NewsNexus12/scripts/newsnexus12-worker-node-orchestrator-weekly.timer
+
+[Timer]
+OnCalendar=Fri *-*-* 12:00:00
+Persistent=true
+RandomizedDelaySec=0
+Unit=newsnexus12-worker-node-orchestrator-weekly.service
+
+[Install]
+WantedBy=timers.target
