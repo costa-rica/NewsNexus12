@@ -1,3 +1,11 @@
+---
+title: Codex assessment: Google RSS request tracking report plan
+date: 2026-05-19
+reviewer: codex
+source_document: docs/20260519_google_rss_request_tracking_report_plan.md
+status: assessment
+---
+
 # Codex assessment: Google RSS request tracking report plan
 
 1. Moderate flaw: the plan says the new sheet should mirror the query input spreadsheet column-for-column, but the proposed `GoogleRssQueryResult` only preserves the six currently required columns.

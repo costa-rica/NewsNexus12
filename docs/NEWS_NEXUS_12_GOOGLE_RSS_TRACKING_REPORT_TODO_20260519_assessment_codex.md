@@ -1,3 +1,11 @@
+---
+title: Codex assessment: Google RSS tracking report TODO
+date: 2026-05-19
+reviewer: codex
+source_document: docs/NEWS_NEXUS_12_GOOGLE_RSS_TRACKING_REPORT_TODO_20260519.md
+status: assessment
+---
+
 # Codex assessment: Google RSS tracking report TODO
 
 1. Moderate concern: several Phase 2 tests depend on spying on private helpers that are not currently exported or injected.

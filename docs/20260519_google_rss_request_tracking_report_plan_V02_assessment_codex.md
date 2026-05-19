@@ -1,3 +1,11 @@
+---
+title: Codex assessment: Google RSS request tracking report plan V02
+date: 2026-05-19
+reviewer: codex
+source_document: docs/20260519_google_rss_request_tracking_report_plan_V02.md
+status: assessment
+---
+
 # Codex assessment: Google RSS request tracking report plan V02
 
 1. Moderate flaw: the `target_reached` and `canceled` mappings can overwrite a row that was already processed successfully.

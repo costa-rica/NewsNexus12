@@ -1,3 +1,11 @@
+---
+title: Codex assessment: Google RSS tracking report TODO V02
+date: 2026-05-19
+reviewer: codex
+source_document: docs/NEWS_NEXUS_12_GOOGLE_RSS_TRACKING_REPORT_TODO_20260519_V02.md
+status: assessment
+---
+
 # Codex assessment: Google RSS tracking report TODO V02
 
 1. Moderate concern: the `empty_query` branch appears to be unreachable under the current query builder.
