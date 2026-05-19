@@ -123,6 +123,7 @@ Summary:
 - Seeds `ArticleContents02` directly when RSS provides usable content.
 - Triggers the same Google-to-publisher scraping flow immediately when RSS content is missing or too short.
 - Does not overwrite an existing canonical `ArticleContents02` row for an article.
+- Emits `queryResults` for the orchestrator report's "Google RSS Queries" sheet. Rows with no AND/OR terms are `skipped / empty_query` and do not hit Google RSS; see `docs/20260519_google_rss_request_tracking_report_plan_V03.md`.
 
 Key files:
 

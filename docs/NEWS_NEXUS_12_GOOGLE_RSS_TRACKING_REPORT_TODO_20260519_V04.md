@@ -235,24 +235,24 @@ In `worker-node/tests/modules/orchestrator/reportWriter.test.ts` (create or exte
 
 ### 4.1 worker-node AGENTS.md
 
-- [ ] Under the `### request-google-rss` section in `worker-node/AGENTS.md`, add one paragraph noting:
+- [x] Under the `### request-google-rss` section in `worker-node/AGENTS.md`, add one paragraph noting:
   - The job now emits `queryResults` on `GoogleRssJobResult`, rendered as the "Google RSS Queries" sheet in the orchestrator report.
   - `buildQuery` now treats rows with no AND/OR terms as empty queries — those rows are recorded as `skipped / empty_query` and do NOT hit Google RSS. Operators editing the query spreadsheet should treat blank-keyword rows as inert.
   - Reference the V03 plan.
 
 ### 4.2 Phase exit
 
-- [ ] Commit.
+- [x] Commit.
 
 ---
 
 ## Done criteria
 
-- [ ] All four phases checked off and committed.
+- [x] All four phases checked off and committed.
 - [ ] A real abbreviated_test orchestrator run produces an xlsx with three sheets in order: Jobs, Google RSS Queries, Articles.
-- [ ] The new sheet has one row per input spreadsheet row, with correct status / saved_articles / note for every row including unreached/failed/canceled tails.
-- [ ] Blank-keyword rows in the input spreadsheet are recorded as `skipped / empty_query` and do not generate Google RSS requests (`buildQuery` change).
-- [ ] No regressions in queue behavior, no schema changes, no endpoint changes.
+- [x] The new sheet has one row per input spreadsheet row, with correct status / saved_articles / note for every row including unreached/failed/canceled tails.
+- [x] Blank-keyword rows in the input spreadsheet are recorded as `skipped / empty_query` and do not generate Google RSS requests (`buildQuery` change).
+- [x] No regressions in queue behavior, no schema changes, no endpoint changes.
 
 ## Out of scope (do NOT do as part of this TODO)
 
