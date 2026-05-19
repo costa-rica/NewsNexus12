@@ -1,3 +1,10 @@
+---
+created_at: 2026-05-19
+updated_at: 2026-05-19
+created_by: claude (opus-4.7)
+modified_by: claude (opus-4.7)
+---
+
 # Plan: Google RSS Query Tracking Sheet in Weekly Orchestrator Report
 
 Status: DRAFT — for AI reviewer assessment
