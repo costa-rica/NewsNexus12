@@ -201,33 +201,33 @@ Adds the new worksheet to the orchestrator xlsx.
 
 ### 3.1 Sheet creation
 
-- [ ] In `worker-node/src/modules/orchestrator/reportWriter.ts`:
-  - [ ] Locate the `google_rss` step via `steps.find(s => s.stepName === 'google_rss')`.
-  - [ ] Read `googleRssStep?.result?.queryResults`.
-  - [ ] Defensively validate the shape: `Array.isArray(...)`, length > 0, every entry is an object with `id` (number) and `status` (string). If invalid, `logger.warn(...)` and skip the sheet — do NOT throw.
-  - [ ] If valid, call `workbook.addWorksheet('Google RSS Queries')` between the Jobs sheet creation and the Articles sheet creation so final sheet order is **Jobs → Google RSS Queries → Articles**.
-  - [ ] Use the column definitions in V03 plan §6 (id, and_keywords, and_exact_phrases, or_keywords, or_exact_phrases, time_range, status, saved_articles, note).
-  - [ ] `for (const row of rawQueryResults) sheet.addRow(row);`
+- [x] In `worker-node/src/modules/orchestrator/reportWriter.ts`:
+  - [x] Locate the `google_rss` step via `steps.find(s => s.stepName === 'google_rss')`.
+  - [x] Read `googleRssStep?.result?.queryResults`.
+  - [x] Defensively validate the shape: `Array.isArray(...)`, length > 0, every entry is an object with `id` (number) and `status` (string). If invalid, `logger.warn(...)` and skip the sheet — do NOT throw.
+  - [x] If valid, call `workbook.addWorksheet('Google RSS Queries')` between the Jobs sheet creation and the Articles sheet creation so final sheet order is **Jobs → Google RSS Queries → Articles**.
+  - [x] Use the column definitions in V03 plan §6 (id, and_keywords, and_exact_phrases, or_keywords, or_exact_phrases, time_range, status, saved_articles, note).
+  - [x] `for (const row of rawQueryResults) sheet.addRow(row);`
 
 ### 3.2 Type sharing
 
-- [ ] Import `GoogleRssQueryResult` from `requestGoogleRssJob.ts` in `reportWriter.ts` so the cast on `addRow` is type-checked rather than `any`.
+- [x] Import `GoogleRssQueryResult` from `requestGoogleRssJob.ts` in `reportWriter.ts` so the cast on `addRow` is type-checked rather than `any`.
 
 ### 3.3 Tests
 
 In `worker-node/tests/modules/orchestrator/reportWriter.test.ts` (create or extend):
 
-- [ ] **Sheet present** — supply a mock `google_rss` step with a non-empty `result.queryResults`. Assert the produced workbook contains a `Google RSS Queries` sheet, with the expected column headers in order, and one row per `queryResults` entry. Assert sheet order: Jobs → Google RSS Queries → Articles.
-- [ ] **Missing queryResults** — supply a `google_rss` step with `result: {}` (no `queryResults`). Assert no `Google RSS Queries` sheet is created and no exception is thrown.
-- [ ] **Malformed queryResults** — supply `result: { queryResults: 'not an array' }`. Assert no sheet, no throw, and a warn-level log was emitted.
-- [ ] **No google_rss step at all** — supply a `steps` array without a `google_rss` step. Assert no sheet, no throw.
+- [x] **Sheet present** — supply a mock `google_rss` step with a non-empty `result.queryResults`. Assert the produced workbook contains a `Google RSS Queries` sheet, with the expected column headers in order, and one row per `queryResults` entry. Assert sheet order: Jobs → Google RSS Queries → Articles.
+- [x] **Missing queryResults** — supply a `google_rss` step with `result: {}` (no `queryResults`). Assert no `Google RSS Queries` sheet is created and no exception is thrown.
+- [x] **Malformed queryResults** — supply `result: { queryResults: 'not an array' }`. Assert no sheet, no throw, and a warn-level log was emitted.
+- [x] **No google_rss step at all** — supply a `steps` array without a `google_rss` step. Assert no sheet, no throw.
 
 ### 3.4 Phase exit
 
-- [ ] `npx tsc -p tsconfig.json --noEmit` passes.
-- [ ] `npm test` passes.
-- [ ] Open a real generated xlsx (use the existing dev/test trigger or the abbreviated_test orchestrator run) and visually confirm the new sheet's column order, headers, and a few representative status values.
-- [ ] Commit.
+- [x] `npx tsc -p tsconfig.json --noEmit` passes.
+- [x] `npm test` passes.
+- [x] Open a real generated xlsx (use the existing dev/test trigger or the abbreviated_test orchestrator run) and visually confirm the new sheet's column order, headers, and a few representative status values.
+- [x] Commit.
 
 ---
 

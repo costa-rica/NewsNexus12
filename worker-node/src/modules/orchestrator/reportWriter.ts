@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { sequelize } from '@newsnexus/db-models';
 import logger from '../logger';
 import type { OrchestratorRunRow, OrchestratorRunStepRow } from './types';
+import type { GoogleRssQueryResult } from '../jobs/requestGoogleRssJob';
 
 interface ArticleReportRow {
   articleId: number;
@@ -99,6 +100,41 @@ const getOutputPath = (startedAt: Date): string => {
   return path.join(utilitiesPath, 'orchestrator', 'reports', `${timestamp}-orchestration-report.xlsx`);
 };
 
+const isGoogleRssQueryResult = (value: unknown): value is GoogleRssQueryResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const row = value as { id?: unknown; status?: unknown };
+  return typeof row.id === 'number' && typeof row.status === 'string';
+};
+
+const getGoogleRssQueryResults = (value: unknown): GoogleRssQueryResult[] | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (!Array.isArray(value)) {
+    logger.warn('reportWriter: invalid google_rss queryResults shape', {
+      reason: 'not_array',
+    });
+    return null;
+  }
+
+  if (value.length === 0) {
+    return null;
+  }
+
+  if (!value.every(isGoogleRssQueryResult)) {
+    logger.warn('reportWriter: invalid google_rss queryResults shape', {
+      reason: 'invalid_row',
+    });
+    return null;
+  }
+
+  return value;
+};
+
 export const writeReport = async (
   run: OrchestratorRunRow,
   steps: OrchestratorRunStepRow[],
@@ -141,6 +177,27 @@ export const writeReport = async (
         status: step.status,
         reasonForEnding,
       });
+    }
+
+    const googleRssStep = steps.find((step) => step.stepName === 'google_rss');
+    const googleRssQueryResults = getGoogleRssQueryResults(googleRssStep?.result?.queryResults);
+    if (googleRssQueryResults) {
+      const googleRssQueriesSheet = workbook.addWorksheet('Google RSS Queries');
+      googleRssQueriesSheet.columns = [
+        { header: 'id', key: 'id', width: 8 },
+        { header: 'and_keywords', key: 'and_keywords', width: 30 },
+        { header: 'and_exact_phrases', key: 'and_exact_phrases', width: 30 },
+        { header: 'or_keywords', key: 'or_keywords', width: 30 },
+        { header: 'or_exact_phrases', key: 'or_exact_phrases', width: 30 },
+        { header: 'time_range', key: 'time_range', width: 12 },
+        { header: 'status', key: 'status', width: 12 },
+        { header: 'saved_articles', key: 'saved_articles', width: 16 },
+        { header: 'note', key: 'note', width: 30 },
+      ];
+
+      for (const row of googleRssQueryResults) {
+        googleRssQueriesSheet.addRow(row);
+      }
     }
 
     if (includeArticles && run.articleIdMinExclusive !== null && run.articleIdMaxInclusive !== null) {
