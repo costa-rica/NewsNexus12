@@ -1,13 +1,15 @@
 ---
-date: 2026-04-27
-origin: Claude Code Opus 4.7
+created_at: 2026-04-27
+updated_at: 2026-05-19
+created_by: claude (opus-4.7)
+modified_by: codex (gpt-5)
 ---
 
 # CTO Onboarding — NewsNexus12
 
 ## 1. Summary
 
-NewsNexus12 is a monorepo for a news-aggregation and analysis platform. It ingests news articles (Google News RSS, NewsAPI, NewsData.io, GNews), persists them in a shared Postgres database via a Sequelize model package, exposes a REST API and a Next.js review portal, and runs analysis workflows (deduper, semantic scorer, location scorer, OpenAI-based state assigner, content scrapers) through two queue-backed worker services — one Node, one Python. There is no monorepo tooling; packages are wired through local `file:` dependencies and built in dependency order. The codebase is mid-migration from SQLite to Postgres (most heavy lifting landed in the last ~30 commits; see `docs/archived/`).
+NewsNexus12 is a monorepo for a news-aggregation and analysis platform. It ingests news articles (Google News RSS, NewsAPI, NewsData.io, GNews), persists them in a shared Postgres database via a Sequelize model package, exposes a REST API and a Next.js review portal, and runs analysis workflows (deduper, semantic scorer, location scorer, OpenAI-based state assigner, content scrapers) through two queue-backed worker services — one Node, one Python. There is no monorepo tooling; packages are wired through local `file:` dependencies and built in dependency order. The codebase is mid-migration from SQLite to Postgres (most heavy lifting landed in the last ~30 commits; see `docs/archive/`).
 
 ## 2. Tech stack
 
@@ -31,7 +33,7 @@ worker-node/     Express worker — Google RSS, semantic scorer, state assigner,
 worker-python/   FastAPI worker — deduper, location scorer
 db-models/       Shared Sequelize models, published locally as @newsnexus/db-models
 db-manager/      CLI tool — backups, ZIP import, article cleanup
-docs/            Project docs (postgres transition history in docs/archived/)
+docs/            Project docs (postgres transition history in docs/archive/)
 .github/         CI workflows
 ```
 
@@ -114,7 +116,7 @@ All credentials are loaded from per-package `.env` files. There is no central se
 Prereqs: Node 22, Python 3 with venv, Postgres 16 reachable.
 
 ```bash
-# 1. Postgres env (each package's .env needs these; see docs/archived/ for setup guides)
+# 1. Postgres env (each package's .env needs these; see docs/archive/ for setup guides)
 PG_HOST=localhost PG_PORT=5432 PG_DATABASE=newsnexus_dev PG_USER=… PG_PASSWORD=…
 
 # 2. Build shared package first — api/worker-node/db-manager depend on db-models via file:
@@ -159,7 +161,7 @@ Coverage is uneven — the Express API and the db-manager CLI are the best-teste
 
 Based on the last 30 commits:
 
-1. **SQLite → Postgres migration.** Dominates recent history (`15539be feat: phase 1 postgres foundation`, `e3ee110 feat: advance postgres worker phase 2`, plus a flurry of `fix:` commits widening STRING→TEXT, fixing serial sequences, sanitizing ZIP-import data). Phase docs archived under [docs/archived/](docs/archived/) on 2026-04-21.
+1. **SQLite → Postgres migration.** Dominates recent history (`15539be feat: phase 1 postgres foundation`, `e3ee110 feat: advance postgres worker phase 2`, plus a flurry of `fix:` commits widening STRING→TEXT, fixing serial sequences, sanitizing ZIP-import data). Phase docs archived under [docs/archive/](docs/archive/) on 2026-04-21.
 2. **CI bootstrap stabilization.** Commits `5733130`, `06e164f`, `0548a90`, `6e1c407` — getting the Postgres CI matrix reliable.
 3. **db-manager hardening.** `de211c4 feat: add --dry_run validator and --drop_db command`, plus the unified portal-replenish import pipeline (`831f338`).
 4. **Stale doc/code drift.** [db-models/AGENTS.md](db-models/AGENTS.md) and [worker-node/AGENTS.md](worker-node/AGENTS.md) still describe SQLite as the live store though the code has moved to Postgres — likely the next doc cleanup target.
