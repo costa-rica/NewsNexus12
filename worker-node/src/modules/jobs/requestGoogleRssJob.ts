@@ -70,10 +70,25 @@ export type GoogleRssEndingReason =
   | 'canceled'
   | 'aborted';
 
+export type GoogleRssQueryStatus = 'success' | 'skipped' | 'failed';
+
+export interface GoogleRssQueryResult {
+  id: number;
+  and_keywords: string;
+  and_exact_phrases: string;
+  or_keywords: string;
+  or_exact_phrases: string;
+  time_range: string;
+  status: GoogleRssQueryStatus;
+  saved_articles: number;
+  note: string | null;
+}
+
 export interface GoogleRssJobResult {
   endingReason: GoogleRssEndingReason;
   endingMessage: string;
   articlesAddedCount: number;
+  queryResults: GoogleRssQueryResult[];
 }
 
 export interface RequestGoogleRssJobContext {
@@ -653,12 +668,29 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
   let articlesAddedCount = 0;
   let endingReason: GoogleRssEndingReason = 'queries_exhausted';
   let endingMessage = 'All queries processed successfully.';
+  let queryResults: GoogleRssQueryResult[] = [];
+  let currentRowIndex = -1;
 
   try {
     const rows = await readQuerySpreadsheet(context.spreadsheetPath);
     logger.info(`Loaded ${rows.length} query rows from spreadsheet.`);
 
-    for (const row of rows) {
+    queryResults = rows.map((row) => ({
+      id: row.id,
+      and_keywords: row.and_keywords,
+      and_exact_phrases: row.and_exact_phrases,
+      or_keywords: row.or_keywords,
+      or_exact_phrases: row.or_exact_phrases,
+      time_range: row.time_range,
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    }));
+
+    for (let i = 0; i < rows.length; i += 1) {
+      currentRowIndex = i;
+      const row = rows[i];
+
       if (context.signal.aborted) {
         endingReason = 'canceled';
         endingMessage = 'Job was canceled before processing all queries.';
@@ -741,7 +773,12 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
   } finally {
     await navigationSessionManager.close();
 
-    const result: GoogleRssJobResult = { endingReason, endingMessage, articlesAddedCount };
+    const result: GoogleRssJobResult = {
+      endingReason,
+      endingMessage,
+      articlesAddedCount,
+      queryResults
+    };
     logger.info('requestGoogleRss job ending', result);
     await context.updateResult?.(result as unknown as Record<string, unknown>);
   }

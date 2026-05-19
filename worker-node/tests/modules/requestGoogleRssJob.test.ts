@@ -22,12 +22,19 @@ const makeQueueContext = (overrides: Partial<{
   updateResult: overrides.updateResult ?? jest.fn(() => Promise.resolve())
 });
 
-const createTestSpreadsheet = async (dir: string): Promise<string> => {
+type TestQueryRow = [number, string, string, string, string, string];
+
+const createTestSpreadsheet = async (
+  dir: string,
+  rows: TestQueryRow[] = [[1, 'test news', '', '', '', '30d']]
+): Promise<string> => {
   const filePath = path.join(dir, 'queries.xlsx');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Queries');
   sheet.addRow(['id', 'and_keywords', 'and_exact_phrases', 'or_keywords', 'or_exact_phrases', 'time_range']);
-  sheet.addRow([1, 'test news', '', '', '', '30d']);
+  for (const row of rows) {
+    sheet.addRow(row);
+  }
   await workbook.xlsx.writeFile(filePath);
   return filePath;
 };
@@ -44,6 +51,14 @@ const makeRssXml = (title = 'Test Article', link = 'https://example.com/article'
       <source>Example News</source>
       <content:encoded><![CDATA[${content}]]></content:encoded>
     </item>
+  </channel>
+</rss>`;
+
+const makeEmptyRssXml = (): string =>
+  `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Google News</title>
   </channel>
 </rss>`;
 
@@ -287,6 +302,52 @@ describe('requestGoogleRss terminal path results', () => {
 
     expect(updateResult).toHaveBeenCalledWith(
       expect.objectContaining({ articlesAddedCount: expect.any(Number) })
+    );
+  });
+
+  it('includes one seeded query result for every spreadsheet row', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [1, 'cpsc', '', '', '', '30d'],
+      [2, 'recall', '"product safety"', 'warning', '', '90d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeEmptyRssXml()
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({
+        queryResults: [
+          {
+            id: 1,
+            and_keywords: 'cpsc',
+            and_exact_phrases: '',
+            or_keywords: '',
+            or_exact_phrases: '',
+            time_range: '30d',
+            status: 'skipped',
+            saved_articles: 0,
+            note: 'not_reached'
+          },
+          {
+            id: 2,
+            and_keywords: 'recall',
+            and_exact_phrases: '"product safety"',
+            or_keywords: 'warning',
+            or_exact_phrases: '',
+            time_range: '90d',
+            status: 'skipped',
+            saved_articles: 0,
+            note: 'not_reached'
+          }
+        ]
+      })
     );
   });
 });

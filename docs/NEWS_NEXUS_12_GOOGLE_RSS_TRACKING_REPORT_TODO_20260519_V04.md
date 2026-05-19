@@ -85,31 +85,31 @@ Adds the new types and the `queryResults` array, but leaves every row at the see
 
 ### 1.1 Types
 
-- [ ] In `worker-node/src/modules/jobs/requestGoogleRssJob.ts`, add:
-  - [ ] `export type GoogleRssQueryStatus = 'success' | 'skipped' | 'failed';`
-  - [ ] `export interface GoogleRssQueryResult { id, and_keywords, and_exact_phrases, or_keywords, or_exact_phrases, time_range, status, saved_articles, note }` per V03 plan §1.
-  - [ ] Extend `GoogleRssJobResult` with `queryResults: GoogleRssQueryResult[]`.
+- [x] In `worker-node/src/modules/jobs/requestGoogleRssJob.ts`, add:
+  - [x] `export type GoogleRssQueryStatus = 'success' | 'skipped' | 'failed';`
+  - [x] `export interface GoogleRssQueryResult { id, and_keywords, and_exact_phrases, or_keywords, or_exact_phrases, time_range, status, saved_articles, note }` per V03 plan §1.
+  - [x] Extend `GoogleRssJobResult` with `queryResults: GoogleRssQueryResult[]`.
 
 ### 1.2 Accumulator
 
-- [ ] After `readQuerySpreadsheet(...)` in `runLegacyWorkflow`, build `queryResults: GoogleRssQueryResult[]` by `rows.map(...)` with seed values `status: 'skipped'`, `saved_articles: 0`, `note: 'not_reached'`.
-- [ ] Declare `let currentRowIndex = -1;` immediately before the per-row loop.
-- [ ] Convert the existing `for (const row of rows)` to a numeric `for (let i = 0; i < rows.length; i += 1)` loop. Assign `currentRowIndex = i;` and `const row = rows[i];` at the top of each iteration. Do NOT yet wire any branch to update `queryResults[i]` — leave that for Phase 2.
+- [x] After `readQuerySpreadsheet(...)` in `runLegacyWorkflow`, build `queryResults: GoogleRssQueryResult[]` by `rows.map(...)` with seed values `status: 'skipped'`, `saved_articles: 0`, `note: 'not_reached'`.
+- [x] Declare `let currentRowIndex = -1;` immediately before the per-row loop.
+- [x] Convert the existing `for (const row of rows)` to a numeric `for (let i = 0; i < rows.length; i += 1)` loop. Assign `currentRowIndex = i;` and `const row = rows[i];` at the top of each iteration. Do NOT yet wire any branch to update `queryResults[i]` — leave that for Phase 2.
 
 ### 1.3 Surface on result
 
-- [ ] In the `finally` block, include `queryResults` on the `GoogleRssJobResult` object passed to `context.updateResult(...)`.
+- [x] In the `finally` block, include `queryResults` on the `GoogleRssJobResult` object passed to `context.updateResult(...)`.
 
 ### 1.4 Tests
 
-- [ ] Update any existing test that snapshots the `GoogleRssJobResult` shape to include `queryResults`.
-- [ ] Add one new test: when the spreadsheet has N rows and the job runs to completion (mock `global.fetch` with a valid empty-channel RSS payload for every row), assert the returned `queryResults` has N entries, all with `status: 'skipped'`, `saved_articles: 0`, `note: 'not_reached'`, and original spreadsheet field values preserved.
+- [x] Update any existing test that snapshots the `GoogleRssJobResult` shape to include `queryResults`.
+- [x] Add one new test: when the spreadsheet has N rows and the job runs to completion (mock `global.fetch` with a valid empty-channel RSS payload for every row), assert the returned `queryResults` has N entries, all with `status: 'skipped'`, `saved_articles: 0`, `note: 'not_reached'`, and original spreadsheet field values preserved.
 
 ### 1.5 Phase exit
 
-- [ ] `npx tsc -p tsconfig.json --noEmit` passes.
-- [ ] `npm test` passes (existing tests + the new Phase 1 test).
-- [ ] Commit.
+- [x] `npx tsc -p tsconfig.json --noEmit` passes.
+- [x] `npm test` passes (existing tests + the new Phase 1 test).
+- [x] Commit.
 
 ---
 
