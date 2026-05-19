@@ -2,7 +2,9 @@
 created_at: 2026-05-19
 updated_at: 2026-05-19
 created_by: claude (opus-4.7)
-modified_by: claude (opus-4.7)
+modified_by:
+  - claude (opus-4.7)
+  - codex (gpt-5)
 ---
 
 # News Nexus 12 Google RSS Tracking Report TODO — V04
@@ -155,7 +157,7 @@ For each, update the existing code in `requestGoogleRssJob.ts` per V03 plan §3:
 - [ ] Repeat window (line ~679): write `queryResults[i] = { ..., status: 'skipped', note: 'repeat_window' }` then `continue`.
 - [ ] Post-fetch abort check (line ~693): write `queryResults[i] = { ..., status: 'skipped', note: 'canceled' }` then `break`.
 - [ ] HTTP 503 (line ~699): write `queryResults[i] = { ..., status: 'failed', note: 'rate_limited' }` then `break`.
-- [ ] Non-503 RSS error (lines ~691, ~706-716): **keep the call to `storeRequestAndArticles(..., status: response.status, items: response.items)` exactly as it is today** — this preserves the existing `NewsApiRequest` history row that `wasRequestMadeRecently` relies on. Then write `queryResults[i] = { ..., status: 'failed', note: \`rss_fetch_error: ${response.error}\` }` and `continue`.
+- [ ] Non-503 RSS error (lines ~691, ~706-716): **keep the call to `storeRequestAndArticles(..., status: response.status, items: response.items)` exactly as it is today** — this preserves the existing `NewsApiRequest` history row that `wasRequestMadeRecently` relies on. Then write `queryResults[i] = { ..., status: 'failed', note: \`rss_fetch_error: ${response.error}\` }`. Do not `continue` or otherwise skip the existing post-request delay path; after recording the failed row outcome, let control flow continue through the normal delay and post-delay abort check unless the run is ending.
 - [ ] Success (lines ~706-717): write `queryResults[i] = { ..., status: 'success', saved_articles: savedThisRequest, note: queryResult.timeRangeInvalid ? 'time_range_invalid' : null }`.
 
 ### 2.3 Branches that DO NOT write to `queryResults[i]`
