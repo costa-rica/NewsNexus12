@@ -244,6 +244,16 @@ const buildQuery = (row: QueryRow): QueryBuildResult => {
   }
 
   const { timeRange, timeRangeInvalid } = normalizeTimeRange(row.time_range);
+  if (andTerms.length === 0 && orTerms.length === 0) {
+    return {
+      query: '',
+      andString: combineForDb(row.and_keywords, row.and_exact_phrases),
+      orString: combineForDb(row.or_keywords, row.or_exact_phrases),
+      timeRange,
+      timeRangeInvalid
+    };
+  }
+
   queryParts.push(`when:${timeRange}`);
 
   return {
@@ -692,6 +702,12 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       const row = rows[i];
 
       if (context.signal.aborted) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'skipped',
+          saved_articles: 0,
+          note: 'canceled'
+        };
         endingReason = 'canceled';
         endingMessage = 'Job was canceled before processing all queries.';
         break;
@@ -699,6 +715,12 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
 
       const queryResult = buildQuery(row);
       if (!queryResult.query) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'skipped',
+          saved_articles: 0,
+          note: 'empty_query'
+        };
         logger.warn(`Skipping row ${row.id}: empty query.`);
         continue;
       }
@@ -709,6 +731,12 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         context.doNotRepeatRequestsWithinHours
       );
       if (alreadyRequested) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'skipped',
+          saved_articles: 0,
+          note: 'repeat_window'
+        };
         logger.info(
           `Skipping RSS request (id: ${row.id}): already requested within the last ${context.doNotRepeatRequestsWithinHours} hours: ${requestUrl}`
         );
@@ -723,12 +751,24 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       const response = await fetchRssItems(requestUrl, context.signal);
 
       if (context.signal.aborted) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'skipped',
+          saved_articles: 0,
+          note: 'canceled'
+        };
         endingReason = 'canceled';
         endingMessage = 'Job was canceled during RSS fetch.';
         break;
       }
 
       if (response.statusCode === 503) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'failed',
+          saved_articles: 0,
+          note: 'rate_limited'
+        };
         endingReason = 'rate_limited';
         endingMessage = `HTTP 503 Service Unavailable (id: ${row.id}): ${requestUrl}. Google RSS rate limit likely exceeded. Try increasing MILISECONDS_IN_BETWEEN_REQUESTS (current: ${delayBetweenRequestsMs}ms).`;
         logger.error(endingMessage);
@@ -747,6 +787,22 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         navigationSessionManager
       });
       articlesAddedCount += savedThisRequest;
+
+      if (response.status === 'error') {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'failed',
+          saved_articles: 0,
+          note: `rss_fetch_error: ${response.error ?? 'unknown error'}`
+        };
+      } else {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'success',
+          saved_articles: savedThisRequest,
+          note: queryResult.timeRangeInvalid ? 'time_range_invalid' : null
+        };
+      }
 
       if (
         context.targetArticlesAddedCount !== undefined &&
@@ -770,6 +826,14 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     endingReason = 'error';
     endingMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
     logger.error(`requestGoogleRss job failed: ${endingMessage}`);
+    if (currentRowIndex >= 0 && currentRowIndex < queryResults.length) {
+      queryResults[currentRowIndex] = {
+        ...queryResults[currentRowIndex],
+        status: 'failed',
+        saved_articles: 0,
+        note: `error: ${endingMessage}`
+      };
+    }
   } finally {
     await navigationSessionManager.close();
 

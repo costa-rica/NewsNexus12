@@ -3,6 +3,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  Article,
+  NewsApiRequest,
+  NewsArticleAggregatorSource,
+  initModels
+} from '@newsnexus/db-models';
+import {
   createRequestGoogleRssJobHandler,
   createRssSeedResult,
   DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
@@ -40,19 +46,80 @@ const createTestSpreadsheet = async (
 };
 
 const makeRssXml = (title = 'Test Article', link = 'https://example.com/article', content = 'x'.repeat(300)): string =>
+  makeRssXmlFromItems([{ title, link, content }]);
+
+const makeRssXmlFromItems = (
+  items: Array<{ title: string; link: string; content?: string }>
+): string =>
   `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
     <title>Google News</title>
-    <item>
-      <title>${title}</title>
-      <link>${link}</link>
+    ${items
+      .map(
+        (item) => `<item>
+      <title>${item.title}</title>
+      <link>${item.link}</link>
       <pubDate>Wed, 29 Apr 2026 12:00:00 GMT</pubDate>
       <source>Example News</source>
-      <content:encoded><![CDATA[${content}]]></content:encoded>
-    </item>
+      <content:encoded><![CDATA[${item.content ?? 'x'.repeat(300)}]]></content:encoded>
+    </item>`
+      )
+      .join('\n')}
   </channel>
 </rss>`;
+
+const makeGoogleRssUrl = (query: string): string => {
+  const params = new URLSearchParams({ q: query });
+  params.set('hl', process.env.GOOGLE_RSS_HL || 'en-US');
+  params.set('gl', process.env.GOOGLE_RSS_GL || 'US');
+  params.set('ceid', process.env.GOOGLE_RSS_CEID || 'US:en');
+  return `https://news.google.com/rss/search?${params.toString()}`;
+};
+
+const getLatestResult = (updateResult: jest.Mock): GoogleRssJobResult => {
+  const calls = updateResult.mock.calls;
+  return calls[calls.length - 1][0] as GoogleRssJobResult;
+};
+
+const createArticles = async (urls: string[]): Promise<void> => {
+  for (const url of urls) {
+    await Article.create({
+      publicationName: 'Existing News',
+      title: `Existing ${url}`,
+      description: 'Already saved',
+      url,
+      publishedDate: '2026-04-29'
+    });
+  }
+};
+
+const countArticlesByUrls = async (urls: string[]): Promise<number> => {
+  let count = 0;
+  for (const url of urls) {
+    count += await Article.count({ where: { url } });
+  }
+  return count;
+};
+
+const expectArticlesExist = async (urls: string[]): Promise<void> => {
+  for (const url of urls) {
+    await expect(Article.findOne({ where: { url } })).resolves.toBeTruthy();
+  }
+};
+
+const createAggregatorSourceId = async (): Promise<number> => {
+  const source = await NewsArticleAggregatorSource.create({
+    nameOfOrg: `Test Source ${Date.now()}-${Math.random()}`,
+    isRss: true,
+    isApi: false
+  });
+  return source.id;
+};
+
+beforeAll(() => {
+  initModels();
+});
 
 const makeEmptyRssXml = (): string =>
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -209,8 +276,11 @@ describe('requestGoogleRss terminal path results', () => {
   let tempDir: string;
   let spreadsheetPath: string;
   let fetchSpy: jest.SpyInstance;
+  let originalDelay: string | undefined;
 
   beforeEach(async () => {
+    originalDelay = process.env.MILISECONDS_IN_BETWEEN_REQUESTS;
+    process.env.MILISECONDS_IN_BETWEEN_REQUESTS = '500';
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rss-terminal-'));
     spreadsheetPath = await createTestSpreadsheet(tempDir);
     fetchSpy = jest.spyOn(global, 'fetch');
@@ -218,6 +288,12 @@ describe('requestGoogleRss terminal path results', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
+    jest.restoreAllMocks();
+    if (originalDelay === undefined) {
+      delete process.env.MILISECONDS_IN_BETWEEN_REQUESTS;
+    } else {
+      process.env.MILISECONDS_IN_BETWEEN_REQUESTS = originalDelay;
+    }
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -305,7 +381,7 @@ describe('requestGoogleRss terminal path results', () => {
     );
   });
 
-  it('includes one seeded query result for every spreadsheet row', async () => {
+  it('includes one query result for every spreadsheet row', async () => {
     spreadsheetPath = await createTestSpreadsheet(tempDir, [
       [1, 'cpsc', '', '', '', '30d'],
       [2, 'recall', '"product safety"', 'warning', '', '90d']
@@ -331,9 +407,9 @@ describe('requestGoogleRss terminal path results', () => {
             or_keywords: '',
             or_exact_phrases: '',
             time_range: '30d',
-            status: 'skipped',
+            status: 'success',
             saved_articles: 0,
-            note: 'not_reached'
+            note: null
           },
           {
             id: 2,
@@ -342,12 +418,381 @@ describe('requestGoogleRss terminal path results', () => {
             or_keywords: 'warning',
             or_exact_phrases: '',
             time_range: '90d',
-            status: 'skipped',
+            status: 'success',
             saved_articles: 0,
-            note: 'not_reached'
+            note: null
           }
         ]
       })
     );
+  });
+
+  it('records blank keyword rows as empty_query and continues', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [10, '', '', '', '', '180d'],
+      [11, 'cpsc', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeEmptyRssXml()
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'empty_query'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'success',
+      saved_articles: 0,
+      note: null
+    });
+  });
+
+  it('records repeat-window rows as skipped without creating another request', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [20, 'repeatable query', '', '', '', '30d']
+    ]);
+    const requestUrl = makeGoogleRssUrl('"repeatable query" when:30d');
+    await NewsApiRequest.create({
+      newsArticleAggregatorSourceId: await createAggregatorSourceId(),
+      status: 'success',
+      url: requestUrl,
+      isFromAutomation: true
+    });
+    const countBefore = await NewsApiRequest.count({ where: { url: requestUrl } });
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({
+      spreadsheetPath,
+      doNotRepeatRequestsWithinHours: 72
+    });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'repeat_window'
+    });
+    await expect(NewsApiRequest.count({ where: { url: requestUrl } })).resolves.toBe(countBefore);
+  });
+
+  it('records successful requests with saved article counts and keeps the time range in the URL', async () => {
+    const urls = [
+      'https://example.com/rss-success-1',
+      'https://example.com/rss-success-2',
+      'https://example.com/rss-success-3'
+    ];
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [30, 'success query', '', '', '', '180d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        makeRssXmlFromItems(urls.map((url, index) => ({ title: `Success ${index}`, link: url })))
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    const fetchedUrl = decodeURIComponent(String(fetchSpy.mock.calls[0][0]));
+    expect(fetchedUrl).toContain('when:180d');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'success',
+      saved_articles: 3,
+      note: null
+    });
+    await expectArticlesExist(urls);
+    await expect(NewsApiRequest.count({ where: { url: String(fetchSpy.mock.calls[0][0]) } })).resolves.toBe(1);
+  });
+
+  it('records successful requests with zero saves when all articles already exist', async () => {
+    const urls = [
+      'https://example.com/rss-existing-1',
+      'https://example.com/rss-existing-2',
+      'https://example.com/rss-existing-3'
+    ];
+    await createArticles(urls);
+    const articleCountBefore = await countArticlesByUrls(urls);
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [40, 'existing query', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        makeRssXmlFromItems(urls.map((url, index) => ({ title: `Existing ${index}`, link: url })))
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'success',
+      saved_articles: 0,
+      note: null
+    });
+    await expect(countArticlesByUrls(urls)).resolves.toBe(articleCountBefore);
+    await expect(NewsApiRequest.count({ where: { url: String(fetchSpy.mock.calls[0][0]) } })).resolves.toBe(1);
+  });
+
+  it('persists non-503 RSS errors and continues after the normal delay path', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [50, 'server error query', '', '', '', '30d'],
+      [51, 'after error query', '', '', '', '30d']
+    ]);
+    const errorUrl = makeGoogleRssUrl('"server error query" when:30d');
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'server error'
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => makeEmptyRssXml()
+      } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    const errorRequest = await NewsApiRequest.findOne({ where: { url: errorUrl } });
+    expect(errorRequest).toMatchObject({
+      status: 'error',
+      countOfArticlesSavedToDbFromRequest: 0
+    });
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'failed',
+      saved_articles: 0,
+      note: 'rss_fetch_error: RSS request failed with status 500'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'success',
+      saved_articles: 0,
+      note: null
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('records HTTP 503 as rate_limited and leaves later rows not_reached', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [60, 'rate limited query', '', '', '', '30d'],
+      [61, 'tail query', '', '', '', '30d']
+    ]);
+    const rateLimitedUrl = makeGoogleRssUrl('rate limited query when:30d');
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => 'unavailable'
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('rate_limited');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'failed',
+      saved_articles: 0,
+      note: 'rate_limited'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    });
+    await expect(NewsApiRequest.count({ where: { url: rateLimitedUrl } })).resolves.toBe(0);
+  });
+
+  it('keeps the successful row outcome when the target is reached', async () => {
+    const urls = [
+      'https://example.com/rss-target-1',
+      'https://example.com/rss-target-2',
+      'https://example.com/rss-target-3'
+    ];
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [70, 'target query', '', '', '', '30d'],
+      [71, 'after target query', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        makeRssXmlFromItems(urls.map((url, index) => ({ title: `Target ${index}`, link: url })))
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({
+      spreadsheetPath,
+      doNotRepeatRequestsWithinHours: 0,
+      targetArticlesAddedCount: 3
+    });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('target_articles_collected');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'success',
+      saved_articles: 3,
+      note: null
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the successful row outcome when canceled during the post-request delay', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [80, 'cancel after success', '', '', '', '30d'],
+      [81, 'after cancel', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeRssXml('Cancel Success', 'https://example.com/rss-cancel-after-success')
+    } as Response);
+    const controller = new AbortController();
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+    const abortTimer = setTimeout(() => controller.abort(), 100);
+
+    await handler(makeQueueContext({ signal: controller.signal, updateResult }));
+    clearTimeout(abortTimer);
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('canceled');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'success',
+      saved_articles: 1,
+      note: null
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the active row as canceled when the signal is pre-aborted', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [90, 'pre canceled', '', '', '', '30d'],
+      [91, 'after pre canceled', '', '', '', '30d']
+    ]);
+    const controller = new AbortController();
+    controller.abort();
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ signal: controller.signal, updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'canceled'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('records the active row as failed when an article create throws mid-row', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [100, '', '', '', '', '30d'],
+      [101, 'exception query', '', '', '', '30d'],
+      [102, 'after exception', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => makeRssXml('Exception Article', 'https://example.com/rss-exception')
+    } as Response);
+    jest.spyOn(Article, 'create').mockRejectedValueOnce(new Error('article create failed'));
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('error');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'empty_query'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      status: 'failed',
+      saved_articles: 0,
+      note: 'error: article create failed'
+    });
+    expect(result.queryResults[2]).toMatchObject({
+      status: 'skipped',
+      saved_articles: 0,
+      note: 'not_reached'
+    });
+  });
+
+  it('preserves duplicate spreadsheet ids as separate query results', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [110, 'duplicate one', '', '', '', '30d'],
+      [110, 'duplicate two', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeEmptyRssXml()
+    } as Response);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.queryResults).toHaveLength(2);
+    expect(result.queryResults[0]).toMatchObject({
+      id: 110,
+      and_keywords: 'duplicate one',
+      status: 'success'
+    });
+    expect(result.queryResults[1]).toMatchObject({
+      id: 110,
+      and_keywords: 'duplicate two',
+      status: 'success'
+    });
   });
 });
