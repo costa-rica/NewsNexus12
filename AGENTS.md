@@ -162,6 +162,14 @@ created_by: codex (gpt-5)
 modified_by: claude (haiku-4.5)
 ```
 
+### Archive Subfolder
+
+- Really old docs are moved into `docs/archive/`.
+- Organized into per-month subfolders named `YYYYMM/` (e.g. `202604/`).
+- Not every month will have a folder — only months with archived files exist.
+- Usually managed by the operator, not the AI coding agent.
+- Agents: these files are kept for reference only; do not review them when scanning the project to build context.
+
 ## Commit Message Guidance
 
 ### Guidelines
