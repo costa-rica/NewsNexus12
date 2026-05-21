@@ -56,8 +56,13 @@ const getArticleRows = async (
       SELECT status FROM "ArticleContents02" WHERE "articleId" = a.id ORDER BY id DESC LIMIT 1
     ) ac ON true
     LEFT JOIN LATERAL (
-      SELECT st.name FROM "ArticleStateContracts02" asc2
-      JOIN "States" st ON st.id = asc2."stateId"
+      SELECT
+        CASE
+          WHEN asc2."stateId" IS NULL THEN 'No state'
+          ELSE st.name
+        END AS name
+      FROM "ArticleStateContracts02" asc2
+      LEFT JOIN "States" st ON st.id = asc2."stateId"
       WHERE asc2."articleId" = a.id
       ORDER BY asc2.id DESC LIMIT 1
     ) s ON true

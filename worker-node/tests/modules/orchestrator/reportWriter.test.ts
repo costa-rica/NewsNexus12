@@ -63,6 +63,19 @@ const getHeaderValues = (sheet: ExcelJS.Worksheet): string[] => {
   );
 };
 
+const makeArticleRun = (): OrchestratorRunRow => ({
+  ...makeRun(),
+  articleIdMinExclusive: 0,
+  articleIdMaxInclusive: 100,
+});
+
+const makeArticleStep = (): OrchestratorRunStepRow =>
+  makeStep({
+    stepName: 'state_assigner',
+    stepOrder: 3,
+    result: null,
+  });
+
 describe('reportWriter google rss query sheet', () => {
   let tempDir: string;
   let originalUtilitiesPath: string | undefined;
@@ -188,5 +201,142 @@ describe('reportWriter google rss query sheet', () => {
     expect(reportPath).not.toBeNull();
     const workbook = await readWorkbook(reportPath!);
     expect(workbook.getWorksheet('Google RSS Queries')).toBeUndefined();
+  });
+});
+
+describe('reportWriter articles sheet state column', () => {
+  let tempDir: string;
+  let originalUtilitiesPath: string | undefined;
+
+  beforeEach(async () => {
+    mockSequelizeQuery.mockResolvedValue([[], null]);
+    originalUtilitiesPath = process.env.PATH_UTILTIES;
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'report-writer-'));
+    process.env.PATH_UTILTIES = tempDir;
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    mockSequelizeQuery.mockReset();
+    if (originalUtilitiesPath === undefined) {
+      delete process.env.PATH_UTILTIES;
+    } else {
+      process.env.PATH_UTILTIES = originalUtilitiesPath;
+    }
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('renders the state name when the latest assignment has a non-null stateId', async () => {
+    mockSequelizeQuery.mockResolvedValueOnce([
+      [
+        {
+          articleId: 1,
+          title: 't',
+          scrapeStatus: 'completed',
+          aiAssignedState: 'California',
+          aiApproverScore: null,
+          aiGatekeeperDecision: null,
+          aiGatekeeperConfidence: null,
+          aiGatekeeperReasonCode: null,
+          semanticRating: null,
+        },
+      ],
+      null,
+    ]);
+
+    const reportPath = await writeReport(makeArticleRun(), [makeArticleStep()]);
+
+    expect(reportPath).not.toBeNull();
+    const workbook = await readWorkbook(reportPath!);
+    const sheet = workbook.getWorksheet('Articles');
+    expect(sheet).toBeDefined();
+    expect(sheet!.getRow(2).getCell(4).value).toBe('California');
+  });
+
+  it('renders "No state" when the latest assignment has stateId = NULL', async () => {
+    mockSequelizeQuery.mockResolvedValueOnce([
+      [
+        {
+          articleId: 1,
+          title: 't',
+          scrapeStatus: 'completed',
+          aiAssignedState: 'No state',
+          aiApproverScore: null,
+          aiGatekeeperDecision: null,
+          aiGatekeeperConfidence: null,
+          aiGatekeeperReasonCode: null,
+          semanticRating: null,
+        },
+      ],
+      null,
+    ]);
+
+    const reportPath = await writeReport(makeArticleRun(), [makeArticleStep()]);
+
+    expect(reportPath).not.toBeNull();
+    const workbook = await readWorkbook(reportPath!);
+    const sheet = workbook.getWorksheet('Articles');
+    expect(sheet).toBeDefined();
+    expect(sheet!.getRow(2).getCell(4).value).toBe('No state');
+  });
+
+  it('leaves the AI Assigned State cell empty when no assignment row exists', async () => {
+    mockSequelizeQuery.mockResolvedValueOnce([
+      [
+        {
+          articleId: 1,
+          title: 't',
+          scrapeStatus: 'completed',
+          aiAssignedState: null,
+          aiApproverScore: null,
+          aiGatekeeperDecision: null,
+          aiGatekeeperConfidence: null,
+          aiGatekeeperReasonCode: null,
+          semanticRating: null,
+        },
+      ],
+      null,
+    ]);
+
+    const reportPath = await writeReport(makeArticleRun(), [makeArticleStep()]);
+
+    expect(reportPath).not.toBeNull();
+    const workbook = await readWorkbook(reportPath!);
+    const sheet = workbook.getWorksheet('Articles');
+    expect(sheet).toBeDefined();
+    expect(sheet!.getRow(2).getCell(4).value == null).toBe(true);
+  });
+
+  it('emits a null-state-preserving lateral subquery for the article state', async () => {
+    mockSequelizeQuery.mockResolvedValueOnce([
+      [
+        {
+          articleId: 1,
+          title: 't',
+          scrapeStatus: 'completed',
+          aiAssignedState: 'California',
+          aiApproverScore: null,
+          aiGatekeeperDecision: null,
+          aiGatekeeperConfidence: null,
+          aiGatekeeperReasonCode: null,
+          semanticRating: null,
+        },
+      ],
+      null,
+    ]);
+
+    const reportPath = await writeReport(makeArticleRun(), [makeArticleStep()]);
+
+    expect(reportPath).not.toBeNull();
+    const articleCall = mockSequelizeQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('"ArticleStateContracts02"')
+    );
+    expect(articleCall).toBeDefined();
+    const sql = articleCall![0] as string;
+    expect(sql).toContain('LEFT JOIN LATERAL');
+    expect(sql).toContain('LEFT JOIN "States"');
+    expect(sql).toContain('asc2."stateId" IS NULL');
+    expect(sql).toContain("'No state'");
+    expect(sql).not.toMatch(/(?<!LEFT\s)JOIN\s+"States"/i);
   });
 });
