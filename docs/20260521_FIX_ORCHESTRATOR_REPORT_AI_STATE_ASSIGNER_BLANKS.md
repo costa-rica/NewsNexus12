@@ -1,3 +1,10 @@
+---
+created_at: 2026-05-21
+updated_at: 2026-05-21
+created_by: codex (gpt-5.5)
+modified_by: codex (gpt-5.5)
+---
+
 # Issue: Orchestrator report leaves AI State Assigner null-state results blank
 
 ## Summary
