@@ -206,7 +206,6 @@ export default function ApprovedArticleDuplicate() {
 
   // Initial API calls on mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     fetchJobListStatus();
     fetchArticleDuplicateAnalysesStatus();
     fetchReportsArray();
