@@ -27,6 +27,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   // Update internal state when defaultSelected prop changes (e.g., when a new article is selected)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- controlled/uncontrolled bridge; see PLAN V03 Pattern B
     setSelectedOptions(defaultSelected);
   }, [defaultSelected]);
 

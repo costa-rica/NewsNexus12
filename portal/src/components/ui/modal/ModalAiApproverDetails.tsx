@@ -164,6 +164,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
   }, [details]);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- form reset when selected top score changes; see PLAN V03 Pattern B */
     if (!topEligibleScore) {
       setHumanApprovalValue(null);
       setReasonHumanRejected("");
@@ -172,6 +173,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
 
     setHumanApprovalValue(topEligibleScore.isHumanApproved);
     setReasonHumanRejected(topEligibleScore.reasonHumanRejected ?? "");
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [topEligibleScore]);
 
   const togglePrompt = (promptId: number) => {

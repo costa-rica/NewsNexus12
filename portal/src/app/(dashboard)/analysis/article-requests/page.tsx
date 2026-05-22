@@ -18,7 +18,7 @@ export default function ArticleRequestsAnalysis() {
   const [dateModified, setDateModified] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const fetchApprovedArticles = useCallback(async () => {
+  const fetchApprovedArticles = useCallback(async (dateRequestsLimit?: string) => {
     setLoading(true);
     try {
       const response = await fetch(
@@ -31,7 +31,7 @@ export default function ArticleRequestsAnalysis() {
           method: "POST",
           body: JSON.stringify({
             dateRequestsLimit:
-              requestsAnalysisTableBodyParams?.dateRequestsLimit,
+              dateRequestsLimit ?? requestsAnalysisTableBodyParams?.dateRequestsLimit,
           }),
         }
       );
@@ -63,6 +63,7 @@ export default function ArticleRequestsAnalysis() {
   }, [token, requestsAnalysisTableBodyParams?.dateRequestsLimit]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     fetchApprovedArticles();
   }, [fetchApprovedArticles]);
 
@@ -142,12 +143,14 @@ export default function ArticleRequestsAnalysis() {
                     requestsAnalysisTableBodyParams?.dateRequestsLimit || ""
                   }
                   onChange={(e) => {
+                    const nextDateRequestsLimit = e.target.value;
                     setDateModified(true);
                     dispatch(
                       updateRequestsAnalysisTableBodyParams({
-                        dateRequestsLimit: e.target.value,
+                        dateRequestsLimit: nextDateRequestsLimit,
                       })
                     );
+                    void fetchApprovedArticles(nextDateRequestsLimit);
                   }}
                   className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
                     dateModified
@@ -157,7 +160,7 @@ export default function ArticleRequestsAnalysis() {
                 />
                 {dateModified && (
                   <button
-                    onClick={fetchApprovedArticles}
+                    onClick={() => void fetchApprovedArticles()}
                     className="px-4 py-2 bg-brand-500 text-white text-sm font-medium rounded-lg hover:bg-brand-600 transition-colors dark:bg-brand-600 dark:hover:bg-brand-700"
                   >
                     Refresh

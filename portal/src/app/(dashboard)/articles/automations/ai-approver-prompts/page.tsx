@@ -198,10 +198,6 @@ export default function AiApproverPromptsPage() {
 		return filteredAndSortedPrompts.slice(pageStart, pageStart + pageSize);
 	}, [filteredAndSortedPrompts, pageSize, safeCurrentPage]);
 
-	useEffect(() => {
-		setCurrentPage(1);
-	}, [showActiveOnly, pageSize]);
-
 	const handleSort = (column: SortColumn) => {
 		if (sortColumn === column) {
 			setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -687,7 +683,10 @@ export default function AiApproverPromptsPage() {
 					<div className="flex flex-wrap items-center gap-3">
 						<button
 							type="button"
-							onClick={() => setShowActiveOnly((current) => !current)}
+							onClick={() => {
+								setShowActiveOnly((current) => !current);
+								setCurrentPage(1);
+							}}
 							disabled={loading}
 							className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 						>
@@ -730,7 +729,10 @@ export default function AiApproverPromptsPage() {
 									<button
 										key={option}
 										type="button"
-										onClick={() => setPageSize(option)}
+										onClick={() => {
+											setPageSize(option);
+											setCurrentPage(1);
+										}}
 										className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
 											pageSize === option
 												? "bg-brand-500 text-white dark:bg-brand-600"

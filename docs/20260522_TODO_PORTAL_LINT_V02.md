@@ -210,25 +210,25 @@ state and compute inline). Drops 4 warnings.
 
 5 locations. Drops 5.
 
-- [ ] **`portal/src/app/(dashboard)/admin-database/main/page.tsx:90`** —
+- [x] **`portal/src/app/(dashboard)/admin-database/main/page.tsx:90`** —
       effect fetches when `selectedTable` changes. Move
       `fetchTableData(selectedTable)` into the dropdown's `onChange`
       handler (alongside `setSelectedTable`). Remove the effect.
       Initial load: either call `fetchTableData(initialTable)` once
       in a Pattern-C suppressed mount effect, or render empty until
       first selection.
-- [ ] **`portal/src/app/(dashboard)/analysis/article-requests/page.tsx:66`** —
+- [x] **`portal/src/app/(dashboard)/analysis/article-requests/page.tsx:66`** —
       effect refetches when `dateRequestsLimit` changes. Move the
       refetch into the date-limit input's change handler. If a
       mount-only initial fetch is still needed, add a Pattern-C
       suppressed effect for that purpose only.
-- [ ] **`portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:201`** —
+- [x] **`portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:201`** —
       effect resets `currentPage` to 1 when `showActiveOnly` or
       `pageSize` change. Move the `setCurrentPage(1)` into the
       respective change handlers (the "active only" toggle's
       `onChange` and the page-size selector's `onChange`). Remove
       the effect.
-- [ ] **`portal/src/components/form/MultiSelect.tsx:30`** — prop-mirror
+- [x] **`portal/src/components/form/MultiSelect.tsx:30`** — prop-mirror
       anti-pattern. Cleanest fix: lift selection to the parent
       (controlled component). If out of scope for this commit, apply
       a scope suppression directly above the flagged statement
@@ -237,21 +237,21 @@ state and compute inline). Drops 4 warnings.
       ```ts
       // eslint-disable-next-line react-hooks/set-state-in-effect -- controlled/uncontrolled bridge; see PLAN V03 Pattern B
       ```
-- [ ] **`portal/src/components/ui/modal/ModalAiApproverDetails.tsx:168`** —
+- [x] **`portal/src/components/ui/modal/ModalAiApproverDetails.tsx:168`** —
       effect resets `humanApprovalValue` and `reasonHumanRejected`
       when `topEligibleScore` changes. Restructure: compute initial
       values from `topEligibleScore` in a `useMemo`, or apply a
       `key` reset to the form section to remount it. If neither is
       desirable, scope-suppress with a Pattern-B reason.
-- [ ] Run dev server, manually verify: admin-database/main dropdown
+- [x] Run dev server, manually verify: admin-database/main dropdown
       still refetches; analysis/article-requests date filter still
       works; ai-approver-prompts pagination resets correctly;
       multi-select still updates when parent passes new
       `defaultSelected`; AI Approver modal still resets fields when
       `topEligibleScore` changes.
-- [ ] Verify lint count: **35 → 30** (`-5`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **35 → 30** (`-5`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 4 — Pattern C: mount-fetch / keyed-load scope-suppress
 
