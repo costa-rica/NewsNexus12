@@ -358,21 +358,21 @@ Drops 4.
 
 2 locations. Drops 2.
 
-- [ ] **`portal/src/app/(dashboard)/articles/review/page.tsx:453`**
+- [x] **`portal/src/app/(dashboard)/articles/review/page.tsx:453`**
       (`react-hooks/immutability`): `handleSelectArticleFromTable` is
       called on line 453 but declared on line 458. Wrap the function
       in `useCallback` and move the declaration above the
       `useEffect` that calls it (around line 440). Update any other
       callers as needed.
-- [ ] **`portal/src/app/(dashboard)/analysis/article-requests/page.tsx:21`**
+- [x] **`portal/src/app/(dashboard)/analysis/article-requests/page.tsx:21`**
       (`react-hooks/preserve-manual-memoization`): inspect the
       `useMemo`/`useCallback` at line 21. Either align its deps to
       the React Compiler-inferred deps, or remove the manual
       memoization and let the compiler infer. If unclear, suppress
       with a named comment placed above the relevant call.
-- [ ] Verify lint count: **2 → 0** (`-2`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **2 → 0** (`-2`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 8 — restore rules to `error` + lock the gate
 

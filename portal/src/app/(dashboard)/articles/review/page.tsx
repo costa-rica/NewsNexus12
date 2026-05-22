@@ -433,6 +433,78 @@ export default function ReviewArticles() {
 		[dispatch, userReducer.stateArray]
 	);
 
+	const handleSelectArticleFromTable = useCallback(
+		async (article: Article) => {
+			console.log("Selected article:", article);
+
+			try {
+				const [approvedResponse, contentResponse] = await Promise.all([
+					fetch(
+						`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles/get-approved/${article.id}`,
+						{
+							headers: { Authorization: `Bearer ${token}` },
+						}
+					),
+					fetch(
+						`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles/review-selected-content/${article.id}`,
+						{
+							headers: { Authorization: `Bearer ${token}` },
+						}
+					),
+				]);
+
+				if (!approvedResponse.ok) {
+					const errorText = await approvedResponse.text();
+					throw new Error(`Server Error: ${errorText}`);
+				}
+
+				if (!contentResponse.ok) {
+					const errorText = await contentResponse.text();
+					throw new Error(`Server Error: ${errorText}`);
+				}
+
+				const result = await approvedResponse.json();
+				const contentResult = (await contentResponse.json()) as {
+					hasArticleContent?: boolean;
+					content?: string | null;
+				};
+				console.log("Fetched approved article data:", result);
+				console.log("Fetched selected article content:", contentResult);
+
+				if (result.article && result.article.id) {
+					setSelectedArticle({
+						...result.article,
+						...article,
+						approved: result.result,
+						content: result.content ?? article.description,
+						isApproved: true, // Mark as approved
+					});
+					updateStateArrayWithArticleState(result.article);
+				} else {
+					const selectedContent =
+						contentResult.hasArticleContent && typeof contentResult.content === "string"
+							? contentResult.content
+							: null;
+
+					setSelectedArticle({
+						...article,
+						content: selectedContent ?? article.description,
+						isApproved: false,
+					});
+					updateStateArrayWithArticleState(article);
+				}
+			} catch (error) {
+				console.error("Error fetching approved article:", error);
+				setSelectedArticle({
+					...article,
+					content: article.description,
+				});
+				updateStateArrayWithArticleState(article);
+			}
+		},
+		[token, updateStateArrayWithArticleState]
+	);
+
 	// Fetch articles only on initial mount
 	useEffect(() => {
 		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
@@ -447,79 +519,15 @@ export default function ReviewArticles() {
 			: articlesArray;
 
 		if (filteredArticles.length > 0) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect -- select first visible article after list refresh; pending SWR migration
 			void handleSelectArticleFromTable(filteredArticles[0]);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [allowUpdateSelectedArticle, articlesArray, userReducer.hideIrrelevant]);
-
-	const handleSelectArticleFromTable = async (article: Article) => {
-		console.log("Selected article:", article);
-
-		try {
-			const [approvedResponse, contentResponse] = await Promise.all([
-				fetch(
-					`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles/get-approved/${article.id}`,
-					{
-						headers: { Authorization: `Bearer ${token}` },
-					}
-				),
-				fetch(
-					`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles/review-selected-content/${article.id}`,
-					{
-						headers: { Authorization: `Bearer ${token}` },
-					}
-				),
-			]);
-
-			if (!approvedResponse.ok) {
-				const errorText = await approvedResponse.text();
-				throw new Error(`Server Error: ${errorText}`);
-			}
-
-			if (!contentResponse.ok) {
-				const errorText = await contentResponse.text();
-				throw new Error(`Server Error: ${errorText}`);
-			}
-
-			const result = await approvedResponse.json();
-			const contentResult = (await contentResponse.json()) as {
-				hasArticleContent?: boolean;
-				content?: string | null;
-			};
-			console.log("Fetched approved article data:", result);
-			console.log("Fetched selected article content:", contentResult);
-
-			if (result.article && result.article.id) {
-				setSelectedArticle({
-					...result.article,
-					...article,
-					approved: result.result,
-					content: result.content ?? article.description,
-					isApproved: true, // Mark as approved
-				});
-				updateStateArrayWithArticleState(result.article);
-			} else {
-				const selectedContent =
-					contentResult.hasArticleContent && typeof contentResult.content === "string"
-						? contentResult.content
-						: null;
-
-				setSelectedArticle({
-					...article,
-					content: selectedContent ?? article.description,
-					isApproved: false,
-				});
-				updateStateArrayWithArticleState(article);
-			}
-		} catch (error) {
-			console.error("Error fetching approved article:", error);
-			setSelectedArticle({
-				...article,
-				content: article.description,
-			});
-			updateStateArrayWithArticleState(article);
-		}
-	};
+	}, [
+		allowUpdateSelectedArticle,
+		articlesArray,
+		handleSelectArticleFromTable,
+		userReducer.hideIrrelevant,
+	]);
 
 	const handleClickIsReviewed = async (articleId: number) => {
 		console.log("Clicked is reviewed for article:", articleId);
