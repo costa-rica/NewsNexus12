@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAppSelector } from "@/store/hooks";
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
@@ -116,7 +116,7 @@ export function WorkerPythonJobStatusPanel({
     DEFAULT_ALERT_MODAL_STATE,
   );
 
-  const fetchLatestJob = async (showErrorModal = true) => {
+  const fetchLatestJob = useCallback(async (showErrorModal = true) => {
     setIsRefreshing(true);
 
     try {
@@ -149,12 +149,12 @@ export function WorkerPythonJobStatusPanel({
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [endpointName, token]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
     void fetchLatestJob(false);
-  }, [endpointName, refreshSignal, token]);
+  }, [fetchLatestJob, refreshSignal]);
 
   const handleCancelJob = async () => {
     if (!job) {

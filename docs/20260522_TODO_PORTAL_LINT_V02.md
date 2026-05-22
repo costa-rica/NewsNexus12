@@ -319,40 +319,40 @@ Drops 4.
 
 8 locations. Drops 8.
 
-- [ ] **`portal/src/components/automations/OrchestratorSection.tsx:208`** —
+- [x] **`portal/src/components/automations/OrchestratorSection.tsx:208`** —
       `useCallback` for `fetchActiveRun` is missing `authHeaders` in
       deps. Add `authHeaders` to the deps array, OR move the
       `authHeaders` computation inside the callback. Verify no
       infinite-loop side effect on the page.
-- [ ] **`portal/src/components/automations/OrchestratorSection.tsx:224`** —
+- [x] **`portal/src/components/automations/OrchestratorSection.tsx:224`** —
       same pattern for `fetchPastRuns`. Apply the same fix.
-- [ ] **`portal/src/components/automations/OrchestratorSection.tsx:246`** —
+- [x] **`portal/src/components/automations/OrchestratorSection.tsx:246`** —
       effect deps are `[activeRun?.status]` but the body uses
       `activeRun` and `fetchPastRuns`. Add both; if the effect now
       fires too often, suppress with a named comment placed above
       the flagged statement.
-- [ ] **`portal/src/components/automations/WorkerNodeJobStatusPanel.tsx:148`** —
+- [x] **`portal/src/components/automations/WorkerNodeJobStatusPanel.tsx:148`** —
       effect calls `fetchLatestJob` but deps array does not include
       it. Add it (and wrap `fetchLatestJob` in `useCallback` if it
       causes excessive re-runs), OR suppress.
-- [ ] **`portal/src/components/automations/WorkerPythonJobStatusPanel.tsx:156`** —
+- [x] **`portal/src/components/automations/WorkerPythonJobStatusPanel.tsx:156`** —
       same pattern.
-- [ ] **`portal/src/components/tables/TableReviewArticles.tsx:708`** —
+- [x] **`portal/src/components/tables/TableReviewArticles.tsx:708`** —
       `useMemo` deps list is missing one or more handlers it
       references. Inspect, add. If wrapping handlers in
       `useCallback` is needed to avoid recompute storms, do that
       too.
-- [ ] **`portal/src/components/tables/TableReviewStateAssigner.tsx:251`** —
+- [x] **`portal/src/components/tables/TableReviewStateAssigner.tsx:251`** —
       same pattern; columns `useMemo` deps may be missing.
-- [ ] **`portal/src/components/ui/modal/ModalAiApproverDetails.tsx:124`** —
+- [x] **`portal/src/components/ui/modal/ModalAiApproverDetails.tsx:124`** —
       effect deps `[articleId, token]` but body calls `fetchDetails`.
       Either add `fetchDetails` (wrap in `useCallback`), OR suppress.
-- [ ] Run dev server, manually verify each affected page: no
+- [x] Run dev server, manually verify each affected page: no
       infinite request loops in the network tab, no visible UI
       regressions.
-- [ ] Verify lint count: **10 → 2** (`-8`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **10 → 2** (`-8`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 7 — `immutability` + `preserve-manual-memoization`
 

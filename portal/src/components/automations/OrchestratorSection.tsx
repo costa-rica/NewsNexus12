@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppSelector } from "@/store/hooks";
 import { CollapsibleAutomationSection } from "@/components/automations/CollapsibleAutomationSection";
 import { Modal } from "@/components/ui/modal";
@@ -179,10 +179,13 @@ export function OrchestratorSection() {
   const [pastRuns, setPastRuns] = useState<OrchestratorRun[]>([]);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
 
-  const authHeaders = {
-    Authorization: `Bearer ${token ?? ""}`,
-    "Content-Type": "application/json",
-  };
+  const authHeaders = useMemo(
+    () => ({
+      Authorization: `Bearer ${token ?? ""}`,
+      "Content-Type": "application/json",
+    }),
+    [token],
+  );
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
   const fetchActiveRun = useCallback(async (): Promise<void> => {
@@ -205,7 +208,7 @@ export function OrchestratorSection() {
     } catch {
       // silent — polling is best-effort
     }
-  }, [apiBase, token]);
+  }, [apiBase, authHeaders]);
 
   const fetchPastRuns = useCallback(async (): Promise<void> => {
     setIsLoadingRuns(true);
@@ -221,7 +224,7 @@ export function OrchestratorSection() {
     } finally {
       setIsLoadingRuns(false);
     }
-  }, [apiBase, token]);
+  }, [apiBase, authHeaders]);
 
   // ── Initial load + polling ────────────────────────────────────────────────────
 
@@ -245,7 +248,7 @@ export function OrchestratorSection() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
       void fetchPastRuns();
     }
-  }, [activeRun?.status]);
+  }, [activeRun, fetchPastRuns]);
 
   // ── Actions ────────────────────────────────────────────────────────────────────
 
