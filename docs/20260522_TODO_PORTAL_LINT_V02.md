@@ -168,7 +168,7 @@ Single config change. Drops 13 warnings.
 4 locations. Replace `useState + useEffect` with `useMemo` (or remove
 state and compute inline). Drops 4 warnings.
 
-- [ ] **`portal/src/app/(dashboard)/admin-database/main/page.tsx:42`** —
+- [x] **`portal/src/app/(dashboard)/admin-database/main/page.tsx:42`** —
       `tableKeys` is computed by an effect from `tableData`. Delete the
       `useState<string[]>` for `tableKeys` and the effect at 38–43.
       Replace usages with:
@@ -182,29 +182,29 @@ state and compute inline). Drops 4 warnings.
         [tableData],
       );
       ```
-- [ ] **`portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:205`** —
+- [x] **`portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:205`** —
       effect clamps `currentPage` to `totalPages`. Remove the effect.
       Where the value is read, use
       `Math.min(currentPage, totalPages)` directly or a derived
       `const safeCurrentPage = Math.min(currentPage, totalPages);`.
       Keep `setCurrentPage` for explicit setters elsewhere.
-- [ ] **`portal/src/app/(dashboard)/articles/review/page.tsx:97`** —
+- [x] **`portal/src/app/(dashboard)/articles/review/page.tsx:97`** —
       `hasFilterChanges` is computed by comparing current filters to
       `initialFiltersRef`. Replace the `useState` and effect with a
       `useMemo` returning the same boolean. Audit any caller that
       does `setHasFilterChanges(false)` explicitly — they need to be
       removed or replaced with a ref reset.
-- [ ] **`portal/src/components/ui/modal/ModalReviewArticleContent.tsx:197`** —
+- [x] **`portal/src/components/ui/modal/ModalReviewArticleContent.tsx:197`** —
       effect clamps `currentPage` to `totalPages` (same pattern as the
       ai-approver-prompts case). Remove the effect, use
       `Math.min(currentPage, totalPages)` at read sites.
-- [ ] Run dev server, manually verify: admin-database/main loads and
+- [x] Run dev server, manually verify: admin-database/main loads and
       switches tables; ai-approver-prompts paginates correctly;
       articles/review filter UI lights up when filters change; the
       review-article-content modal still paginates correctly.
-- [ ] Verify lint count: **39 → 35** (`-4`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **39 → 35** (`-4`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 3 — Pattern B: event-driven → handler or restructure
 

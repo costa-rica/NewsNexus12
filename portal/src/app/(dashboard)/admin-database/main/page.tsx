@@ -17,7 +17,6 @@ export default function AdminDatabaseMain() {
   const { token, isAdmin } = useAppSelector((state) => state.user);
   const [selectedTable, setSelectedTable] = useState<string>("User");
   const [tableData, setTableData] = useState<TableRow[]>([]);
-  const [tableKeys, setTableKeys] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
@@ -34,13 +33,13 @@ export default function AdminDatabaseMain() {
     message: "",
   });
 
-  // Extract all column keys from table data (except id)
-  useEffect(() => {
-    if (tableData.length === 0) return;
-
-    const allKeys = Object.keys(tableData[0]).filter((key) => key !== "id");
-    setTableKeys(allKeys);
-  }, [tableData]);
+  const tableKeys = useMemo(
+    () =>
+      tableData.length === 0
+        ? []
+        : Object.keys(tableData[0]).filter((key) => key !== "id"),
+    [tableData]
+  );
 
   const fetchTableData = useCallback(
     async (tableName: string) => {

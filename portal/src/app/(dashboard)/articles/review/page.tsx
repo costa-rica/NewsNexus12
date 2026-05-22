@@ -66,7 +66,6 @@ export default function ReviewArticles() {
 		table01: false,
 	});
 	const [allowUpdateSelectedArticle] = useState(true);
-	const [hasFilterChanges, setHasFilterChanges] = useState(false);
 	const [alertModal, setAlertModal] = useState<{
 		show: boolean;
 		variant: "success" | "error";
@@ -79,8 +78,7 @@ export default function ReviewArticles() {
 		message: "",
 	});
 
-	// Track initial filter values to detect changes - use ref so we can update it
-	const initialFiltersRef = React.useRef({
+	const [initialFilters, setInitialFilters] = useState({
 		returnOnlyThisPublishedDateOrAfter:
 			userReducer.articleTableBodyParams?.returnOnlyThisPublishedDateOrAfter ?? null,
 		returnOnlyThisCreatedAtDateOrAfter:
@@ -91,23 +89,21 @@ export default function ReviewArticles() {
 			userReducer.articleTableBodyParams?.returnOnlyIsRelevant ?? true,
 	});
 
-	// Check if filters have changed
-	useEffect(() => {
+	const hasFilterChanges = useMemo(() => {
 		if (!userReducer.articleTableBodyParams) {
-			setHasFilterChanges(false);
-			return;
+			return false;
 		}
-		const changed =
+		return (
 			userReducer.articleTableBodyParams.returnOnlyThisPublishedDateOrAfter !==
-				initialFiltersRef.current.returnOnlyThisPublishedDateOrAfter ||
+				initialFilters.returnOnlyThisPublishedDateOrAfter ||
 			userReducer.articleTableBodyParams.returnOnlyThisCreatedAtDateOrAfter !==
-				initialFiltersRef.current.returnOnlyThisCreatedAtDateOrAfter ||
+				initialFilters.returnOnlyThisCreatedAtDateOrAfter ||
 			userReducer.articleTableBodyParams.returnOnlyIsNotApproved !==
-				initialFiltersRef.current.returnOnlyIsNotApproved ||
+				initialFilters.returnOnlyIsNotApproved ||
 			userReducer.articleTableBodyParams.returnOnlyIsRelevant !==
-				initialFiltersRef.current.returnOnlyIsRelevant;
-		setHasFilterChanges(changed);
-	}, [userReducer.articleTableBodyParams]);
+				initialFilters.returnOnlyIsRelevant
+		);
+	}, [initialFilters, userReducer.articleTableBodyParams]);
 
 	// Transform stateArray for MultiSelect component
 	const stateOptions = stateArray.map((state) => ({
@@ -624,8 +620,7 @@ export default function ReviewArticles() {
 	const handleRefreshWithFilters = () => {
 		if (!userReducer.articleTableBodyParams) return;
 
-		// Update the ref to current filter values
-		initialFiltersRef.current = {
+		setInitialFilters({
 			returnOnlyThisPublishedDateOrAfter:
 				userReducer.articleTableBodyParams.returnOnlyThisPublishedDateOrAfter,
 			returnOnlyThisCreatedAtDateOrAfter:
@@ -634,9 +629,8 @@ export default function ReviewArticles() {
 				userReducer.articleTableBodyParams.returnOnlyIsNotApproved,
 			returnOnlyIsRelevant:
 				userReducer.articleTableBodyParams.returnOnlyIsRelevant,
-		};
+		});
 		fetchArticlesArray();
-		setHasFilterChanges(false);
 	};
 
 	const handleStateAssignerArticleUpdate = (articleId: number, isHumanApproved: boolean) => {
