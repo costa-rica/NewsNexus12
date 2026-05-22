@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 // import { useAppDispatch } from "@/lib/hooks";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useAppDispatch } from "@/store/hooks";
 // import { clearUser } from "@/store/userSlice";
 import { logoutUserFully } from "@/store/features/user/userSlice";
 
