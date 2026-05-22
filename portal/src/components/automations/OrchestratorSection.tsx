@@ -242,6 +242,7 @@ export function OrchestratorSection() {
   // When active run finishes, refresh past runs list
   useEffect(() => {
     if (activeRun && activeRun.status !== "running") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
       void fetchPastRuns();
     }
   }, [activeRun?.status]);

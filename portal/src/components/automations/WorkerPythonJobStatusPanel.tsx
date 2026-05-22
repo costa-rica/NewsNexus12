@@ -152,6 +152,7 @@ export function WorkerPythonJobStatusPanel({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
     void fetchLatestJob(false);
   }, [endpointName, refreshSignal, token]);
 

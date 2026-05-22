@@ -303,17 +303,17 @@ flagged line:
 
 Drops 4.
 
-- [ ] `portal/src/components/automations/OrchestratorSection.tsx:244` —
+- [x] `portal/src/components/automations/OrchestratorSection.tsx:244` —
       refetch past runs when active run finishes
-- [ ] `portal/src/components/automations/WorkerNodeJobStatusPanel.tsx:147` —
+- [x] `portal/src/components/automations/WorkerNodeJobStatusPanel.tsx:147` —
       parent `refreshSignal` triggers refetch
-- [ ] `portal/src/components/automations/WorkerPythonJobStatusPanel.tsx:155` —
+- [x] `portal/src/components/automations/WorkerPythonJobStatusPanel.tsx:155` —
       parent `refreshSignal` triggers refetch
-- [ ] `portal/src/components/ui/modal/ModalReviewArticleContent.tsx:325` —
+- [x] `portal/src/components/ui/modal/ModalReviewArticleContent.tsx:325` —
       `setInterval` polling for queued job status
-- [ ] Verify lint count: **14 → 10** (`-4`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **14 → 10** (`-4`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 6 — `react-hooks/exhaustive-deps`
 

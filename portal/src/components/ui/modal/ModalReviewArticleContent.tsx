@@ -319,6 +319,7 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 		if (isTerminalStatus(queuedJob.status)) {
 			if (queuedJob.status === "completed") {
 				onScoresUpdated?.(articleId);
+				// eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
 				setFeedback({
 					title: "One-Off Prompt Completed",
 					message:
