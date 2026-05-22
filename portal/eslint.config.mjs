@@ -24,17 +24,17 @@ const eslintConfig = [
           destructuredArrayIgnorePattern: "^_",
         },
       ],
-      // Tracked for cleanup in docs/20260522_PLAN_PORTAL_LINT_V03.md.
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-      "react-hooks/immutability": "warn",
+      // Kept as errors to prevent React Compiler cleanup regressions.
+      "react-hooks/set-state-in-effect": "error",
+      "react-hooks/preserve-manual-memoization": "error",
+      "react-hooks/immutability": "error",
     },
   },
   {
     files: ["src/components/tables/Table*.tsx"],
     rules: {
       // TanStack `useReactTable` returns mutable refs that React Compiler cannot prove pure.
-      // Decision documented in docs/20260522_PLAN_PORTAL_LINT_V03.md.
+      // Keep this scoped exception so the rule remains active outside table components.
       "react-hooks/incompatible-library": "off",
     },
   },

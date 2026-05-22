@@ -378,23 +378,23 @@ Drops 4.
 
 No source changes. Restores strictness so regressions break CI.
 
-- [ ] Edit `portal/eslint.config.mjs`: change the three downgraded
+- [x] Edit `portal/eslint.config.mjs`: change the three downgraded
       rules from `"warn"` back to `"error"`:
       - `react-hooks/set-state-in-effect`
       - `react-hooks/preserve-manual-memoization`
       - `react-hooks/immutability`
-- [ ] Update the comment block above those rules: remove the
+- [x] Update the comment block above those rules: remove the
       "tracked for cleanup" pointer (or replace with "kept as error
       to prevent regression").
-- [ ] Update the TanStack scope-disable block's comment to remove
+- [x] Update the TanStack scope-disable block's comment to remove
       the "tracked in PLAN V03" pointer since the decision is now
       final.
-- [ ] Run `npm run lint --workspace newsnexus12portal`. Confirm exit
+- [x] Run `npm run lint --workspace newsnexus12portal`. Confirm exit
       code 0, zero warnings.
-- [ ] Verify build passes.
-- [ ] Optionally add `--max-warnings=0` to the `lint` script in
+- [x] Verify build passes.
+- [x] Optionally add `--max-warnings=0` to the `lint` script in
       `portal/package.json` so any future warning also fails.
-- [ ] Commit.
+- [x] Commit.
 - [ ] Delete or archive the PLAN docs
       (`docs/20260522_PLAN_PORTAL_LINT*.md`) and codex assessment
       files. Project owner decides whether to delete outright or
