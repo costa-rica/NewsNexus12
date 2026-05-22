@@ -7,7 +7,7 @@ related_doc: docs/20260521_FAILED_TESTS_AND_VULNERABILITIES.md
 branch: dev_09_issues
 ---
 
-# Portal lint cleanup TODO
+# Portal lint cleanup PLAN
 
 ## Background
 

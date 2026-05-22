@@ -24,7 +24,7 @@ const eslintConfig = [
           destructuredArrayIgnorePattern: "^_",
         },
       ],
-      // Tracked for cleanup in docs/20260522_PORTAL_LINT_TODO.md.
+      // Tracked for cleanup in docs/20260522_PLAN_PORTAL_LINT_V03.md.
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/preserve-manual-memoization": "warn",
       "react-hooks/immutability": "warn",
