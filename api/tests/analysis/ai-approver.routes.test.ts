@@ -144,6 +144,11 @@ describe("analysis ai approver routes", () => {
       promptInMarkdown: "# Task",
       isActive: true,
       endedAt: null,
+      promptRole: "category_score",
+      promptKey: null,
+      pipelineVersion: null,
+      responseSchemaVersion: null,
+      modelName: null,
     });
   });
 
@@ -285,6 +290,11 @@ describe("analysis ai approver routes", () => {
       promptInMarkdown: "# Prompt",
       isActive: false,
       endedAt: null,
+      promptRole: "category_score",
+      promptKey: null,
+      pipelineVersion: null,
+      responseSchemaVersion: null,
+      modelName: null,
     });
     expect(mockAxios.post).toHaveBeenCalledWith(
       "http://worker-python/ai-approver/review-page/start-job",
@@ -357,6 +367,11 @@ describe("analysis ai approver routes", () => {
       promptInMarkdown: "# Task",
       isActive: false,
       endedAt: null,
+      promptRole: "category_score",
+      promptKey: null,
+      pipelineVersion: null,
+      responseSchemaVersion: null,
+      modelName: null,
     });
   });
 
