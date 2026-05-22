@@ -2,7 +2,7 @@
 created_at: 2026-05-22
 updated_at: 2026-05-22
 created_by: codex (gpt-5)
-modified_by: claude (opus-4.7)
+modified_by: codex (gpt-5)
 ---
 
 # Vulnerabilities assessment V02
@@ -144,10 +144,10 @@ Recommendation:
 
 ## 6. Recommended next actions
 
-1. Create `docs/RESIDUAL_AUDIT_RISKS.md`.
-   - Add one entry for the Next/PostCSS finding.
-   - Add one entry for the UUID via ExcelJS/Sequelize finding.
-   - Include advisory IDs, package paths, exposure rationale, current decision, and revisit trigger.
+1. Use `docs/20260522_WEEKLY_RESIDUAL_AUDIT_CHECK_SERVER_AGENT.md` as the single residual-risk and weekly-check instruction file.
+   - Keep one entry for the Next/PostCSS finding.
+   - Keep one entry for the UUID via ExcelJS/Sequelize finding.
+   - Include advisory IDs, package paths, exposure rationale, current decision, revisit trigger, and server-agent instructions.
 
 2. Add a recurring audit review cadence.
    - Monthly is reasonable while these findings are open.
@@ -177,8 +177,9 @@ A few details to nail down before an agent executes section 6.
 
 ### 7.1 Residual register template
 
-`docs/RESIDUAL_AUDIT_RISKS.md` is one markdown file with one heading per
-accepted finding. Each entry uses this shape:
+`docs/20260522_WEEKLY_RESIDUAL_AUDIT_CHECK_SERVER_AGENT.md` is the single
+source of truth for both the weekly check instructions and the accepted
+residual findings. Each accepted finding uses this shape:
 
 ```markdown
 ## <package>@<vulnerable-range> via <parent>
