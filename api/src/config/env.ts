@@ -53,6 +53,7 @@ export const REQUIRED_STARTUP_ENV_VARS: string[] = [
   'PG_PORT',
   'PG_DATABASE',
   'PG_USER',
+  'PG_SCHEMA',
   'NAME_APP',
 ];
 
