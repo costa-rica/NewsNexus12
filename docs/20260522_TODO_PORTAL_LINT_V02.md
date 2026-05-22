@@ -271,26 +271,26 @@ before moving on. If after suppression the same effect produces
 another warning at a different line, repeat at that line OR convert
 to a block disable around the effect body.
 
-- [ ] `portal/src/app/(dashboard)/admin-database/backup/page.tsx:124`
-- [ ] `portal/src/app/(dashboard)/admin-database/delete/page.tsx:87`
-- [ ] `portal/src/app/(dashboard)/admin-database/upload/page.tsx:41`
-- [ ] `portal/src/app/(dashboard)/analysis/approved-article-duplicate/page.tsx:209`
-- [ ] `portal/src/app/(dashboard)/analysis/approved-chatgpt/page.tsx:177`
-- [ ] `portal/src/app/(dashboard)/analysis/count-by-state/page.tsx:66`
-- [ ] `portal/src/app/(dashboard)/articles/add-delete/page.tsx:123`
-- [ ] `portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:146`
-- [ ] `portal/src/app/(dashboard)/articles/review/page.tsx:442`
-- [ ] `portal/src/app/(dashboard)/reports/weekly-cpsc/page.tsx:133`
-- [ ] `portal/src/components/automations/ArticleRequestSpreadsheetsSection.tsx:72`
-- [ ] `portal/src/components/automations/OrchestratorSection.tsx:229`
-- [ ] `portal/src/components/common/RecentlyApprovedByUser.tsx:62`
-- [ ] `portal/src/components/common/SummaryStatistics.tsx:51`
-- [ ] `portal/src/components/ui/modal/ModalAiApproverDetails.tsx:123` —
+- [x] `portal/src/app/(dashboard)/admin-database/backup/page.tsx:124`
+- [x] `portal/src/app/(dashboard)/admin-database/delete/page.tsx:87`
+- [x] `portal/src/app/(dashboard)/admin-database/upload/page.tsx:41`
+- [x] `portal/src/app/(dashboard)/analysis/approved-article-duplicate/page.tsx:209`
+- [x] `portal/src/app/(dashboard)/analysis/approved-chatgpt/page.tsx:177`
+- [x] `portal/src/app/(dashboard)/analysis/count-by-state/page.tsx:66`
+- [x] `portal/src/app/(dashboard)/articles/add-delete/page.tsx:123`
+- [x] `portal/src/app/(dashboard)/articles/automations/ai-approver-prompts/page.tsx:146`
+- [x] `portal/src/app/(dashboard)/articles/review/page.tsx:442`
+- [x] `portal/src/app/(dashboard)/reports/weekly-cpsc/page.tsx:133`
+- [x] `portal/src/components/automations/ArticleRequestSpreadsheetsSection.tsx:72`
+- [x] `portal/src/components/automations/OrchestratorSection.tsx:229`
+- [x] `portal/src/components/common/RecentlyApprovedByUser.tsx:62`
+- [x] `portal/src/components/common/SummaryStatistics.tsx:51`
+- [x] `portal/src/components/ui/modal/ModalAiApproverDetails.tsx:123` —
       reason variant: `modal data load on articleId change; pending SWR migration`
-- [ ] `portal/src/components/user-settings/WebBrowserExtensionsSection.tsx:44`
-- [ ] Verify lint count: **30 → 14** (`-16`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] `portal/src/components/user-settings/WebBrowserExtensionsSection.tsx:44`
+- [x] Verify lint count: **30 → 14** (`-16`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 5 — Pattern D: signal/polling scope-suppress
 

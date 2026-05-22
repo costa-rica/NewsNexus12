@@ -120,6 +120,7 @@ export default function AddDeleteArticle() {
 	}, [token, articleTableBodyParams]);
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		fetchArticlesArray();
 		updateStateArrayWithArticleState({ States: [] });
 	// eslint-disable-next-line react-hooks/exhaustive-deps

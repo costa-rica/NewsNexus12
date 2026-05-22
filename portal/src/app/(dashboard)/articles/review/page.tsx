@@ -435,6 +435,7 @@ export default function ReviewArticles() {
 
 	// Fetch articles only on initial mount
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		fetchArticlesArray();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);

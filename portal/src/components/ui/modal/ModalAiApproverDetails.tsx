@@ -120,6 +120,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- modal data load on articleId change; pending SWR migration
     void fetchDetails();
   }, [articleId, token]);
 
