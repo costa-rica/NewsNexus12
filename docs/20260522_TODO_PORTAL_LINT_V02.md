@@ -140,7 +140,7 @@ npm run dev --workspace newsnexus12portal
 
 Single config change. Drops 13 warnings.
 
-- [ ] Edit `portal/eslint.config.mjs`. Add the following object as the
+- [x] Edit `portal/eslint.config.mjs`. Add the following object as the
       final entry in the exported config array (after the existing
       rules block):
 
@@ -159,9 +159,9 @@ Single config change. Drops 13 warnings.
       The `files` glob is relative to the ESLint config file
       (`portal/eslint.config.mjs`), so `src/components/tables/Table*.tsx`
       is correct when the lint command runs from the portal workspace.
-- [ ] Verify lint count: **52 → 39** (`-13`).
-- [ ] Verify build passes.
-- [ ] Commit.
+- [x] Verify lint count: **52 → 39** (`-13`).
+- [x] Verify build passes.
+- [x] Commit.
 
 ## Phase 2 — Pattern A: derived state → useMemo
 

@@ -30,6 +30,14 @@ const eslintConfig = [
       "react-hooks/immutability": "warn",
     },
   },
+  {
+    files: ["src/components/tables/Table*.tsx"],
+    rules: {
+      // TanStack `useReactTable` returns mutable refs that React Compiler cannot prove pure.
+      // Decision documented in docs/20260522_PLAN_PORTAL_LINT_V03.md.
+      "react-hooks/incompatible-library": "off",
+    },
+  },
 ];
 
 export default eslintConfig;
