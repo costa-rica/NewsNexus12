@@ -507,6 +507,7 @@ export default function ReviewArticles() {
 
 	// Fetch articles only on initial mount
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		fetchArticlesArray();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
@@ -518,6 +519,7 @@ export default function ReviewArticles() {
 			: articlesArray;
 
 		if (filteredArticles.length > 0) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect -- select first visible article after list refresh; pending SWR migration
 			void handleSelectArticleFromTable(filteredArticles[0]);
 		}
 	}, [

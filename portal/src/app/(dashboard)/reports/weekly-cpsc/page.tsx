@@ -130,6 +130,7 @@ export default function WeeklyCpsc() {
 	}, [token]);
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		fetchReportsArray();
 		if (approvedArticlesArray?.length === 0) {
 			fetchApprovedArticlesArray();

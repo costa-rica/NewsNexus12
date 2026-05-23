@@ -63,6 +63,7 @@ export default function CountByStateAnalysis() {
   }, [token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     fetchApprovedArticleStateCounts();
   }, [fetchApprovedArticleStateCounts]);
 

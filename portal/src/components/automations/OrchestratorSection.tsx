@@ -229,6 +229,7 @@ export function OrchestratorSection() {
   // ── Initial load + polling ────────────────────────────────────────────────────
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     void fetchActiveRun();
     void fetchPastRuns();
   }, [fetchActiveRun, fetchPastRuns]);
@@ -244,6 +245,7 @@ export function OrchestratorSection() {
   // When active run finishes, refresh past runs list
   useEffect(() => {
     if (activeRun && activeRun.status !== "running") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
       void fetchPastRuns();
     }
   }, [activeRun, fetchPastRuns]);
