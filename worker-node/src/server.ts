@@ -52,7 +52,8 @@ export const startServer = async (options: StartServerOptions = {}): Promise<voi
       pathToStateAssignerFiles: config.pathToStateAssignerFiles,
       pathToSemanticScorerDir: config.pathToSemanticScorerDir,
       pathToLogs: config.pathToLogs,
-      deleteArticlesBatchSize: config.deleteArticlesBatchSize
+      deleteArticlesBatchSize: config.deleteArticlesBatchSize,
+      limitArticleAgeInDays: config.limitArticleAgeInDays
     });
     await ensureStateAssignerDirectories(config.pathToStateAssignerFiles);
     const queueStore = new QueueJobStore(resolveDefaultQueueStorePath(config.pathUtilities));

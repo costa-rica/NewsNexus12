@@ -120,7 +120,28 @@ const REQUIRED_HEADERS = [
 ] as const;
 
 const GOOGLE_NEWS_RSS_ORG_NAME = 'Google News RSS';
-const DEFAULT_TIME_RANGE = '180d';
+
+const getDefaultLimitDays = (): number => {
+  const raw = process.env.LIMIT_ARTICLE_AGE_IN_DAYS;
+  const parsed = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      `LIMIT_ARTICLE_AGE_IN_DAYS is required and must be a positive integer (got: "${raw ?? ''}"). This should have been caught at startup.`
+    );
+  }
+  return parsed;
+};
+
+const getDefaultTimeRange = (): string => `${getDefaultLimitDays()}d`;
+
+const parseTimeRangeDays = (timeRange: string): number | null => {
+  const match = /^(\d+)d$/.exec(timeRange);
+  if (!match) {
+    return null;
+  }
+  const days = Number.parseInt(match[1], 10);
+  return Number.isFinite(days) && days > 0 ? days : null;
+};
 
 let dbReadyPromise: Promise<void> | null = null;
 
@@ -205,14 +226,14 @@ const normalizeTerm = (term: string): string => {
 const normalizeTimeRange = (value?: string): { timeRange: string; timeRangeInvalid: boolean } => {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) {
-    return { timeRange: DEFAULT_TIME_RANGE, timeRangeInvalid: false };
+    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: false };
   }
   if (!/^\d+d$/.test(trimmed)) {
-    return { timeRange: DEFAULT_TIME_RANGE, timeRangeInvalid: true };
+    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: true };
   }
   const days = Number.parseInt(trimmed.slice(0, -1), 10);
   if (!Number.isFinite(days) || days <= 0) {
-    return { timeRange: DEFAULT_TIME_RANGE, timeRangeInvalid: true };
+    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: true };
   }
   return { timeRange: trimmed, timeRangeInvalid: false };
 };
@@ -538,7 +559,11 @@ const storeRequestAndArticles = async (params: {
   entityWhoFoundArticleId: number;
   signal: AbortSignal;
   navigationSessionManager: GoogleNavigationSessionManager;
+  timeRange: string;
 }): Promise<number> => {
+  const cutoffDays = parseTimeRangeDays(params.timeRange) ?? getDefaultLimitDays();
+  const cutoffMs = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
+
   const dateEndOfRequest = new Date().toISOString().split('T')[0];
 
   const request = await NewsApiRequest.create({
@@ -558,6 +583,25 @@ const storeRequestAndArticles = async (params: {
   for (const item of params.items) {
     if (!item.link) {
       continue;
+    }
+
+    if (item.pubDate) {
+      const parsedDate = new Date(item.pubDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        logger.info('Accepting RSS item with unparseable pubDate', {
+          url: item.link,
+          pubDate: item.pubDate
+        });
+      } else if (parsedDate.getTime() < cutoffMs) {
+        logger.info('Skipping RSS item older than cutoff', {
+          url: item.link,
+          pubDate: item.pubDate,
+          cutoffDays
+        });
+        continue;
+      }
+    } else {
+      logger.info('Accepting RSS item with missing pubDate', { url: item.link });
     }
 
     const existing = await Article.findOne({ where: { url: item.link } });
@@ -784,7 +828,8 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         newsArticleAggregatorSourceId,
         entityWhoFoundArticleId,
         signal: context.signal,
-        navigationSessionManager
+        navigationSessionManager,
+        timeRange: queryResult.timeRange
       });
       articlesAddedCount += savedThisRequest;
 
