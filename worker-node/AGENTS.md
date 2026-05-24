@@ -271,6 +271,7 @@ Common required variables:
 8. `NAME_DB`
 9. `PATH_DATABASE`
 10. `PATH_UTILTIES`
+11. `LIMIT_ARTICLE_AGE_IN_DAYS` — positive integer (days) used both as the Google RSS `when:` fallback when a spreadsheet row's `time_range` is empty/invalid, and as the per-row cutoff that rejects RSS items older than the row's effective `time_range`. Required: if missing or not a positive integer, the worker-node process fails fast at startup with a "Missing required environment variables: LIMIT_ARTICLE_AGE_IN_DAYS" error on stderr and exits with code 1.
 
 Common optional variables:
 
@@ -387,7 +388,7 @@ When adding a new workflow:
 4. Forgetting that `ArticleContents02` may have multiple attempt rows.
 5. Assuming failed `ArticleContents02` rows are still eligible for rescrape from portal or state assigner. They are not, unless the code is intentionally changed.
 6. Making state-assigner changes without considering the pre-scrape step.
-6. Changing endpoint names that the portal latest-job panels depend on.
+7. Changing endpoint names that the portal latest-job panels depend on.
 
 ## Recommended first-read files
 

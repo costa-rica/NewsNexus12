@@ -12,6 +12,7 @@ const REQUIRED_ENV_VARS = [
   "PG_USER",
   "PATH_UTILTIES",
   "URL_BASE_NEWS_NEXUS_WORKER_PYTHON",
+  "LIMIT_ARTICLE_AGE_IN_DAYS",
 ] as const;
 
 export type RuntimeNodeEnv = "development" | "testing" | "production";
@@ -34,6 +35,7 @@ export interface AppConfig {
   logMaxFiles: number;
   port: number;
   deleteArticlesBatchSize: number;
+  limitArticleAgeInDays: number;
 }
 
 export class StartupConfigError extends Error {
@@ -130,6 +132,11 @@ export const loadAppConfig = (
     1000,
     "DELETE_ARTICLES_BATCH_SIZE",
   );
+  const limitArticleAgeInDays = parsePositiveInteger(
+    env.LIMIT_ARTICLE_AGE_IN_DAYS,
+    0,
+    "LIMIT_ARTICLE_AGE_IN_DAYS",
+  );
 
   return {
     pathAndFilenameForQuerySpreadsheetAutomated: readRequiredString(
@@ -161,6 +168,7 @@ export const loadAppConfig = (
     logMaxFiles,
     port,
     deleteArticlesBatchSize,
+    limitArticleAgeInDays,
   };
 };
 

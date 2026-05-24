@@ -20,6 +20,7 @@ const requiredEnv = {
   PG_USER: "nick",
   PATH_UTILTIES: "/tmp/utilities",
   URL_BASE_NEWS_NEXUS_WORKER_PYTHON: "http://worker-python",
+  LIMIT_ARTICLE_AGE_IN_DAYS: "180",
 };
 
 describe("startup config validation", () => {
@@ -30,6 +31,22 @@ describe("startup config validation", () => {
         DELETE_ARTICLES_BATCH_SIZE: "zero",
       }),
     ).toThrow("DELETE_ARTICLES_BATCH_SIZE");
+  });
+
+  it("fails when LIMIT_ARTICLE_AGE_IN_DAYS is missing", () => {
+    const { LIMIT_ARTICLE_AGE_IN_DAYS: _omit, ...envWithout } = requiredEnv;
+    expect(() => loadAppConfig(envWithout)).toThrow(
+      "LIMIT_ARTICLE_AGE_IN_DAYS",
+    );
+  });
+
+  it("fails when LIMIT_ARTICLE_AGE_IN_DAYS is not a positive integer", () => {
+    expect(() =>
+      loadAppConfig({
+        ...requiredEnv,
+        LIMIT_ARTICLE_AGE_IN_DAYS: "zero",
+      }),
+    ).toThrow("LIMIT_ARTICLE_AGE_IN_DAYS");
   });
 
   it("fails startup and exits when required env vars are missing", async () => {
