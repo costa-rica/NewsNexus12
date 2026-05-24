@@ -187,15 +187,12 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 	}, [prompts, sortColumn, sortDirection]);
 
 	const totalPages = Math.max(1, Math.ceil(sortedPrompts.length / pageSize));
+	const safeCurrentPage = Math.min(currentPage, totalPages);
 
 	const paginatedPrompts = useMemo(() => {
-		const pageStart = (currentPage - 1) * pageSize;
+		const pageStart = (safeCurrentPage - 1) * pageSize;
 		return sortedPrompts.slice(pageStart, pageStart + pageSize);
-	}, [currentPage, pageSize, sortedPrompts]);
-
-	useEffect(() => {
-		setCurrentPage((current) => Math.min(current, totalPages));
-	}, [totalPages]);
+	}, [pageSize, safeCurrentPage, sortedPrompts]);
 
 	const handleSort = (column: SortColumn) => {
 		if (sortColumn === column) {
@@ -322,6 +319,7 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 		if (isTerminalStatus(queuedJob.status)) {
 			if (queuedJob.status === "completed") {
 				onScoresUpdated?.(articleId);
+				// eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
 				setFeedback({
 					title: "One-Off Prompt Completed",
 					message:
@@ -686,15 +684,17 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 
 											<div className="flex flex-wrap items-center justify-between gap-3">
 												<div className="text-sm text-gray-600 dark:text-gray-400">
-													Page {currentPage} of {totalPages}
+													Page {safeCurrentPage} of {totalPages}
 												</div>
 												<div className="flex items-center gap-2">
 													<button
 														type="button"
 														onClick={() =>
-															setCurrentPage((current) => Math.max(1, current - 1))
+															setCurrentPage((current) =>
+																Math.max(1, Math.min(current, totalPages) - 1)
+															)
 														}
-														disabled={currentPage === 1}
+														disabled={safeCurrentPage === 1}
 														className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 													>
 														Previous
@@ -703,10 +703,10 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 														type="button"
 														onClick={() =>
 															setCurrentPage((current) =>
-																Math.min(totalPages, current + 1)
+																Math.min(totalPages, Math.min(current, totalPages) + 1)
 															)
 														}
-														disabled={currentPage === totalPages}
+														disabled={safeCurrentPage === totalPages}
 														className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 													>
 														Next

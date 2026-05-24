@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import {
 	useReactTable,
 	getCoreRowModel,
@@ -40,7 +40,7 @@ const TableReviewStateAssigner: React.FC<TableReviewStateAssignerProps> = ({
 	);
 	const { token } = useAppSelector((state) => state.user);
 
-	const handleApproveReject = async (
+	const handleApproveReject = useCallback(async (
 		articleId: number,
 		stateId: number,
 		currentIsHumanApproved: boolean
@@ -74,7 +74,7 @@ const TableReviewStateAssigner: React.FC<TableReviewStateAssignerProps> = ({
 		} catch (error) {
 			console.error(`Error ${action}ing article:`, error);
 		}
-	};
+	}, [onArticleUpdate, token]);
 
 	const columns = useMemo(
 		() => [
@@ -248,7 +248,7 @@ const TableReviewStateAssigner: React.FC<TableReviewStateAssignerProps> = ({
 				},
 			}),
 		],
-		[onArticleUpdate, token]
+		[handleApproveReject]
 	);
 
 	const table = useReactTable({

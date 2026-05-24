@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	useReactTable,
 	getCoreRowModel,
@@ -221,7 +221,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 		return () => document.removeEventListener("mousedown", handlePointerDown);
 	}, [isStateFilterOpen]);
 
-	const updateStateFilter = (nextValues: string[]) => {
+	const updateStateFilter = useCallback((nextValues: string[]) => {
 		setColumnFilters((currentFilters) => {
 			const remainingFilters = currentFilters.filter(
 				(filter) => filter.id !== "stateAssignmentStateName"
@@ -241,15 +241,15 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			...prev,
 			pageIndex: 0,
 		}));
-	};
+	}, []);
 
-	const toggleStateFilterValue = (value: string) => {
+	const toggleStateFilterValue = useCallback((value: string) => {
 		const nextValues = selectedStateFilterValues.includes(value)
 			? selectedStateFilterValues.filter((currentValue) => currentValue !== value)
 			: [...selectedStateFilterValues, value];
 
 		updateStateFilter(nextValues);
-	};
+	}, [selectedStateFilterValues, updateStateFilter]);
 
 	const columns = useMemo(
 		() => {
@@ -719,6 +719,8 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			isStateFilterOpen,
 			selectedStateFilterValues,
 			stateFilterOptions,
+			toggleStateFilterValue,
+			updateStateFilter,
 		]
 	);
 

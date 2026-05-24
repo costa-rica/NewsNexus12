@@ -42,7 +42,7 @@ export const LoadingDots: React.FC<LoadingDotsProps> = ({
 				}}
 			></div>
 			{/* `transform: translateY(-16px);` increases the bounce height */}
-			<style jsx>{`
+			<style>{`
 				@keyframes bigBounce {
 					0%,
 					100% {

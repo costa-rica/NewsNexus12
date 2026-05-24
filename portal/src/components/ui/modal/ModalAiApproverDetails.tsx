@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { LoadingDots } from "@/components/common/LoadingDots";
 import { useAppSelector } from "@/store/hooks";
 import type {
@@ -87,7 +87,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
     DEFAULT_FEEDBACK_MODAL_STATE,
   );
 
-  const fetchDetails = async () => {
+  const fetchDetails = useCallback(async () => {
     if (!token) {
       setError("Authentication token not found");
       setLoading(false);
@@ -117,11 +117,12 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [articleId, token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- modal data load on articleId change; pending SWR migration
     void fetchDetails();
-  }, [articleId, token]);
+  }, [fetchDetails]);
 
   const topEligibleScore = useMemo(() => {
     if (!details) return null;
@@ -164,6 +165,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
   }, [details]);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- form reset when selected top score changes; see PLAN V03 Pattern B */
     if (!topEligibleScore) {
       setHumanApprovalValue(null);
       setReasonHumanRejected("");
@@ -172,6 +174,7 @@ const ModalAiApproverDetails: React.FC<ModalAiApproverDetailsProps> = ({
 
     setHumanApprovalValue(topEligibleScore.isHumanApproved);
     setReasonHumanRejected(topEligibleScore.reasonHumanRejected ?? "");
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [topEligibleScore]);
 
   const togglePrompt = (promptId: number) => {

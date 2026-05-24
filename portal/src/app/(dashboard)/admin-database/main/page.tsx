@@ -13,11 +13,12 @@ interface TableRow {
   [key: string]: unknown;
 }
 
+const DEFAULT_SELECTED_TABLE = "User";
+
 export default function AdminDatabaseMain() {
   const { token, isAdmin } = useAppSelector((state) => state.user);
-  const [selectedTable, setSelectedTable] = useState<string>("User");
+  const [selectedTable, setSelectedTable] = useState<string>(DEFAULT_SELECTED_TABLE);
   const [tableData, setTableData] = useState<TableRow[]>([]);
-  const [tableKeys, setTableKeys] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
@@ -34,13 +35,13 @@ export default function AdminDatabaseMain() {
     message: "",
   });
 
-  // Extract all column keys from table data (except id)
-  useEffect(() => {
-    if (tableData.length === 0) return;
-
-    const allKeys = Object.keys(tableData[0]).filter((key) => key !== "id");
-    setTableKeys(allKeys);
-  }, [tableData]);
+  const tableKeys = useMemo(
+    () =>
+      tableData.length === 0
+        ? []
+        : Object.keys(tableData[0]).filter((key) => key !== "id"),
+    [tableData]
+  );
 
   const fetchTableData = useCallback(
     async (tableName: string) => {
@@ -85,10 +86,15 @@ export default function AdminDatabaseMain() {
     [token]
   );
 
-  // Fetch table data when selectedTable changes
   useEffect(() => {
-    fetchTableData(selectedTable);
-  }, [selectedTable, fetchTableData]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
+    fetchTableData(DEFAULT_SELECTED_TABLE);
+  }, [fetchTableData]);
+
+  const handleSelectedTableChange = (tableName: string) => {
+    setSelectedTable(tableName);
+    fetchTableData(tableName);
+  };
 
   const handleAddOrUpdateRow = async () => {
     if (!token) return;
@@ -297,7 +303,7 @@ export default function AdminDatabaseMain() {
           </label>
           <select
             value={selectedTable}
-            onChange={(e) => setSelectedTable(e.target.value)}
+            onChange={(e) => handleSelectedTableChange(e.target.value)}
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 dark:focus:ring-brand-600"
           >
             <option value="User">User</option>

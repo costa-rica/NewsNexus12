@@ -143,6 +143,7 @@ export default function AiApproverPromptsPage() {
 	}, [token]);
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		void fetchPrompts();
 	}, [fetchPrompts]);
 
@@ -191,19 +192,12 @@ export default function AiApproverPromptsPage() {
 		1,
 		Math.ceil(filteredAndSortedPrompts.length / pageSize)
 	);
+	const safeCurrentPage = Math.min(currentPage, totalPages);
 
 	const paginatedPrompts = useMemo(() => {
-		const pageStart = (currentPage - 1) * pageSize;
+		const pageStart = (safeCurrentPage - 1) * pageSize;
 		return filteredAndSortedPrompts.slice(pageStart, pageStart + pageSize);
-	}, [currentPage, filteredAndSortedPrompts, pageSize]);
-
-	useEffect(() => {
-		setCurrentPage(1);
-	}, [showActiveOnly, pageSize]);
-
-	useEffect(() => {
-		setCurrentPage((current) => Math.min(current, totalPages));
-	}, [totalPages]);
+	}, [filteredAndSortedPrompts, pageSize, safeCurrentPage]);
 
 	const handleSort = (column: SortColumn) => {
 		if (sortColumn === column) {
@@ -690,7 +684,10 @@ export default function AiApproverPromptsPage() {
 					<div className="flex flex-wrap items-center gap-3">
 						<button
 							type="button"
-							onClick={() => setShowActiveOnly((current) => !current)}
+							onClick={() => {
+								setShowActiveOnly((current) => !current);
+								setCurrentPage(1);
+							}}
 							disabled={loading}
 							className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 						>
@@ -733,7 +730,10 @@ export default function AiApproverPromptsPage() {
 									<button
 										key={option}
 										type="button"
-										onClick={() => setPageSize(option)}
+										onClick={() => {
+											setPageSize(option);
+											setCurrentPage(1);
+										}}
 										className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
 											pageSize === option
 												? "bg-brand-500 text-white dark:bg-brand-600"
@@ -888,14 +888,18 @@ export default function AiApproverPromptsPage() {
 
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<div className="text-sm text-gray-600 dark:text-gray-400">
-								Page {currentPage} of {totalPages}
+								Page {safeCurrentPage} of {totalPages}
 							</div>
 
 							<div className="flex items-center gap-2">
 								<button
 									type="button"
-									onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
-									disabled={currentPage === 1}
+									onClick={() =>
+										setCurrentPage((current) =>
+											Math.max(1, Math.min(current, totalPages) - 1)
+										)
+									}
+									disabled={safeCurrentPage === 1}
 									className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 								>
 									Previous
@@ -903,9 +907,11 @@ export default function AiApproverPromptsPage() {
 								<button
 									type="button"
 									onClick={() =>
-										setCurrentPage((current) => Math.min(totalPages, current + 1))
+										setCurrentPage((current) =>
+											Math.min(totalPages, Math.min(current, totalPages) + 1)
+										)
 									}
-									disabled={currentPage === totalPages}
+									disabled={safeCurrentPage === totalPages}
 									className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 								>
 									Next

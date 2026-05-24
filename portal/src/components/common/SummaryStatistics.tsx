@@ -48,6 +48,7 @@ export const SummaryStatistics: React.FC<SummaryStatisticsProps> = ({
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     fetchArticlesSummaryStatistics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
