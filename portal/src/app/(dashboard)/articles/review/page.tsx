@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { SummaryStatistics } from "@/components/common/SummaryStatistics";
 import { RecentlyApprovedByUser } from "@/components/common/RecentlyApprovedByUser";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -61,6 +61,7 @@ export default function ReviewArticles() {
 	const [aiApproverArticleId, setAiApproverArticleId] = useState<number | null>(null);
 	const [reviewArticleContentArticleId, setReviewArticleContentArticleId] =
 		useState<number | null>(null);
+	const selectionRequestIdRef = useRef(0);
 	const userReducer = useAppSelector((s) => s.user);
 	const [loadingComponents, setLoadingComponents] = useState({
 		table01: false,
@@ -417,10 +418,10 @@ export default function ReviewArticles() {
 
 	const updateStateArrayWithArticleState = useCallback(
 		(article: Article) => {
-			if (!article?.States || !userReducer.stateArray) {
+			if (!userReducer.stateArray) {
 				return;
 			}
-			const articleStateIds = article.States.map((state) => state.id);
+			const articleStateIds = article.States?.map((state) => state.id) ?? [];
 			const tempStatesArray = userReducer.stateArray.map((stateObj) => {
 				if (articleStateIds.includes(stateObj.id)) {
 					return { ...stateObj, selected: true };
@@ -436,6 +437,14 @@ export default function ReviewArticles() {
 	const handleSelectArticleFromTable = useCallback(
 		async (article: Article) => {
 			console.log("Selected article:", article);
+			const requestId = selectionRequestIdRef.current + 1;
+			selectionRequestIdRef.current = requestId;
+
+			setSelectedArticle({
+				...article,
+				content: article.content ?? article.description,
+			});
+			updateStateArrayWithArticleState(article);
 
 			try {
 				const [approvedResponse, contentResponse] = await Promise.all([
@@ -471,6 +480,10 @@ export default function ReviewArticles() {
 				console.log("Fetched approved article data:", result);
 				console.log("Fetched selected article content:", contentResult);
 
+				if (selectionRequestIdRef.current !== requestId) {
+					return;
+				}
+
 				if (result.article && result.article.id) {
 					setSelectedArticle({
 						...result.article,
@@ -495,6 +508,9 @@ export default function ReviewArticles() {
 				}
 			} catch (error) {
 				console.error("Error fetching approved article:", error);
+				if (selectionRequestIdRef.current !== requestId) {
+					return;
+				}
 				setSelectedArticle({
 					...article,
 					content: article.description,
@@ -518,14 +534,27 @@ export default function ReviewArticles() {
 			? articlesArray.filter((article) => article.isRelevant !== false)
 			: articlesArray;
 
-		if (filteredArticles.length > 0) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect -- select first visible article after list refresh; pending SWR migration
-			void handleSelectArticleFromTable(filteredArticles[0]);
+		if (filteredArticles.length === 0) {
+			return;
 		}
+
+		if (
+			selectedArticle?.id &&
+			filteredArticles.some((article) => article.id === selectedArticle.id)
+		) {
+			return;
+		}
+
+		const timeoutId = window.setTimeout(() => {
+			void handleSelectArticleFromTable(filteredArticles[0]);
+		}, 0);
+
+		return () => window.clearTimeout(timeoutId);
 	}, [
 		allowUpdateSelectedArticle,
 		articlesArray,
 		handleSelectArticleFromTable,
+		selectedArticle?.id,
 		userReducer.hideIrrelevant,
 	]);
 
