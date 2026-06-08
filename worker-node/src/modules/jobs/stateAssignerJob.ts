@@ -226,9 +226,11 @@ const analyzeArticleWithOpenAi = async (
     throw new Error('No response content from OpenAI');
   }
 
-  const responseFileName = `response-${article.id}-${new Date().toISOString().replace(/:/g, '-')}.json`;
-  const responseFilePath = path.join(stateAssignerDirectories.chatGptResponsesDir, responseFileName);
-  await fs.writeFile(responseFilePath, rawContent, 'utf8');
+  // Raw ChatGPT responses are no longer persisted to chatgpt_responses.
+  // The response is still parsed in memory below for state assignment.
+  // const responseFileName = `response-${article.id}-${new Date().toISOString().replace(/:/g, '-')}.json`;
+  // const responseFilePath = path.join(stateAssignerDirectories.chatGptResponsesDir, responseFileName);
+  // await fs.writeFile(responseFilePath, rawContent, 'utf8');
 
   const parsed = JSON.parse(rawContent) as ChatGptResponse;
 
