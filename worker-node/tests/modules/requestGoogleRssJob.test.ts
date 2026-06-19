@@ -30,6 +30,8 @@ const makeQueueContext = (overrides: Partial<{
 
 type TestQueryRow = [number, string, string, string, string, string];
 
+const RECENT_RSS_PUB_DATE = new Date().toUTCString();
+
 const createTestSpreadsheet = async (
   dir: string,
   rows: TestQueryRow[] = [[1, 'test news', '', '', '', '30d']]
@@ -60,7 +62,7 @@ const makeRssXmlFromItems = (
         (item) => `<item>
       <title>${item.title}</title>
       <link>${item.link}</link>
-      <pubDate>Wed, 29 Apr 2026 12:00:00 GMT</pubDate>
+      <pubDate>${RECENT_RSS_PUB_DATE}</pubDate>
       <source>Example News</source>
       <content:encoded><![CDATA[${item.content ?? 'x'.repeat(300)}]]></content:encoded>
     </item>`
