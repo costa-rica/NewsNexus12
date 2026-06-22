@@ -5,14 +5,52 @@ This project is the monorepo of applicaitons that are part of the News Nexus eco
 - This News Nexus 12 project is built off the News Nexus 11 project with changing database infrastructure from SQLite to PostGres.
 
 
-## Root npm Workspace Workflow
+## Setup
+
+Run from root of project.
+
+### 1. Install Node dependencies:
 
 ```bash
 npm install
+```
+
+The root npm workspace includes `db-models`, `db-manager`, `api`, `worker-node`, and `portal`.
+`worker-python` is not included in the npm workspace flow.
+
+### 2. Set up worker-python:
+
+```bash
+cd worker-python
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cd ..
+```
+
+### 3. Build the npm workspace apps:
+
+```bash
 npm run build
 ```
 
-Root-level npm commands apply to all Node apps in the workspace list: db-models, db-manager, api, worker-node, and portal. worker-python is not included in the npm workspace flow.
+The root build runs the packages in dependency order, including `db-models` before the apps that depend on it.
+
+### 4. Start locally in separate terminals:
+
+```bash
+# terminal 1: API, port 3000
+npm run start:api
+
+# terminal 2: worker-node, port 3002 by default
+npm run start:worker-node
+
+# terminal 3: portal, port 3001
+npm run start:portal
+
+# terminal 4: worker-python, port 5000
+cd worker-python && source venv/bin/activate && uvicorn src.main:app --host 0.0.0.0 --port 5000
+```
 
 ## Key Documentation
 

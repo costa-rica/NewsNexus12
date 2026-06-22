@@ -13,7 +13,10 @@
   "scripts": {
     "build": "npm run build --workspace @newsnexus/db-models && npm run build --workspace @newsnexus/db-manager && npm run build --workspace newsnexus12api && npm run build --workspace newsnexus12-worker-node && npm run build --workspace newsnexus12portal",
     "build:backend": "npm run build --workspace @newsnexus/db-models && npm run build --workspace @newsnexus/db-manager && npm run build --workspace newsnexus12api && npm run build --workspace newsnexus12-worker-node",
-    "build:portal": "npm run build --workspace newsnexus12portal"
+    "build:portal": "npm run build --workspace newsnexus12portal",
+    "start:api": "npm run start --workspace newsnexus12api",
+    "start:worker-node": "npm run start --workspace newsnexus12-worker-node",
+    "start:portal": "npm run start --workspace newsnexus12portal"
   },
   "engines": {
     "node": ">=20"

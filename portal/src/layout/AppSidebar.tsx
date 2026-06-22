@@ -19,6 +19,8 @@ import {
 import SidebarWidget from "./SidebarWidget";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
+
 type NavItem = {
   name: string;
   icon: React.ReactNode;
@@ -382,11 +384,24 @@ const AppSidebar: React.FC = () => {
       </div>
 
       {/* Widget anchored to bottom */}
-      {(isExpanded || isMobileOpen) && (
-        <div className="pb-6">
-          <SidebarWidget />
+      <div className="pb-6">
+        {(isExpanded || isMobileOpen) && <SidebarWidget />}
+        <div
+          className={`mx-auto w-full text-center ${
+            isExpanded || isMobileOpen ? "px-2 pt-1" : "px-0"
+          }`}
+        >
+          {isExpanded || isMobileOpen ? (
+            <p className="break-words text-sm leading-tight text-gray-400 dark:text-gray-600">
+              version {appVersion}
+            </p>
+          ) : (
+            <p className="break-words text-sm leading-tight text-gray-400 dark:text-gray-600">
+              {appVersion}
+            </p>
+          )}
         </div>
-      )}
+      </div>
     </aside>
   );
 };

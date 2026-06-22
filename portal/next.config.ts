@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 type WebpackRule = {
@@ -7,7 +9,28 @@ type WebpackRule = {
 	exclude?: RegExp;
 };
 
+const appVersionScriptPath = fileURLToPath(
+	new URL("../scripts/appVersion.mjs", import.meta.url)
+);
+
+function readAppVersion(): string {
+	try {
+		return (
+			execFileSync(process.execPath, [appVersionScriptPath], {
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "ignore"],
+			}).trim() || "dev"
+		);
+	} catch {
+		return "dev";
+	}
+}
+
 const nextConfig: NextConfig = {
+	env: {
+		NEXT_PUBLIC_APP_VERSION: readAppVersion(),
+	},
+
 	/**
 	 * SECURITY HEADERS CONFIGURATION
 	 *
