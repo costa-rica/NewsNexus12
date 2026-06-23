@@ -324,6 +324,207 @@ class AiApproverRepository:
 
         return [dict(row) for row in rows]
 
+    def get_retryable_score_rows(
+        self,
+        *,
+        limit: int,
+        require_state_assignment: bool,
+        state_ids: list[int] | None,
+        mode: str,
+        gatekeeper_prompt_version_id: int | None,
+        category_prompt_version_ids: list[int],
+        article_id_min_exclusive: int | None,
+        article_id_max_inclusive: int | None,
+        retry_transient_failures: bool,
+        retry_invalid_responses: bool,
+    ) -> list[dict[str, Any]]:
+        if not retry_transient_failures and not retry_invalid_responses:
+            return []
+
+        prompt_ids = list(category_prompt_version_ids)
+        if gatekeeper_prompt_version_id is not None:
+            prompt_ids.append(gatekeeper_prompt_version_id)
+        if not prompt_ids:
+            return []
+
+        retryable_statuses: list[str] = []
+        retryable_error_tokens: list[str] = []
+        if retry_transient_failures:
+            retryable_statuses.extend(
+                [
+                    "rate_limit",
+                    "rate_limited",
+                    "canceled",
+                    "cancelled",
+                    "timeout",
+                    "timed_out",
+                    "worker_interrupted",
+                    "worker_restart",
+                ]
+            )
+            retryable_error_tokens.extend(
+                [
+                    "rate_limit",
+                    "rate_limited",
+                    "canceled",
+                    "cancelled",
+                    "timeout",
+                    "timed_out",
+                    "worker_interrupted",
+                    "worker_restart",
+                ]
+            )
+        if retry_invalid_responses:
+            retryable_statuses.append("invalid_response")
+            retryable_error_tokens.append("invalid_response")
+
+        filters = [
+            'aas."promptVersionId" = ANY(%s::int[])',
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM "ArticleIsRelevants" air
+                WHERE air."articleId" = a.id
+                  AND air."isRelevant" = FALSE
+            )
+            """,
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM "ArticleApproveds" aa
+                WHERE aa."articleId" = a.id
+            )
+            """,
+        ]
+        params: list[Any] = [prompt_ids]
+
+        retry_filters: list[str] = []
+        if retryable_statuses:
+            retry_filters.append('LOWER(COALESCE(aas."resultStatus", \'\')) = ANY(%s::text[])')
+            params.append(retryable_statuses)
+        if retryable_error_tokens:
+            retry_filters.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM unnest(%s::text[]) token
+                    WHERE LOWER(COALESCE(aas."errorCode", '')) = token
+                       OR LOWER(COALESCE(aas."errorMessage", '')) LIKE ('%%' || token || '%%')
+                )
+                """
+            )
+            params.append(retryable_error_tokens)
+
+        filters.append(f"({' OR '.join(retry_filters)})")
+
+        if mode in ("gatekeeper", "gatekeeper_with_manual_review") and gatekeeper_prompt_version_id is not None:
+            filters.append(
+                """
+                (
+                    aas."promptVersionId" = %s
+                    OR (
+                        aas."promptVersionId" = ANY(%s::int[])
+                        AND EXISTS (
+                            SELECT 1
+                            FROM "AiApproverArticleScores" gatekeeper_score
+                            WHERE gatekeeper_score."articleId" = a.id
+                              AND gatekeeper_score."promptVersionId" = %s
+                              AND gatekeeper_score."resultStatus" = 'completed'
+                              AND gatekeeper_score.decision = 'pass'
+                        )
+                    )
+                )
+                """
+            )
+            params.extend(
+                [
+                    gatekeeper_prompt_version_id,
+                    category_prompt_version_ids,
+                    gatekeeper_prompt_version_id,
+                ]
+            )
+
+        if require_state_assignment:
+            filters.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM "ArticleStateContracts02" asc2
+                    WHERE asc2."articleId" = a.id
+                      AND asc2."stateId" IS NOT NULL
+                      AND asc2."isDeterminedToBeError" = FALSE
+                )
+                """
+            )
+
+        if state_ids:
+            placeholders = ",".join("%s" for _ in state_ids)
+            filters.append(
+                f"""
+                EXISTS (
+                    SELECT 1
+                    FROM "ArticleStateContracts02" asc2
+                    WHERE asc2."articleId" = a.id
+                      AND asc2."stateId" IN ({placeholders})
+                      AND asc2."stateId" IS NOT NULL
+                      AND asc2."isDeterminedToBeError" = FALSE
+                )
+                """
+            )
+            params.extend(state_ids)
+
+        if article_id_min_exclusive is not None:
+            filters.append("a.id > %s")
+            params.append(article_id_min_exclusive)
+
+        if article_id_max_inclusive is not None:
+            filters.append("a.id <= %s")
+            params.append(article_id_max_inclusive)
+
+        params.append(limit)
+        where_clause = " AND ".join(filters)
+
+        conn = self.get_connection()
+        rows = conn.execute(
+            f"""
+            SELECT
+                aas.id AS "scoreRowId",
+                aas."articleId",
+                aas."promptVersionId",
+                aas."resultStatus" AS "previousResultStatus",
+                aas."errorCode" AS "previousErrorCode",
+                aas."errorMessage" AS "previousErrorMessage",
+                aas."jobId" AS "previousJobId",
+                aas.metadata AS "previousMetadata",
+                COALESCE(aas."promptRole", apv."promptRole", 'category_score') AS "promptRole",
+                a.id,
+                a.title,
+                COALESCE(
+                    (
+                        SELECT ac2.content
+                        FROM "ArticleContents02" ac2
+                        WHERE ac2."articleId" = a.id
+                        ORDER BY
+                            CASE WHEN ac2.status = 'success' THEN 2 ELSE 0 END DESC,
+                            LENGTH(TRIM(COALESCE(ac2.content, ''))) DESC,
+                            ac2.id DESC
+                        LIMIT 1
+                    ),
+                    a.description,
+                    ''
+                ) AS content
+            FROM "AiApproverArticleScores" aas
+            JOIN "Articles" a ON a.id = aas."articleId"
+            LEFT JOIN "AiApproverPromptVersions" apv ON apv.id = aas."promptVersionId"
+            WHERE {where_clause}
+            ORDER BY a.id DESC, aas.id ASC
+            LIMIT %s
+            """,
+            params,
+        ).fetchall()
+
+        return [dict(row) for row in rows]
+
     def get_score_result(
         self,
         *,
@@ -461,4 +662,64 @@ class AiApproverRepository:
         except psycopg.Error as exc:
             raise AiApproverProcessorError(
                 f"Failed to insert AI approver score row for article {article_id}"
+            ) from exc
+
+    def update_score_row(
+        self,
+        *,
+        score_row_id: int,
+        result_status: str,
+        score: float | None,
+        reason: str | None,
+        error_code: str | None,
+        error_message: str | None,
+        job_id: str | None,
+        prompt_role: str = "category_score",
+        pipeline_version: str | None = None,
+        decision: str | None = None,
+        confidence: float | None = None,
+        reason_code: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        conn = self.get_connection()
+        try:
+            conn.execute(
+                """
+                UPDATE "AiApproverArticleScores"
+                SET
+                    "resultStatus" = %s,
+                    score = %s,
+                    reason = %s,
+                    "errorCode" = %s,
+                    "errorMessage" = %s,
+                    "jobId" = %s,
+                    "promptRole" = %s,
+                    "pipelineVersion" = %s,
+                    decision = %s,
+                    confidence = %s,
+                    "reasonCode" = %s,
+                    metadata = %s,
+                    "updatedAt" = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (
+                    result_status,
+                    score,
+                    reason,
+                    error_code,
+                    error_message,
+                    job_id,
+                    prompt_role,
+                    pipeline_version,
+                    decision,
+                    confidence,
+                    reason_code,
+                    Jsonb(metadata) if metadata is not None else None,
+                    score_row_id,
+                ),
+            )
+            conn.commit()
+        except psycopg.Error as exc:
+            raise AiApproverProcessorError(
+                f"Failed to update AI approver score row {score_row_id}"
             ) from exc

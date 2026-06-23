@@ -348,7 +348,11 @@ export const buildStepRequestBody = (
       return {
         limit: resolveDownstreamArticleCount(config, articlesAddedCount, stepConfig.stepName),
         ...(config.continuation?.retryPolicy
-          ? { continuationRetryPolicy: config.continuation.retryPolicy.aiApprover }
+          ? {
+              mode: config.continuation.retryPolicy.aiApprover.mode,
+              requireStateAssignment: true,
+              continuationRetryPolicy: config.continuation.retryPolicy.aiApprover,
+            }
           : {}),
         ...cursorBody,
       };

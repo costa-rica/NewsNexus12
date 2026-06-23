@@ -17,6 +17,8 @@ def _build_config() -> AiApproverConfig:
         openai_api_key="secret",
         model_name="gpt-4o-mini",
         batch_size=10,
+        default_mode="gatekeeper",
+        gatekeeper_reject_confidence_threshold=0.85,
     )
 
 
@@ -132,6 +134,7 @@ def _create_repo() -> AiApproverRepository:
         [
             (1, "P1", None, "# T1", True, None, "category_score"),
             (2, "P2", None, "# T2", False, None, "category_score"),
+            (3, "Gatekeeper", None, "# G1", True, None, "gatekeeper"),
         ],
     )
     execute_many(
@@ -247,3 +250,168 @@ def test_insert_score_row_persists_result() -> None:
 
     assert len(rows) == 1
     assert dict(rows[0])["articleId"] == 1
+
+
+def test_get_retryable_score_rows_selects_transient_failures_inside_bounds() -> None:
+    repo = _create_repo()
+    try:
+        repo.get_connection().execute(
+            """
+            INSERT INTO "AiApproverArticleScores"(
+                id, "articleId", "promptVersionId", "resultStatus", "errorCode",
+                "errorMessage", "jobId", metadata, "promptRole", "createdAt", "updatedAt"
+            )
+            VALUES
+                (101, 1, 3, 'failed', 'timeout', 'request timed out', 'source-1', '{"phase":"source"}', 'gatekeeper', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (102, 2, 3, 'completed', NULL, NULL, 'source-2', NULL, 'gatekeeper', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (103, 5, 3, 'failed', 'timeout', 'outside bounds', 'source-3', NULL, 'gatekeeper', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+        )
+        repo.get_connection().commit()
+
+        rows = repo.get_retryable_score_rows(
+            limit=10,
+            require_state_assignment=True,
+            state_ids=None,
+            mode="gatekeeper",
+            gatekeeper_prompt_version_id=3,
+            category_prompt_version_ids=[1],
+            article_id_min_exclusive=0,
+            article_id_max_inclusive=2,
+            retry_transient_failures=True,
+            retry_invalid_responses=False,
+        )
+    finally:
+        repo.close()
+
+    assert [row["scoreRowId"] for row in rows] == [101]
+    assert rows[0]["previousResultStatus"] == "failed"
+    assert rows[0]["previousErrorCode"] == "timeout"
+    assert rows[0]["previousJobId"] == "source-1"
+    assert rows[0]["previousMetadata"] == {"phase": "source"}
+
+
+def test_get_retryable_score_rows_only_selects_category_rows_after_gatekeeper_pass() -> None:
+    repo = _create_repo()
+    try:
+        repo.get_connection().execute(
+            """
+            INSERT INTO "AiApproverArticleScores"(
+                id, "articleId", "promptVersionId", "resultStatus", "errorCode",
+                "jobId", "promptRole", decision, "createdAt", "updatedAt"
+            )
+            VALUES
+                (101, 1, 3, 'completed', NULL, 'gatekeeper-job', 'gatekeeper', 'pass', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (102, 1, 1, 'failed', 'rate_limited', 'category-job', 'category_score', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (103, 2, 3, 'completed', NULL, 'gatekeeper-job', 'gatekeeper', 'reject', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (104, 2, 1, 'failed', 'rate_limited', 'category-job', 'category_score', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+        )
+        repo.get_connection().commit()
+
+        rows = repo.get_retryable_score_rows(
+            limit=10,
+            require_state_assignment=True,
+            state_ids=None,
+            mode="gatekeeper",
+            gatekeeper_prompt_version_id=3,
+            category_prompt_version_ids=[1],
+            article_id_min_exclusive=0,
+            article_id_max_inclusive=2,
+            retry_transient_failures=True,
+            retry_invalid_responses=False,
+        )
+    finally:
+        repo.close()
+
+    assert [row["scoreRowId"] for row in rows] == [102]
+
+
+def test_get_retryable_score_rows_excludes_invalid_response_by_default() -> None:
+    repo = _create_repo()
+    try:
+        repo.get_connection().execute(
+            """
+            INSERT INTO "AiApproverArticleScores"(
+                id, "articleId", "promptVersionId", "resultStatus", "errorCode",
+                "jobId", "promptRole", "createdAt", "updatedAt"
+            )
+            VALUES
+                (101, 1, 3, 'invalid_response', 'invalid_response', 'source-1', 'gatekeeper', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (102, 2, 3, 'failed', 'timeout', 'source-2', 'gatekeeper', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+        )
+        repo.get_connection().commit()
+
+        rows = repo.get_retryable_score_rows(
+            limit=10,
+            require_state_assignment=True,
+            state_ids=None,
+            mode="gatekeeper",
+            gatekeeper_prompt_version_id=3,
+            category_prompt_version_ids=[1],
+            article_id_min_exclusive=0,
+            article_id_max_inclusive=2,
+            retry_transient_failures=True,
+            retry_invalid_responses=False,
+        )
+    finally:
+        repo.close()
+
+    assert [row["scoreRowId"] for row in rows] == [102]
+
+
+def test_update_score_row_overwrites_retryable_row_in_place() -> None:
+    repo = _create_repo()
+    try:
+        repo.get_connection().execute(
+            """
+            INSERT INTO "AiApproverArticleScores"(
+                id, "articleId", "promptVersionId", "resultStatus", "errorCode",
+                "errorMessage", "jobId", "promptRole", metadata, "createdAt", "updatedAt"
+            )
+            VALUES
+                (101, 1, 3, 'failed', 'timeout', 'timed out', 'source-job', 'gatekeeper', '{"before":true}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """
+        )
+        repo.get_connection().commit()
+
+        repo.update_score_row(
+            score_row_id=101,
+            result_status="completed",
+            score=None,
+            reason="passes gatekeeper",
+            error_code=None,
+            error_message=None,
+            job_id="continuation-job",
+            prompt_role="gatekeeper",
+            pipeline_version="ai_approver_gatekeeper_v1",
+            decision="pass",
+            confidence=0.91,
+            reason_code="safety_incident",
+            metadata={
+                "continuationRetryAudit": {
+                    "previousStatus": "failed",
+                    "previousErrorMessage": "timed out",
+                }
+            },
+        )
+        rows = repo.get_connection().execute(
+            """
+            SELECT id, "resultStatus", reason, "errorCode", "errorMessage", "jobId",
+                   "promptRole", "pipelineVersion", decision, confidence, "reasonCode", metadata
+            FROM "AiApproverArticleScores"
+            WHERE id = 101
+            """
+        ).fetchall()
+    finally:
+        repo.close()
+
+    assert len(rows) == 1
+    row = dict(rows[0])
+    assert row["resultStatus"] == "completed"
+    assert row["errorCode"] is None
+    assert row["errorMessage"] is None
+    assert row["jobId"] == "continuation-job"
+    assert row["decision"] == "pass"
+    assert row["metadata"]["continuationRetryAudit"]["previousStatus"] == "failed"

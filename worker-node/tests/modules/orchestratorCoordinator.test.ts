@@ -181,6 +181,8 @@ describe('orchestrator coordinator request bodies', () => {
 
     expect(buildStepRequestBody(aiApproverStep, continuationConfig, 1000, 1250, 250)).toEqual({
       limit: 250,
+      mode: 'gatekeeper',
+      requireStateAssignment: true,
       continuationRetryPolicy: {
         mode: 'gatekeeper',
         retryTransientFailures: true,

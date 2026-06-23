@@ -37,12 +37,20 @@ def test_start_job_returns_expected_shape(client, monkeypatch: pytest.MonkeyPatc
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        mode: str | None = None,
+        gatekeeper_reject_confidence_threshold: float | None = None,
         article_id_min_exclusive: int | None = None,
         article_id_max_inclusive: int | None = None,
+        continuation_retry_policy: dict[str, object] | None = None,
     ):
         assert limit == 5
         assert require_state_assignment is True
         assert state_ids == [1, 2]
+        assert mode is None
+        assert gatekeeper_reject_confidence_threshold is None
+        assert article_id_min_exclusive is None
+        assert article_id_max_inclusive is None
+        assert continuation_retry_policy is None
 
         def _run(context) -> None:
             return None
@@ -111,6 +119,65 @@ def test_start_job_rejects_unknown_fields(client) -> None:
 
 
 @pytest.mark.integration
+def test_start_job_accepts_continuation_retry_policy(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+    ai_approver_queue_override,
+) -> None:
+    from src.routes import ai_approver as ai_approver_routes
+
+    engine, _store = ai_approver_queue_override
+
+    def fake_runner(
+        limit: int,
+        require_state_assignment: bool,
+        state_ids: list[int] | None,
+        mode: str | None = None,
+        gatekeeper_reject_confidence_threshold: float | None = None,
+        article_id_min_exclusive: int | None = None,
+        article_id_max_inclusive: int | None = None,
+        continuation_retry_policy: dict[str, object] | None = None,
+    ):
+        assert limit == 150
+        assert require_state_assignment is True
+        assert state_ids is None
+        assert mode == "gatekeeper"
+        assert article_id_min_exclusive == 1000
+        assert article_id_max_inclusive == 1150
+        assert continuation_retry_policy == {
+            "mode": "gatekeeper",
+            "retryTransientFailures": True,
+            "retryInvalidResponses": False,
+        }
+
+        def _run(context) -> None:
+            return None
+
+        return _run
+
+    monkeypatch.setattr(ai_approver_routes, "create_ai_approver_runner", fake_runner)
+
+    response = client.post(
+        "/ai-approver/start-job",
+        json={
+            "limit": 150,
+            "requireStateAssignment": True,
+            "mode": "gatekeeper",
+            "articleIdMinExclusive": 1000,
+            "articleIdMaxInclusive": 1150,
+            "continuationRetryPolicy": {
+                "mode": "gatekeeper",
+                "retryTransientFailures": True,
+                "retryInvalidResponses": False,
+            },
+        },
+    )
+
+    assert response.status_code == 202
+    assert engine.on_idle(timeout=1) is True
+
+
+@pytest.mark.integration
 def test_review_page_start_job_rejects_unknown_fields(client) -> None:
     response = client.post(
         "/ai-approver/review-page/start-job",
@@ -135,8 +202,11 @@ def test_ai_approver_job_supports_queue_cancel(
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        mode: str | None = None,
+        gatekeeper_reject_confidence_threshold: float | None = None,
         article_id_min_exclusive: int | None = None,
         article_id_max_inclusive: int | None = None,
+        continuation_retry_policy: dict[str, object] | None = None,
     ):
         def _run(context) -> None:
             started_event.set()

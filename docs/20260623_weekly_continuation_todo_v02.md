@@ -148,22 +148,22 @@ Package areas: `worker-node` orchestration routes/services/coordinator, step cre
 
 Package areas: `worker-python` AI Approver, AI score repository/data-access code, worker-node AI Approver request payloads.
 
-- [ ] Ensure continuation invokes AI Approver in `gatekeeper` mode.
-- [ ] Pass `requireStateAssignment: true`, article bounds, limit based on planned article count, and continuation retry policy.
-- [ ] Keep retry policy conservative:
-  - [ ] process missing gatekeeper rows
-  - [ ] process missing category rows only for completed gatekeeper pass rows
-  - [ ] retry transient failed rows for rate limit, cancellation, timeout, or worker interruption
-  - [ ] do not automatically retry `invalid_response` rows in the first implementation
-- [ ] Add a retry-selection query for existing score rows inside continuation bounds whose `resultStatus` is retryable.
-- [ ] Add an `update_score_row` repository method that overwrites the selected retryable failed row in place.
-- [ ] Ensure retry selection bypasses normal skip-existing behavior only for rows selected by the retry-selection query.
-- [ ] Verify successful rows, non-retryable failed rows, and rows outside bounds are not re-touched.
-- [ ] Preserve audit metadata on updates, including previous status, previous error, source job id, continuation job id, retry timestamp, and previous metadata.
-- [ ] Add tests for missing rows, completed-row skipping, retry-selection, `update_score_row`, and default `invalid_response` exclusion.
-- [ ] Run relevant `worker-python` tests/checks where infrastructure exists and relevant `worker-node` type checks/tests/build attempts for payload integration.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 6 changes after verification passes.
+- [x] Ensure continuation invokes AI Approver in `gatekeeper` mode.
+- [x] Pass `requireStateAssignment: true`, article bounds, limit based on planned article count, and continuation retry policy.
+- [x] Keep retry policy conservative:
+  - [x] process missing gatekeeper rows
+  - [x] process missing category rows only for completed gatekeeper pass rows
+  - [x] retry transient failed rows for rate limit, cancellation, timeout, or worker interruption
+  - [x] do not automatically retry `invalid_response` rows in the first implementation
+- [x] Add a retry-selection query for existing score rows inside continuation bounds whose `resultStatus` is retryable.
+- [x] Add an `update_score_row` repository method that overwrites the selected retryable failed row in place.
+- [x] Ensure retry selection bypasses normal skip-existing behavior only for rows selected by the retry-selection query.
+- [x] Verify successful rows, non-retryable failed rows, and rows outside bounds are not re-touched.
+- [x] Preserve audit metadata on updates, including previous status, previous error, source job id, continuation job id, retry timestamp, and previous metadata.
+- [x] Add tests for missing rows, completed-row skipping, retry-selection, `update_score_row`, and default `invalid_response` exclusion.
+- [x] Run relevant `worker-python` tests/checks where infrastructure exists and relevant `worker-node` type checks/tests/build attempts for payload integration.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 6 changes after verification passes.
 
 ## Phase 7: API proxy routes
 

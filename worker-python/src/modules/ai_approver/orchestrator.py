@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import UTC, datetime
 from typing import Any
 
 from src.modules.ai_approver.client import AiApproverOpenAIClient
@@ -132,6 +133,88 @@ class AiApproverOrchestrator:
             and gatekeeper_result.get("decision") == "pass"
         )
 
+    def _build_retry_metadata(
+        self,
+        *,
+        retry_score_row: dict[str, Any] | None,
+        job_id: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if retry_score_row is None:
+            return metadata
+
+        return {
+            **(metadata or {}),
+            "continuationRetryAudit": {
+                "previousStatus": retry_score_row.get("previousResultStatus"),
+                "previousErrorCode": retry_score_row.get("previousErrorCode"),
+                "previousErrorMessage": retry_score_row.get("previousErrorMessage"),
+                "sourceJobId": retry_score_row.get("previousJobId"),
+                "continuationJobId": job_id,
+                "retriedAt": datetime.now(UTC).isoformat(),
+                "previousMetadata": retry_score_row.get("previousMetadata"),
+            },
+        }
+
+    def _write_score_row(
+        self,
+        *,
+        retry_score_row: dict[str, Any] | None,
+        article_id: int,
+        prompt_version_id: int,
+        result_status: str,
+        score: float | None,
+        reason: str | None,
+        error_code: str | None,
+        error_message: str | None,
+        job_id: str | None,
+        prompt_role: str,
+        pipeline_version: str | None,
+        decision: str | None = None,
+        confidence: float | None = None,
+        reason_code: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        write_metadata = self._build_retry_metadata(
+            retry_score_row=retry_score_row,
+            job_id=job_id,
+            metadata=metadata,
+        )
+        if retry_score_row is None:
+            self.repository.insert_score_row(
+                article_id=article_id,
+                prompt_version_id=prompt_version_id,
+                result_status=result_status,
+                score=score,
+                reason=reason,
+                error_code=error_code,
+                error_message=error_message,
+                job_id=job_id,
+                prompt_role=prompt_role,
+                pipeline_version=pipeline_version,
+                decision=decision,
+                confidence=confidence,
+                reason_code=reason_code,
+                metadata=write_metadata,
+            )
+            return
+
+        self.repository.update_score_row(
+            score_row_id=int(retry_score_row["scoreRowId"]),
+            result_status=result_status,
+            score=score,
+            reason=reason,
+            error_code=error_code,
+            error_message=error_message,
+            job_id=job_id,
+            prompt_role=prompt_role,
+            pipeline_version=pipeline_version,
+            decision=decision,
+            confidence=confidence,
+            reason_code=reason_code,
+            metadata=write_metadata,
+        )
+
     def _run_category_prompt_for_article(
         self,
         *,
@@ -139,6 +222,7 @@ class AiApproverOrchestrator:
         prompt_version: dict[str, Any],
         usage_totals: dict[str, int],
         job_id: str | None,
+        retry_score_row: dict[str, Any] | None = None,
     ) -> None:
         prompt_role = prompt_version.get("promptRole") or "category_score"
         prompt = build_prompt(
@@ -154,7 +238,8 @@ class AiApproverOrchestrator:
             result_status, score, reason, error_code, error_message = (
                 self._parse_category_payload(payload)
             )
-            self.repository.insert_score_row(
+            self._write_score_row(
+                retry_score_row=retry_score_row,
                 article_id=int(article["id"]),
                 prompt_version_id=int(prompt_version["id"]),
                 result_status=result_status,
@@ -167,7 +252,8 @@ class AiApproverOrchestrator:
                 pipeline_version=prompt_version.get("pipelineVersion"),
             )
         except Exception as exc:
-            self.repository.insert_score_row(
+            self._write_score_row(
+                retry_score_row=retry_score_row,
                 article_id=int(article["id"]),
                 prompt_version_id=int(prompt_version["id"]),
                 result_status="failed",
@@ -188,6 +274,7 @@ class AiApproverOrchestrator:
         usage_totals: dict[str, int],
         job_id: str | None,
         reject_confidence_threshold: float,
+        retry_score_row: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         prompt = build_prompt(
             prompt_version["promptInMarkdown"],
@@ -203,7 +290,8 @@ class AiApproverOrchestrator:
                 payload,
                 reject_confidence_threshold=reject_confidence_threshold,
             )
-            self.repository.insert_score_row(
+            self._write_score_row(
+                retry_score_row=retry_score_row,
                 article_id=int(article["id"]),
                 prompt_version_id=int(prompt_version["id"]),
                 result_status=parsed["result_status"],
@@ -225,7 +313,8 @@ class AiApproverOrchestrator:
                 "confidence": parsed["confidence"],
             }
         except Exception as exc:
-            self.repository.insert_score_row(
+            self._write_score_row(
+                retry_score_row=retry_score_row,
                 article_id=int(article["id"]),
                 prompt_version_id=int(prompt_version["id"]),
                 result_status="failed",
@@ -257,6 +346,7 @@ class AiApproverOrchestrator:
         should_cancel,
         mode: str = "legacy",
         gatekeeper_reject_confidence_threshold: float = 0.85,
+        continuation_retry_policy: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         category_prompt_versions = self.repository.get_active_category_prompt_versions()
         gatekeeper_prompt_version = None
@@ -281,6 +371,43 @@ class AiApproverOrchestrator:
             article_id_min_exclusive=article_id_min_exclusive,
             article_id_max_inclusive=article_id_max_inclusive,
         )
+        retry_rows: list[dict[str, Any]] = []
+        if continuation_retry_policy is not None:
+            retry_rows = self.repository.get_retryable_score_rows(
+                limit=limit,
+                require_state_assignment=require_state_assignment,
+                state_ids=state_ids,
+                mode=mode,
+                gatekeeper_prompt_version_id=(
+                    int(gatekeeper_prompt_version["id"]) if gatekeeper_prompt_version else None
+                ),
+                category_prompt_version_ids=[
+                    int(prompt_version["id"]) for prompt_version in category_prompt_versions
+                ],
+                article_id_min_exclusive=article_id_min_exclusive,
+                article_id_max_inclusive=article_id_max_inclusive,
+                retry_transient_failures=bool(
+                    continuation_retry_policy.get("retryTransientFailures")
+                ),
+                retry_invalid_responses=bool(
+                    continuation_retry_policy.get("retryInvalidResponses")
+                ),
+            )
+
+        retry_by_article_prompt = {
+            (int(row["articleId"]), int(row["promptVersionId"])): row for row in retry_rows
+        }
+        articles_by_id = {int(article["id"]): article for article in articles}
+        for row in retry_rows:
+            article_id = int(row["articleId"])
+            if article_id not in articles_by_id:
+                article = {
+                    "id": article_id,
+                    "title": row.get("title", ""),
+                    "content": row.get("content", ""),
+                }
+                articles.append(article)
+                articles_by_id[article_id] = article
 
         usage_totals = self._empty_usage_totals()
         gatekeeper_attempts = 0
@@ -302,13 +429,17 @@ class AiApproverOrchestrator:
                     article_id=int(article["id"]),
                     prompt_version_id=int(gatekeeper_prompt_version["id"]),
                 )
-                if gatekeeper_result is None:
+                gatekeeper_retry_row = retry_by_article_prompt.get(
+                    (int(article["id"]), int(gatekeeper_prompt_version["id"]))
+                )
+                if gatekeeper_result is None or gatekeeper_retry_row is not None:
                     gatekeeper_result = self._run_gatekeeper_for_article(
                         article=article,
                         prompt_version=gatekeeper_prompt_version,
                         usage_totals=usage_totals,
                         job_id=job_id,
                         reject_confidence_threshold=gatekeeper_reject_confidence_threshold,
+                        retry_score_row=gatekeeper_retry_row,
                     )
                     gatekeeper_attempts += 1
 
@@ -340,7 +471,10 @@ class AiApproverOrchestrator:
                     article_id=int(article["id"]),
                     prompt_version_id=int(prompt_version["id"]),
                 )
-                if existing_category_result is not None:
+                category_retry_row = retry_by_article_prompt.get(
+                    (int(article["id"]), int(prompt_version["id"]))
+                )
+                if existing_category_result is not None and category_retry_row is None:
                     continue
 
                 self._run_category_prompt_for_article(
@@ -348,6 +482,7 @@ class AiApproverOrchestrator:
                     prompt_version=prompt_version,
                     usage_totals=usage_totals,
                     job_id=job_id,
+                    retry_score_row=category_retry_row,
                 )
                 category_attempts += 1
 

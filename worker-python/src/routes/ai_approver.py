@@ -30,6 +30,22 @@ queue_engine = global_queue_engine
 queue_store = global_queue_store
 
 
+class AiApproverContinuationRetryPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str = "gatekeeper"
+    retryTransientFailures: bool = True
+    retryInvalidResponses: bool = False
+
+    @field_validator("mode")
+    @classmethod
+    def validate_retry_mode(cls, value: str) -> str:
+        parsed = parse_ai_approver_mode(value, key="continuationRetryPolicy.mode")
+        if parsed != "gatekeeper":
+            raise ValueError("continuationRetryPolicy.mode must be gatekeeper")
+        return parsed
+
+
 class AiApproverStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -40,6 +56,7 @@ class AiApproverStartRequest(BaseModel):
     articleIdMaxInclusive: int | None = Field(default=None, gt=0)
     mode: str | None = None
     gatekeeperRejectConfidenceThreshold: float | None = Field(default=None, ge=0, le=1)
+    continuationRetryPolicy: AiApproverContinuationRetryPolicy | None = None
 
     @field_validator("mode")
     @classmethod
@@ -108,6 +125,7 @@ def create_ai_approver_runner(
     gatekeeper_reject_confidence_threshold: float | None = None,
     article_id_min_exclusive: int | None = None,
     article_id_max_inclusive: int | None = None,
+    continuation_retry_policy: dict[str, object] | None = None,
 ):
     def _run(context: QueueExecutionContext) -> None:
         _append_job_log(context.jobId, "job_started", limit=limit, mode=mode or "env")
@@ -134,6 +152,7 @@ def create_ai_approver_runner(
                 should_cancel=context.is_cancel_requested,
                 mode=resolved_mode,
                 gatekeeper_reject_confidence_threshold=reject_threshold,
+                continuation_retry_policy=continuation_retry_policy,
             )
         except AiApproverConfigError as exc:
             _update_job_result_fields(
@@ -321,6 +340,8 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
         parameters["articleIdMinExclusive"] = body.articleIdMinExclusive
     if body.articleIdMaxInclusive is not None:
         parameters["articleIdMaxInclusive"] = body.articleIdMaxInclusive
+    if body.continuationRetryPolicy is not None:
+        parameters["continuationRetryPolicy"] = body.continuationRetryPolicy.model_dump()
 
     result = queue_engine.enqueue_job(
         EnqueueJobInput(
@@ -333,6 +354,9 @@ def start_ai_approver_job(body: AiApproverStartRequest) -> JSONResponse:
                 body.gatekeeperRejectConfidenceThreshold,
                 body.articleIdMinExclusive,
                 body.articleIdMaxInclusive,
+                body.continuationRetryPolicy.model_dump()
+                if body.continuationRetryPolicy is not None
+                else None,
             ),
             parameters=parameters,
         )

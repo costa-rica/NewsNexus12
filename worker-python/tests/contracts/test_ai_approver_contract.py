@@ -35,8 +35,11 @@ def test_ai_approver_contract_runtime_matches_spec(
         limit: int,
         require_state_assignment: bool,
         state_ids: list[int] | None,
+        mode: str | None = None,
+        gatekeeper_reject_confidence_threshold: float | None = None,
         article_id_min_exclusive: int | None = None,
         article_id_max_inclusive: int | None = None,
+        continuation_retry_policy: dict[str, object] | None = None,
     ):
         def _run(context) -> None:
             return None
