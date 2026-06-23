@@ -4,6 +4,7 @@ import { QueueJobHandler } from '../modules/queue/queueEngine';
 import {
   createRequestGoogleRssJobHandler,
   DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
+  GoogleRssJobResumePlan,
   RequestGoogleRssJobInput,
   verifySpreadsheetFileExists
 } from '../modules/jobs/requestGoogleRssJob';
@@ -89,6 +90,131 @@ const resolveTargetArticlesAddedCount = (body: unknown): number | undefined => {
   return parsed;
 };
 
+const parseNullablePositiveInteger = (
+  rawValue: unknown,
+  field: string,
+  details: Array<{ field: string; message: string }>
+): number | null | undefined => {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+  if (rawValue === null || rawValue === '') {
+    return null;
+  }
+  const parsed =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number.parseInt(rawValue, 10)
+        : Number.NaN;
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    details.push({ field, message: `${field} must be a positive integer, null, or omitted` });
+    return undefined;
+  }
+
+  return parsed;
+};
+
+const parseNullableNonNegativeInteger = (
+  rawValue: unknown,
+  field: string,
+  details: Array<{ field: string; message: string }>
+): number | null | undefined => {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+  if (rawValue === null || rawValue === '') {
+    return null;
+  }
+  const parsed =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number.parseInt(rawValue, 10)
+        : Number.NaN;
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    details.push({ field, message: `${field} must be a non-negative integer, null, or omitted` });
+    return undefined;
+  }
+
+  return parsed;
+};
+
+export const resolveGoogleRssResumePlanFromBody = (
+  body: unknown
+): GoogleRssJobResumePlan | undefined => {
+  const rawValue =
+    typeof body === 'object' && body !== null && 'googleRssResumePlan' in body
+      ? body.googleRssResumePlan
+      : undefined;
+
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return undefined;
+  }
+
+  if (typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+    throw AppError.validation([
+      {
+        field: 'googleRssResumePlan',
+        message: 'googleRssResumePlan must be an object when provided'
+      }
+    ]);
+  }
+
+  const details: Array<{ field: string; message: string }> = [];
+  const value = rawValue as Record<string, unknown>;
+  const resumeAfterRequestUrl = value.resumeAfterRequestUrl;
+  const resumeAfterQueryRowIndex = parseNullableNonNegativeInteger(
+    value.resumeAfterQueryRowIndex,
+    'googleRssResumePlan.resumeAfterQueryRowIndex',
+    details
+  );
+  const resumeAfterQueryRowId = parseNullablePositiveInteger(
+    value.resumeAfterQueryRowId,
+    'googleRssResumePlan.resumeAfterQueryRowId',
+    details
+  );
+  const sourceOrchestratorRunId = parseNullablePositiveInteger(
+    value.sourceOrchestratorRunId,
+    'googleRssResumePlan.sourceOrchestratorRunId',
+    details
+  );
+  const continuationRunId = parseNullablePositiveInteger(
+    value.continuationRunId,
+    'googleRssResumePlan.continuationRunId',
+    details
+  );
+
+  if (
+    resumeAfterRequestUrl !== undefined &&
+    resumeAfterRequestUrl !== null &&
+    (typeof resumeAfterRequestUrl !== 'string' || resumeAfterRequestUrl.trim() === '')
+  ) {
+    details.push({
+      field: 'googleRssResumePlan.resumeAfterRequestUrl',
+      message: 'googleRssResumePlan.resumeAfterRequestUrl must be a non-empty string, null, or omitted'
+    });
+  }
+
+  if (details.length > 0) {
+    throw AppError.validation(details);
+  }
+
+  return {
+    ...(typeof resumeAfterRequestUrl === 'string'
+      ? { resumeAfterRequestUrl: resumeAfterRequestUrl.trim() }
+      : resumeAfterRequestUrl === null
+        ? { resumeAfterRequestUrl: null }
+        : {}),
+    ...(resumeAfterQueryRowIndex !== undefined ? { resumeAfterQueryRowIndex } : {}),
+    ...(resumeAfterQueryRowId !== undefined ? { resumeAfterQueryRowId } : {}),
+    ...(sourceOrchestratorRunId !== undefined ? { sourceOrchestratorRunId } : {}),
+    ...(continuationRunId !== undefined ? { continuationRunId } : {}),
+  };
+};
+
 export const resolveOrchestratorRunId = (headerValue: unknown): number | undefined => {
   const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
 
@@ -125,6 +251,7 @@ export const createRequestGoogleRssRouter = (
       const spreadsheetPath = resolveSpreadsheetPathFromEnv(env);
       const doNotRepeatRequestsWithinHours = resolveDoNotRepeatRequestsWithinHours(req.body);
       const targetArticlesAddedCount = resolveTargetArticlesAddedCount(req.body);
+      const resumePlan = resolveGoogleRssResumePlanFromBody(req.body);
       const orchestratorRunId = resolveOrchestratorRunId(req.headers['x-orchestrator-run-id']);
       await verifySpreadsheetFileExists(spreadsheetPath);
 
@@ -133,7 +260,8 @@ export const createRequestGoogleRssRouter = (
         spreadsheetPath,
         doNotRepeatRequestsWithinHours,
         orchestratorRunId,
-        targetArticlesAddedCount
+        targetArticlesAddedCount,
+        resumePlan
       });
 
       const enqueueResult = await queueEngine.enqueueJob({
@@ -142,7 +270,8 @@ export const createRequestGoogleRssRouter = (
           spreadsheetPath,
           doNotRepeatRequestsWithinHours,
           ...(orchestratorRunId !== undefined ? { orchestratorRunId } : {}),
-          ...(targetArticlesAddedCount !== undefined ? { targetArticlesAddedCount } : {})
+          ...(targetArticlesAddedCount !== undefined ? { targetArticlesAddedCount } : {}),
+          ...(resumePlan !== undefined ? { resumePlan } : {})
         })
       });
 
@@ -152,7 +281,8 @@ export const createRequestGoogleRssRouter = (
         status: enqueueResult.status,
         doNotRepeatRequestsWithinHours,
         orchestratorRunId,
-        targetArticlesAddedCount
+        targetArticlesAddedCount,
+        resumePlan
       });
 
       return res.status(202).json({

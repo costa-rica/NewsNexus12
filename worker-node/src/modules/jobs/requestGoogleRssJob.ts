@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { parseStringPromise } from 'xml2js';
 import {
   Article,
@@ -26,25 +25,16 @@ import {
   ArticleContent02WorkflowResult
 } from '../article-content-02/types';
 import { hasUsableArticleContent02 } from '../article-content-02/repository';
+import {
+  buildGoogleRssQuery,
+  buildGoogleRssUrl,
+  GoogleRssQueryRow,
+  parseTimeRangeDays,
+  readGoogleRssQuerySpreadsheet,
+  getDefaultLimitDays,
+} from '../google-rss/querySpreadsheet';
 
 export const DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS = 72;
-
-interface QueryRow {
-  id: number;
-  and_keywords: string;
-  and_exact_phrases: string;
-  or_keywords: string;
-  or_exact_phrases: string;
-  time_range: string;
-}
-
-interface QueryBuildResult {
-  query: string;
-  andString: string | null;
-  orString: string | null;
-  timeRange: string;
-  timeRangeInvalid: boolean;
-}
 
 interface RssItem {
   title?: string;
@@ -97,6 +87,7 @@ export interface RequestGoogleRssJobContext {
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
   orchestratorRunId?: number;
+  resumePlan?: GoogleRssJobResumePlan;
   signal: AbortSignal;
   updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
@@ -110,40 +101,18 @@ export interface RequestGoogleRssJobInput {
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
   orchestratorRunId?: number;
+  resumePlan?: GoogleRssJobResumePlan;
 }
 
-const REQUIRED_HEADERS = [
-  'id',
-  'and_keywords',
-  'and_exact_phrases',
-  'or_keywords',
-  'or_exact_phrases',
-  'time_range'
-] as const;
+export interface GoogleRssJobResumePlan {
+  resumeAfterRequestUrl?: string | null;
+  resumeAfterQueryRowIndex?: number | null;
+  resumeAfterQueryRowId?: number | null;
+  sourceOrchestratorRunId?: number | null;
+  continuationRunId?: number | null;
+}
 
 const GOOGLE_NEWS_RSS_ORG_NAME = 'Google News RSS';
-
-const getDefaultLimitDays = (): number => {
-  const raw = process.env.LIMIT_ARTICLE_AGE_IN_DAYS;
-  const parsed = Number.parseInt(raw ?? '', 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(
-      `LIMIT_ARTICLE_AGE_IN_DAYS is required and must be a positive integer (got: "${raw ?? ''}"). This should have been caught at startup.`
-    );
-  }
-  return parsed;
-};
-
-const getDefaultTimeRange = (): string => `${getDefaultLimitDays()}d`;
-
-const parseTimeRangeDays = (timeRange: string): number | null => {
-  const match = /^(\d+)d$/.exec(timeRange);
-  if (!match) {
-    return null;
-  }
-  const days = Number.parseInt(match[1], 10);
-  return Number.isFinite(days) && days > 0 ? days : null;
-};
 
 let dbReadyPromise: Promise<void> | null = null;
 
@@ -176,193 +145,6 @@ export const verifySpreadsheetFileExists = async (spreadsheetPath: string): Prom
   }
 };
 
-const toCellString = (value: ExcelJS.CellValue | null | undefined): string => {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  if (typeof value === 'number') {
-    return String(value);
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === 'object' && 'text' in value) {
-    return String(value.text).trim();
-  }
-  return String(value).trim();
-};
-
-const splitCsv = (value?: string): string[] => {
-  if (!value) {
-    return [];
-  }
-  return value
-    .split(',')
-    .map((term) => term.trim())
-    .filter((term) => term.length > 0);
-};
-
-const normalizeTerm = (term: string): string => {
-  const trimmed = term.trim();
-  if (!trimmed) {
-    return '';
-  }
-  const hasQuotes =
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"));
-  if (hasQuotes) {
-    return trimmed;
-  }
-  if (trimmed.includes(' ')) {
-    return `"${trimmed}"`;
-  }
-  return trimmed;
-};
-
-const normalizeTimeRange = (value?: string): { timeRange: string; timeRangeInvalid: boolean } => {
-  const trimmed = value?.trim() ?? '';
-  if (!trimmed) {
-    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: false };
-  }
-  if (!/^\d+d$/.test(trimmed)) {
-    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: true };
-  }
-  const days = Number.parseInt(trimmed.slice(0, -1), 10);
-  if (!Number.isFinite(days) || days <= 0) {
-    return { timeRange: getDefaultTimeRange(), timeRangeInvalid: true };
-  }
-  return { timeRange: trimmed, timeRangeInvalid: false };
-};
-
-const combineForDb = (keywords?: string, exactPhrases?: string): string | null => {
-  const parts = [...splitCsv(keywords), ...splitCsv(exactPhrases)];
-  if (parts.length === 0) {
-    return null;
-  }
-  return parts.join(', ');
-};
-
-const buildQuery = (row: QueryRow): QueryBuildResult => {
-  const andKeywords = splitCsv(row.and_keywords);
-  const andExact = splitCsv(row.and_exact_phrases);
-  const orKeywords = splitCsv(row.or_keywords);
-  const orExact = splitCsv(row.or_exact_phrases);
-
-  const andTerms = [...andKeywords, ...andExact].map(normalizeTerm).filter(Boolean);
-  const orTerms = [...orKeywords, ...orExact].map(normalizeTerm).filter(Boolean);
-
-  const queryParts: string[] = [];
-  if (andTerms.length > 0) {
-    queryParts.push(andTerms.join(' '));
-  }
-  if (orTerms.length > 0) {
-    const orExpression = orTerms.join(' OR ');
-    queryParts.push(andTerms.length > 0 && orTerms.length > 1 ? `(${orExpression})` : orExpression);
-  }
-
-  const { timeRange, timeRangeInvalid } = normalizeTimeRange(row.time_range);
-  if (andTerms.length === 0 && orTerms.length === 0) {
-    return {
-      query: '',
-      andString: combineForDb(row.and_keywords, row.and_exact_phrases),
-      orString: combineForDb(row.or_keywords, row.or_exact_phrases),
-      timeRange,
-      timeRangeInvalid
-    };
-  }
-
-  queryParts.push(`when:${timeRange}`);
-
-  return {
-    query: queryParts.join(' ').trim(),
-    andString: combineForDb(row.and_keywords, row.and_exact_phrases),
-    orString: combineForDb(row.or_keywords, row.or_exact_phrases),
-    timeRange,
-    timeRangeInvalid
-  };
-};
-
-const buildRssUrl = (query: string): string => {
-  const baseUrl = 'https://news.google.com/rss/search';
-  const params = new URLSearchParams({ q: query });
-
-  const hl = process.env.GOOGLE_RSS_HL || 'en-US';
-  const gl = process.env.GOOGLE_RSS_GL || 'US';
-  const ceid = process.env.GOOGLE_RSS_CEID || 'US:en';
-
-  params.set('hl', hl);
-  params.set('gl', gl);
-  params.set('ceid', ceid);
-
-  return `${baseUrl}?${params.toString()}`;
-};
-
-const readQuerySpreadsheet = async (filePath: string): Promise<QueryRow[]> => {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
-
-  const worksheet = workbook.worksheets[0];
-  if (!worksheet) {
-    throw new Error('Spreadsheet has no worksheets.');
-  }
-
-  const headerRow = worksheet.getRow(1);
-  const headerMap = new Map<string, number>();
-
-  headerRow.eachCell((cell, colNumber) => {
-    const header = toCellString(cell.value).toLowerCase();
-    if (header) {
-      headerMap.set(header, colNumber);
-    }
-  });
-
-  const missingHeaders = REQUIRED_HEADERS.filter((header) => !headerMap.has(header));
-  if (missingHeaders.length > 0) {
-    throw new Error(`Spreadsheet missing required columns: ${missingHeaders.join(', ')}`);
-  }
-
-  const rows: QueryRow[] = [];
-  for (let rowIndex = 2; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-    const row = worksheet.getRow(rowIndex);
-    const rowValues = {
-      id: toCellString(row.getCell(headerMap.get('id')!).value),
-      and_keywords: toCellString(row.getCell(headerMap.get('and_keywords')!).value),
-      and_exact_phrases: toCellString(row.getCell(headerMap.get('and_exact_phrases')!).value),
-      or_keywords: toCellString(row.getCell(headerMap.get('or_keywords')!).value),
-      or_exact_phrases: toCellString(row.getCell(headerMap.get('or_exact_phrases')!).value),
-      time_range: toCellString(row.getCell(headerMap.get('time_range')!).value)
-    };
-
-    const hasAnyValue = Object.values(rowValues).some((value) => value);
-    if (!hasAnyValue) {
-      continue;
-    }
-
-    const idNumber = Number.parseInt(rowValues.id, 10);
-    if (Number.isNaN(idNumber) || !rowValues.id) {
-      throw new Error(
-        `Missing or invalid id in row ${rowIndex}. All rows must have a valid numeric id.`
-      );
-    }
-
-    rows.push({
-      id: idNumber,
-      and_keywords: rowValues.and_keywords,
-      and_exact_phrases: rowValues.and_exact_phrases,
-      or_keywords: rowValues.or_keywords,
-      or_exact_phrases: rowValues.or_exact_phrases,
-      time_range: rowValues.time_range
-    });
-  }
-
-  return rows;
-};
 
 const stripHtml = (input: string): string => input.replace(/<[^>]*>/g, '').trim();
 
@@ -685,13 +467,39 @@ const delay = async (ms: number, signal: AbortSignal): Promise<void> => {
   });
 };
 
+export const shouldSkipRowForResumePlan = (
+  row: GoogleRssQueryRow,
+  rowIndex: number,
+  requestUrl: string | null,
+  resumePlan: GoogleRssJobResumePlan | undefined
+): boolean => {
+  if (!resumePlan) {
+    return false;
+  }
+
+  if (typeof resumePlan.resumeAfterQueryRowIndex === 'number') {
+    return rowIndex <= resumePlan.resumeAfterQueryRowIndex;
+  }
+
+  if (typeof resumePlan.resumeAfterQueryRowId === 'number') {
+    return row.id <= resumePlan.resumeAfterQueryRowId;
+  }
+
+  if (resumePlan.resumeAfterRequestUrl && requestUrl) {
+    return requestUrl === resumePlan.resumeAfterRequestUrl;
+  }
+
+  return false;
+};
+
 const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<void> => {
   logWorkflowStart('Request Google RSS', {
     jobId: context.jobId,
     spreadsheetPath: context.spreadsheetPath,
     doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours,
     orchestratorRunId: context.orchestratorRunId,
-    targetArticlesAddedCount: context.targetArticlesAddedCount
+    targetArticlesAddedCount: context.targetArticlesAddedCount,
+    resumePlan: context.resumePlan
   });
 
   const delayBetweenRequestsMs = (() => {
@@ -731,7 +539,7 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
   let currentRowIndex = -1;
 
   try {
-    const rows = await readQuerySpreadsheet(context.spreadsheetPath);
+    const rows = await readGoogleRssQuerySpreadsheet(context.spreadsheetPath);
     logger.info(`Loaded ${rows.length} query rows from spreadsheet.`);
 
     queryResults = rows.map((row) => ({
@@ -762,7 +570,25 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         break;
       }
 
-      const queryResult = buildQuery(row);
+      const queryResult = buildGoogleRssQuery(row);
+      const requestUrl = queryResult.query ? buildGoogleRssUrl(queryResult.query) : null;
+
+      if (shouldSkipRowForResumePlan(row, i, requestUrl, context.resumePlan)) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'skipped',
+          saved_articles: 0,
+          note: 'resume_before_marker'
+        };
+        logger.info('Skipping row before or at Google RSS resume marker', {
+          rowId: row.id,
+          rowIndex: i,
+          requestUrl,
+          resumePlan: context.resumePlan
+        });
+        continue;
+      }
+
       if (!queryResult.query) {
         queryResults[i] = {
           ...queryResults[i],
@@ -774,7 +600,10 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         continue;
       }
 
-      const requestUrl = buildRssUrl(queryResult.query);
+      if (!requestUrl) {
+        throw new Error(`Failed to build Google RSS request URL for row ${row.id}.`);
+      }
+
       const alreadyRequested = await wasRequestMadeRecently(
         requestUrl,
         context.doNotRepeatRequestsWithinHours
@@ -917,6 +746,9 @@ export const createRequestGoogleRssJobHandler = (
         : {}),
       ...(input.orchestratorRunId !== undefined
         ? { orchestratorRunId: input.orchestratorRunId }
+        : {}),
+      ...(input.resumePlan !== undefined
+        ? { resumePlan: input.resumePlan }
         : {}),
       signal: queueContext.signal,
       updateResult: queueContext.updateResult

@@ -258,7 +258,7 @@ describe('orchestrator routes', () => {
       expect(res.body).toMatchObject({
         eligible: true,
         reasonCode: 'eligible_google_rss_interrupted',
-        googleRssResumePlan: { status: 'phase_4_deferred', resumeAfter: null },
+        googleRssResumePlan: { status: 'unavailable', resumeAfter: null },
       });
     });
   });

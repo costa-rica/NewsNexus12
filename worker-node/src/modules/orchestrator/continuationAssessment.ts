@@ -11,6 +11,10 @@ import {
   hasActiveContinuationForSource,
 } from './repository';
 import { getActiveOrchestratorRunId } from './activeRunGuard';
+import {
+  buildGoogleRssResumePlan,
+  GoogleRssResumePlanningResult,
+} from '../google-rss/resumePlanner';
 
 const TERMINAL_SUCCESS_STATUSES = new Set<OrchestratorRunStatus>([
   'completed',
@@ -64,9 +68,15 @@ export interface ContinuationAssessmentStep {
 }
 
 export interface GoogleRssResumePlan {
-  status: 'phase_4_deferred' | 'not_applicable';
+  status: 'ready' | 'phase_4_deferred' | 'not_applicable' | 'unavailable';
   reason: string;
-  resumeAfter: null;
+  resumeAfter: GoogleRssResumePlanningResult['resumeAfter'] | null;
+  startFrom?: GoogleRssResumePlanningResult['startFrom'];
+  sourceOrchestratorRunId?: number;
+  rowsTotal?: number;
+  expectedRequestCount?: number;
+  matchedRequestCount?: number;
+  replayAllowed?: boolean;
 }
 
 export interface ContinuationRetryPolicy {
@@ -308,14 +318,52 @@ export const assessContinuationForRun = async (
     hasActiveContinuationForSource(sourceRunId),
   ]);
 
+  const assessment = buildContinuationAssessment({
+    run: data.run,
+    steps: data.steps,
+    activeRunId,
+    hasActiveContinuation: activeContinuation,
+  });
+
+  if (assessment.eligible && assessment.reasonCode === 'eligible_google_rss_interrupted') {
+    assessment.googleRssResumePlan = await resolveGoogleRssResumePlan(data.run);
+  }
+
   return {
     found: true,
-    assessment: buildContinuationAssessment({
-      run: data.run,
-      steps: data.steps,
-      activeRunId,
-      hasActiveContinuation: activeContinuation,
-    }),
+    assessment,
+  };
+};
+
+const resolveGoogleRssResumePlan = async (
+  run: OrchestratorRunRow
+): Promise<GoogleRssResumePlan> => {
+  const spreadsheetPath = process.env.PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED?.trim();
+  if (!spreadsheetPath) {
+    return {
+      status: 'unavailable',
+      reason: 'PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED is not configured, so Google RSS resume planning could not read the weekly query spreadsheet.',
+      resumeAfter: null,
+    };
+  }
+
+  const plan = await buildGoogleRssResumePlan({
+    sourceRunId: run.id,
+    sourceStartedAt: run.startedAt,
+    sourceEndedAt: run.endedAt,
+    spreadsheetPath,
+  });
+
+  return {
+    status: plan.status,
+    reason: plan.reason,
+    resumeAfter: plan.resumeAfter,
+    startFrom: plan.startFrom,
+    sourceOrchestratorRunId: plan.sourceOrchestratorRunId,
+    rowsTotal: plan.rowsTotal,
+    expectedRequestCount: plan.expectedRequestCount,
+    matchedRequestCount: plan.matchedRequestCount,
+    replayAllowed: plan.replayAllowed,
   };
 };
 

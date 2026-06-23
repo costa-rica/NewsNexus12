@@ -98,24 +98,24 @@ Package areas: `worker-node` orchestration routes/services, run-list response co
 
 Package areas: `worker-node` Google RSS automation, query spreadsheet helpers, `NewsApiRequests` matching, continuation assessment.
 
-- [ ] Extract reusable helpers for reading the weekly query spreadsheet.
-- [ ] Extract or reuse helpers for normalizing query row fields.
-- [ ] Extract or reuse helpers for building the Google RSS query and final RSS URL.
-- [ ] Extract or reuse helpers for database strings used as `andString` and `orString`.
-- [ ] In full assessment, build expected RSS URLs for each spreadsheet row.
-- [ ] Match persisted automation requests for the source run using exact `url` first.
-- [ ] Add fallback matching using `andString`, `orString`, `isFromAutomation`, status, counts, and timestamps.
-- [ ] Verify fallback matching does not use `notString` unless the Google RSS job first persists a meaningful value for it.
-- [ ] Pick the latest matching query row as the resume marker.
-- [ ] Plan resumed Google RSS to start after the last persisted matching request.
-- [ ] Plan start from the first query row when no persisted match exists.
-- [ ] Accept a resume plan in the Google RSS job request body for continuation runs.
-- [ ] Skip spreadsheet rows until passing the resume marker, then process remaining rows normally.
-- [ ] Preserve the allowed one-request replay behavior when a request was started but never recorded in `NewsApiRequests`.
-- [ ] Add tests for last URL match, no-match first-row behavior, and fallback matching without `notString`.
-- [ ] Run relevant `worker-node` type checks, tests, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 4 changes after verification passes.
+- [x] Extract reusable helpers for reading the weekly query spreadsheet.
+- [x] Extract or reuse helpers for normalizing query row fields.
+- [x] Extract or reuse helpers for building the Google RSS query and final RSS URL.
+- [x] Extract or reuse helpers for database strings used as `andString` and `orString`.
+- [x] In full assessment, build expected RSS URLs for each spreadsheet row.
+- [x] Match persisted automation requests for the source run using exact `url` first.
+- [x] Add fallback matching using `andString`, `orString`, `isFromAutomation`, status, counts, and timestamps.
+- [x] Verify fallback matching does not use `notString` unless the Google RSS job first persists a meaningful value for it.
+- [x] Pick the latest matching query row as the resume marker.
+- [x] Plan resumed Google RSS to start after the last persisted matching request.
+- [x] Plan start from the first query row when no persisted match exists.
+- [x] Accept a resume plan in the Google RSS job request body for continuation runs.
+- [x] Skip spreadsheet rows until passing the resume marker, then process remaining rows normally.
+- [x] Preserve the allowed one-request replay behavior when a request was started but never recorded in `NewsApiRequests`.
+- [x] Add tests for last URL match, no-match first-row behavior, and fallback matching without `notString`.
+- [x] Run relevant `worker-node` type checks, tests, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 4 changes after verification passes.
 
 ## Phase 5: Continuation creation and coordinator branching
 
