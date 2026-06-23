@@ -10,6 +10,8 @@ const router = express.Router();
 const {
   AiApproverArticleScore,
   AiApproverPromptVersion,
+  OrchestratorRun,
+  OrchestratorRunStep,
   User,
   ArticleKeywordContract,
   EntityWhoCategorizedArticle,
@@ -42,6 +44,8 @@ const {
 const tableRegistry = {
   AiApproverArticleScore,
   AiApproverPromptVersion,
+  OrchestratorRun,
+  OrchestratorRunStep,
   User,
   ArticleKeywordContract,
   EntityWhoCategorizedArticle,

@@ -52,6 +52,8 @@ function createModelMock() {
 const modelNames = [
   "AiApproverArticleScore",
   "AiApproverPromptVersion",
+  "OrchestratorRun",
+  "OrchestratorRunStep",
   "User",
   "ArticleKeywordContract",
   "EntityWhoCategorizedArticle",
@@ -149,9 +151,11 @@ describe("adminDb routes", () => {
     });
   });
 
-  test("GET /admin-db/db-row-counts-by-table includes AI approver tables", async () => {
+  test("GET /admin-db/db-row-counts-by-table includes AI approver and orchestrator tables", async () => {
     dbMock.AiApproverArticleScore.count.mockResolvedValue(7);
     dbMock.AiApproverPromptVersion.count.mockResolvedValue(2);
+    dbMock.OrchestratorRun.count.mockResolvedValue(13);
+    dbMock.OrchestratorRunStep.count.mockResolvedValue(83);
 
     const app = buildApp();
     const response = await request(app).get("/admin-db/db-row-counts-by-table");
@@ -162,6 +166,8 @@ describe("adminDb routes", () => {
       expect.arrayContaining([
         { tableName: "AiApproverArticleScore", rowCount: 7 },
         { tableName: "AiApproverPromptVersion", rowCount: 2 },
+        { tableName: "OrchestratorRun", rowCount: 13 },
+        { tableName: "OrchestratorRunStep", rowCount: 83 },
       ]),
     );
   });
