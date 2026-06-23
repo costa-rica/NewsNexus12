@@ -9,8 +9,13 @@ export type OrchestratorRunStatus =
   | 'canceled'
   | 'timed_out';
 
+export type OrchestratorRunMode = 'standard' | 'continuation';
+
 interface OrchestratorRunAttributes {
   id: number;
+  sourceOrchestratorRunId: number | null;
+  runMode: OrchestratorRunMode;
+  continuationPlan: Record<string, unknown> | null;
   status: OrchestratorRunStatus;
   startedAt: Date;
   endedAt: Date | null;
@@ -27,6 +32,9 @@ interface OrchestratorRunCreationAttributes
   extends Optional<
     OrchestratorRunAttributes,
     | 'id'
+    | 'sourceOrchestratorRunId'
+    | 'runMode'
+    | 'continuationPlan'
     | 'endedAt'
     | 'articleIdMinExclusive'
     | 'articleIdMaxInclusive'
@@ -40,6 +48,9 @@ export class OrchestratorRun
   implements OrchestratorRunAttributes
 {
   public id!: number;
+  public sourceOrchestratorRunId!: number | null;
+  public runMode!: OrchestratorRunMode;
+  public continuationPlan!: Record<string, unknown> | null;
   public status!: OrchestratorRunStatus;
   public startedAt!: Date;
   public endedAt!: Date | null;
@@ -62,6 +73,19 @@ export function initOrchestratorRun() {
         type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true,
+      },
+      sourceOrchestratorRunId: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      runMode: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        defaultValue: 'standard',
+      },
+      continuationPlan: {
+        type: DataTypes.JSONB,
+        allowNull: true,
       },
       status: {
         type: DataTypes.STRING(64),

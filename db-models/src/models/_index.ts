@@ -78,7 +78,7 @@ import { initState, State } from "./State";
 import { initUser, User } from "./User";
 import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
 import { initOrchestratorRun, OrchestratorRun } from "./OrchestratorRun";
-import type { OrchestratorRunStatus } from "./OrchestratorRun";
+import type { OrchestratorRunMode, OrchestratorRunStatus } from "./OrchestratorRun";
 import { initOrchestratorRunStep, OrchestratorRunStep } from "./OrchestratorRunStep";
 import type { OrchestratorRunStepName, OrchestratorRunStepStatus } from "./OrchestratorRunStep";
 
@@ -158,7 +158,7 @@ export function initModels() {
 	};
 }
 
-export type { OrchestratorRunStatus, OrchestratorRunStepName, OrchestratorRunStepStatus };
+export type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepName, OrchestratorRunStepStatus };
 
 export {
 	sequelize,

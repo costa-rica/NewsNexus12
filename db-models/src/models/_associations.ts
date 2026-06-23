@@ -285,12 +285,30 @@ export function applyAssociations(): void {
 	User.hasMany(OrchestratorRun, { foreignKey: "userId" });
 	OrchestratorRun.belongsTo(User, { foreignKey: "userId" });
 
+	OrchestratorRun.belongsTo(OrchestratorRun, {
+		foreignKey: "sourceOrchestratorRunId",
+		as: "sourceRun",
+	});
+	OrchestratorRun.hasMany(OrchestratorRun, {
+		foreignKey: "sourceOrchestratorRunId",
+		as: "continuationRuns",
+	});
+
 	OrchestratorRun.hasMany(OrchestratorRunStep, {
 		foreignKey: "orchestratorRunId",
 		as: "steps",
 	});
 	OrchestratorRunStep.belongsTo(OrchestratorRun, {
 		foreignKey: "orchestratorRunId",
+	});
+
+	OrchestratorRun.hasMany(NewsApiRequest, {
+		foreignKey: "orchestratorRunId",
+		as: "newsApiRequests",
+	});
+	NewsApiRequest.belongsTo(OrchestratorRun, {
+		foreignKey: "orchestratorRunId",
+		as: "orchestratorRun",
 	});
 
 	console.log("✅ Associations have been set up");

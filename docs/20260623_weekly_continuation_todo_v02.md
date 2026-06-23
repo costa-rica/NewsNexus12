@@ -42,20 +42,20 @@ Package areas: `worker-node`, orchestration startup/reconciliation code, orchest
 
 Package areas: `db-models`, `worker-node`, `db-manager` or docs for controlled schema upgrade, backup/import registry if applicable.
 
-- [ ] Extend `OrchestratorRuns` with nullable `sourceOrchestratorRunId`.
-- [ ] Extend `OrchestratorRuns` with `runMode`, defaulting to `standard`.
-- [ ] Extend `OrchestratorRuns` with nullable JSONB `continuationPlan`.
-- [ ] Add the self-reference association for source and continuation runs where associations are centralized.
-- [ ] Extend `NewsApiRequests` with nullable `orchestratorRunId`.
-- [ ] Thread `orchestratorRunId` into future weekly Google RSS request persistence.
-- [ ] Do not add `queryRowId` unless a later implementation step proves it is necessary and documents the row-id contract.
-- [ ] Provide an explicit idempotent schema upgrade path, such as a documented SQL script or controlled `db-manager` command.
-- [ ] Do not add hidden `ALTER TABLE` behavior to API or worker startup.
-- [ ] Confirm backup/replenish/export/import paths include the new columns when those paths are model or registry driven.
-- [ ] Add or update tests for model initialization and associations where test infrastructure exists.
-- [ ] Run `db-models` build and relevant `worker-node` type checks, tests, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 2 changes after verification passes.
+- [x] Extend `OrchestratorRuns` with nullable `sourceOrchestratorRunId`.
+- [x] Extend `OrchestratorRuns` with `runMode`, defaulting to `standard`.
+- [x] Extend `OrchestratorRuns` with nullable JSONB `continuationPlan`.
+- [x] Add the self-reference association for source and continuation runs where associations are centralized.
+- [x] Extend `NewsApiRequests` with nullable `orchestratorRunId`.
+- [x] Thread `orchestratorRunId` into future weekly Google RSS request persistence.
+- [x] Do not add `queryRowId` unless a later implementation step proves it is necessary and documents the row-id contract.
+- [x] Provide an explicit idempotent schema upgrade path, such as a documented SQL script or controlled `db-manager` command.
+- [x] Do not add hidden `ALTER TABLE` behavior to API or worker startup.
+- [x] Confirm backup/replenish/export/import paths include the new columns when those paths are model or registry driven.
+- [x] Add or update tests for model initialization and associations where test infrastructure exists.
+- [x] Run `db-models` build and relevant `worker-node` type checks, tests, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 2 changes after verification passes.
 
 ## Phase 3: Cheap signal and full assessment contract
 

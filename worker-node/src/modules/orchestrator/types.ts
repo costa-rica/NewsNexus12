@@ -1,6 +1,6 @@
-import type { OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName } from '@newsnexus/db-models';
+import type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName } from '@newsnexus/db-models';
 
-export type { OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName };
+export type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName };
 
 export interface OrchestratorConfig {
   aiApproverEnabled: boolean;
@@ -78,6 +78,9 @@ export const STEP_DEFAULTS: StepConfig[] = [
 
 export type OrchestratorRunRow = {
   id: number;
+  sourceOrchestratorRunId: number | null;
+  runMode: OrchestratorRunMode;
+  continuationPlan: Record<string, unknown> | null;
   status: OrchestratorRunStatus;
   startedAt: Date;
   endedAt: Date | null;

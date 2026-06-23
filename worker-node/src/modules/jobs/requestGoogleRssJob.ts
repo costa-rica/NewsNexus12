@@ -96,6 +96,7 @@ export interface RequestGoogleRssJobContext {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
+  orchestratorRunId?: number;
   signal: AbortSignal;
   updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
@@ -108,6 +109,7 @@ export interface RequestGoogleRssJobInput {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
+  orchestratorRunId?: number;
 }
 
 const REQUIRED_HEADERS = [
@@ -556,6 +558,7 @@ const storeRequestAndArticles = async (params: {
   status: 'success' | 'error';
   items: RssItem[];
   newsArticleAggregatorSourceId: number;
+  orchestratorRunId?: number;
   entityWhoFoundArticleId: number;
   signal: AbortSignal;
   navigationSessionManager: GoogleNavigationSessionManager;
@@ -568,6 +571,7 @@ const storeRequestAndArticles = async (params: {
 
   const request = await NewsApiRequest.create({
     newsArticleAggregatorSourceId: params.newsArticleAggregatorSourceId,
+    orchestratorRunId: params.orchestratorRunId ?? null,
     dateEndOfRequest,
     countOfArticlesReceivedFromRequest: params.items.length,
     status: params.status,
@@ -686,6 +690,7 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     jobId: context.jobId,
     spreadsheetPath: context.spreadsheetPath,
     doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours,
+    orchestratorRunId: context.orchestratorRunId,
     targetArticlesAddedCount: context.targetArticlesAddedCount
   });
 
@@ -826,6 +831,7 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         status: response.status,
         items: response.items,
         newsArticleAggregatorSourceId,
+        orchestratorRunId: context.orchestratorRunId,
         entityWhoFoundArticleId,
         signal: context.signal,
         navigationSessionManager,
@@ -908,6 +914,9 @@ export const createRequestGoogleRssJobHandler = (
       doNotRepeatRequestsWithinHours: input.doNotRepeatRequestsWithinHours,
       ...(input.targetArticlesAddedCount !== undefined
         ? { targetArticlesAddedCount: input.targetArticlesAddedCount }
+        : {}),
+      ...(input.orchestratorRunId !== undefined
+        ? { orchestratorRunId: input.orchestratorRunId }
         : {}),
       signal: queueContext.signal,
       updateResult: queueContext.updateResult

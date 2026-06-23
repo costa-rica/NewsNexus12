@@ -10,6 +10,7 @@ jest.mock("@newsnexus/db-models", () => ({
     rawAttributes: {
       publishedDate: { type: { key: "DATEONLY" } },
       createdAt: { type: { key: "DATE" } },
+      continuationPlan: { type: { key: "JSONB" } },
     },
   },
   User: {
@@ -47,6 +48,7 @@ import {
   importZipFileToDatabase,
   normalizeDateValue,
   sanitizeDateFields,
+  sanitizeJsonFields,
 } from "../../src/modules/zipImport";
 
 describe("Zip import module", () => {
@@ -195,6 +197,35 @@ describe("Zip import module", () => {
       expect(result).toBe(1); // Only the second one was sanitized
       expect(records[0].createdAt).toBeNull();
       expect(records[1].createdAt).toBeNull();
+    });
+  });
+
+  describe("sanitizeJsonFields()", () => {
+    it("parses JSON strings in-place", () => {
+      const records = [
+        { id: "1", continuationPlan: "{\"sourceRunId\":11,\"warnings\":[\"range\"]}" },
+      ];
+
+      const result = sanitizeJsonFields(records, ["continuationPlan"]);
+
+      expect(result).toBe(1);
+      expect(records[0].continuationPlan).toEqual({
+        sourceRunId: 11,
+        warnings: ["range"],
+      });
+    });
+
+    it("normalizes empty and invalid JSON values to null", () => {
+      const records = [
+        { id: "1", continuationPlan: "" },
+        { id: "2", continuationPlan: "{invalid" },
+      ];
+
+      const result = sanitizeJsonFields(records, ["continuationPlan"]);
+
+      expect(result).toBe(2);
+      expect(records[0].continuationPlan).toBeNull();
+      expect(records[1].continuationPlan).toBeNull();
     });
   });
 
@@ -383,6 +414,34 @@ describe("Zip import module", () => {
 
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining("Sanitized 1 invalid date values"),
+      );
+    });
+
+    it("normalizes JSONB columns before bulk import", async () => {
+      const zipPath = path.join(tempDir, "data.zip");
+      const zip = new AdmZip();
+
+      const articleCsv =
+        'id,title,continuationPlan\n1,Article 1,"{""sourceRunId"":11}"';
+      zip.addFile("Article.csv", Buffer.from(articleCsv));
+      zip.writeZip(zipPath);
+
+      (db.Article.bulkCreate as jest.Mock).mockResolvedValue(null);
+      (db.sequelize.query as jest.Mock).mockResolvedValue(null);
+
+      await importZipFileToDatabase(zipPath);
+
+      expect(db.Article.bulkCreate).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            id: "1",
+            continuationPlan: { sourceRunId: 11 },
+          }),
+        ],
+        { ignoreDuplicates: true, transaction: {} },
+      );
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Normalized 1 JSON values"),
       );
     });
   });

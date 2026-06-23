@@ -89,6 +89,26 @@ const resolveTargetArticlesAddedCount = (body: unknown): number | undefined => {
   return parsed;
 };
 
+export const resolveOrchestratorRunId = (headerValue: unknown): number | undefined => {
+  const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(String(rawValue), 10);
+  if (!Number.isInteger(parsed) || parsed <= 0 || String(parsed) !== String(rawValue).trim()) {
+    throw AppError.validation([
+      {
+        field: 'X-Orchestrator-Run-Id',
+        message: 'X-Orchestrator-Run-Id must be a positive integer when provided'
+      }
+    ]);
+  }
+
+  return parsed;
+};
+
 export const createRequestGoogleRssRouter = (
   dependencies: RequestGoogleRssRouteDependencies = {
     queueEngine: globalQueueEngine,
@@ -105,12 +125,14 @@ export const createRequestGoogleRssRouter = (
       const spreadsheetPath = resolveSpreadsheetPathFromEnv(env);
       const doNotRepeatRequestsWithinHours = resolveDoNotRepeatRequestsWithinHours(req.body);
       const targetArticlesAddedCount = resolveTargetArticlesAddedCount(req.body);
+      const orchestratorRunId = resolveOrchestratorRunId(req.headers['x-orchestrator-run-id']);
       await verifySpreadsheetFileExists(spreadsheetPath);
 
       logger.info('Received Request Google RSS start request', {
         endpointName,
         spreadsheetPath,
         doNotRepeatRequestsWithinHours,
+        orchestratorRunId,
         targetArticlesAddedCount
       });
 
@@ -119,6 +141,7 @@ export const createRequestGoogleRssRouter = (
         run: buildJobHandler({
           spreadsheetPath,
           doNotRepeatRequestsWithinHours,
+          ...(orchestratorRunId !== undefined ? { orchestratorRunId } : {}),
           ...(targetArticlesAddedCount !== undefined ? { targetArticlesAddedCount } : {})
         })
       });
@@ -128,6 +151,7 @@ export const createRequestGoogleRssRouter = (
         jobId: enqueueResult.jobId,
         status: enqueueResult.status,
         doNotRepeatRequestsWithinHours,
+        orchestratorRunId,
         targetArticlesAddedCount
       });
 

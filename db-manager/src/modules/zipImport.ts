@@ -117,6 +117,20 @@ function getFloatFields(model: { rawAttributes?: Record<string, unknown> }): str
     .map(([field]) => field);
 }
 
+function getJsonFields(model: { rawAttributes?: Record<string, unknown> }): string[] {
+  if (!model.rawAttributes) {
+    return [];
+  }
+
+  return Object.entries(model.rawAttributes)
+    .filter(([, attribute]) => {
+      const type = (attribute as { type?: { key?: string; constructor?: { name?: string } } }).type;
+      const key = type?.key ?? type?.constructor?.name;
+      return key === DataTypes.JSON.key || key === DataTypes.JSONB.key;
+    })
+    .map(([field]) => field);
+}
+
 export function normalizeDateValue(value: unknown, typeKey: "DATE" | "DATEONLY"): string | null {
   if (value === null || value === undefined) {
     return null;
@@ -264,6 +278,48 @@ export function sanitizeBooleanFields(
   return normalizedCount;
 }
 
+export function sanitizeJsonFields(
+  records: Record<string, string | null | unknown>[],
+  jsonFields: string[],
+): number {
+  if (jsonFields.length === 0 || records.length === 0) {
+    return 0;
+  }
+
+  let normalizedCount = 0;
+
+  for (const record of records) {
+    for (const field of jsonFields) {
+      if (!(field in record)) {
+        continue;
+      }
+
+      const value = record[field];
+      if (value === null || value === undefined || value === "") {
+        if (value === "") {
+          record[field] = null;
+          normalizedCount += 1;
+        }
+        continue;
+      }
+
+      if (typeof value !== "string") {
+        continue;
+      }
+
+      try {
+        record[field] = JSON.parse(value);
+        normalizedCount += 1;
+      } catch {
+        record[field] = null;
+        normalizedCount += 1;
+      }
+    }
+  }
+
+  return normalizedCount;
+}
+
 async function collectCsvFiles(rootDir: string): Promise<string[]> {
   const entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
   const results: string[] = [];
@@ -298,16 +354,26 @@ async function importCsvFileInBatches(
   filePath: string,
   tableName: string,
   model: { bulkCreate: Function; rawAttributes?: Record<string, unknown> },
-): Promise<{ importedCount: number; sanitizedDates: number; sanitizedBooleans: number; sanitizedIntegers: number; sanitizedFloats: number; skippedFkCount: number }> {
+): Promise<{
+  importedCount: number;
+  sanitizedDates: number;
+  sanitizedBooleans: number;
+  sanitizedIntegers: number;
+  sanitizedFloats: number;
+  sanitizedJson: number;
+  skippedFkCount: number;
+}> {
   const dateFields = getDateFields(model);
   const booleanFields = getBooleanFields(model);
   const integerFields = getIntegerFields(model);
   const floatFields = getFloatFields(model);
+  const jsonFields = getJsonFields(model);
   let importedCount = 0;
   let sanitizedDates = 0;
   let sanitizedBooleans = 0;
   let sanitizedIntegers = 0;
   let sanitizedFloats = 0;
+  let sanitizedJson = 0;
   let skippedFkCount = 0;
   let batch: Record<string, string | null>[] = [];
   let nextProgressLogAt = INITIAL_PROGRESS_LOG_THRESHOLD;
@@ -321,6 +387,7 @@ async function importCsvFileInBatches(
     sanitizedBooleans += sanitizeBooleanFields(batch, booleanFields);
     sanitizedIntegers += sanitizeIntegerFields(batch, integerFields);
     sanitizedFloats += sanitizeFloatFields(batch, floatFields);
+    sanitizedJson += sanitizeJsonFields(batch, jsonFields);
 
     try {
       await sequelize.transaction(async (transaction: Transaction) => {
@@ -399,7 +466,7 @@ async function importCsvFileInBatches(
     stream.on("error", handleError);
   });
 
-  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, skippedFkCount };
+  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, sanitizedJson, skippedFkCount };
 }
 
 export async function rebuildSchema(): Promise<void> {
@@ -479,7 +546,7 @@ export async function importZipFileToDatabase(
         continue;
       }
 
-      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, skippedFkCount } = await importCsvFileInBatches(
+      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, sanitizedJson, skippedFkCount } = await importCsvFileInBatches(
         csvFile,
         tableName,
         model,
@@ -507,6 +574,11 @@ export async function importZipFileToDatabase(
       if (sanitizedFloats > 0) {
         logger.warn(
           `Sanitized ${sanitizedFloats} empty-string float values to null for ${tableName}`,
+        );
+      }
+      if (sanitizedJson > 0) {
+        logger.warn(
+          `Normalized ${sanitizedJson} JSON values for ${tableName}`,
         );
       }
       if (skippedFkCount > 0) {
