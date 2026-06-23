@@ -5,6 +5,7 @@ import { errorHandler } from '../../src/modules/middleware/errorHandlers';
 
 const mockGetActiveRunId = jest.fn();
 const mockStartCoordinator = jest.fn();
+const mockStartContinuationCoordinator = jest.fn();
 const mockRequestCancel = jest.fn();
 const mockGetActiveCoordinator = jest.fn();
 const mockGetRunWithSteps = jest.fn();
@@ -21,6 +22,7 @@ jest.mock('../../src/modules/orchestrator/activeRunGuard', () => ({
 
 jest.mock('../../src/modules/orchestrator/coordinator', () => ({
   startCoordinator: (...args: unknown[]) => mockStartCoordinator(...args),
+  startContinuationCoordinator: (...args: unknown[]) => mockStartContinuationCoordinator(...args),
   requestCancel: (...args: unknown[]) => mockRequestCancel(...args),
   getActiveCoordinator: () => mockGetActiveCoordinator(),
 }));
@@ -264,6 +266,17 @@ describe('orchestrator routes', () => {
   });
 
   describe('POST /orchestrator/runs/:id/continue', () => {
+    it('returns 409 when another run is active before assessment', async () => {
+      mockGetActiveRunId.mockResolvedValueOnce(77);
+
+      const res = await request(buildApp()).post('/orchestrator/runs/1/continue').send({});
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ orchestratorRunId: 77 });
+      expect(mockGetRunWithSteps).not.toHaveBeenCalled();
+      expect(mockStartContinuationCoordinator).not.toHaveBeenCalled();
+    });
+
     it('returns 404 when the source run is missing', async () => {
       mockGetRunWithSteps.mockResolvedValueOnce(null);
 
@@ -316,6 +329,72 @@ describe('orchestrator routes', () => {
         eligible: false,
         reasonCode: 'report_only_continuation_deferred',
       });
+    });
+
+    it('creates a linked continuation run and returns 202', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce({
+        run: {
+          id: 1,
+          runMode: 'standard',
+          status: 'timed_out',
+          startedAt: new Date('2026-06-23T00:00:00Z'),
+          endedAt: new Date('2026-06-23T01:00:00Z'),
+          articleIdMinExclusive: 100,
+          articleIdMaxInclusive: 250,
+        },
+        steps: [
+          { id: 1, stepName: 'delete_articles', stepOrder: 1, enabled: true, status: 'completed', childJobId: 'delete-job' },
+          { id: 2, stepName: 'google_rss', stepOrder: 2, enabled: true, status: 'completed', childJobId: 'rss-job' },
+          { id: 3, stepName: 'state_assigner', stepOrder: 3, enabled: true, status: 'completed', childJobId: 'state-job' },
+          { id: 4, stepName: 'ai_approver', stepOrder: 4, enabled: true, status: 'timed_out', childJobId: 'ai-job' },
+          { id: 5, stepName: 'semantic_scorer', stepOrder: 5, enabled: true, status: 'pending', childJobId: null },
+          { id: 6, stepName: 'report', stepOrder: 6, enabled: true, status: 'pending', childJobId: null },
+        ],
+      });
+      mockGetRunById.mockResolvedValueOnce({
+        id: 1,
+        aiApproverEnabled: false,
+        semanticScorerEnabled: true,
+        userId: 12,
+      });
+      mockStartContinuationCoordinator.mockResolvedValueOnce(88);
+
+      const res = await request(buildApp()).post('/orchestrator/runs/1/continue').send({});
+
+      expect(res.status).toBe(202);
+      expect(res.body).toEqual({ runId: 88, sourceRunId: 1, runMode: 'continuation' });
+      expect(mockStartContinuationCoordinator).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'weekly',
+          aiApproverEnabled: false,
+          semanticScorerEnabled: true,
+          continuation: expect.objectContaining({
+            sourceOrchestratorRunId: 1,
+            articleIdMinExclusive: 100,
+            firstRunnableStep: 'ai_approver',
+            inheritedSteps: expect.arrayContaining([
+              expect.objectContaining({
+                stepName: 'google_rss',
+                sourceStepId: 2,
+                sourceChildJobId: 'rss-job',
+              }),
+            ]),
+            retryPolicy: expect.objectContaining({
+              aiApprover: expect.objectContaining({ mode: 'gatekeeper' }),
+            }),
+          }),
+        }),
+        12,
+        expect.objectContaining({
+          eligible: true,
+          sourceRunId: 1,
+          reasonCode: 'eligible_downstream_interrupted',
+          warnings: expect.arrayContaining([
+            expect.stringContaining('manual ingestion'),
+          ]),
+        })
+      );
+      expect(mockInvalidateCache).toHaveBeenCalled();
     });
   });
 

@@ -45,6 +45,15 @@ const aiApproverStep: StepConfig = {
   endpointName: '/ai-approver/start-job',
 };
 
+const googleRssStep: StepConfig = {
+  stepName: 'google_rss',
+  stepOrder: 2,
+  enabled: true,
+  timeoutSeconds: 1,
+  worker: 'node',
+  endpointName: '/request-google-rss/start-job',
+};
+
 describe('orchestrator coordinator request bodies', () => {
   it('calculates articles added from captured article id bounds', () => {
     expect(calculateArticlesAddedCount(1000, 1250)).toBe(250);
@@ -94,6 +103,91 @@ describe('orchestrator coordinator request bodies', () => {
     });
     expect(buildStepRequestBody(aiApproverStep, weeklyConfig, 1000, 1250, null)).toMatchObject({
       limit: 100,
+    });
+  });
+
+  it('passes Google RSS resume plans for continuation runs', () => {
+    const continuationConfig: OrchestratorConfig = {
+      ...weeklyConfig,
+      continuation: {
+        sourceOrchestratorRunId: 14,
+        inheritedSteps: [],
+        firstRunnableStep: 'google_rss',
+        articleIdMinExclusive: 1000,
+        plannedArticleIdMaxInclusive: null,
+        googleRssResumePlan: {
+          status: 'ready',
+          reason: 'matched latest request',
+          resumeAfter: {
+            queryRowId: 12,
+            queryRowIndex: 3,
+            requestUrl: 'https://example.test/rss',
+            newsApiRequestId: 55,
+            matchedBy: 'exact_url',
+            requestCreatedAt: '2026-06-23T00:00:00.000Z',
+          },
+          sourceOrchestratorRunId: 14,
+        },
+        retryPolicy: {
+          aiApprover: {
+            mode: 'gatekeeper',
+            retryTransientFailures: true,
+            retryInvalidResponses: false,
+          },
+          semanticScorer: { rerunAllowed: true },
+        },
+      },
+    };
+
+    expect(
+      buildStepRequestBody(googleRssStep, continuationConfig, 1000, null, null, 88)
+    ).toMatchObject({
+      googleRssResumePlan: {
+        status: 'ready',
+        sourceOrchestratorRunId: 14,
+        continuationRunId: 88,
+        resumeAfter: {
+          queryRowId: 12,
+          newsApiRequestId: 55,
+        },
+      },
+    });
+  });
+
+  it('passes AI Approver retry policy for continuation runs', () => {
+    const continuationConfig: OrchestratorConfig = {
+      ...weeklyConfig,
+      continuation: {
+        sourceOrchestratorRunId: 11,
+        inheritedSteps: [],
+        firstRunnableStep: 'ai_approver',
+        articleIdMinExclusive: 1000,
+        plannedArticleIdMaxInclusive: 1250,
+        googleRssResumePlan: {
+          status: 'not_applicable',
+          reason: 'downstream continuation',
+          resumeAfter: null,
+        },
+        retryPolicy: {
+          aiApprover: {
+            mode: 'gatekeeper',
+            retryTransientFailures: true,
+            retryInvalidResponses: false,
+          },
+          semanticScorer: { rerunAllowed: true },
+        },
+      },
+    };
+
+    expect(buildStepRequestBody(aiApproverStep, continuationConfig, 1000, 1250, 250)).toEqual({
+      limit: 250,
+      continuationRetryPolicy: {
+        mode: 'gatekeeper',
+        retryTransientFailures: true,
+        retryInvalidResponses: false,
+      },
+      articleIdMinExclusive: 1000,
+      articleIdMaxInclusive: 1250,
     });
   });
 });

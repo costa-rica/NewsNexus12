@@ -140,6 +140,14 @@ const getGoogleRssQueryResults = (value: unknown): GoogleRssQueryResult[] | null
   return value;
 };
 
+const getContinuationWarnings = (run: OrchestratorRunRow): string[] => {
+  const warnings = run.continuationPlan?.warnings;
+  if (!Array.isArray(warnings)) {
+    return [];
+  }
+  return warnings.filter((warning): warning is string => typeof warning === 'string');
+};
+
 export const writeReport = async (
   run: OrchestratorRunRow,
   steps: OrchestratorRunStepRow[],
@@ -202,6 +210,22 @@ export const writeReport = async (
 
       for (const row of googleRssQueryResults) {
         googleRssQueriesSheet.addRow(row);
+      }
+    }
+
+    const continuationWarnings = getContinuationWarnings(run);
+    if (run.runMode === 'continuation' || continuationWarnings.length > 0) {
+      const continuationSheet = workbook.addWorksheet('Continuation');
+      continuationSheet.columns = [
+        { header: 'Field', key: 'field', width: 28 },
+        { header: 'Value', key: 'value', width: 100 },
+      ];
+
+      continuationSheet.addRow({ field: 'sourceRunId', value: run.sourceOrchestratorRunId ?? '' });
+      continuationSheet.addRow({ field: 'articleIdMinExclusive', value: run.articleIdMinExclusive ?? '' });
+      continuationSheet.addRow({ field: 'articleIdMaxInclusive', value: run.articleIdMaxInclusive ?? '' });
+      for (const warning of continuationWarnings) {
+        continuationSheet.addRow({ field: 'warning', value: warning });
       }
     }
 

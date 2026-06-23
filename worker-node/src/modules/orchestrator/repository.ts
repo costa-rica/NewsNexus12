@@ -8,16 +8,23 @@ import type {
   OrchestratorRunStepRow,
   OrchestratorConfig,
   StepConfig,
+  CreateRunOptions,
 } from './types';
 
 export const createRun = async (
   config: OrchestratorConfig,
   steps: StepConfig[],
-  userId: number | null
+  userId: number | null,
+  options: CreateRunOptions = {}
 ): Promise<{ run: OrchestratorRunRow; runSteps: OrchestratorRunStepRow[] }> => {
   const run = await OrchestratorRun.create({
     status: 'running' as OrchestratorRunStatus,
     startedAt: new Date(),
+    runMode: options.runMode ?? 'standard',
+    sourceOrchestratorRunId: options.sourceOrchestratorRunId ?? null,
+    continuationPlan: (options.continuationPlan ?? null) as Record<string, unknown> | null,
+    articleIdMinExclusive: options.articleIdMinExclusive ?? null,
+    articleIdMaxInclusive: options.articleIdMaxInclusive ?? null,
     aiApproverEnabled: config.aiApproverEnabled,
     semanticScorerEnabled: config.semanticScorerEnabled,
     userId,

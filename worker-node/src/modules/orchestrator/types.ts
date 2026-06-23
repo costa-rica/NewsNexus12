@@ -1,4 +1,10 @@
 import type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName } from '@newsnexus/db-models';
+import type {
+  ContinuationAssessment,
+  ContinuationAssessmentStep,
+  ContinuationRetryPolicy,
+  GoogleRssResumePlan,
+} from './continuationAssessment';
 
 export type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepStatus, OrchestratorRunStepName };
 
@@ -7,6 +13,25 @@ export interface OrchestratorConfig {
   semanticScorerEnabled: boolean;
   mode?: 'weekly' | 'abbreviated_test';
   testConfig?: OrchestratorTestConfig;
+  continuation?: ContinuationCoordinatorConfig;
+}
+
+export interface ContinuationCoordinatorConfig {
+  sourceOrchestratorRunId: number;
+  inheritedSteps: ContinuationAssessmentStep[];
+  firstRunnableStep: OrchestratorRunStepName;
+  articleIdMinExclusive: number;
+  plannedArticleIdMaxInclusive: number | null;
+  googleRssResumePlan: GoogleRssResumePlan;
+  retryPolicy: ContinuationRetryPolicy;
+}
+
+export interface CreateRunOptions {
+  runMode?: OrchestratorRunMode;
+  sourceOrchestratorRunId?: number | null;
+  continuationPlan?: ContinuationAssessment | null;
+  articleIdMinExclusive?: number | null;
+  articleIdMaxInclusive?: number | null;
 }
 
 export interface OrchestratorTestConfig {

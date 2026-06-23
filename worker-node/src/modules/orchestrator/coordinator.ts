@@ -18,10 +18,12 @@ import type {
   OrchestratorRunRow,
   OrchestratorRunStepRow,
   OrchestratorRunStatus,
+  OrchestratorRunStepName,
   StepConfig,
   ChildJobHandle,
 } from './types';
 import { STEP_DEFAULTS } from './types';
+import type { ContinuationAssessment } from './continuationAssessment';
 import logger from '../logger';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -69,6 +71,47 @@ export const startCoordinator = async (
   void runCoordinator(run.id, runSteps, steps, config, ac.signal).catch((err) => {
     logger.error('coordinator: unhandled error in run loop', {
       runId: run.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
+
+  return run.id;
+};
+
+export const startContinuationCoordinator = async (
+  config: OrchestratorConfig,
+  userId: number | null,
+  continuationPlan: ContinuationAssessment
+): Promise<number> => {
+  await ensureDbReady();
+
+  if (!config.continuation) {
+    throw new Error('continuation coordinator config is required');
+  }
+
+  const steps = buildStepList(config);
+  const { run, runSteps } = await createRun(config, steps, userId, {
+    runMode: 'continuation',
+    sourceOrchestratorRunId: continuationPlan.sourceRunId,
+    continuationPlan,
+    articleIdMinExclusive: config.continuation.articleIdMinExclusive,
+    articleIdMaxInclusive: config.continuation.plannedArticleIdMaxInclusive,
+  });
+
+  await markInheritedStepsSkipped(runSteps, config.continuation.inheritedSteps);
+  const refreshed = await getRunWithSteps(run.id);
+  const effectiveRunSteps = refreshed?.steps ?? runSteps;
+  await writeJobsReportSnapshot(run.id);
+
+  invalidateActiveRunCache();
+
+  const ac = new AbortController();
+  activeCoordinator = { runId: run.id, abortController: ac };
+
+  void runCoordinator(run.id, effectiveRunSteps, steps, config, ac.signal).catch((err) => {
+    logger.error('coordinator: unhandled error in continuation run loop', {
+      runId: run.id,
+      sourceOrchestratorRunId: continuationPlan.sourceRunId,
       error: err instanceof Error ? err.message : String(err),
     });
   });
@@ -159,6 +202,36 @@ const writeJobsReportSnapshot = async (runId: number): Promise<void> => {
   }
 };
 
+const markInheritedStepsSkipped = async (
+  runSteps: OrchestratorRunStepRow[],
+  inheritedSteps: NonNullable<OrchestratorConfig['continuation']>['inheritedSteps']
+): Promise<void> => {
+  const inheritedByName = new Map(inheritedSteps.map((step) => [step.stepName, step]));
+
+  await Promise.all(
+    runSteps.map(async (runStep) => {
+      const inheritedStep = inheritedByName.get(runStep.stepName);
+      if (!inheritedStep) {
+        return;
+      }
+
+      await updateStepStatus(runStep.id, 'skipped', {
+        endedAt: new Date(),
+        endingReason: 'inherited_from_source_run',
+        result: {
+          sourceStepId: inheritedStep.sourceStepId,
+          sourceStepName: inheritedStep.stepName,
+          sourceStepStatus: inheritedStep.sourceStatus,
+          sourceChildJobId: inheritedStep.sourceChildJobId,
+          sourceEndingReason: inheritedStep.sourceEndingReason,
+          sourceEndingMessage: inheritedStep.sourceEndingMessage,
+          sourceResult: inheritedStep.sourceResult,
+        },
+      });
+    })
+  );
+};
+
 const normalizeTestConfig = (config: OrchestratorConfig): OrchestratorTestConfig => ({
   ...DEFAULT_TEST_CONFIG,
   ...(config.testConfig ?? {}),
@@ -231,7 +304,8 @@ export const buildStepRequestBody = (
   config: OrchestratorConfig,
   articleIdMinExclusive: number | null,
   articleIdMaxInclusive: number | null,
-  articlesAddedCount: number | null
+  articlesAddedCount: number | null,
+  runId?: number
 ): Record<string, unknown> => {
   const cursorBody = buildCursorBody(articleIdMinExclusive, articleIdMaxInclusive);
   const isAbbreviatedTest = config.mode === 'abbreviated_test';
@@ -241,14 +315,25 @@ export const buildStepRequestBody = (
     case 'delete_articles':
       return isAbbreviatedTest ? { trimCount: testConfig.deleteTrimCount } : {};
     case 'google_rss':
-      return isAbbreviatedTest
-        ? {
-            targetArticlesAddedCount: testConfig.targetArticlesAddedCount,
-            ...(testConfig.doNotRepeatRequestsWithinHours !== undefined
-              ? { doNotRepeatRequestsWithinHours: testConfig.doNotRepeatRequestsWithinHours }
-              : {}),
-          }
-        : {};
+      return {
+        ...(isAbbreviatedTest
+          ? {
+              targetArticlesAddedCount: testConfig.targetArticlesAddedCount,
+              ...(testConfig.doNotRepeatRequestsWithinHours !== undefined
+                ? { doNotRepeatRequestsWithinHours: testConfig.doNotRepeatRequestsWithinHours }
+                : {}),
+            }
+          : {}),
+        ...(config.continuation?.googleRssResumePlan
+          ? {
+              googleRssResumePlan: {
+                ...config.continuation.googleRssResumePlan,
+                sourceOrchestratorRunId: config.continuation.sourceOrchestratorRunId,
+                ...(runId !== undefined ? { continuationRunId: runId } : {}),
+              },
+            }
+          : {}),
+      };
     case 'state_assigner':
       return {
         targetArticleThresholdDaysOld: DEFAULT_ARTICLE_THRESHOLD_DAYS_OLD,
@@ -262,6 +347,9 @@ export const buildStepRequestBody = (
     case 'ai_approver':
       return {
         limit: resolveDownstreamArticleCount(config, articlesAddedCount, stepConfig.stepName),
+        ...(config.continuation?.retryPolicy
+          ? { continuationRetryPolicy: config.continuation.retryPolicy.aiApprover }
+          : {}),
         ...cursorBody,
       };
     case 'semantic_scorer':
@@ -283,6 +371,24 @@ const startChildJob = async (
   return startNodeJob(stepConfig.endpointName, body, runId);
 };
 
+const DOWNSTREAM_STEP_NAMES = new Set<OrchestratorRunStepName>([
+  'state_assigner',
+  'ai_approver',
+  'semantic_scorer',
+]);
+
+const shouldCaptureContinuationUpperBound = (
+  stepName: OrchestratorRunStepName,
+  config: OrchestratorConfig,
+  articleIdMaxInclusive: number | null
+): boolean => {
+  return Boolean(
+    config.continuation &&
+      articleIdMaxInclusive === null &&
+      DOWNSTREAM_STEP_NAMES.has(stepName)
+  );
+};
+
 const runCoordinator = async (
   runId: number,
   runSteps: OrchestratorRunStepRow[],
@@ -290,9 +396,12 @@ const runCoordinator = async (
   config: OrchestratorConfig,
   signal: AbortSignal
 ): Promise<void> => {
-  let articleIdMinExclusive: number | null = null;
-  let articleIdMaxInclusive: number | null = null;
-  let articlesAddedCount: number | null = null;
+  let articleIdMinExclusive: number | null = config.continuation?.articleIdMinExclusive ?? null;
+  let articleIdMaxInclusive: number | null = config.continuation?.plannedArticleIdMaxInclusive ?? null;
+  let articlesAddedCount: number | null =
+    articleIdMinExclusive !== null && articleIdMaxInclusive !== null
+      ? calculateArticlesAddedCount(articleIdMinExclusive, articleIdMaxInclusive, runId)
+      : null;
   let finalStatus: OrchestratorRunStatus = 'completed';
   let failureReason: string | undefined;
 
@@ -302,6 +411,10 @@ const runCoordinator = async (
 
       const stepRow = runSteps.find((s) => s.stepName === stepConfig.stepName);
       if (!stepRow) continue;
+
+      if (stepRow.status === 'skipped') {
+        continue;
+      }
 
       if (!stepConfig.enabled) {
         await updateStepStatus(stepRow.id, 'skipped');
@@ -319,10 +432,23 @@ const runCoordinator = async (
       await updateStepStatus(stepRow.id, 'running', { startedAt: new Date() });
       await writeJobsReportSnapshot(runId);
 
-      if (stepConfig.stepName === 'google_rss') {
+      if (stepConfig.stepName === 'google_rss' && !config.continuation) {
         articleIdMinExclusive = await captureMaxArticleId();
         await updateRunStatus(runId, 'running', { articleIdMinExclusive });
         await writeJobsReportSnapshot(runId);
+      }
+
+      if (shouldCaptureContinuationUpperBound(stepConfig.stepName, config, articleIdMaxInclusive)) {
+        articleIdMaxInclusive = await captureMaxArticleId();
+        articlesAddedCount = calculateArticlesAddedCount(articleIdMinExclusive, articleIdMaxInclusive, runId);
+        await updateRunStatus(runId, 'running', { articleIdMaxInclusive });
+        await writeJobsReportSnapshot(runId);
+        logger.warn('coordinator: continuation captured a global article upper bound that may include unrelated ingestion', {
+          runId,
+          sourceOrchestratorRunId: config.continuation?.sourceOrchestratorRunId,
+          articleIdMinExclusive,
+          articleIdMaxInclusive,
+        });
       }
 
       const stepRequestBody = buildStepRequestBody(
@@ -330,7 +456,8 @@ const runCoordinator = async (
         config,
         articleIdMinExclusive,
         articleIdMaxInclusive,
-        articlesAddedCount
+        articlesAddedCount,
+        runId
       );
 
       let handle: ChildJobHandle;

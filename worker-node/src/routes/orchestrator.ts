@@ -19,6 +19,7 @@ import {
   assessContinuationForRun,
   buildCheapContinuationSignal,
 } from '../modules/orchestrator/continuationAssessment';
+import { createContinuationForRun } from '../modules/orchestrator/continuationCreation';
 import logger from '../modules/logger';
 
 const DEFAULT_TEST_CONFIG: OrchestratorTestConfig = {
@@ -207,29 +208,8 @@ export const createOrchestratorRouter = (): Router => {
         throw AppError.validation([{ field: 'id', message: 'id must be a positive integer' }]);
       }
 
-      const result = await assessContinuationForRun(runId);
-      if (!result.found || !result.assessment) {
-        throw new AppError({ status: 404, code: 'NOT_FOUND', message: `Run ${runId} not found` });
-      }
-
-      const { assessment } = result;
-      if (!assessment.eligible) {
-        const unsupportedReasonCodes = new Set([
-          'report_only_continuation_deferred',
-          'unrecognized_failure_shape',
-          'source_is_continuation',
-        ]);
-        const status = unsupportedReasonCodes.has(assessment.reasonCode) ? 422 : 409;
-        return res.status(status).json(assessment);
-      }
-
-      // Phase 5 owns creating and starting continuation runs, including the 202 success path.
-      return res.status(422).json({
-        ...assessment,
-        eligible: false,
-        reasonCode: 'continuation_creation_deferred',
-        blockingReasons: ['Continuation run creation is deferred to Phase 5.'],
-      });
+      const response = await createContinuationForRun(runId);
+      return res.status(response.statusCode).json(response.body);
     } catch (error) {
       return next(error);
     }

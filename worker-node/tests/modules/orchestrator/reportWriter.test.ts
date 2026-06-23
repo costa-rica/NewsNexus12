@@ -21,6 +21,9 @@ const startedAt = new Date('2026-05-19T12:00:00.000Z');
 
 const makeRun = (): OrchestratorRunRow => ({
   id: 101,
+  sourceOrchestratorRunId: null,
+  runMode: 'standard',
+  continuationPlan: null,
   status: 'completed',
   startedAt,
   endedAt: new Date('2026-05-19T12:05:00.000Z'),
@@ -201,6 +204,33 @@ describe('reportWriter google rss query sheet', () => {
     expect(reportPath).not.toBeNull();
     const workbook = await readWorkbook(reportPath!);
     expect(workbook.getWorksheet('Google RSS Queries')).toBeUndefined();
+  });
+
+  it('writes continuation warnings from the saved continuation plan', async () => {
+    const reportPath = await writeReport(
+      {
+        ...makeRun(),
+        sourceOrchestratorRunId: 14,
+        runMode: 'continuation',
+        articleIdMinExclusive: 100,
+        articleIdMaxInclusive: 250,
+        continuationPlan: {
+          warnings: [
+            'Continuation upper bound will be captured when downstream processing starts and may include articles from unrelated later runs or manual ingestion.',
+          ],
+        },
+      },
+      [makeStep({ stepName: 'ai_approver', stepOrder: 4 })],
+      { includeArticles: false }
+    );
+
+    expect(reportPath).not.toBeNull();
+    const workbook = await readWorkbook(reportPath!);
+    const sheet = workbook.getWorksheet('Continuation');
+    expect(sheet).toBeDefined();
+    expect(sheet!.getRow(2).getCell(2).value).toBe(14);
+    expect(sheet!.getRow(5).getCell(1).value).toBe('warning');
+    expect(String(sheet!.getRow(5).getCell(2).value)).toContain('manual ingestion');
   });
 });
 

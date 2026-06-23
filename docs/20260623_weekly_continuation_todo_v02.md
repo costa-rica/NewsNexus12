@@ -121,28 +121,28 @@ Package areas: `worker-node` Google RSS automation, query spreadsheet helpers, `
 
 Package areas: `worker-node` orchestration routes/services/coordinator, step creation, report generation.
 
-- [ ] Implement `POST /orchestrator/runs/:id/continue`.
-- [ ] Re-run full assessment inside the POST handler immediately before creating a continuation.
-- [ ] Reject no-longer-eligible requests with an appropriate status and response body.
-- [ ] Create a new `OrchestratorRun` with `runMode: "continuation"`, `sourceOrchestratorRunId`, and the exact full assessment saved in `continuationPlan`.
-- [ ] Copy relevant source settings such as `aiApproverEnabled` and `semanticScorerEnabled`.
-- [ ] Create normal step rows for the continuation run.
-- [ ] Mark inherited steps as `skipped` with `endingReason: "inherited_from_source_run"` and result metadata linking source step and child job ids where available.
-- [ ] Extend coordinator configuration to include source run id, inherited steps, first runnable step, article lower bound, planned upper bound, Google RSS resume plan, and AI Approver retry policy.
-- [ ] Replicate the existing inline active-run guard for `POST /continue` so standard and continuation runs cannot overlap.
-- [ ] Call `invalidateActiveRunCache()` after creating a continuation run, matching the existing start-route cache invalidation behavior.
-- [ ] Preserve normal weekly run behavior as the default path.
-- [ ] Seed continuation run `articleIdMinExclusive` from the source run or saved `continuationPlan` before any runnable continuation step starts.
-- [ ] For continuation runs, do not call `captureMaxArticleId()` to recapture `articleIdMinExclusive` when `google_rss` is a runnable step.
-- [ ] Keep the continuation lower bound fixed at the source `articleIdMinExclusive` for all downstream steps, including the run-14-style Google RSS replay path.
-- [ ] Capture current global max article id only for the upper bound when continuation reaches downstream processing.
-- [ ] Save that current global max as the continuation `articleIdMaxInclusive`.
-- [ ] Add warnings when the planned global article range may include articles from unrelated later runs or manual ingestion.
-- [ ] Verify warnings appear in `continuationPlan` and generated reports.
-- [ ] Add tests for linked run creation, inherited steps, coordinator branching, active-run guard, and global max article-id warnings.
-- [ ] Run relevant `worker-node` type checks, tests, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 5 changes after verification passes.
+- [x] Implement `POST /orchestrator/runs/:id/continue`.
+- [x] Re-run full assessment inside the POST handler immediately before creating a continuation.
+- [x] Reject no-longer-eligible requests with an appropriate status and response body.
+- [x] Create a new `OrchestratorRun` with `runMode: "continuation"`, `sourceOrchestratorRunId`, and the exact full assessment saved in `continuationPlan`.
+- [x] Copy relevant source settings such as `aiApproverEnabled` and `semanticScorerEnabled`.
+- [x] Create normal step rows for the continuation run.
+- [x] Mark inherited steps as `skipped` with `endingReason: "inherited_from_source_run"` and result metadata linking source step and child job ids where available.
+- [x] Extend coordinator configuration to include source run id, inherited steps, first runnable step, article lower bound, planned upper bound, Google RSS resume plan, and AI Approver retry policy.
+- [x] Replicate the existing inline active-run guard for `POST /continue` so standard and continuation runs cannot overlap.
+- [x] Call `invalidateActiveRunCache()` after creating a continuation run, matching the existing start-route cache invalidation behavior.
+- [x] Preserve normal weekly run behavior as the default path.
+- [x] Seed continuation run `articleIdMinExclusive` from the source run or saved `continuationPlan` before any runnable continuation step starts.
+- [x] For continuation runs, do not call `captureMaxArticleId()` to recapture `articleIdMinExclusive` when `google_rss` is a runnable step.
+- [x] Keep the continuation lower bound fixed at the source `articleIdMinExclusive` for all downstream steps, including the run-14-style Google RSS replay path.
+- [x] Capture current global max article id only for the upper bound when continuation reaches downstream processing.
+- [x] Save that current global max as the continuation `articleIdMaxInclusive`.
+- [x] Add warnings when the planned global article range may include articles from unrelated later runs or manual ingestion.
+- [x] Verify warnings appear in `continuationPlan` and generated reports.
+- [x] Add tests for linked run creation, inherited steps, coordinator branching, active-run guard, and global max article-id warnings.
+- [x] Run relevant `worker-node` type checks, tests, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 5 changes after verification passes.
 
 ## Phase 6: AI Approver continuation retry support
 

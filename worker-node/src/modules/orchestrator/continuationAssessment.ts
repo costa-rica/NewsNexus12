@@ -65,6 +65,9 @@ export interface ContinuationAssessmentStep {
   sourceStepId: number | null;
   sourceStatus: string | null;
   sourceChildJobId: string | null;
+  sourceEndingReason: string | null;
+  sourceEndingMessage: string | null;
+  sourceResult: Record<string, unknown> | null;
 }
 
 export interface GoogleRssResumePlan {
@@ -252,6 +255,9 @@ export const buildContinuationAssessment = ({
     if (run.articleIdMaxInclusive === null) {
       eligible = true;
       reasonCode = 'eligible_google_rss_interrupted';
+      warnings.push(
+        'Continuation will keep the source article lower bound fixed; the eventual global upper bound may include articles from unrelated later runs or manual ingestion.'
+      );
       googleRssResumePlan = {
         status: 'phase_4_deferred',
         reason: 'Google RSS resume matching is deferred to Phase 4; exact resume details are intentionally not populated here.',
@@ -271,7 +277,9 @@ export const buildContinuationAssessment = ({
       } else {
         eligible = true;
         reasonCode = 'eligible_downstream_interrupted';
-        warnings.push('Continuation upper bound will be captured when the continuation starts and may include later unrelated ingestion.');
+        warnings.push(
+          'Continuation upper bound will be captured when downstream processing starts and may include articles from unrelated later runs or manual ingestion.'
+        );
         addStepsBefore(steps, inheritedSteps, firstRunnable.stepName);
         addStepsFrom(steps, runnableSteps, firstRunnable.stepName);
       }
@@ -413,6 +421,9 @@ const addStepsByOrder = (
             sourceStepId: null,
             sourceStatus: null,
             sourceChildJobId: null,
+            sourceEndingReason: null,
+            sourceEndingMessage: null,
+            sourceResult: null,
           }
     );
   });
@@ -424,4 +435,7 @@ const toAssessmentStep = (step: OrchestratorRunStepRow): ContinuationAssessmentS
   sourceStepId: step.id,
   sourceStatus: step.status,
   sourceChildJobId: step.childJobId,
+  sourceEndingReason: step.endingReason,
+  sourceEndingMessage: step.endingMessage,
+  sourceResult: step.result,
 });
