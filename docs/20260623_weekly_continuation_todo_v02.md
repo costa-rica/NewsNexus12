@@ -25,18 +25,18 @@ Assessment addressed: `docs/20260623_weekly_continuation_todo_v01_ASSESSMENT_CLA
 
 Package areas: `worker-node`, orchestration startup/reconciliation code, orchestration run and step model usage from `db-models`.
 
-- [ ] Locate the restart/orphan reconciliation path that currently marks interrupted orchestration runs and steps.
-- [ ] Change reconciliation to identify affected run ids first.
-- [ ] Mark only affected `running` runs as failed.
-- [ ] Update only `OrchestratorRunSteps` rows belonging to affected run ids.
-- [ ] Preserve the distinction between in-flight and never-started steps:
-  - [ ] `running` steps at restart become `failed` with `endingReason: "worker_restart"`.
-  - [ ] `pending` steps remain `pending`, or use a clearly distinct terminal marker such as `never_started_after_worker_restart`.
-- [ ] Verify reconciliation does not globally update every `running` or `pending` step.
-- [ ] Add or update tests covering affected-run scoping and in-flight versus never-started step handling.
-- [ ] Run relevant `worker-node` type checks, tests, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 1 changes after verification passes.
+- [x] Locate the restart/orphan reconciliation path that currently marks interrupted orchestration runs and steps.
+- [x] Change reconciliation to identify affected run ids first.
+- [x] Mark only affected `running` runs as failed.
+- [x] Update only `OrchestratorRunSteps` rows belonging to affected run ids.
+- [x] Preserve the distinction between in-flight and never-started steps:
+  - [x] `running` steps at restart become `failed` with `endingReason: "worker_restart"`.
+  - [x] `pending` steps remain `pending`, or use a clearly distinct terminal marker such as `never_started_after_worker_restart`.
+- [x] Verify reconciliation does not globally update every `running` or `pending` step.
+- [x] Add or update tests covering affected-run scoping and in-flight versus never-started step handling.
+- [x] Run relevant `worker-node` type checks, tests, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 1 changes after verification passes.
 
 ## Phase 2: Continuation schema and persistence metadata
 

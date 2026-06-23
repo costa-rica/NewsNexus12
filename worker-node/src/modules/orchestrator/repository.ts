@@ -117,17 +117,26 @@ export const listRuns = async (
 };
 
 export const reconcileOrphanedRuns = async (): Promise<number> => {
+  const affectedRuns = await OrchestratorRun.findAll({
+    attributes: ['id'],
+    where: { status: 'running' },
+  });
+  const affectedRunIds = affectedRuns.map((run) => run.id);
+
+  if (affectedRunIds.length === 0) {
+    return 0;
+  }
+
+  const endedAt = new Date();
   const [affectedCount] = await OrchestratorRun.update(
-    { status: 'failed' as OrchestratorRunStatus, endedAt: new Date(), failureReason: 'Worker restarted unexpectedly' },
-    { where: { status: 'running' } }
+    { status: 'failed' as OrchestratorRunStatus, endedAt, failureReason: 'Worker restarted unexpectedly' },
+    { where: { id: affectedRunIds, status: 'running' } }
   );
 
-  if (affectedCount > 0) {
-    await OrchestratorRunStep.update(
-      { status: 'failed' as OrchestratorRunStepStatus, endedAt: new Date(), endingReason: 'worker_restart', endingMessage: 'Worker restarted while step was active' },
-      { where: { status: ['running', 'pending'] as OrchestratorRunStepStatus[] } }
-    );
-  }
+  await OrchestratorRunStep.update(
+    { status: 'failed' as OrchestratorRunStepStatus, endedAt, endingReason: 'worker_restart', endingMessage: 'Worker restarted while step was active' },
+    { where: { orchestratorRunId: affectedRunIds, status: 'running' as OrchestratorRunStepStatus } }
+  );
 
   return affectedCount;
 };
