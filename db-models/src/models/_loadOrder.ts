@@ -14,6 +14,8 @@ export const MODEL_LOAD_ORDER: string[] = [
   "NewsApiRequestWebsiteDomainContract",
   "NewsArticleAggregatorSourceStateContract",
   "Report",
+  "OrchestratorRun",
+  "OrchestratorRunStep",
   "Article",
   "ArticleApproved",
   "ArticleContents02",
