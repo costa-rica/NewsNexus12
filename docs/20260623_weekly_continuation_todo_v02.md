@@ -61,38 +61,38 @@ Package areas: `db-models`, `worker-node`, `db-manager` or docs for controlled s
 
 Package areas: `worker-node` orchestration routes/services, run-list response code, continuation assessment service.
 
-- [ ] Add the cheap list-level continuation signal as fields embedded on each item in the existing recent-runs/list response.
-- [ ] Do not implement a separate batched cheap-signal endpoint in this first implementation.
-- [ ] Include fields such as `canRequestContinuationAssessment`, `continuationSignalReasonCode`, and `continuationSignalWarnings`.
-- [ ] Ensure the cheap signal uses only cheap inputs:
-  - [ ] source run status
-  - [ ] run mode
-  - [ ] presence of `articleIdMinExclusive`
-  - [ ] presence of `articleIdMaxInclusive`
-  - [ ] active orchestration run state
-  - [ ] existing active continuation for the source
-- [ ] Verify the cheap signal does not read the Google RSS spreadsheet.
-- [ ] Verify the cheap signal does not scan `NewsApiRequests`.
-- [ ] Implement `GET /orchestrator/runs/:id/continuation-assessment`.
-- [ ] Pin the worker-node status-code contract for continuation routes at the source:
-  - [ ] `GET /orchestrator/runs/:id/continuation-assessment` returns `200` with `eligible`, `blockingReasons`, and the assessment body for existing source runs, including recognized ineligible cases such as running, completed, `completed_no_new_articles`, pre-Google-RSS, already-active-continuation, and recognized unsupported/deferred shapes.
-  - [ ] `GET /orchestrator/runs/:id/continuation-assessment` returns `404` only when the source run is missing.
+- [x] Add the cheap list-level continuation signal as fields embedded on each item in the existing recent-runs/list response.
+- [x] Do not implement a separate batched cheap-signal endpoint in this first implementation.
+- [x] Include fields such as `canRequestContinuationAssessment`, `continuationSignalReasonCode`, and `continuationSignalWarnings`.
+- [x] Ensure the cheap signal uses only cheap inputs:
+  - [x] source run status
+  - [x] run mode
+  - [x] presence of `articleIdMinExclusive`
+  - [x] presence of `articleIdMaxInclusive`
+  - [x] active orchestration run state
+  - [x] existing active continuation for the source
+- [x] Verify the cheap signal does not read the Google RSS spreadsheet.
+- [x] Verify the cheap signal does not scan `NewsApiRequests`.
+- [x] Implement `GET /orchestrator/runs/:id/continuation-assessment`.
+- [x] Pin the worker-node status-code contract for continuation routes at the source:
+  - [x] `GET /orchestrator/runs/:id/continuation-assessment` returns `200` with `eligible`, `blockingReasons`, and the assessment body for existing source runs, including recognized ineligible cases such as running, completed, `completed_no_new_articles`, pre-Google-RSS, already-active-continuation, and recognized unsupported/deferred shapes.
+  - [x] `GET /orchestrator/runs/:id/continuation-assessment` returns `404` only when the source run is missing.
   - [ ] `POST /orchestrator/runs/:id/continue` returns `202` with the new continuation run id on success.
-  - [ ] `POST /orchestrator/runs/:id/continue` returns `404` when the source run is missing.
-  - [ ] `POST /orchestrator/runs/:id/continue` returns `409` when another orchestration run is active or the source is no longer eligible at POST-time revalidation.
-  - [ ] `POST /orchestrator/runs/:id/continue` returns `422` for recognized but unsupported shapes, including deferred report-only continuation.
-- [ ] Make full assessment re-read durable state and return `eligible`, `reasonCode`, source/run mode, article bounds, inherited steps, runnable steps, Google RSS resume plan, retry policy, warnings, and blocking reasons.
-- [ ] Use run-level bounds as the primary failure-location signal:
-  - [ ] `articleIdMinExclusive` null means no continuation is needed.
-  - [ ] `articleIdMinExclusive` set and `articleIdMaxInclusive` null means Google RSS interruption unless stronger evidence blocks it.
-  - [ ] both bounds set means locate downstream continuation from step details, child job state, and report metadata as advisory signals.
-- [ ] Represent running, completed, `completed_no_new_articles`, pre-Google-RSS, already-active-continuation, and recognized unsupported shapes as `200` assessment responses with `eligible: false` and populated `blockingReasons`; use `404` only for a missing source run.
-- [ ] Treat unrecognized failure shapes as blocking and choose the status/body according to the pinned contract above.
-- [ ] Recognize report-only continuation as unsupported or deferred in this first implementation.
-- [ ] Add tests for cheap signal behavior and full assessment blocking/eligible cases.
-- [ ] Run relevant `worker-node` type checks, tests, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 3 changes after verification passes.
+  - [x] `POST /orchestrator/runs/:id/continue` returns `404` when the source run is missing.
+  - [x] `POST /orchestrator/runs/:id/continue` returns `409` when another orchestration run is active or the source is no longer eligible at POST-time revalidation.
+  - [x] `POST /orchestrator/runs/:id/continue` returns `422` for recognized but unsupported shapes, including deferred report-only continuation.
+- [x] Make full assessment re-read durable state and return `eligible`, `reasonCode`, source/run mode, article bounds, inherited steps, runnable steps, Google RSS resume plan, retry policy, warnings, and blocking reasons.
+- [x] Use run-level bounds as the primary failure-location signal:
+  - [x] `articleIdMinExclusive` null means no continuation is needed.
+  - [x] `articleIdMinExclusive` set and `articleIdMaxInclusive` null means Google RSS interruption unless stronger evidence blocks it.
+  - [x] both bounds set means locate downstream continuation from step details, child job state, and report metadata as advisory signals.
+- [x] Represent running, completed, `completed_no_new_articles`, pre-Google-RSS, already-active-continuation, and recognized unsupported shapes as `200` assessment responses with `eligible: false` and populated `blockingReasons`; use `404` only for a missing source run.
+- [x] Treat unrecognized failure shapes as blocking and choose the status/body according to the pinned contract above.
+- [x] Recognize report-only continuation as unsupported or deferred in this first implementation.
+- [x] Add tests for cheap signal behavior and full assessment blocking/eligible cases.
+- [x] Run relevant `worker-node` type checks, tests, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 3 changes after verification passes.
 
 ## Phase 4: Google RSS resume planning
 

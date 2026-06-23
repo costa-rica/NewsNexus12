@@ -10,6 +10,8 @@ const mockGetActiveCoordinator = jest.fn();
 const mockGetRunWithSteps = jest.fn();
 const mockGetRunById = jest.fn();
 const mockListRuns = jest.fn();
+const mockListActiveContinuationSourceRunIds = jest.fn();
+const mockHasActiveContinuationForSource = jest.fn();
 const mockInvalidateCache = jest.fn();
 
 jest.mock('../../src/modules/orchestrator/activeRunGuard', () => ({
@@ -27,6 +29,8 @@ jest.mock('../../src/modules/orchestrator/repository', () => ({
   getRunWithSteps: (...args: unknown[]) => mockGetRunWithSteps(...args),
   getRunById: (...args: unknown[]) => mockGetRunById(...args),
   listRuns: (...args: unknown[]) => mockListRuns(...args),
+  listActiveContinuationSourceRunIds: (...args: unknown[]) => mockListActiveContinuationSourceRunIds(...args),
+  hasActiveContinuationForSource: (...args: unknown[]) => mockHasActiveContinuationForSource(...args),
 }));
 
 const buildApp = (): express.Express => {
@@ -40,6 +44,9 @@ const buildApp = (): express.Express => {
 describe('orchestrator routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetActiveRunId.mockResolvedValue(null);
+    mockListActiveContinuationSourceRunIds.mockResolvedValue([]);
+    mockHasActiveContinuationForSource.mockResolvedValue(false);
   });
 
   describe('POST /orchestrator/start', () => {
@@ -165,13 +172,150 @@ describe('orchestrator routes', () => {
   });
 
   describe('GET /orchestrator/runs', () => {
-    it('returns a list of runs', async () => {
-      mockListRuns.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
+    it('returns a list of runs with cheap continuation signals', async () => {
+      mockListRuns.mockResolvedValueOnce([
+        {
+          id: 1,
+          runMode: 'standard',
+          status: 'failed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: null,
+        },
+        {
+          id: 2,
+          runMode: 'standard',
+          status: 'completed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: 20,
+        },
+      ]);
 
       const res = await request(buildApp()).get('/orchestrator/runs');
 
       expect(res.status).toBe(200);
       expect(res.body.runs).toHaveLength(2);
+      expect(res.body.runs[0]).toMatchObject({
+        canRequestContinuationAssessment: true,
+        continuationSignalReasonCode: 'assessment_available',
+      });
+      expect(res.body.runs[1]).toMatchObject({
+        canRequestContinuationAssessment: false,
+        continuationSignalReasonCode: 'source_completed',
+      });
+      expect(mockListActiveContinuationSourceRunIds).toHaveBeenCalledWith([1, 2]);
+    });
+  });
+
+  describe('GET /orchestrator/runs/:id/continuation-assessment', () => {
+    it('returns 404 only when the source run is missing', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce(null);
+
+      const res = await request(buildApp()).get('/orchestrator/runs/99/continuation-assessment');
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 200 with eligible false for completed source runs', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce({
+        run: {
+          id: 1,
+          runMode: 'standard',
+          status: 'completed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: 20,
+        },
+        steps: [],
+      });
+
+      const res = await request(buildApp()).get('/orchestrator/runs/1/continuation-assessment');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        eligible: false,
+        reasonCode: 'source_completed',
+        blockingReasons: ['The source run completed successfully.'],
+      });
+    });
+
+    it('returns 200 with eligible true for Google RSS interruption', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce({
+        run: {
+          id: 1,
+          runMode: 'standard',
+          status: 'failed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: null,
+        },
+        steps: [
+          { id: 1, stepName: 'delete_articles', stepOrder: 1, enabled: true, status: 'completed', childJobId: null },
+          { id: 2, stepName: 'google_rss', stepOrder: 2, enabled: true, status: 'failed', childJobId: null },
+        ],
+      });
+
+      const res = await request(buildApp()).get('/orchestrator/runs/1/continuation-assessment');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        eligible: true,
+        reasonCode: 'eligible_google_rss_interrupted',
+        googleRssResumePlan: { status: 'phase_4_deferred', resumeAfter: null },
+      });
+    });
+  });
+
+  describe('POST /orchestrator/runs/:id/continue', () => {
+    it('returns 404 when the source run is missing', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce(null);
+
+      const res = await request(buildApp()).post('/orchestrator/runs/99/continue').send({});
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 409 when the source is no longer eligible at revalidation', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce({
+        run: {
+          id: 1,
+          runMode: 'standard',
+          status: 'completed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: 20,
+        },
+        steps: [],
+      });
+
+      const res = await request(buildApp()).post('/orchestrator/runs/1/continue').send({});
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ eligible: false, reasonCode: 'source_completed' });
+    });
+
+    it('returns 422 for deferred report-only continuation', async () => {
+      mockGetRunWithSteps.mockResolvedValueOnce({
+        run: {
+          id: 1,
+          runMode: 'standard',
+          status: 'failed',
+          articleIdMinExclusive: 10,
+          articleIdMaxInclusive: 20,
+        },
+        steps: [
+          { id: 1, stepName: 'delete_articles', stepOrder: 1, enabled: true, status: 'completed', childJobId: null },
+          { id: 2, stepName: 'google_rss', stepOrder: 2, enabled: true, status: 'completed', childJobId: null },
+          { id: 3, stepName: 'state_assigner', stepOrder: 3, enabled: true, status: 'completed', childJobId: null },
+          { id: 4, stepName: 'ai_approver', stepOrder: 4, enabled: true, status: 'completed', childJobId: null },
+          { id: 5, stepName: 'semantic_scorer', stepOrder: 5, enabled: true, status: 'completed', childJobId: null },
+          { id: 6, stepName: 'report', stepOrder: 6, enabled: true, status: 'failed', childJobId: null },
+        ],
+      });
+
+      const res = await request(buildApp()).post('/orchestrator/runs/1/continue').send({});
+
+      expect(res.status).toBe(422);
+      expect(res.body).toMatchObject({
+        eligible: false,
+        reasonCode: 'report_only_continuation_deferred',
+      });
     });
   });
 

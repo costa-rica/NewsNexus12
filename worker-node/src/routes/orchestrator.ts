@@ -9,7 +9,16 @@ import {
 } from '../modules/orchestrator/coordinator';
 import type { OrchestratorConfig, OrchestratorTestConfig } from '../modules/orchestrator/types';
 import { getActiveOrchestratorRunId, invalidateActiveRunCache } from '../modules/orchestrator/activeRunGuard';
-import { getRunWithSteps, getRunById, listRuns } from '../modules/orchestrator/repository';
+import {
+  getRunWithSteps,
+  getRunById,
+  listRuns,
+  listActiveContinuationSourceRunIds,
+} from '../modules/orchestrator/repository';
+import {
+  assessContinuationForRun,
+  buildCheapContinuationSignal,
+} from '../modules/orchestrator/continuationAssessment';
 import logger from '../modules/logger';
 
 const DEFAULT_TEST_CONFIG: OrchestratorTestConfig = {
@@ -153,7 +162,74 @@ export const createOrchestratorRouter = (): Router => {
       const limit = Math.min(Number(req.query.limit ?? 20), 100);
       const offset = Number(req.query.offset ?? 0);
       const runs = await listRuns(limit, offset);
-      return res.status(200).json({ runs });
+      const [activeRunId, activeContinuationSourceRunIds] = await Promise.all([
+        getActiveOrchestratorRunId(),
+        listActiveContinuationSourceRunIds(runs.map((run) => run.id)),
+      ]);
+      const activeContinuationSourceRunIdSet = new Set(activeContinuationSourceRunIds);
+      const runsWithContinuationSignal = runs.map((run) => ({
+        ...run,
+        ...buildCheapContinuationSignal(
+          run,
+          activeRunId,
+          activeContinuationSourceRunIdSet.has(run.id)
+        ),
+      }));
+
+      return res.status(200).json({ runs: runsWithContinuationSignal });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.get('/runs/:id/continuation-assessment', async (req, res, next) => {
+    try {
+      const runId = Number(req.params.id);
+      if (!Number.isFinite(runId) || runId <= 0) {
+        throw AppError.validation([{ field: 'id', message: 'id must be a positive integer' }]);
+      }
+
+      const result = await assessContinuationForRun(runId);
+      if (!result.found || !result.assessment) {
+        throw new AppError({ status: 404, code: 'NOT_FOUND', message: `Run ${runId} not found` });
+      }
+
+      return res.status(200).json(result.assessment);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.post('/runs/:id/continue', async (req, res, next) => {
+    try {
+      const runId = Number(req.params.id);
+      if (!Number.isFinite(runId) || runId <= 0) {
+        throw AppError.validation([{ field: 'id', message: 'id must be a positive integer' }]);
+      }
+
+      const result = await assessContinuationForRun(runId);
+      if (!result.found || !result.assessment) {
+        throw new AppError({ status: 404, code: 'NOT_FOUND', message: `Run ${runId} not found` });
+      }
+
+      const { assessment } = result;
+      if (!assessment.eligible) {
+        const unsupportedReasonCodes = new Set([
+          'report_only_continuation_deferred',
+          'unrecognized_failure_shape',
+          'source_is_continuation',
+        ]);
+        const status = unsupportedReasonCodes.has(assessment.reasonCode) ? 422 : 409;
+        return res.status(status).json(assessment);
+      }
+
+      // Phase 5 owns creating and starting continuation runs, including the 202 success path.
+      return res.status(422).json({
+        ...assessment,
+        eligible: false,
+        reasonCode: 'continuation_creation_deferred',
+        blockingReasons: ['Continuation run creation is deferred to Phase 5.'],
+      });
     } catch (error) {
       return next(error);
     }

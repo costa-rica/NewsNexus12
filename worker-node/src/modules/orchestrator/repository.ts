@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { OrchestratorRun, OrchestratorRunStep } from '@newsnexus/db-models';
 import type {
   OrchestratorRunStatus,
@@ -114,6 +115,42 @@ export const listRuns = async (
     offset,
   });
   return runs.map((r) => r.get({ plain: true }));
+};
+
+export const listActiveContinuationSourceRunIds = async (
+  sourceRunIds: number[]
+): Promise<number[]> => {
+  if (sourceRunIds.length === 0) {
+    return [];
+  }
+
+  const runs = await OrchestratorRun.findAll({
+    attributes: ['sourceOrchestratorRunId'],
+    where: {
+      runMode: 'continuation',
+      status: 'running',
+      sourceOrchestratorRunId: { [Op.in]: sourceRunIds },
+    },
+  });
+
+  return runs
+    .map((run) => run.sourceOrchestratorRunId)
+    .filter((id): id is number => id !== null);
+};
+
+export const hasActiveContinuationForSource = async (
+  sourceRunId: number
+): Promise<boolean> => {
+  const run = await OrchestratorRun.findOne({
+    attributes: ['id'],
+    where: {
+      runMode: 'continuation',
+      status: 'running',
+      sourceOrchestratorRunId: sourceRunId,
+    },
+  });
+
+  return run !== null;
 };
 
 export const reconcileOrphanedRuns = async (): Promise<number> => {
