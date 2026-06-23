@@ -94,6 +94,38 @@ router.get('/runs/:id', authenticateToken, async (req, res) => {
   }
 });
 
+router.get('/runs/:id/continuation-assessment', authenticateToken, async (req, res) => {
+  const baseUrl = getRequiredWorkerNodeBaseUrl(res);
+  if (!baseUrl) return;
+
+  try {
+    const response = await axios.get(
+      `${baseUrl}/orchestrator/runs/${req.params.id}/continuation-assessment`
+    );
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    logger.error('orchestrator proxy: GET /runs/:id/continuation-assessment failed', error);
+    forwardAxiosError(res, error);
+  }
+});
+
+router.post('/runs/:id/continue', authenticateToken, async (req, res) => {
+  const baseUrl = getRequiredWorkerNodeBaseUrl(res);
+  if (!baseUrl) return;
+
+  try {
+    const response = await axios.post(
+      `${baseUrl}/orchestrator/runs/${req.params.id}/continue`,
+      req.body,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    logger.error('orchestrator proxy: POST /runs/:id/continue failed', error);
+    forwardAxiosError(res, error);
+  }
+});
+
 router.post('/runs/:id/cancel', authenticateToken, async (req, res) => {
   const baseUrl = getRequiredWorkerNodeBaseUrl(res);
   if (!baseUrl) return;

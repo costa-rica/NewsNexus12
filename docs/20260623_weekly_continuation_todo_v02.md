@@ -169,20 +169,20 @@ Package areas: `worker-python` AI Approver, AI score repository/data-access code
 
 Package areas: `api` automation routes/proxy code, auth middleware, worker-node client/proxy helpers.
 
-- [ ] Add authenticated proxy route `GET /automations/orchestrator/runs/:id/continuation-assessment`.
-- [ ] Add authenticated proxy route `POST /automations/orchestrator/runs/:id/continue`.
-- [ ] Preserve worker-node response bodies and the pinned continuation status-code contract from Phase 3.
-- [ ] Explicitly verify preservation for:
-  - [ ] `200` assessment responses, including recognized ineligible cases with `eligible: false` and `blockingReasons`
-  - [ ] `202` accepted continuation starts with new continuation run id
-  - [ ] `404` missing source run responses
-  - [ ] `409` active-run or no-longer-eligible POST responses
-  - [ ] `422` recognized unsupported-shape POST responses
-- [ ] Preserve cheap continuation signal fields through any runs-list proxy path.
-- [ ] Add or update API tests for authentication and status preservation.
-- [ ] Run relevant `api` tests, type checks, and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 7 changes after verification passes.
+- [x] Add authenticated proxy route `GET /automations/orchestrator/runs/:id/continuation-assessment`.
+- [x] Add authenticated proxy route `POST /automations/orchestrator/runs/:id/continue`.
+- [x] Preserve worker-node response bodies and the pinned continuation status-code contract from Phase 3.
+- [x] Explicitly verify preservation for:
+  - [x] `200` assessment responses, including recognized ineligible cases with `eligible: false` and `blockingReasons`
+  - [x] `202` accepted continuation starts with new continuation run id
+  - [x] `404` missing source run responses
+  - [x] `409` active-run or no-longer-eligible POST responses
+  - [x] `422` recognized unsupported-shape POST responses
+- [x] Preserve cheap continuation signal fields through any runs-list proxy path.
+- [x] Add or update API tests for authentication and status preservation.
+- [x] Run relevant `api` tests, type checks, and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 7 changes after verification passes.
 
 ## Phase 8: Portal continuation UI
 
