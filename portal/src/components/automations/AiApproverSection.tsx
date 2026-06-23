@@ -24,6 +24,7 @@ const DEFAULT_ALERT_MODAL_STATE: AlertModalState = {
 };
 
 const AI_APPROVER_ENDPOINT_NAME = "/ai-approver/start-job";
+const AI_APPROVER_MODE = "gatekeeper";
 
 function buildWorkerPythonResponseMessage(result: {
   endpointName?: string;
@@ -69,7 +70,6 @@ function getErrorMessage(errorBody: string): string {
 export function AiApproverSection() {
   const { token, stateArray = [] } = useAppSelector((state) => state.user);
   const [articleCount, setArticleCount] = useState("25");
-  const [mode, setMode] = useState("legacy");
   const [requireStateAssignment, setRequireStateAssignment] = useState(true);
   const [selectedStateValues, setSelectedStateValues] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,7 +100,7 @@ export function AiApproverSection() {
       } = {
         limit: Number(articleCount),
         requireStateAssignment,
-        mode,
+        mode: AI_APPROVER_MODE,
       };
 
       if (selectedStateValues.length > 0) {
@@ -188,19 +188,13 @@ export function AiApproverSection() {
                 >
                   Mode
                 </label>
-                <select
+                <input
                   id="aiApproverMode"
-                  value={mode}
-                  onChange={(event) => setMode(event.target.value)}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="legacy">legacy</option>
-                  <option value="shadow">shadow</option>
-                  <option value="gatekeeper_with_manual_review">
-                    gatekeeper_with_manual_review
-                  </option>
-                  <option value="gatekeeper">gatekeeper</option>
-                </select>
+                  type="text"
+                  value={AI_APPROVER_MODE}
+                  readOnly
+                  className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
               </div>
 
               <div className="flex items-end">
