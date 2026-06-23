@@ -47,6 +47,7 @@ type OrchestratorStep = {
 
 type OrchestratorRun = {
   id: number;
+  runMode?: "standard" | "continuation";
   status: OrchestratorRunStatus;
   startedAt: string;
   endedAt: string | null;
@@ -56,6 +57,9 @@ type OrchestratorRun = {
   failureReason: string | null;
   aiApproverEnabled: boolean;
   semanticScorerEnabled: boolean;
+  canRequestContinuationAssessment?: boolean;
+  continuationSignalReasonCode?: ContinuationSignalReasonCode;
+  continuationSignalWarnings?: string[];
 };
 
 type AlertModalState = {
@@ -63,6 +67,97 @@ type AlertModalState = {
   show: boolean;
   title: string;
   variant: "error" | "info" | "success" | "warning";
+};
+
+type ContinuationSignalReasonCode =
+  | "assessment_available"
+  | "active_orchestration_run"
+  | "already_active_continuation"
+  | "source_is_continuation"
+  | "source_running"
+  | "source_completed"
+  | "completed_no_new_articles"
+  | "pre_google_rss"
+  | "unsupported_run_status"
+  | string;
+
+type ContinuationAssessmentReasonCode =
+  | "eligible_google_rss_interrupted"
+  | "eligible_downstream_interrupted"
+  | "active_orchestration_run"
+  | "already_active_continuation"
+  | "source_is_continuation"
+  | "source_running"
+  | "source_completed"
+  | "completed_no_new_articles"
+  | "pre_google_rss"
+  | "report_only_continuation_deferred"
+  | "unrecognized_failure_shape"
+  | string;
+
+type ContinuationBlockingReason = string | { code?: string; message?: string };
+
+type GoogleRssResumePlan = {
+  status: "ready" | "phase_4_deferred" | "not_applicable" | "unavailable" | string;
+  reason?: string;
+  resumeAfter?: {
+    requestId?: number | null;
+    queryRowIndex?: number | null;
+    queryRowId?: string | null;
+    requestUrl?: string | null;
+  } | null;
+  startFrom?: {
+    queryRowIndex?: number | null;
+    queryRowId?: string | null;
+  };
+  rowsTotal?: number;
+  expectedRequestCount?: number;
+  matchedRequestCount?: number;
+  replayAllowed?: boolean;
+};
+
+type ContinuationAssessmentStep = {
+  stepName: OrchestratorStepName;
+  stepOrder: number;
+  sourceStepId: number | null;
+  sourceStatus: string | null;
+  sourceChildJobId: string | null;
+  sourceEndingReason: string | null;
+  sourceEndingMessage: string | null;
+  sourceResult: Record<string, unknown> | null;
+};
+
+type ContinuationAssessment = {
+  eligible: boolean;
+  reasonCode: ContinuationAssessmentReasonCode;
+  sourceRunId: number;
+  sourceStatus: OrchestratorRunStatus;
+  runMode: "standard" | "continuation" | string;
+  articleIdMinExclusive: number | null;
+  articleIdMaxInclusive: number | null;
+  plannedArticleIdMaxInclusive: number | null;
+  inheritedSteps: ContinuationAssessmentStep[];
+  runnableSteps: ContinuationAssessmentStep[];
+  googleRssResumePlan: GoogleRssResumePlan;
+  warnings: string[];
+  blockingReasons: ContinuationBlockingReason[];
+};
+
+type ContinuePostSuccess = {
+  runId?: number;
+  sourceRunId?: number;
+  sourceOrchestratorRunId?: number;
+  runMode?: "continuation" | string;
+};
+
+type ContinuationModalState = {
+  run: OrchestratorRun | null;
+  isOpen: boolean;
+  isLoadingAssessment: boolean;
+  isConfirming: boolean;
+  assessment: ContinuationAssessment | null;
+  errorMessage: string | null;
+  successRunId: number | null;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -90,6 +185,16 @@ const DEFAULT_ALERT: AlertModalState = {
   show: false,
   title: "",
   variant: "info",
+};
+
+const DEFAULT_CONTINUATION_MODAL: ContinuationModalState = {
+  run: null,
+  isOpen: false,
+  isLoadingAssessment: false,
+  isConfirming: false,
+  assessment: null,
+  errorMessage: null,
+  successRunId: null,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -150,16 +255,73 @@ function parseApiError(body: string): string {
   try {
     const parsed = JSON.parse(body) as {
       orchestratorRunId?: number;
+      activeRunId?: number;
       message?: string;
       error?: { message?: string };
+      blockingReasons?: ContinuationBlockingReason[];
+      assessment?: {
+        blockingReasons?: ContinuationBlockingReason[];
+      };
     };
+    const message = parsed.message ?? parsed.error?.message;
+    const blockingReasons = parsed.blockingReasons ?? parsed.assessment?.blockingReasons ?? [];
+    const blockingReasonSummary = blockingReasons.map(blockingReasonText).join(" ");
     if (parsed.orchestratorRunId !== undefined && parsed.message) {
       return parsed.message;
     }
-    return parsed.message ?? parsed.error?.message ?? body;
+    if (parsed.activeRunId !== undefined && message) {
+      return `${message} Active run id: ${parsed.activeRunId}.`;
+    }
+    if (message && blockingReasonSummary) {
+      return `${message} ${blockingReasonSummary}`;
+    }
+    return message ?? (blockingReasonSummary || body);
   } catch {
     return body;
   }
+}
+
+function blockingReasonText(reason: ContinuationBlockingReason): string {
+  if (typeof reason === "string") return reason;
+  return reason.message ?? reason.code ?? "Continuation is blocked.";
+}
+
+function formatStepName(stepName: OrchestratorStepName): string {
+  return STEP_LABELS[stepName] ?? stepName;
+}
+
+function formatArticleBound(value: number | null): string {
+  return value === null ? "not set" : `#${value}`;
+}
+
+function formatPlannedUpperBound(value: number | null): string {
+  return value === null ? "captured when downstream processing starts" : `#${value}`;
+}
+
+function formatGoogleRssResume(plan: GoogleRssResumePlan | null | undefined): string {
+  if (!plan) return "not available";
+  const reason = plan.reason ? ` ${plan.reason}` : "";
+  if (plan.status === "not_applicable") return `not applicable.${reason}`;
+  if (plan.status === "ready") {
+    const requestId = plan.resumeAfter?.requestId;
+    const rowId = plan.resumeAfter?.queryRowId;
+    const rowIndex = plan.resumeAfter?.queryRowIndex;
+    const marker =
+      requestId !== undefined && requestId !== null
+        ? ` after request #${requestId}`
+        : rowId
+          ? ` after query row ${rowId}`
+          : rowIndex !== undefined && rowIndex !== null
+            ? ` after query row index ${rowIndex}`
+            : "";
+    return `resume${marker}.${reason}`;
+  }
+  return `${plan.status}.${reason}`;
+}
+
+async function readResponseText(res: Response): Promise<string> {
+  const body = await res.text();
+  return body.trim();
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -178,6 +340,8 @@ export function OrchestratorSection() {
   const [activeRun, setActiveRun] = useState<(OrchestratorRun & { steps: OrchestratorStep[] }) | null>(null);
   const [pastRuns, setPastRuns] = useState<OrchestratorRun[]>([]);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
+  const [continuationModal, setContinuationModal] =
+    useState<ContinuationModalState>(DEFAULT_CONTINUATION_MODAL);
 
   const authHeaders = useMemo(
     () => ({
@@ -226,10 +390,56 @@ export function OrchestratorSection() {
     }
   }, [apiBase, authHeaders]);
 
+  const fetchContinuationAssessment = useCallback(
+    async (run: OrchestratorRun): Promise<void> => {
+      setContinuationModal((state) => ({
+        ...state,
+        isLoadingAssessment: true,
+        assessment: null,
+        errorMessage: null,
+        successRunId: null,
+      }));
+
+      try {
+        const res = await fetch(
+          `${apiBase}/automations/orchestrator/runs/${run.id}/continuation-assessment`,
+          { headers: authHeaders },
+        );
+        const body = await readResponseText(res);
+        if (!res.ok) {
+          const statusMessage =
+            res.status === 404
+              ? `Source run #${run.id} was not found.`
+              : parseApiError(body);
+          setContinuationModal((state) => ({
+            ...state,
+            errorMessage: statusMessage,
+            isLoadingAssessment: false,
+          }));
+          return;
+        }
+
+        const assessment = JSON.parse(body) as ContinuationAssessment;
+        setContinuationModal((state) => ({
+          ...state,
+          assessment,
+          errorMessage: null,
+          isLoadingAssessment: false,
+        }));
+      } catch (err) {
+        setContinuationModal((state) => ({
+          ...state,
+          errorMessage: err instanceof Error ? err.message : "Unknown error.",
+          isLoadingAssessment: false,
+        }));
+      }
+    },
+    [apiBase, authHeaders],
+  );
+
   // ── Initial load + polling ────────────────────────────────────────────────────
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
     void fetchActiveRun();
     void fetchPastRuns();
   }, [fetchActiveRun, fetchPastRuns]);
@@ -245,7 +455,6 @@ export function OrchestratorSection() {
   // When active run finishes, refresh past runs list
   useEffect(() => {
     if (activeRun && activeRun.status !== "running") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- signal/polling fetch; rule cannot statically verify
       void fetchPastRuns();
     }
   }, [activeRun, fetchPastRuns]);
@@ -334,6 +543,86 @@ export function OrchestratorSection() {
       });
     } finally {
       setIsCanceling(false);
+    }
+  };
+
+  const handleOpenContinuation = (run: OrchestratorRun) => {
+    setContinuationModal({
+      ...DEFAULT_CONTINUATION_MODAL,
+      run,
+      isOpen: true,
+      isLoadingAssessment: true,
+    });
+    void fetchContinuationAssessment(run);
+  };
+
+  const handleCloseContinuation = () => {
+    if (continuationModal.isConfirming) return;
+    setContinuationModal(DEFAULT_CONTINUATION_MODAL);
+  };
+
+  const handleRetryContinuationAssessment = () => {
+    if (!continuationModal.run) return;
+    void fetchContinuationAssessment(continuationModal.run);
+  };
+
+  const handleConfirmContinuation = async () => {
+    const sourceRun = continuationModal.run;
+    if (!sourceRun || !continuationModal.assessment?.eligible) return;
+
+    setContinuationModal((state) => ({
+      ...state,
+      isConfirming: true,
+      errorMessage: null,
+      successRunId: null,
+    }));
+
+    try {
+      const res = await fetch(
+        `${apiBase}/automations/orchestrator/runs/${sourceRun.id}/continue`,
+        { method: "POST", headers: authHeaders, body: "{}" },
+      );
+      const body = await readResponseText(res);
+
+      if (res.status === 202) {
+        const data = body ? (JSON.parse(body) as ContinuePostSuccess) : {};
+        const continuationRunId = data.runId ?? null;
+        setContinuationModal((state) => ({
+          ...state,
+          isConfirming: false,
+          successRunId: continuationRunId,
+          errorMessage: null,
+        }));
+        await fetchActiveRun();
+        await fetchPastRuns();
+        return;
+      }
+
+      const message =
+        res.status === 404
+          ? `Source run #${sourceRun.id} was not found.`
+          : res.status === 409
+            ? `Continuation could not start because another run is active or the source is no longer eligible. ${parseApiError(body)}`
+            : res.status === 422
+              ? `Continuation is not supported for this run shape. ${parseApiError(body)}`
+              : parseApiError(body);
+
+      setContinuationModal((state) => ({
+        ...state,
+        isConfirming: false,
+        errorMessage: message.trim(),
+      }));
+
+      if (res.status === 409) {
+        await fetchActiveRun();
+        await fetchPastRuns();
+      }
+    } catch (err) {
+      setContinuationModal((state) => ({
+        ...state,
+        isConfirming: false,
+        errorMessage: err instanceof Error ? err.message : "Unknown error.",
+      }));
     }
   };
 
@@ -427,7 +716,14 @@ export function OrchestratorSection() {
           )}
 
           {/* Past runs */}
-          <PastRunsTable runs={pastRuns} isLoading={isLoadingRuns} apiBase={apiBase} token={token ?? ""} />
+          <PastRunsTable
+            runs={pastRuns}
+            isLoading={isLoadingRuns}
+            apiBase={apiBase}
+            token={token ?? ""}
+            isRunActive={isRunActive}
+            onContinue={handleOpenContinuation}
+          />
         </div>
       </CollapsibleAutomationSection>
 
@@ -437,6 +733,15 @@ export function OrchestratorSection() {
           message={alertModal.message}
           variant={alertModal.variant}
           onClose={() => setAlertModal(DEFAULT_ALERT)}
+        />
+      </Modal>
+
+      <Modal isOpen={continuationModal.isOpen} onClose={handleCloseContinuation}>
+        <ContinuationConfirmationModal
+          state={continuationModal}
+          onClose={handleCloseContinuation}
+          onConfirm={() => void handleConfirmContinuation()}
+          onRetry={handleRetryContinuationAssessment}
         />
       </Modal>
     </>
@@ -539,9 +844,18 @@ type PastRunsTableProps = {
   isLoading: boolean;
   apiBase: string;
   token: string;
+  isRunActive: boolean;
+  onContinue: (run: OrchestratorRun) => void;
 };
 
-function PastRunsTable({ runs, isLoading, apiBase, token }: PastRunsTableProps) {
+function PastRunsTable({
+  runs,
+  isLoading,
+  apiBase,
+  token,
+  isRunActive,
+  onContinue,
+}: PastRunsTableProps) {
   if (isLoading) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">Loading past runs…</div>
@@ -566,53 +880,281 @@ function PastRunsTable({ runs, isLoading, apiBase, token }: PastRunsTableProps) 
               <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Started</th>
               <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Duration</th>
               <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Report</th>
+              <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Action</th>
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => (
-              <tr key={run.id} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-3 py-2 font-mono text-gray-700 dark:text-gray-300">#{run.id}</td>
-                <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRunStatusClasses(run.status)}`}>
-                    {run.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{formatDate(run.startedAt)}</td>
-                <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
-                  {formatDuration(run.startedAt, run.endedAt)}
-                </td>
-                <td className="px-3 py-2">
-                  {run.reportFilePath ? (
-                    <a
-                      href={`${apiBase}/automations/orchestrator/runs/${run.id}/report`}
-                      download
-                      onClick={(e) => {
-                        e.preventDefault();
-                        const a = document.createElement("a");
-                        a.href = `${apiBase}/automations/orchestrator/runs/${run.id}/report`;
-                        a.download = `orchestration-report-${run.id}.xlsx`;
-                        const headers = new Headers({ Authorization: `Bearer ${token}` });
-                        void fetch(a.href, { headers }).then(async (res) => {
-                          const blob = await res.blob();
-                          const url = URL.createObjectURL(blob);
-                          a.href = url;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        });
-                      }}
-                      className="text-brand-500 underline hover:text-brand-600 dark:text-brand-400"
-                    >
-                      Download
-                    </a>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {runs.map((run) => {
+              const canContinue = run.canRequestContinuationAssessment === true;
+              return (
+                <tr key={run.id} className="border-t border-gray-100 dark:border-gray-800">
+                  <td className="px-3 py-2 font-mono text-gray-700 dark:text-gray-300">#{run.id}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRunStatusClasses(run.status)}`}>
+                      {run.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{formatDate(run.startedAt)}</td>
+                  <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                    {formatDuration(run.startedAt, run.endedAt)}
+                  </td>
+                  <td className="px-3 py-2">
+                    {run.reportFilePath ? (
+                      <a
+                        href={`${apiBase}/automations/orchestrator/runs/${run.id}/report`}
+                        download
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const a = document.createElement("a");
+                          a.href = `${apiBase}/automations/orchestrator/runs/${run.id}/report`;
+                          a.download = `orchestration-report-${run.id}.xlsx`;
+                          const headers = new Headers({ Authorization: `Bearer ${token}` });
+                          void fetch(a.href, { headers }).then(async (res) => {
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            a.href = url;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          });
+                        }}
+                        className="text-brand-500 underline hover:text-brand-600 dark:text-brand-400"
+                      >
+                        Download
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {canContinue ? (
+                      <div className="flex flex-col items-start gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => onContinue(run)}
+                          disabled={isRunActive}
+                          title="continue from where left off"
+                          className="rounded-md border border-brand-300 px-3 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
+                        >
+                          continue
+                        </button>
+                        <span className="text-[11px] leading-4 text-gray-400 dark:text-gray-500">
+                          from where left off
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+type ContinuationConfirmationModalProps = {
+  state: ContinuationModalState;
+  onClose: () => void;
+  onConfirm: () => void;
+  onRetry: () => void;
+};
+
+function ContinuationConfirmationModal({
+  state,
+  onClose,
+  onConfirm,
+  onRetry,
+}: ContinuationConfirmationModalProps) {
+  const assessment = state.assessment;
+  const sourceRunId = assessment?.sourceRunId ?? state.run?.id ?? null;
+  const canConfirm =
+    assessment?.eligible === true &&
+    !state.isConfirming &&
+    !state.isLoadingAssessment &&
+    state.successRunId === null;
+  const blockingReasons = assessment?.blockingReasons ?? [];
+  const warnings = [
+    ...(state.run?.continuationSignalWarnings ?? []),
+    ...(assessment?.warnings ?? []),
+  ];
+
+  return (
+    <div className="p-6 sm:p-8">
+      <div className="mb-5 pr-10">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          Continue orchestration run
+        </h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Continue from where left off after server revalidation.
+        </p>
+      </div>
+
+      {state.isLoadingAssessment && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
+          Loading continuation assessment…
+        </div>
+      )}
+
+      {!state.isLoadingAssessment && state.errorMessage && (
+        <div className="mb-4 rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-900/60 dark:bg-error-900/20 dark:text-error-300">
+          {state.errorMessage}
+        </div>
+      )}
+
+      {state.successRunId !== null && (
+        <div className="mb-4 rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-900/60 dark:bg-success-900/20 dark:text-success-300">
+          Continuation run #{state.successRunId} was accepted.
+        </div>
+      )}
+
+      {assessment && (
+        <div className="space-y-4 text-sm">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ContinuationDetail label="source run id" value={sourceRunId === null ? "unknown" : `#${sourceRunId}`} />
+            <ContinuationDetail label="new run type" value="continuation" />
+            <ContinuationDetail
+              label="article lower bound"
+              value={formatArticleBound(assessment.articleIdMinExclusive)}
+            />
+            <ContinuationDetail
+              label="planned article upper bound"
+              value={formatPlannedUpperBound(assessment.plannedArticleIdMaxInclusive)}
+            />
+          </div>
+
+          <ContinuationStepList title="Inherited steps" steps={assessment.inheritedSteps} emptyText="none" />
+          <ContinuationStepList title="Runnable steps" steps={assessment.runnableSteps} emptyText="none" />
+
+          <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+            <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+              Google RSS resume behavior
+            </div>
+            <div className="mt-1 text-gray-700 dark:text-gray-200">
+              {formatGoogleRssResume(assessment.googleRssResumePlan)}
+            </div>
+          </div>
+
+          {!assessment.eligible && blockingReasons.length > 0 && (
+            <ContinuationMessageList
+              title="Blocking reasons"
+              items={blockingReasons.map(blockingReasonText)}
+              tone="error"
+            />
+          )}
+
+          {warnings.length > 0 && (
+            <ContinuationMessageList title="Warnings" items={warnings} tone="warning" />
+          )}
+        </div>
+      )}
+
+      {!state.isLoadingAssessment && !assessment && state.run?.continuationSignalWarnings?.length ? (
+        <ContinuationMessageList
+          title="Warnings"
+          items={state.run.continuationSignalWarnings}
+          tone="warning"
+        />
+      ) : null}
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={state.isConfirming}
+          className="rounded-lg bg-gray-100 px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          {state.successRunId === null ? "Cancel" : "Close"}
+        </button>
+        {state.errorMessage && state.successRunId === null && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={state.isLoadingAssessment || state.isConfirming}
+            className="rounded-lg border border-brand-300 px-5 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-700 dark:text-brand-400 dark:hover:bg-brand-900/20"
+          >
+            Retry
+          </button>
+        )}
+        {state.successRunId === null && (
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!canConfirm}
+            className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
+          >
+            {state.isConfirming ? "Continuing…" : "continue"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type ContinuationDetailProps = {
+  label: string;
+  value: string;
+};
+
+function ContinuationDetail({ label, value }: ContinuationDetailProps) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+      <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{label}</div>
+      <div className="mt-1 text-gray-800 dark:text-gray-100">{value}</div>
+    </div>
+  );
+}
+
+type ContinuationStepListProps = {
+  title: string;
+  steps: ContinuationAssessmentStep[];
+  emptyText: string;
+};
+
+function ContinuationStepList({ title, steps, emptyText }: ContinuationStepListProps) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+      <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{title}</div>
+      {steps.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {steps.map((step) => (
+            <li key={`${step.stepName}-${step.sourceStepId ?? step.stepOrder}`} className="text-gray-700 dark:text-gray-200">
+              {formatStepName(step.stepName)}
+              {step.sourceStatus ? (
+                <span className="text-gray-500 dark:text-gray-400"> ({step.sourceStatus})</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="mt-1 text-gray-500 dark:text-gray-400">{emptyText}</div>
+      )}
+    </div>
+  );
+}
+
+type ContinuationMessageListProps = {
+  title: string;
+  items: string[];
+  tone: "error" | "warning";
+};
+
+function ContinuationMessageList({ title, items, tone }: ContinuationMessageListProps) {
+  const classes =
+    tone === "error"
+      ? "border-error-200 bg-error-50 text-error-700 dark:border-error-900/60 dark:bg-error-900/20 dark:text-error-300"
+      : "border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-900/60 dark:bg-warning-900/20 dark:text-warning-300";
+
+  return (
+    <div className={`rounded-lg border p-3 text-sm ${classes}`}>
+      <div className="text-xs font-semibold uppercase">{title}</div>
+      <ul className="mt-2 space-y-1">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
     </div>
   );
 }

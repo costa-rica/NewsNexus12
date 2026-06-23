@@ -188,36 +188,36 @@ Package areas: `api` automation routes/proxy code, auth middleware, worker-node 
 
 Package areas: `portal` weekly orchestration dashboard, API client layer, Redux slices or hooks if used, modal components.
 
-- [ ] Render the `continue` action only from the cheap list-level continuation signal.
-- [ ] Read cheap continuation signal fields from the existing past-runs/list response; do not add a separate cheap-signal portal fetch in this first implementation.
-- [ ] Do not fetch full assessment during table rendering or polling.
-- [ ] Disable continuation action while any orchestration run is active.
-- [ ] Fetch full assessment only when the operator opens the confirmation modal.
-- [ ] Build confirmation modal behavior showing:
-  - [ ] source run id
-  - [ ] new run type `continuation`
-  - [ ] inherited steps
-  - [ ] runnable steps
-  - [ ] article lower bound
-  - [ ] planned article upper bound
-  - [ ] Google RSS resume behavior when applicable
-  - [ ] warnings, including global article range warnings
-- [ ] Use primary visible button text `continue`.
-- [ ] Use secondary small text or tooltip `from where left off`.
-- [ ] On confirm, call `POST /continue` and let the server revalidate.
-- [ ] Branch on the pinned worker-node/API status-code contract:
-  - [ ] Treat `200` assessment responses with `eligible: false` and `blockingReasons` as a non-continuable source state to explain in the modal.
-  - [ ] Treat `202` POST responses as a successfully accepted continuation and refresh run state.
-  - [ ] Treat `404` as a missing source run.
-  - [ ] Treat `409` as active-run conflict or no-longer-eligible after POST-time revalidation.
-  - [ ] Treat `422` as a recognized unsupported shape.
-- [ ] Refresh active-run and past-run state after a continuation starts.
-- [ ] Verify modal close, cancel, loading, error, retry, and success states.
-- [ ] Verify strict TypeScript and ESLint expectations, including no `any`.
-- [ ] Add or update portal tests if existing infrastructure supports the touched area.
-- [ ] Run `portal` lint and build attempts.
-- [ ] If checks fail, fix and rerun before marking this phase complete.
-- [ ] Commit only Phase 8 changes after verification passes.
+- [x] Render the `continue` action only from the cheap list-level continuation signal.
+- [x] Read cheap continuation signal fields from the existing past-runs/list response; do not add a separate cheap-signal portal fetch in this first implementation.
+- [x] Do not fetch full assessment during table rendering or polling.
+- [x] Disable continuation action while any orchestration run is active.
+- [x] Fetch full assessment only when the operator opens the confirmation modal.
+- [x] Build confirmation modal behavior showing:
+  - [x] source run id
+  - [x] new run type `continuation`
+  - [x] inherited steps
+  - [x] runnable steps
+  - [x] article lower bound
+  - [x] planned article upper bound
+  - [x] Google RSS resume behavior when applicable
+  - [x] warnings, including global article range warnings
+- [x] Use primary visible button text `continue`.
+- [x] Use secondary small text or tooltip `from where left off`.
+- [x] On confirm, call `POST /continue` and let the server revalidate.
+- [x] Branch on the pinned worker-node/API status-code contract:
+  - [x] Treat `200` assessment responses with `eligible: false` and `blockingReasons` as a non-continuable source state to explain in the modal.
+  - [x] Treat `202` POST responses as a successfully accepted continuation and refresh run state.
+  - [x] Treat `404` as a missing source run.
+  - [x] Treat `409` as active-run conflict or no-longer-eligible after POST-time revalidation.
+  - [x] Treat `422` as a recognized unsupported shape.
+- [x] Refresh active-run and past-run state after a continuation starts.
+- [x] Verify modal close, cancel, loading, error, retry, and success states.
+- [x] Verify strict TypeScript and ESLint expectations, including no `any`.
+- [x] Add or update portal tests if existing infrastructure supports the touched area. No portal test runner or script is configured.
+- [x] Run `portal` lint and build attempts.
+- [x] If checks fail, fix and rerun before marking this phase complete.
+- [x] Commit only Phase 8 changes after verification passes.
 
 ## Phase 9: Manual validation and regression pass
 
