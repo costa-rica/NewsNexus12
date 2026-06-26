@@ -83,14 +83,25 @@ done
 
 ## 3. Seed the dev database
 
-Use db-manager to restore from a CSV backup zip. This is the **only** supported path for getting real data into a fresh Postgres instance — we do not run SQLite → Postgres migration.
+Use db-manager to restore from a CSV backup zip. This is the only supported path for getting real data into a fresh Postgres instance — we do not run SQLite → Postgres migration.
 
 ```bash
 cd db-manager
 # Ensure db-manager/.env points PG_* to newsnexus_dev using the bootstrap role
 npm run build
-node dist/index.js --zip-file /absolute/path/to/db_backup_YYYYMMDDHHMMSS.zip
+
+# Optional: validate the zip in a scratch database before touching newsnexus_dev
+node dist/index.js --dry_run --zip_file /absolute/path/to/db_backup_YYYYMMDDHHMMSS.zip
+
+# Restore into newsnexus_dev
+node dist/index.js --zip_file /absolute/path/to/db_backup_YYYYMMDDHHMMSS.zip
 ```
+
+Important notes:
+
+1. The db-manager restore flag is `--zip_file`, with an underscore. `--zip-file` is not accepted.
+2. `--dry_run` is optional. It imports the same zip into a scratch database first so you can verify the backup before changing `newsnexus_dev`.
+3. The real restore command rebuilds the target schema before loading the CSVs.
 
 db-manager will:
 
