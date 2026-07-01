@@ -2,7 +2,7 @@
 created_at: 2026-07-01
 updated_at: 2026-07-01
 created_by: claude (fable-5)
-modified_by: claude (opus-4.8)
+modified_by: codex (gpt-5)
 version: v02
 supersedes: 20260701_api_pagination_oom_fix_todo_v01.md
 ---
@@ -86,23 +86,23 @@ constraints, verification gates, and phase commit instructions) is preserved unc
 
 ## Phase 1 — Pagination module and constants (api)
 
-- [ ] Create `api/src/modules/pagination.ts` exporting:
-  - [ ] Per-endpoint default/maximum page-size constants (values from the plan, tunable):
+- [x] Create `api/src/modules/pagination.ts` exporting:
+  - [x] Per-endpoint default/maximum page-size constants (values from the plan, tunable):
         `POST /articles/with-ratings` default 200 / max 500; `POST /articles` default 200 /
         max 500; `GET /articles/approved` default 50 / max 200.
-  - [ ] `clampPageSize(requested, defaultSize, maxSize)` — returns `defaultSize` when
+  - [x] `clampPageSize(requested, defaultSize, maxSize)` — returns `defaultSize` when
         `requested` is missing/invalid (non-numeric, non-integer, `<= 0`), otherwise
         `min(requested, maxSize)`.
-  - [ ] A cursor parser/validator helper (accepts a positive-integer article id or
+  - [x] A cursor parser/validator helper (accepts a positive-integer article id or
         `undefined`; rejects garbage rather than interpolating it into SQL).
-- [ ] Add a Jest unit test for `clampPageSize` and cursor parsing (missing, valid, above-max,
+- [x] Add a Jest unit test for `clampPageSize` and cursor parsing (missing, valid, above-max,
       zero/negative, non-numeric inputs), following existing suite patterns under `api/`.
 
 ### Phase 1 verification
 
-- [ ] `cd api && npm run build` (tsc type check + build).
-- [ ] `cd api && npm test` — fix any failures.
-- [ ] Check off completed Phase 1 tasks and commit Phase 1 changes.
+- [x] `cd api && npm run build` (tsc type check + build).
+- [x] `cd api && npm test` — fix any failures.
+- [x] Check off completed Phase 1 tasks and commit Phase 1 changes.
 
 ---
 
