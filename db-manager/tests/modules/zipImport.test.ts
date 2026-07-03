@@ -50,6 +50,7 @@ import {
   sanitizeDateFields,
   sanitizeJsonFields,
 } from "../../src/modules/zipImport";
+import { MODEL_LOAD_ORDER as ACTUAL_MODEL_LOAD_ORDER } from "../../../db-models/src/models/_loadOrder";
 
 describe("Zip import module", () => {
   beforeEach(() => {
@@ -226,6 +227,23 @@ describe("Zip import module", () => {
       expect(result).toBe(2);
       expect(records[0].continuationPlan).toBeNull();
       expect(records[1].continuationPlan).toBeNull();
+    });
+  });
+
+  describe("MODEL_LOAD_ORDER", () => {
+    const indexOf = (modelName: string) => {
+      const index = ACTUAL_MODEL_LOAD_ORDER.indexOf(modelName);
+      expect(index).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+
+    it("loads orchestrator tables before NewsApiRequest descendants", () => {
+      expect(indexOf("OrchestratorRun")).toBeLessThan(indexOf("OrchestratorRunStep"));
+      expect(indexOf("OrchestratorRun")).toBeLessThan(indexOf("NewsApiRequest"));
+      expect(indexOf("OrchestratorRunStep")).toBeLessThan(indexOf("NewsApiRequest"));
+      expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("NewsApiRequestWebsiteDomainContract"));
+      expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("Article"));
+      expect(indexOf("OrchestratorRunStep")).toBeLessThan(indexOf("Article"));
     });
   });
 
