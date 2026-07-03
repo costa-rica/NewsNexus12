@@ -128,7 +128,7 @@ Each package reads from its own `.env`. Key variables:
 The default naming pattern should be
 
 - prefix date using the `YYYYMMDD_` format
-- descriptive name in all caps
+- descriptive name in lowercase
 - use "\_" in place of spaces
 
 ### YAML frontmatter
