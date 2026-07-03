@@ -546,28 +546,12 @@ async function sqlQueryCountArticlesForWithRatingsRoute(
 }
 
 async function sqlQueryArticlesForWithRatingsRoute(
-  returnOnlyThisCreatedAtDateOrAfter?: string | Date | null,
-  returnOnlyThisPublishedDateOrAfter?: string | Date | null,
+  articleIds: number[],
 ): Promise<SqlQueryRow[]> {
-  const replacements: SqlQueryReplacements = {};
-  const whereClauses = [];
-
-  if (returnOnlyThisCreatedAtDateOrAfter) {
-    whereClauses.push(`a."createdAt" >= :returnOnlyThisCreatedAtDateOrAfter`);
-    replacements.returnOnlyThisCreatedAtDateOrAfter =
-      returnOnlyThisCreatedAtDateOrAfter;
+  if (articleIds.length === 0) {
+    return [];
   }
 
-  if (returnOnlyThisPublishedDateOrAfter) {
-    whereClauses.push(
-      `a."publishedDate" >= :returnOnlyThisPublishedDateOrAfter`,
-    );
-    replacements.returnOnlyThisPublishedDateOrAfter =
-      returnOnlyThisPublishedDateOrAfter;
-  }
-
-  const whereClause =
-    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
   const sql = `
     SELECT
       a.id,
@@ -649,12 +633,12 @@ async function sqlQueryArticlesForWithRatingsRoute(
     -- Join AI state assignments from ArticleStateContracts02
     LEFT JOIN "ArticleStateContracts02" asc02 ON asc02."articleId" = a.id
     LEFT JOIN "States" s2 ON s2.id = asc02."stateId"
-    ${whereClause}
+    WHERE a.id IN (:articleIds)
     ORDER BY a.id;
   `;
 
   const rawResults = (await sequelizeAny.query(sql, {
-    replacements,
+    replacements: { articleIds },
     type: QueryTypes.SELECT,
   })) as SqlQueryRow[];
 

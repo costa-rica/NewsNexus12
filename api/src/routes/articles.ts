@@ -29,6 +29,8 @@ const { getLastThursdayAt20hInNyTimeZone } = require("../modules/common");
 const {
   sqlQueryArticles,
   sqlQueryArticlesWithStatesApprovedReportContract,
+  sqlQueryArticleIdsForWithRatingsRoute,
+  sqlQueryCountArticlesForWithRatingsRoute,
   sqlQueryArticlesForWithRatingsRoute,
   sqlQueryArticlesWithStates,
   sqlQueryArticlesApproved,
@@ -38,6 +40,11 @@ const {
   sqlQueryArticleDetails,
 } = require("../modules/queriesSql");
 import logger from "../modules/logger";
+import {
+  WITH_RATINGS_DEFAULT_LIMIT,
+  WITH_RATINGS_MAX_LIMIT,
+  clampLimit,
+} from "../modules/pagination";
 
 function parseNumericId(value: string): number | null {
   if (!/^\d+$/.test(value)) {
@@ -839,67 +846,53 @@ router.post(
       semanticScorerEntityName,
       returnOnlyIsNotApproved,
       returnOnlyIsRelevant,
+      limit,
+      cursor,
     } = req.body;
 
-    let semanticScorerEntityId;
-
-    if (semanticScorerEntityName) {
-      const semanticScorerEntityObj = await ArtificialIntelligence.findOne({
-        where: { name: semanticScorerEntityName },
-      });
-      semanticScorerEntityId = semanticScorerEntityObj.id;
-    }
-
-    // try {
-    // 🔹 Step 1: Get full list of articles as base array
-    const whereClause: Record<string, unknown> = {};
-    if (returnOnlyThisPublishedDateOrAfter) {
-      whereClause.publishedDate = {
-        [require("sequelize").Op.gte]: new Date(
-          returnOnlyThisPublishedDateOrAfter,
-        ),
-      };
-    }
-
-    if (returnOnlyThisCreatedAtDateOrAfter) {
-      whereClause.createdAt = {
-        [require("sequelize").Op.gte]: new Date(
-          returnOnlyThisCreatedAtDateOrAfter,
-        ),
-      };
-    }
-
-    const articlesArray = await sqlQueryArticlesForWithRatingsRoute(
-      returnOnlyThisCreatedAtDateOrAfter,
-      returnOnlyThisPublishedDateOrAfter,
+    const effectiveLimit = clampLimit(
+      limit,
+      WITH_RATINGS_DEFAULT_LIMIT,
+      WITH_RATINGS_MAX_LIMIT,
     );
+    const filters = {
+      returnOnlyThisPublishedDateOrAfter,
+      returnOnlyThisCreatedAtDateOrAfter,
+      returnOnlyIsNotApproved,
+      returnOnlyIsRelevant,
+    };
+    const cursorValue = cursor ?? null;
+    const idsWithExtraRow = await sqlQueryArticleIdsForWithRatingsRoute(
+      filters,
+      cursorValue,
+      effectiveLimit,
+    );
+    const hasMore = idsWithExtraRow.length > effectiveLimit;
+    const trimmedArticleIds = idsWithExtraRow.slice(0, effectiveLimit);
+    const nextCursor =
+      hasMore && trimmedArticleIds.length > 0
+        ? trimmedArticleIds[trimmedArticleIds.length - 1]
+        : null;
+    const totalCount =
+      cursorValue === null
+        ? await sqlQueryCountArticlesForWithRatingsRoute(filters)
+        : null;
+    if (trimmedArticleIds.length === 0) {
+      const timeToRenderResponseFromApiInSeconds =
+        (Date.now() - startTime) / 1000;
+      return res.json({
+        articleCount: 0,
+        articlesArray: [],
+        limit: effectiveLimit,
+        nextCursor: null,
+        hasMore: false,
+        totalCount,
+        timeToRenderResponseFromApiInSeconds,
+      });
+    }
 
-    // Step 2: Filter articles
-    // Filter in JavaScript based on related tables
-    const articlesArrayFilteredNoAi = articlesArray.filter((article: any) => {
-      // Filter out not approved if requested
-      if (
-        returnOnlyIsNotApproved &&
-        article.ArticleApproveds &&
-        article.ArticleApproveds.some(
-          (entry: any) => entry.isApproved === true || entry.isApproved === 1,
-        )
-      ) {
-        return false;
-      }
-
-      // Filter out not relevant if requested
-      if (
-        returnOnlyIsRelevant &&
-        article.ArticleIsRelevants &&
-        article.ArticleIsRelevants.some(
-          (entry: any) => entry.isRelevant !== null,
-        )
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const articlesArray =
+      await sqlQueryArticlesForWithRatingsRoute(trimmedArticleIds);
 
     // Step 2.1: Get AI scores
     const artificialIntelligenceObject01 = await ArtificialIntelligence.findOne(
@@ -911,34 +904,34 @@ router.post(
     if (!artificialIntelligenceObject01) {
       return res.status(404).json({ message: "AI not found." });
     }
-    const entityWhoCategorizedArticleId01 =
-      artificialIntelligenceObject01.EntityWhoCategorizedArticles[0].id;
 
     if (!artificialIntelligenceObject01.EntityWhoCategorizedArticles?.length) {
       return res
         .status(500)
         .json({ message: "No related EntityWhoCategorizedArticles found" });
     }
+    const entityWhoCategorizedArticleId01 =
+      artificialIntelligenceObject01.EntityWhoCategorizedArticles[0].id;
 
-    const articlesIdArray = articlesArrayFilteredNoAi.map(
-      (article: any) => article.id,
-    );
+    const articlesIdArray = articlesArray.map((article: any) => article.id);
 
     const articlesAndAiScores = await sqlQueryArticlesAndAiScores(
       articlesIdArray,
       entityWhoCategorizedArticleId01,
     );
-    const articlesArrayFilteredWithSemanticScorer =
-      articlesArrayFilteredNoAi.map((article: any) => {
-        const aiScore = articlesAndAiScores.find(
-          (score: any) => score.articleId === article.id,
-        );
+    const aiScoresByArticleId = new Map<number, any>(
+      articlesAndAiScores.map((score: any) => [Number(score.articleId), score]),
+    );
+    const articlesArrayFilteredWithSemanticScorer = articlesArray.map(
+      (article: any) => {
+        const aiScore = aiScoresByArticleId.get(Number(article.id));
         return {
           ...article,
           semanticRatingMax: aiScore?.keywordRating,
           semanticRatingMaxLabel: aiScore?.keyword,
         };
-      });
+      },
+    );
 
     // Step 2.2: Get zero shot Location Classifier scores
 
@@ -951,6 +944,11 @@ router.post(
     if (!artificialIntelligenceObject02) {
       return res.status(404).json({ message: "AI not found." });
     }
+    if (!artificialIntelligenceObject02.EntityWhoCategorizedArticles?.length) {
+      return res
+        .status(500)
+        .json({ message: "No related EntityWhoCategorizedArticles found" });
+    }
     const entityWhoCategorizedArticleId02 =
       artificialIntelligenceObject02.EntityWhoCategorizedArticles[0].id;
 
@@ -960,12 +958,17 @@ router.post(
         entityWhoCategorizedArticleId02,
       );
 
+    const locationScoresByArticleId = new Map<number, any>(
+      articlesAndLocationClassifierScoresArray.map((score: any) => [
+        Number(score.articleId),
+        score,
+      ]),
+    );
     const articlesArrayWithBothAiScores =
       articlesArrayFilteredWithSemanticScorer.map((article: any) => {
-        const locationClassifierScore =
-          articlesAndLocationClassifierScoresArray.find(
-            (score: any) => score.articleId === article.id,
-          );
+        const locationClassifierScore = locationScoresByArticleId.get(
+          Number(article.id),
+        );
         return {
           ...article,
           locationClassifierScore: locationClassifierScore?.keywordRating,
@@ -1029,7 +1032,10 @@ router.post(
     res.json({
       articleCount: finalArticles.length,
       articlesArray: finalArticles,
-      // articlesArray: articlesArrayFilteredWithSemanticScorer,
+      limit: effectiveLimit,
+      nextCursor,
+      hasMore,
+      totalCount,
       timeToRenderResponseFromApiInSeconds,
     });
     // } catch (error) {
@@ -1153,7 +1159,16 @@ router.get(
   "/test-sql",
   authenticateToken,
   async (_req: Request, res: Response) => {
-    const articlesArray = await sqlQueryArticlesForWithRatingsRoute(null, null);
+    const articleIdsWithExtraRow = await sqlQueryArticleIdsForWithRatingsRoute(
+      {},
+      null,
+      WITH_RATINGS_DEFAULT_LIMIT,
+    );
+    const articleIds = articleIdsWithExtraRow.slice(
+      0,
+      WITH_RATINGS_DEFAULT_LIMIT,
+    );
+    const articlesArray = await sqlQueryArticlesForWithRatingsRoute(articleIds);
     const articleIdArray = articlesArray.map((article: any) => article.id);
 
     // AI 01 : NewsNexusSemanticScorer02
@@ -1172,10 +1187,11 @@ router.get(
       articleIdArray,
       entityWhoCategorizedArticleId,
     );
+    const aiScoresByArticleId = new Map<number, any>(
+      articlesAndAiScores.map((score: any) => [Number(score.articleId), score]),
+    );
     const articlesArrayModified = articlesArray.map((article: any) => {
-      const aiScore = articlesAndAiScores.find(
-        (score: any) => score.articleId === article.id,
-      );
+      const aiScore = aiScoresByArticleId.get(Number(article.id));
       return {
         ...article,
         // aiScore,

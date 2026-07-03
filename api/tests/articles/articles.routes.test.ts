@@ -45,6 +45,8 @@ jest.mock("../../src/modules/common", () => mockCommonModule);
 const mockQueriesSqlModule = {
   sqlQueryArticles: jest.fn(),
   sqlQueryArticlesWithStatesApprovedReportContract: jest.fn(),
+  sqlQueryArticleIdsForWithRatingsRoute: jest.fn(),
+  sqlQueryCountArticlesForWithRatingsRoute: jest.fn(),
   sqlQueryArticlesForWithRatingsRoute: jest.fn(),
   sqlQueryArticlesWithStates: jest.fn(),
   sqlQueryArticlesApproved: jest.fn(),
@@ -67,6 +69,10 @@ const mockArticleApprovedModel = {
   create: jest.fn(),
 };
 
+const mockArtificialIntelligenceModel = {
+  findOne: jest.fn(),
+};
+
 jest.mock("@newsnexus/db-models", () => ({
   Article: mockArticleModel,
   State: {},
@@ -75,7 +81,7 @@ jest.mock("@newsnexus/db-models", () => ({
   EntityWhoFoundArticle: {},
   ArticleStateContract: {},
   ArticleContents02: {},
-  ArtificialIntelligence: {},
+  ArtificialIntelligence: mockArtificialIntelligenceModel,
   ArticleReviewed: {},
   EntityWhoCategorizedArticle: {},
 }));
@@ -93,6 +99,50 @@ describe("articles routes contract tests", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
+
+  const buildHydratedArticle = (id: number) => ({
+    id,
+    title: `Article ${id}`,
+    description: `Description ${id}`,
+    publishedDate: "2026-07-01",
+    publicationName: "Example News",
+    url: `https://example.com/${id}`,
+    publisherFinalUrl: null,
+    hasArticleContent: true,
+    States: [{ id: 1, name: "Ohio" }],
+    ArticleIsRelevants: [],
+    ArticleApproveds: [],
+    ArticleRevieweds: [],
+    NewsApiRequest: {
+      NewsArticleAggregatorSource: {
+        nameOfOrg: "Example Org",
+      },
+    },
+    StateAssignment: null,
+  });
+
+  const mockAiLookups = () => {
+    mockArtificialIntelligenceModel.findOne
+      .mockResolvedValueOnce({
+        EntityWhoCategorizedArticles: [{ id: 11 }],
+      })
+      .mockResolvedValueOnce({
+        EntityWhoCategorizedArticles: [{ id: 22 }],
+      });
+    mockQueriesSqlModule.sqlQueryArticlesAndAiScores
+      .mockResolvedValueOnce([
+        { articleId: 10, keywordRating: 0.9, keyword: "semantic" },
+        { articleId: 11, keywordRating: 0.8, keyword: "semantic" },
+        { articleId: 21, keywordRating: 0.7, keyword: "semantic" },
+        { articleId: 22, keywordRating: 0.6, keyword: "semantic" },
+      ])
+      .mockResolvedValueOnce([
+        { articleId: 10, keywordRating: 0.5, keyword: "location" },
+        { articleId: 11, keywordRating: 0.4, keyword: "location" },
+        { articleId: 21, keywordRating: 0.3, keyword: "location" },
+        { articleId: 22, keywordRating: 0.2, keyword: "location" },
+      ]);
+  };
 
   test("POST /articles returns grouped article contract fields", async () => {
     mockQueriesSqlModule.sqlQueryArticles.mockResolvedValue([
@@ -205,6 +255,188 @@ describe("articles routes contract tests", () => {
       articleHasStateCount: 2,
       articleIsApprovedCount: 2,
       approvedButNotInReportCount: 1,
+    });
+  });
+
+  test("POST /articles/with-ratings applies default limit and returns empty chunk", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForWithRatingsRoute.mockResolvedValue(
+      0,
+    );
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/with-ratings")
+      .send({ semanticScorerEntityName: "NewsNexusSemanticScorer02" });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), null, 5000);
+    expect(response.body).toMatchObject({
+      articleCount: 0,
+      articlesArray: [],
+      limit: 5000,
+      nextCursor: null,
+      hasMore: false,
+      totalCount: 0,
+    });
+    expect(mockQueriesSqlModule.sqlQueryArticlesAndAiScores).not.toHaveBeenCalled();
+  });
+
+  test("POST /articles/with-ratings clamps limit above max", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForWithRatingsRoute.mockResolvedValue(
+      0,
+    );
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/with-ratings")
+      .send({
+        semanticScorerEntityName: "NewsNexusSemanticScorer02",
+        limit: 25000,
+      });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), null, 20000);
+    expect(response.body.limit).toBe(20000);
+  });
+
+  test("POST /articles/with-ratings derives hasMore and nextCursor from extra id", async () => {
+    mockAiLookups();
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue([
+      10, 11, 12,
+    ]);
+    mockQueriesSqlModule.sqlQueryCountArticlesForWithRatingsRoute.mockResolvedValue(
+      3,
+    );
+    mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute.mockResolvedValue([
+      buildHydratedArticle(10),
+      buildHydratedArticle(11),
+    ]);
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/with-ratings")
+      .send({
+        semanticScorerEntityName: "NewsNexusSemanticScorer02",
+        limit: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute,
+    ).toHaveBeenCalledWith([10, 11]);
+    expect(response.body).toMatchObject({
+      articleCount: 2,
+      limit: 2,
+      nextCursor: 11,
+      hasMore: true,
+      totalCount: 3,
+    });
+    expect(response.body.articlesArray).toHaveLength(2);
+    expect(response.body.articlesArray[0]).toMatchObject({
+      id: 10,
+      semanticRatingMax: 0.9,
+      locationClassifierScore: 0.5,
+    });
+  });
+
+  test("POST /articles/with-ratings returns null nextCursor when no more chunks", async () => {
+    mockAiLookups();
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue([
+      21, 22,
+    ]);
+    mockQueriesSqlModule.sqlQueryCountArticlesForWithRatingsRoute.mockResolvedValue(
+      2,
+    );
+    mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute.mockResolvedValue([
+      buildHydratedArticle(21),
+      buildHydratedArticle(22),
+    ]);
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/with-ratings")
+      .send({
+        semanticScorerEntityName: "NewsNexusSemanticScorer02",
+        limit: 3,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      articleCount: 2,
+      hasMore: false,
+      nextCursor: null,
+      totalCount: 2,
+    });
+  });
+
+  test("POST /articles/with-ratings skips totalCount when cursor is supplied", async () => {
+    mockAiLookups();
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue([
+      21,
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute.mockResolvedValue([
+      buildHydratedArticle(21),
+    ]);
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles/with-ratings")
+      .send({
+        semanticScorerEntityName: "NewsNexusSemanticScorer02",
+        cursor: 11,
+        limit: 2,
+      });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), 11, 2);
+    expect(
+      mockQueriesSqlModule.sqlQueryCountArticlesForWithRatingsRoute,
+    ).not.toHaveBeenCalled();
+    expect(response.body.totalCount).toBeNull();
+  });
+
+  test("GET /articles/test-sql returns bounded modified articles", async () => {
+    mockArtificialIntelligenceModel.findOne.mockResolvedValue({
+      EntityWhoCategorizedArticles: [{ id: 11 }],
+    });
+    mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute.mockResolvedValue([
+      10, 11,
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute.mockResolvedValue([
+      buildHydratedArticle(10),
+      buildHydratedArticle(11),
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesAndAiScores.mockResolvedValue([
+      { articleId: 10, keywordRating: 0.9, keyword: "semantic" },
+    ]);
+
+    const app = buildApp();
+    const response = await request(app).get("/articles/test-sql");
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
+    ).toHaveBeenCalledWith({}, null, 5000);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute,
+    ).toHaveBeenCalledWith([10, 11]);
+    expect(response.body.articlesArrayModified).toHaveLength(2);
+    expect(response.body.articlesArrayModified[0]).toMatchObject({
+      id: 10,
+      semanticRatingMax: 0.9,
+      semanticRatingMaxLabel: "semantic",
     });
   });
 
