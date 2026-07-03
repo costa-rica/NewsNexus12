@@ -71,7 +71,7 @@ const initialState: UserState = {
 		returnOnlyThisCreatedAtDateOrAfter: getDateDaysAgo(90),
 		returnOnlyIsNotApproved: true,
 		returnOnlyIsRelevant: true,
-		limit: 5000,
+		limit: 20000,
 	},
 	approvedArticlesArray: [],
 	requestsAnalysisTableBodyParams: {
@@ -178,7 +178,7 @@ export const userSlice = createSlice({
 				returnOnlyThisCreatedAtDateOrAfter: getDateDaysAgo(90),
 				returnOnlyIsNotApproved: true,
 				returnOnlyIsRelevant: true,
-				limit: 5000,
+				limit: 20000,
 			};
 			state.approvedArticlesArray = [];
 			console.log("-----> Finished Super Logout !!!");

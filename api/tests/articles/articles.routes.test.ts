@@ -274,11 +274,11 @@ describe("articles routes contract tests", () => {
     expect(response.status).toBe(200);
     expect(
       mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
-    ).toHaveBeenCalledWith(expect.any(Object), null, 5000);
+    ).toHaveBeenCalledWith(expect.any(Object), null, 20000);
     expect(response.body).toMatchObject({
       articleCount: 0,
       articlesArray: [],
-      limit: 5000,
+      limit: 20000,
       nextCursor: null,
       hasMore: false,
       totalCount: 0,
@@ -299,14 +299,14 @@ describe("articles routes contract tests", () => {
       .post("/articles/with-ratings")
       .send({
         semanticScorerEntityName: "NewsNexusSemanticScorer02",
-        limit: 25000,
+        limit: 50000,
       });
 
     expect(response.status).toBe(200);
     expect(
       mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
-    ).toHaveBeenCalledWith(expect.any(Object), null, 20000);
-    expect(response.body.limit).toBe(20000);
+    ).toHaveBeenCalledWith(expect.any(Object), null, 40000);
+    expect(response.body.limit).toBe(40000);
   });
 
   test("POST /articles/with-ratings derives hasMore and nextCursor from extra id", async () => {
@@ -428,7 +428,7 @@ describe("articles routes contract tests", () => {
     expect(response.status).toBe(200);
     expect(
       mockQueriesSqlModule.sqlQueryArticleIdsForWithRatingsRoute,
-    ).toHaveBeenCalledWith({}, null, 5000);
+    ).toHaveBeenCalledWith({}, null, 20000);
     expect(
       mockQueriesSqlModule.sqlQueryArticlesForWithRatingsRoute,
     ).toHaveBeenCalledWith([10, 11]);

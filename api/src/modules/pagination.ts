@@ -1,5 +1,5 @@
-const WITH_RATINGS_DEFAULT_LIMIT = 5000;
-const WITH_RATINGS_MAX_LIMIT = 20000;
+const WITH_RATINGS_DEFAULT_LIMIT = 20000;
+const WITH_RATINGS_MAX_LIMIT = 40000;
 
 function clampLimit(
   requested: unknown,

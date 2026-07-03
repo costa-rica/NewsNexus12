@@ -63,6 +63,8 @@ const ARTICLE_LIMIT_OPTIONS = [
 	{ value: "5000", label: "5,000" },
 	{ value: "10000", label: "10,000" },
 	{ value: "20000", label: "20,000" },
+	{ value: "30000", label: "30,000" },
+	{ value: "40000", label: "40,000" },
 ];
 
 export default function ReviewArticles() {
@@ -108,9 +110,9 @@ export default function ReviewArticles() {
 			userReducer.articleTableBodyParams?.returnOnlyIsNotApproved ?? true,
 		returnOnlyIsRelevant:
 			userReducer.articleTableBodyParams?.returnOnlyIsRelevant ?? true,
-		limit: userReducer.articleTableBodyParams?.limit ?? 5000,
+		limit: userReducer.articleTableBodyParams?.limit ?? 20000,
 	});
-	const articleLimit = userReducer.articleTableBodyParams?.limit ?? 5000;
+	const articleLimit = userReducer.articleTableBodyParams?.limit ?? 20000;
 	const totalChunks =
 		totalCount === null ? null : Math.ceil(totalCount / articleLimit);
 	const chunkLabel =
@@ -133,7 +135,7 @@ export default function ReviewArticles() {
 				initialFilters.returnOnlyIsNotApproved ||
 			userReducer.articleTableBodyParams.returnOnlyIsRelevant !==
 				initialFilters.returnOnlyIsRelevant ||
-			(userReducer.articleTableBodyParams.limit ?? 5000) !== initialFilters.limit
+			(userReducer.articleTableBodyParams.limit ?? 20000) !== initialFilters.limit
 		);
 	}, [initialFilters, userReducer.articleTableBodyParams]);
 
@@ -390,7 +392,7 @@ export default function ReviewArticles() {
 	const fetchArticlesArray = async (
 		cursor: number | null = null
 	): Promise<boolean> => {
-		const limit = userReducer.articleTableBodyParams?.limit ?? 5000;
+		const limit = userReducer.articleTableBodyParams?.limit ?? 20000;
 		const bodyParams = {
 			...(userReducer.articleTableBodyParams || {
 				returnOnlyThisPublishedDateOrAfter: null,
@@ -761,7 +763,7 @@ export default function ReviewArticles() {
 				userReducer.articleTableBodyParams.returnOnlyIsNotApproved,
 			returnOnlyIsRelevant:
 				userReducer.articleTableBodyParams.returnOnlyIsRelevant,
-			limit: userReducer.articleTableBodyParams.limit ?? 5000,
+			limit: userReducer.articleTableBodyParams.limit ?? 20000,
 		});
 		setChunkStartCursors([null]);
 		setCurrentChunkIndex(0);
