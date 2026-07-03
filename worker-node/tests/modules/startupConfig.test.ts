@@ -1,7 +1,7 @@
 process.env.PG_HOST = "localhost";
 process.env.PG_PORT = "5432";
 process.env.PG_DATABASE = "newsnexus_test_worker_node";
-process.env.PG_USER = "nick";
+process.env.PG_USER = "newsnexus_boot";
 
 import { startServer } from "../../src/server";
 import { loadAppConfig } from "../../src/modules/startup/config";
@@ -17,7 +17,7 @@ const requiredEnv = {
   PG_HOST: "localhost",
   PG_PORT: "5432",
   PG_DATABASE: "newsnexus_test_worker_node",
-  PG_USER: "nick",
+  PG_USER: "newsnexus_boot",
   PATH_UTILTIES: "/tmp/utilities",
   URL_BASE_NEWS_NEXUS_WORKER_PYTHON: "http://worker-python",
   LIMIT_ARTICLE_AGE_IN_DAYS: "180",
