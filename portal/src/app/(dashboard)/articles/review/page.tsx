@@ -7,8 +7,9 @@ import { updateStateArray } from "@/store/features/user/userSlice";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
+import Select from "@/components/form/Select";
 import TableReviewArticles from "@/components/tables/TableReviewArticles";
-import type { Article } from "@/types/article";
+import type { Article, ArticleWithRatingsResponse } from "@/types/article";
 import {
 	toggleHideApproved,
 	toggleHideIrrelevant,
@@ -52,6 +53,18 @@ type AiApproverGatekeeperMap = Record<
 	}
 >;
 
+type AiApproverTopScoresResponse = {
+	topScores: AiApproverTopScoreMap;
+	gatekeeperResults: AiApproverGatekeeperMap;
+};
+
+const ARTICLE_LIMIT_OPTIONS = [
+	{ value: "1000", label: "1,000" },
+	{ value: "5000", label: "5,000" },
+	{ value: "10000", label: "10,000" },
+	{ value: "20000", label: "20,000" },
+];
+
 export default function ReviewArticles() {
 	const dispatch = useAppDispatch();
 	const { token, stateArray = [] } = useAppSelector((state) => state.user);
@@ -66,6 +79,13 @@ export default function ReviewArticles() {
 	const [loadingComponents, setLoadingComponents] = useState({
 		table01: false,
 	});
+	const [chunkStartCursors, setChunkStartCursors] = useState<(number | null)[]>([
+		null,
+	]);
+	const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+	const [nextCursor, setNextCursor] = useState<number | null>(null);
+	const [totalCount, setTotalCount] = useState<number | null>(null);
+	const [hasMore, setHasMore] = useState(false);
 	const [allowUpdateSelectedArticle] = useState(true);
 	const [alertModal, setAlertModal] = useState<{
 		show: boolean;
@@ -88,7 +108,17 @@ export default function ReviewArticles() {
 			userReducer.articleTableBodyParams?.returnOnlyIsNotApproved ?? true,
 		returnOnlyIsRelevant:
 			userReducer.articleTableBodyParams?.returnOnlyIsRelevant ?? true,
+		limit: userReducer.articleTableBodyParams?.limit ?? 5000,
 	});
+	const articleLimit = userReducer.articleTableBodyParams?.limit ?? 5000;
+	const totalChunks =
+		totalCount === null ? null : Math.ceil(totalCount / articleLimit);
+	const chunkLabel =
+		totalChunks === null
+			? null
+			: totalChunks === 0
+			? "Chunk 0 of 0"
+			: `Chunk ${currentChunkIndex + 1} of ${totalChunks}`;
 
 	const hasFilterChanges = useMemo(() => {
 		if (!userReducer.articleTableBodyParams) {
@@ -102,7 +132,8 @@ export default function ReviewArticles() {
 			userReducer.articleTableBodyParams.returnOnlyIsNotApproved !==
 				initialFilters.returnOnlyIsNotApproved ||
 			userReducer.articleTableBodyParams.returnOnlyIsRelevant !==
-				initialFilters.returnOnlyIsRelevant
+				initialFilters.returnOnlyIsRelevant ||
+			(userReducer.articleTableBodyParams.limit ?? 5000) !== initialFilters.limit
 		);
 	}, [initialFilters, userReducer.articleTableBodyParams]);
 
@@ -304,9 +335,9 @@ export default function ReviewArticles() {
 	);
 
 	const fetchAiApproverTopScores = useCallback(
-		async (articleIds: number[]) => {
+		async (articleIds: number[]): Promise<AiApproverTopScoresResponse> => {
 			if (!token || articleIds.length === 0) {
-				return {};
+				return { topScores: {}, gatekeeperResults: {} };
 			}
 
 			const response = await fetch(
@@ -335,14 +366,41 @@ export default function ReviewArticles() {
 		[token]
 	);
 
-	const fetchArticlesArray = async () => {
+	const fetchAiApproverTopScoresInChunks = useCallback(
+		async (articleIds: number[]): Promise<AiApproverTopScoresResponse> => {
+			const combinedTopScores: AiApproverTopScoreMap = {};
+			const combinedGatekeeperResults: AiApproverGatekeeperMap = {};
+
+			for (let i = 0; i < articleIds.length; i += 500) {
+				const chunk = articleIds.slice(i, i + 500);
+				const { topScores, gatekeeperResults } =
+					await fetchAiApproverTopScores(chunk);
+				Object.assign(combinedTopScores, topScores);
+				Object.assign(combinedGatekeeperResults, gatekeeperResults);
+			}
+
+			return {
+				topScores: combinedTopScores,
+				gatekeeperResults: combinedGatekeeperResults,
+			};
+		},
+		[fetchAiApproverTopScores]
+	);
+
+	const fetchArticlesArray = async (
+		cursor: number | null = null
+	): Promise<boolean> => {
+		const limit = userReducer.articleTableBodyParams?.limit ?? 5000;
 		const bodyParams = {
 			...(userReducer.articleTableBodyParams || {
 				returnOnlyThisPublishedDateOrAfter: null,
 				returnOnlyThisCreatedAtDateOrAfter: null,
 				returnOnlyIsNotApproved: true,
 				returnOnlyIsRelevant: true,
+				limit,
 			}),
+			limit,
+			cursor,
 			// entityWhoCategorizesIdSemantic: 1,
 			semanticScorerEntityName: "NewsNexusSemanticScorer02",
 		};
@@ -371,13 +429,19 @@ export default function ReviewArticles() {
 				throw new Error(`Server Error: ${errorText}`);
 			}
 
-			const result = await response.json();
+			const result = (await response.json()) as ArticleWithRatingsResponse;
 			console.log("Fetched Data:", result);
+
+			setHasMore(result.hasMore);
+			setNextCursor(result.nextCursor);
+			if (result.totalCount !== null) {
+				setTotalCount(result.totalCount);
+			}
 
 			if (result.articlesArray && Array.isArray(result.articlesArray)) {
 				const articleIds = result.articlesArray.map((article: Article) => article.id);
 				const { topScores, gatekeeperResults } =
-					await fetchAiApproverTopScores(articleIds);
+					await fetchAiApproverTopScoresInChunks(articleIds);
 				setArticlesArray(
 					mergeAiApproverTopScores(
 						result.articlesArray,
@@ -388,14 +452,19 @@ export default function ReviewArticles() {
 			} else {
 				setArticlesArray([]);
 			}
+			return true;
 		} catch (error) {
 			console.error("Error fetching data:", error);
 			setArticlesArray([]);
+			setNextCursor(null);
+			setHasMore(false);
+			return false;
+		} finally {
+			setLoadingComponents((prev) => ({
+				...prev,
+				table01: false,
+			}));
 		}
-		setLoadingComponents((prev) => ({
-			...prev,
-			table01: false,
-		}));
 	};
 
 	const handleAiApproverArticleUpdate = useCallback(
@@ -655,6 +724,31 @@ export default function ReviewArticles() {
 		}
 	};
 
+	const handleNextChunk = async () => {
+		if (!hasMore || nextCursor === null) return;
+
+		const cursorForNext = nextCursor;
+		const fetched = await fetchArticlesArray(cursorForNext);
+		if (!fetched) return;
+
+		setChunkStartCursors((prev) => {
+			const currentStack = prev.slice(0, currentChunkIndex + 1);
+			return [...currentStack, cursorForNext];
+		});
+		setCurrentChunkIndex((prev) => prev + 1);
+	};
+
+	const handlePreviousChunk = async () => {
+		if (currentChunkIndex <= 0) return;
+
+		const previousCursor = chunkStartCursors[currentChunkIndex - 1] ?? null;
+		const fetched = await fetchArticlesArray(previousCursor);
+		if (!fetched) return;
+
+		setChunkStartCursors((prev) => prev.slice(0, currentChunkIndex));
+		setCurrentChunkIndex((prev) => Math.max(prev - 1, 0));
+	};
+
 	const handleRefreshWithFilters = () => {
 		if (!userReducer.articleTableBodyParams) return;
 
@@ -667,8 +761,14 @@ export default function ReviewArticles() {
 				userReducer.articleTableBodyParams.returnOnlyIsNotApproved,
 			returnOnlyIsRelevant:
 				userReducer.articleTableBodyParams.returnOnlyIsRelevant,
+			limit: userReducer.articleTableBodyParams.limit ?? 5000,
 		});
-		fetchArticlesArray();
+		setChunkStartCursors([null]);
+		setCurrentChunkIndex(0);
+		setNextCursor(null);
+		setHasMore(false);
+		setTotalCount(null);
+		fetchArticlesArray(null);
 	};
 
 	const handleStateAssignerArticleUpdate = (articleId: number, isHumanApproved: boolean) => {
@@ -853,7 +953,7 @@ export default function ReviewArticles() {
 				</h3>
 				<div className="flex flex-col gap-4">
 					{/* Date Filters */}
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 						{/* Database Date Limit */}
 						<div className="relative group">
 							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -910,6 +1010,24 @@ export default function ReviewArticles() {
 								}
 							/>
 						</div>
+
+						{/* Article Limit */}
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Load Limit
+							</label>
+							<Select
+								options={ARTICLE_LIMIT_OPTIONS}
+								value={String(articleLimit)}
+								onChange={(value) =>
+									dispatch(
+										updateArticleTableBodyParams({
+											limit: Number(value),
+										})
+									)
+								}
+							/>
+						</div>
 					</div>
 
 					{/* Toggle Buttons and Refresh */}
@@ -954,6 +1072,37 @@ export default function ReviewArticles() {
 						>
 							{hasFilterChanges ? "Refresh with New Filters" : "No Changes"}
 						</button>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+						<span>
+							{totalCount === null
+								? "Article count pending"
+								: `${totalCount.toLocaleString()} articles match the current filters`}
+						</span>
+						{chunkLabel && (
+							<span className="rounded-lg bg-gray-100 px-3 py-2 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+								{chunkLabel}
+							</span>
+						)}
+						<div className="ml-auto flex items-center gap-2">
+							<button
+								onClick={handlePreviousChunk}
+								disabled={currentChunkIndex === 0 || loadingComponents.table01}
+								className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 transition-all hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							>
+								Prev
+							</button>
+							<button
+								onClick={handleNextChunk}
+								disabled={
+									!hasMore || nextCursor === null || loadingComponents.table01
+								}
+								className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 transition-all hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							>
+								Next
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>

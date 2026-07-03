@@ -41,6 +41,16 @@ export interface Article {
 	stateAssignment?: StateAssignment | null;
 }
 
+export interface ArticleWithRatingsResponse {
+	articleCount: number;
+	articlesArray: Article[];
+	timeToRenderResponseFromApiInSeconds: number;
+	limit: number;
+	nextCursor: number | null;
+	hasMore: boolean;
+	totalCount: number | null;
+}
+
 export interface ReviewArticleContentResponse {
 	result: boolean;
 	articleId: number;

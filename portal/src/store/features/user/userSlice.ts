@@ -19,6 +19,7 @@ export interface ArticleTableBodyParams {
 	returnOnlyThisCreatedAtDateOrAfter: string | null;
 	returnOnlyIsNotApproved: boolean;
 	returnOnlyIsRelevant: boolean;
+	limit: number;
 }
 
 export interface RequestsAnalysisTableBodyParams {
@@ -70,6 +71,7 @@ const initialState: UserState = {
 		returnOnlyThisCreatedAtDateOrAfter: getDateDaysAgo(90),
 		returnOnlyIsNotApproved: true,
 		returnOnlyIsRelevant: true,
+		limit: 5000,
 	},
 	approvedArticlesArray: [],
 	requestsAnalysisTableBodyParams: {
@@ -176,6 +178,7 @@ export const userSlice = createSlice({
 				returnOnlyThisCreatedAtDateOrAfter: getDateDaysAgo(90),
 				returnOnlyIsNotApproved: true,
 				returnOnlyIsRelevant: true,
+				limit: 5000,
 			};
 			state.approvedArticlesArray = [];
 			console.log("-----> Finished Super Logout !!!");
