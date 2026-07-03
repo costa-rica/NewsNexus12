@@ -6,6 +6,13 @@ const sequelizeAny = sequelize as any;
 
 type SqlQueryReplacements = Record<string, string | number | boolean | Date>;
 type SqlQueryRow = Record<string, any>;
+type SqlQueryReplacementValue =
+  | string
+  | number
+  | boolean
+  | Date
+  | Array<string | number>;
+type SqlQueryReplacementMap = Record<string, SqlQueryReplacementValue>;
 
 type RequestsFromApiQueryOptions = {
   dateLimitOnRequestMade?: string | Date;
@@ -20,6 +27,58 @@ type ArticlesQueryOptions = {
 type ArticlesOldQueryOptions = {
   publishedDate?: string | Date;
 };
+
+type WithRatingsFilters = {
+  returnOnlyThisCreatedAtDateOrAfter?: string | Date | null;
+  returnOnlyThisPublishedDateOrAfter?: string | Date | null;
+  returnOnlyIsNotApproved?: boolean | null;
+  returnOnlyIsRelevant?: boolean | null;
+};
+
+function buildWithRatingsWhereClause(
+  filters: WithRatingsFilters,
+  cursor?: number | string | null,
+): { clause: string; replacements: SqlQueryReplacementMap } {
+  const replacements: SqlQueryReplacementMap = {};
+  const whereClauses = [];
+
+  if (filters.returnOnlyThisCreatedAtDateOrAfter) {
+    whereClauses.push(`a."createdAt" >= :returnOnlyThisCreatedAtDateOrAfter`);
+    replacements.returnOnlyThisCreatedAtDateOrAfter =
+      filters.returnOnlyThisCreatedAtDateOrAfter;
+  }
+
+  if (filters.returnOnlyThisPublishedDateOrAfter) {
+    whereClauses.push(
+      `a."publishedDate" >= :returnOnlyThisPublishedDateOrAfter`,
+    );
+    replacements.returnOnlyThisPublishedDateOrAfter =
+      filters.returnOnlyThisPublishedDateOrAfter;
+  }
+
+  if (filters.returnOnlyIsNotApproved) {
+    whereClauses.push(
+      `NOT EXISTS (SELECT 1 FROM "ArticleApproveds" aa WHERE aa."articleId" = a.id AND aa."isApproved" = true)`,
+    );
+  }
+
+  if (filters.returnOnlyIsRelevant) {
+    whereClauses.push(
+      `NOT EXISTS (SELECT 1 FROM "ArticleIsRelevants" air WHERE air."articleId" = a.id AND air."isRelevant" IS NOT NULL)`,
+    );
+  }
+
+  if (cursor !== null && cursor !== undefined) {
+    whereClauses.push(`a.id > :cursor`);
+    replacements.cursor = cursor;
+  }
+
+  return {
+    clause:
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "",
+    replacements,
+  };
+}
 
 async function sqlQueryArticlesSummaryStatistics(): Promise<SqlQueryRow[]> {
   // ------ NOTE -----------------------------------
@@ -440,6 +499,52 @@ async function sqlQueryArticlesWithStatesApprovedReportContract(): Promise<
 }
 
 // async function sqlQueryArticlesForWithRatingsRouteNoAi(
+async function sqlQueryArticleIdsForWithRatingsRoute(
+  filters: WithRatingsFilters,
+  cursor: number | string | null,
+  limit: number,
+): Promise<number[]> {
+  const { clause, replacements } = buildWithRatingsWhereClause(
+    filters,
+    cursor,
+  );
+  const sql = `
+    SELECT a.id
+    FROM "Articles" a
+    ${clause}
+    ORDER BY a.id
+    LIMIT :limitPlusOne;
+  `;
+
+  const results = (await sequelizeAny.query(sql, {
+    replacements: {
+      ...replacements,
+      limitPlusOne: limit + 1,
+    },
+    type: QueryTypes.SELECT,
+  })) as Array<{ id: number | string }>;
+
+  return results.map((row) => Number(row.id));
+}
+
+async function sqlQueryCountArticlesForWithRatingsRoute(
+  filters: WithRatingsFilters,
+): Promise<number> {
+  const { clause, replacements } = buildWithRatingsWhereClause(filters);
+  const sql = `
+    SELECT COUNT(*) AS "count"
+    FROM "Articles" a
+    ${clause};
+  `;
+
+  const results = (await sequelizeAny.query(sql, {
+    replacements,
+    type: QueryTypes.SELECT,
+  })) as Array<{ count: number | string }>;
+
+  return Number(results[0]?.count ?? 0);
+}
+
 async function sqlQueryArticlesForWithRatingsRoute(
   returnOnlyThisCreatedAtDateOrAfter?: string | Date | null,
   returnOnlyThisPublishedDateOrAfter?: string | Date | null,
@@ -685,9 +790,10 @@ async function sqlQueryArticlesAndAiScores(
   articlesIdArray: Array<number | string>,
   entityWhoCategorizedArticleId: number | string,
 ): Promise<SqlQueryRow[]> {
-  const whereClause = `WHERE aewcac."articleId" IN (${articlesIdArray.join(
-    ",",
-  )}) AND aewcac."entityWhoCategorizesId" = ${entityWhoCategorizedArticleId}`;
+  if (articlesIdArray.length === 0) {
+    return [];
+  }
+
   const sql = `
     SELECT
 
@@ -700,12 +806,16 @@ async function sqlQueryArticlesAndAiScores(
 
     FROM "ArticleEntityWhoCategorizedArticleContracts" aewcac 
 
-    ${whereClause}
+    WHERE aewcac."articleId" IN (:articleIds)
+      AND aewcac."entityWhoCategorizesId" = :entityWhoCategorizesId
     ORDER BY aewcac.id;
   `;
 
   const rawResults = (await sequelizeAny.query(sql, {
-    // replacements,
+    replacements: {
+      articleIds: articlesIdArray,
+      entityWhoCategorizesId: entityWhoCategorizedArticleId,
+    },
     type: QueryTypes.SELECT,
   })) as SqlQueryRow[];
 
@@ -849,6 +959,9 @@ export {
   sqlQueryArticlesApproved,
   sqlQueryRequestsFromApi,
   sqlQueryArticlesWithStatesApprovedReportContract,
+  buildWithRatingsWhereClause,
+  sqlQueryArticleIdsForWithRatingsRoute,
+  sqlQueryCountArticlesForWithRatingsRoute,
   sqlQueryArticlesForWithRatingsRoute,
   sqlQueryArticlesWithStates,
   sqlQueryArticlesReport,
