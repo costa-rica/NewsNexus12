@@ -45,6 +45,8 @@ jest.mock("../../src/modules/common", () => mockCommonModule);
 const mockQueriesSqlModule = {
   sqlQueryArticles: jest.fn(),
   sqlQueryArticlesWithStatesApprovedReportContract: jest.fn(),
+  sqlQueryArticleIdsForArticlesRoute: jest.fn(),
+  sqlQueryCountArticlesForArticlesRoute: jest.fn(),
   sqlQueryArticleIdsForWithRatingsRoute: jest.fn(),
   sqlQueryCountArticlesForWithRatingsRoute: jest.fn(),
   sqlQueryArticlesForWithRatingsRoute: jest.fn(),
@@ -98,6 +100,12 @@ function buildApp() {
 describe("articles routes contract tests", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      0,
+    );
   });
 
   const buildHydratedArticle = (id: number) => ({
@@ -145,6 +153,12 @@ describe("articles routes contract tests", () => {
   };
 
   test("POST /articles returns grouped article contract fields", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue([
+      10,
+    ]);
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      1,
+    );
     mockQueriesSqlModule.sqlQueryArticles.mockResolvedValue([
       {
         articleId: 10,
@@ -173,6 +187,18 @@ describe("articles routes contract tests", () => {
     const response = await request(app).post("/articles").send({});
 
     expect(response.status).toBe(200);
+    expect(mockQueriesSqlModule.sqlQueryArticles).toHaveBeenCalledWith({
+      articleIds: [10],
+    });
+    expect(mockQueriesSqlModule.sqlQueryArticlesWithStates).toHaveBeenCalledWith(
+      [10],
+    );
+    expect(mockQueriesSqlModule.sqlQueryArticlesIsRelevant).toHaveBeenCalledWith(
+      [10],
+    );
+    expect(mockQueriesSqlModule.sqlQueryArticlesApproved).toHaveBeenCalledWith([
+      10,
+    ]);
     expect(response.body.articlesArray).toHaveLength(1);
     expect(response.body.articlesArray[0]).toMatchObject({
       id: 10,
@@ -184,6 +210,200 @@ describe("articles routes contract tests", () => {
     expect(response.body.articlesArray[0].keyword).toContain("AND injury");
     expect(response.body.articlesArray[0].keyword).toContain("OR recall");
     expect(response.body.articlesArray[0].keyword).toContain("NOT sports");
+    expect(response.body).toMatchObject({
+      articleCount: 1,
+      limit: 20000,
+      nextCursor: null,
+      hasMore: false,
+      totalCount: 1,
+    });
+  });
+
+  test("POST /articles applies default limit", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      0,
+    );
+
+    const app = buildApp();
+    const response = await request(app).post("/articles").send({});
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), null, 20000);
+    expect(response.body.limit).toBe(20000);
+  });
+
+  test("POST /articles clamps limit above max", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      0,
+    );
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles")
+      .send({ limit: 50000 });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), null, 40000);
+    expect(response.body.limit).toBe(40000);
+  });
+
+  test("POST /articles derives hasMore and nextCursor from extra id", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue([
+      10, 11, 12,
+    ]);
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      3,
+    );
+    mockQueriesSqlModule.sqlQueryArticles.mockResolvedValue([
+      {
+        articleId: 10,
+        title: "Article 10",
+        description: "Desc 10",
+        publishedDate: "2026-02-20",
+        url: "https://example.com/a10",
+      },
+      {
+        articleId: 11,
+        title: "Article 11",
+        description: "Desc 11",
+        publishedDate: "2026-02-21",
+        url: "https://example.com/a11",
+      },
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesWithStates.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesIsRelevant.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesApproved.mockResolvedValue([]);
+
+    const app = buildApp();
+    const response = await request(app).post("/articles").send({ limit: 2 });
+
+    expect(response.status).toBe(200);
+    expect(mockQueriesSqlModule.sqlQueryArticles).toHaveBeenCalledWith({
+      articleIds: [10, 11],
+    });
+    expect(mockQueriesSqlModule.sqlQueryArticlesWithStates).toHaveBeenCalledWith(
+      [10, 11],
+    );
+    expect(mockQueriesSqlModule.sqlQueryArticlesIsRelevant).toHaveBeenCalledWith(
+      [10, 11],
+    );
+    expect(mockQueriesSqlModule.sqlQueryArticlesApproved).toHaveBeenCalledWith([
+      10, 11,
+    ]);
+    expect(response.body).toMatchObject({
+      articleCount: 2,
+      limit: 2,
+      nextCursor: 11,
+      hasMore: true,
+      totalCount: 3,
+    });
+  });
+
+  test("POST /articles returns null nextCursor when no more chunks", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue([
+      21, 22,
+    ]);
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      2,
+    );
+    mockQueriesSqlModule.sqlQueryArticles.mockResolvedValue([
+      {
+        articleId: 21,
+        title: "Article 21",
+        description: "Desc 21",
+        publishedDate: "2026-02-20",
+        url: "https://example.com/a21",
+      },
+      {
+        articleId: 22,
+        title: "Article 22",
+        description: "Desc 22",
+        publishedDate: "2026-02-21",
+        url: "https://example.com/a22",
+      },
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesWithStates.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesIsRelevant.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesApproved.mockResolvedValue([]);
+
+    const app = buildApp();
+    const response = await request(app).post("/articles").send({ limit: 3 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      articleCount: 2,
+      hasMore: false,
+      nextCursor: null,
+      totalCount: 2,
+    });
+  });
+
+  test("POST /articles skips totalCount when cursor is supplied", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue([
+      21,
+    ]);
+    mockQueriesSqlModule.sqlQueryArticles.mockResolvedValue([
+      {
+        articleId: 21,
+        title: "Article 21",
+        description: "Desc 21",
+        publishedDate: "2026-02-20",
+        url: "https://example.com/a21",
+      },
+    ]);
+    mockQueriesSqlModule.sqlQueryArticlesWithStates.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesIsRelevant.mockResolvedValue([]);
+    mockQueriesSqlModule.sqlQueryArticlesApproved.mockResolvedValue([]);
+
+    const app = buildApp();
+    const response = await request(app)
+      .post("/articles")
+      .send({ cursor: 11, limit: 2 });
+
+    expect(response.status).toBe(200);
+    expect(
+      mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute,
+    ).toHaveBeenCalledWith(expect.any(Object), 11, 2);
+    expect(
+      mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute,
+    ).not.toHaveBeenCalled();
+    expect(response.body.totalCount).toBeNull();
+  });
+
+  test("POST /articles returns empty chunk without hydration queries", async () => {
+    mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue(
+      [],
+    );
+    mockQueriesSqlModule.sqlQueryCountArticlesForArticlesRoute.mockResolvedValue(
+      0,
+    );
+
+    const app = buildApp();
+    const response = await request(app).post("/articles").send({ limit: 2 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      articlesArray: [],
+      articleCount: 0,
+      limit: 2,
+      nextCursor: null,
+      hasMore: false,
+      totalCount: 0,
+    });
+    expect(mockQueriesSqlModule.sqlQueryArticles).not.toHaveBeenCalled();
+    expect(mockQueriesSqlModule.sqlQueryArticlesWithStates).not.toHaveBeenCalled();
+    expect(mockQueriesSqlModule.sqlQueryArticlesIsRelevant).not.toHaveBeenCalled();
+    expect(mockQueriesSqlModule.sqlQueryArticlesApproved).not.toHaveBeenCalled();
   });
 
   test("GET /articles/approved returns only approved entries with derived fields", async () => {

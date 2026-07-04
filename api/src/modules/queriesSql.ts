@@ -22,6 +22,7 @@ type RequestsFromApiQueryOptions = {
 type ArticlesQueryOptions = {
   publishedDate?: string | Date;
   createdAt?: string | Date;
+  articleIds?: number[];
 };
 
 type ArticlesOldQueryOptions = {
@@ -34,6 +35,8 @@ type WithRatingsFilters = {
   returnOnlyIsNotApproved?: boolean | null;
   returnOnlyIsRelevant?: boolean | null;
 };
+
+type ArticlesListFilters = WithRatingsFilters;
 
 function buildWithRatingsWhereClause(
   filters: WithRatingsFilters,
@@ -65,6 +68,51 @@ function buildWithRatingsWhereClause(
   if (filters.returnOnlyIsRelevant) {
     whereClauses.push(
       `NOT EXISTS (SELECT 1 FROM "ArticleIsRelevants" air WHERE air."articleId" = a.id AND air."isRelevant" IS NOT NULL)`,
+    );
+  }
+
+  if (cursor !== null && cursor !== undefined) {
+    whereClauses.push(`a.id > :cursor`);
+    replacements.cursor = cursor;
+  }
+
+  return {
+    clause:
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "",
+    replacements,
+  };
+}
+
+function buildArticlesListWhereClause(
+  filters: ArticlesListFilters,
+  cursor?: number | string | null,
+): { clause: string; replacements: SqlQueryReplacementMap } {
+  const replacements: SqlQueryReplacementMap = {};
+  const whereClauses = [];
+
+  if (filters.returnOnlyThisCreatedAtDateOrAfter) {
+    whereClauses.push(`a."createdAt" >= :returnOnlyThisCreatedAtDateOrAfter`);
+    replacements.returnOnlyThisCreatedAtDateOrAfter =
+      filters.returnOnlyThisCreatedAtDateOrAfter;
+  }
+
+  if (filters.returnOnlyThisPublishedDateOrAfter) {
+    whereClauses.push(
+      `a."publishedDate" >= :returnOnlyThisPublishedDateOrAfter`,
+    );
+    replacements.returnOnlyThisPublishedDateOrAfter =
+      filters.returnOnlyThisPublishedDateOrAfter;
+  }
+
+  if (filters.returnOnlyIsNotApproved) {
+    whereClauses.push(
+      `NOT EXISTS (SELECT 1 FROM "ArticleApproveds" aa WHERE aa."articleId" = a.id AND aa."isApproved" = true)`,
+    );
+  }
+
+  if (filters.returnOnlyIsRelevant) {
+    whereClauses.push(
+      `NOT EXISTS (SELECT 1 FROM "ArticleIsRelevants" air WHERE air."articleId" = a.id)`,
     );
   }
 
@@ -121,8 +169,16 @@ async function sqlQueryArticlesSummaryStatistics(): Promise<SqlQueryRow[]> {
   return results;
 }
 
-async function sqlQueryArticlesApproved(): Promise<SqlQueryRow[]> {
-  const sql = `
+async function sqlQueryArticlesApproved(
+  articleIds?: number[],
+): Promise<SqlQueryRow[]> {
+  if (articleIds !== undefined && articleIds.length === 0) {
+    return [];
+  }
+
+  const sql =
+    articleIds === undefined
+      ? `
     SELECT
       a.id AS "articleId",
       a.title,
@@ -135,9 +191,25 @@ async function sqlQueryArticlesApproved(): Promise<SqlQueryRow[]> {
     INNER JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
     WHERE aa."isApproved" = true
     ORDER BY a.id;
+  `
+      : `
+    SELECT
+      a.id AS "articleId",
+      a.title,
+      a.description,
+      a."publishedDate",
+      a."createdAt",
+      a.url,
+      aa."userId" AS "approvedByUserId"
+    FROM "Articles" a
+    INNER JOIN "ArticleApproveds" aa ON aa."articleId" = a.id
+    WHERE aa."isApproved" = true
+    AND aa."articleId" IN (:articleIds)
+    ORDER BY a.id;
   `;
 
   const results = (await sequelizeAny.query(sql, {
+    replacements: articleIds !== undefined ? { articleIds } : undefined,
     type: QueryTypes.SELECT,
   })) as SqlQueryRow[];
 
@@ -282,8 +354,13 @@ async function sqlQueryArticlesOld({
 async function sqlQueryArticles({
   publishedDate,
   createdAt,
+  articleIds,
 }: ArticlesQueryOptions): Promise<SqlQueryRow[]> {
-  const replacements: SqlQueryReplacements = {};
+  if (articleIds !== undefined && articleIds.length === 0) {
+    return [];
+  }
+
+  const replacements: SqlQueryReplacementMap = {};
   const whereClauses = [];
 
   if (publishedDate) {
@@ -294,6 +371,11 @@ async function sqlQueryArticles({
   if (createdAt) {
     whereClauses.push(`a."createdAt" >= :createdAt`);
     replacements.createdAt = createdAt;
+  }
+
+  if (articleIds !== undefined) {
+    whereClauses.push(`a.id IN (:articleIds)`);
+    replacements.articleIds = articleIds;
   }
 
   const whereString =
@@ -324,8 +406,16 @@ async function sqlQueryArticles({
   return results;
 }
 
-async function sqlQueryArticlesWithStates(): Promise<SqlQueryRow[]> {
-  const sql = `
+async function sqlQueryArticlesWithStates(
+  articleIds?: number[],
+): Promise<SqlQueryRow[]> {
+  if (articleIds !== undefined && articleIds.length === 0) {
+    return [];
+  }
+
+  const sql =
+    articleIds === undefined
+      ? `
       SELECT
         a.id AS "articleId",
         a.title,
@@ -339,9 +429,26 @@ async function sqlQueryArticlesWithStates(): Promise<SqlQueryRow[]> {
       INNER JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
       LEFT JOIN "States" s ON asct."stateId" = s.id
       ORDER BY a.id;
+    `
+      : `
+      SELECT
+        a.id AS "articleId",
+        a.title,
+        a.description,
+        a."publishedDate",
+        a.url,
+        s.id AS "stateId",
+        s.name AS "stateName",
+        s.abbreviation
+      FROM "Articles" a
+      INNER JOIN "ArticleStateContracts" asct ON a.id = asct."articleId"
+      LEFT JOIN "States" s ON asct."stateId" = s.id
+      WHERE a.id IN (:articleIds)
+      ORDER BY a.id;
     `;
 
   const results = (await sequelizeAny.query(sql, {
+    replacements: articleIds !== undefined ? { articleIds } : undefined,
     type: QueryTypes.SELECT,
   })) as SqlQueryRow[];
 
@@ -531,6 +638,52 @@ async function sqlQueryCountArticlesForWithRatingsRoute(
   filters: WithRatingsFilters,
 ): Promise<number> {
   const { clause, replacements } = buildWithRatingsWhereClause(filters);
+  const sql = `
+    SELECT COUNT(*) AS "count"
+    FROM "Articles" a
+    ${clause};
+  `;
+
+  const results = (await sequelizeAny.query(sql, {
+    replacements,
+    type: QueryTypes.SELECT,
+  })) as Array<{ count: number | string }>;
+
+  return Number(results[0]?.count ?? 0);
+}
+
+async function sqlQueryArticleIdsForArticlesRoute(
+  filters: ArticlesListFilters,
+  cursor: number | string | null,
+  limit: number,
+): Promise<number[]> {
+  const { clause, replacements } = buildArticlesListWhereClause(
+    filters,
+    cursor,
+  );
+  const sql = `
+    SELECT a.id
+    FROM "Articles" a
+    ${clause}
+    ORDER BY a.id
+    LIMIT :limitPlusOne;
+  `;
+
+  const results = (await sequelizeAny.query(sql, {
+    replacements: {
+      ...replacements,
+      limitPlusOne: limit + 1,
+    },
+    type: QueryTypes.SELECT,
+  })) as Array<{ id: number | string }>;
+
+  return results.map((row) => Number(row.id));
+}
+
+async function sqlQueryCountArticlesForArticlesRoute(
+  filters: ArticlesListFilters,
+): Promise<number> {
+  const { clause, replacements } = buildArticlesListWhereClause(filters);
   const sql = `
     SELECT COUNT(*) AS "count"
     FROM "Articles" a
@@ -838,8 +991,16 @@ async function sqlQueryArticlesReport(): Promise<SqlQueryRow[]> {
   return flatResults;
 }
 
-async function sqlQueryArticlesIsRelevant(): Promise<SqlQueryRow[]> {
-  const sql = `
+async function sqlQueryArticlesIsRelevant(
+  articleIds?: number[],
+): Promise<SqlQueryRow[]> {
+  if (articleIds !== undefined && articleIds.length === 0) {
+    return [];
+  }
+
+  const sql =
+    articleIds === undefined
+      ? `
     SELECT
       a.id AS "articleId",
       a.title,
@@ -851,9 +1012,24 @@ async function sqlQueryArticlesIsRelevant(): Promise<SqlQueryRow[]> {
     FROM "Articles" a
     INNER JOIN "ArticleIsRelevants" ar ON ar."articleId" = a.id
     ORDER BY a.id;
+  `
+      : `
+    SELECT
+      a.id AS "articleId",
+      a.title,
+      a.description,
+      a."publishedDate",
+      a.url,
+      a."createdAt",
+      ar."isRelevant"
+    FROM "Articles" a
+    INNER JOIN "ArticleIsRelevants" ar ON ar."articleId" = a.id
+    WHERE a.id IN (:articleIds)
+    ORDER BY a.id;
   `;
 
   const flatResults = (await sequelizeAny.query(sql, {
+    replacements: articleIds !== undefined ? { articleIds } : undefined,
     type: QueryTypes.SELECT,
   })) as SqlQueryRow[];
 
@@ -944,8 +1120,11 @@ export {
   sqlQueryRequestsFromApi,
   sqlQueryArticlesWithStatesApprovedReportContract,
   buildWithRatingsWhereClause,
+  buildArticlesListWhereClause,
   sqlQueryArticleIdsForWithRatingsRoute,
   sqlQueryCountArticlesForWithRatingsRoute,
+  sqlQueryArticleIdsForArticlesRoute,
+  sqlQueryCountArticlesForArticlesRoute,
   sqlQueryArticlesForWithRatingsRoute,
   sqlQueryArticlesWithStates,
   sqlQueryArticlesReport,

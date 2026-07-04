@@ -1,20 +1,25 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import {
 	updateStateArray,
+	toggleHideApproved,
+	toggleHideIrrelevant,
 	toggleShowSummaryStatistics,
 	toggleShowRecentlyApprovedByUser,
+	updateArticleTableBodyParams,
 } from "@/store/features/user/userSlice";
 import { SummaryStatistics } from "@/components/common/SummaryStatistics";
 import { RecentlyApprovedByUser } from "@/components/common/RecentlyApprovedByUser";
 import TableReviewArticles from "@/components/tables/TableReviewArticles";
 import MultiSelect from "@/components/form/MultiSelect";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
 import { ModalInformationYesOrNo } from "@/components/ui/modal/ModalInformationYesOrNo";
 import { LoadingDots } from "@/components/common/LoadingDots";
-import type { Article } from "@/types/article";
+import type { Article, ArticleWithRatingsResponse } from "@/types/article";
 
 interface State {
 	id: number;
@@ -30,6 +35,15 @@ interface NewArticle {
 	content?: string;
 	States?: State[];
 }
+
+const ARTICLE_LIMIT_OPTIONS = [
+	{ value: "1000", label: "1,000" },
+	{ value: "5000", label: "5,000" },
+	{ value: "10000", label: "10,000" },
+	{ value: "20000", label: "20,000" },
+	{ value: "30000", label: "30,000" },
+	{ value: "40000", label: "40,000" },
+];
 
 export default function AddDeleteArticle() {
 	const dispatch = useAppDispatch();
@@ -50,6 +64,13 @@ export default function AddDeleteArticle() {
 		content: false,
 	});
 	const [loadingTable, setLoadingTable] = useState(false);
+	const [chunkStartCursors, setChunkStartCursors] = useState<(number | null)[]>([
+		null,
+	]);
+	const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+	const [nextCursor, setNextCursor] = useState<number | null>(null);
+	const [totalCount, setTotalCount] = useState<number | null>(null);
+	const [hasMore, setHasMore] = useState(false);
 	const [alertModal, setAlertModal] = useState<{
 		show: boolean;
 		variant: "success" | "error" | "warning";
@@ -61,6 +82,43 @@ export default function AddDeleteArticle() {
 		title: "",
 		message: "",
 	});
+
+	const [initialFilters, setInitialFilters] = useState({
+		returnOnlyThisPublishedDateOrAfter:
+			articleTableBodyParams?.returnOnlyThisPublishedDateOrAfter ?? null,
+		returnOnlyThisCreatedAtDateOrAfter:
+			articleTableBodyParams?.returnOnlyThisCreatedAtDateOrAfter ?? null,
+		returnOnlyIsNotApproved:
+			articleTableBodyParams?.returnOnlyIsNotApproved ?? true,
+		returnOnlyIsRelevant: articleTableBodyParams?.returnOnlyIsRelevant ?? true,
+		limit: articleTableBodyParams?.limit ?? 20000,
+	});
+	const articleLimit = articleTableBodyParams?.limit ?? 20000;
+	const totalChunks =
+		totalCount === null ? null : Math.ceil(totalCount / articleLimit);
+	const chunkLabel =
+		totalChunks === null
+			? null
+			: totalChunks === 0
+			? "Chunk 0 of 0"
+			: `Chunk ${currentChunkIndex + 1} of ${totalChunks}`;
+
+	const hasFilterChanges = useMemo(() => {
+		if (!articleTableBodyParams) {
+			return false;
+		}
+		return (
+			articleTableBodyParams.returnOnlyThisPublishedDateOrAfter !==
+				initialFilters.returnOnlyThisPublishedDateOrAfter ||
+			articleTableBodyParams.returnOnlyThisCreatedAtDateOrAfter !==
+				initialFilters.returnOnlyThisCreatedAtDateOrAfter ||
+			articleTableBodyParams.returnOnlyIsNotApproved !==
+				initialFilters.returnOnlyIsNotApproved ||
+			articleTableBodyParams.returnOnlyIsRelevant !==
+				initialFilters.returnOnlyIsRelevant ||
+			(articleTableBodyParams.limit ?? 20000) !== initialFilters.limit
+		);
+	}, [articleTableBodyParams, initialFilters]);
 
 	const updateStateArrayWithArticleState = useCallback((article: { States?: State[] }) => {
 		if (!article?.States) {
@@ -82,11 +140,19 @@ export default function AddDeleteArticle() {
 		dispatch(updateStateArray(tempStatesArray));
 	}, [dispatch, stateArray]);
 
-	const fetchArticlesArray = useCallback(async () => {
-		if (!token) return;
+	const fetchArticlesArray = useCallback(async (cursor: number | null = null) => {
+		if (!token) return false;
 
 		try {
 			setLoadingTable(true);
+			const bodyParams = {
+				...(articleTableBodyParams ?? {
+					returnOnlyIsNotApproved: true,
+					returnOnlyIsRelevant: true,
+				}),
+				limit: articleTableBodyParams?.limit ?? 20000,
+				cursor,
+			};
 			const response = await fetch(
 				`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles`,
 				{
@@ -95,7 +161,7 @@ export default function AddDeleteArticle() {
 						"Content-Type": "application/json",
 					},
 					method: "POST",
-					body: JSON.stringify(articleTableBodyParams),
+					body: JSON.stringify(bodyParams),
 				}
 			);
 
@@ -104,16 +170,26 @@ export default function AddDeleteArticle() {
 				throw new Error(`Server Error: ${errorText}`);
 			}
 
-			const result = await response.json();
+			const result = (await response.json()) as ArticleWithRatingsResponse;
+
+			setHasMore(result.hasMore);
+			setNextCursor(result.nextCursor);
+			if (result.totalCount !== null) {
+				setTotalCount(result.totalCount);
+			}
 
 			if (result.articlesArray && Array.isArray(result.articlesArray)) {
 				setArticlesArray(result.articlesArray);
 			} else {
 				setArticlesArray([]);
 			}
+			return true;
 		} catch (error) {
 			console.error("Error fetching data:", error);
 			setArticlesArray([]);
+			setNextCursor(null);
+			setHasMore(false);
+			return false;
 		} finally {
 			setLoadingTable(false);
 		}
@@ -123,8 +199,8 @@ export default function AddDeleteArticle() {
 		// eslint-disable-next-line react-hooks/set-state-in-effect -- client-side auth mount fetch; pending SWR migration
 		fetchArticlesArray();
 		updateStateArrayWithArticleState({ States: [] });
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [fetchArticlesArray]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const handleAddAndSubmitArticle = async () => {
 		if (!token) return;
@@ -381,6 +457,51 @@ export default function AddDeleteArticle() {
 		}
 	};
 
+	const handleNextChunk = async () => {
+		if (!hasMore || nextCursor === null || loadingTable) return;
+
+		const cursorForNext = nextCursor;
+		const fetched = await fetchArticlesArray(cursorForNext);
+		if (!fetched) return;
+
+		setChunkStartCursors((prev) => {
+			const currentStack = prev.slice(0, currentChunkIndex + 1);
+			return [...currentStack, cursorForNext];
+		});
+		setCurrentChunkIndex((prev) => prev + 1);
+	};
+
+	const handlePreviousChunk = async () => {
+		if (currentChunkIndex <= 0 || loadingTable) return;
+
+		const previousCursor = chunkStartCursors[currentChunkIndex - 1] ?? null;
+		const fetched = await fetchArticlesArray(previousCursor);
+		if (!fetched) return;
+
+		setChunkStartCursors((prev) => prev.slice(0, currentChunkIndex));
+		setCurrentChunkIndex((prev) => Math.max(prev - 1, 0));
+	};
+
+	const handleRefreshWithFilters = () => {
+		if (!articleTableBodyParams) return;
+
+		setInitialFilters({
+			returnOnlyThisPublishedDateOrAfter:
+				articleTableBodyParams.returnOnlyThisPublishedDateOrAfter,
+			returnOnlyThisCreatedAtDateOrAfter:
+				articleTableBodyParams.returnOnlyThisCreatedAtDateOrAfter,
+			returnOnlyIsNotApproved: articleTableBodyParams.returnOnlyIsNotApproved,
+			returnOnlyIsRelevant: articleTableBodyParams.returnOnlyIsRelevant,
+			limit: articleTableBodyParams.limit ?? 20000,
+		});
+		setChunkStartCursors([null]);
+		setCurrentChunkIndex(0);
+		setNextCursor(null);
+		setHasMore(false);
+		setTotalCount(null);
+		fetchArticlesArray(null);
+	};
+
 	return (
 		<div className="flex flex-col gap-4 md:gap-6">
 			<h1 className="text-title-xl text-gray-700 dark:text-gray-300">
@@ -603,6 +724,165 @@ export default function AddDeleteArticle() {
 								Submit
 							</button>
 						)}
+					</div>
+				</div>
+			</div>
+
+			{/* Filter Controls */}
+			<div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+				<h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
+					Filter Articles
+				</h3>
+				<div className="flex flex-col gap-4">
+					{/* Date Filters */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						{/* Database Date Limit */}
+						<div className="relative group">
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Database Date Limit
+								<span className="ml-1 text-xs text-gray-500 dark:text-gray-500 cursor-help">
+									ⓘ
+								</span>
+							</label>
+							<span className="invisible group-hover:visible absolute left-0 top-full mt-1 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg z-10 max-w-xs whitespace-normal">
+								Limits downloading articles added to the Nexus News Database
+								before this date
+							</span>
+							<Input
+								type="date"
+								value={
+									articleTableBodyParams?.returnOnlyThisCreatedAtDateOrAfter ||
+									""
+								}
+								onChange={(e) =>
+									dispatch(
+										updateArticleTableBodyParams({
+											returnOnlyThisCreatedAtDateOrAfter:
+												e.target.value || null,
+										})
+									)
+								}
+							/>
+						</div>
+
+						{/* Published Date Limit */}
+						<div className="relative group">
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Published Date Limit
+								<span className="ml-1 text-xs text-gray-500 dark:text-gray-500 cursor-help">
+									ⓘ
+								</span>
+							</label>
+							<span className="invisible group-hover:visible absolute left-0 top-full mt-1 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg z-10 max-w-xs whitespace-normal">
+								Limits downloading articles published before this date
+							</span>
+							<Input
+								type="date"
+								value={
+									articleTableBodyParams
+										?.returnOnlyThisPublishedDateOrAfter || ""
+								}
+								onChange={(e) =>
+									dispatch(
+										updateArticleTableBodyParams({
+											returnOnlyThisPublishedDateOrAfter:
+												e.target.value || null,
+										})
+									)
+								}
+							/>
+						</div>
+
+						{/* Article Limit */}
+						<div>
+							<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+								Load Limit
+							</label>
+							<Select
+								options={ARTICLE_LIMIT_OPTIONS}
+								value={String(articleLimit)}
+								onChange={(value) =>
+									dispatch(
+										updateArticleTableBodyParams({
+											limit: Number(value),
+										})
+									)
+								}
+							/>
+						</div>
+					</div>
+
+					{/* Toggle Buttons and Refresh */}
+					<div className="flex flex-wrap items-center gap-3">
+						{/* Hide Approved Button */}
+						<button
+							onClick={() => dispatch(toggleHideApproved())}
+							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+								articleTableBodyParams?.returnOnlyIsNotApproved
+									? "bg-brand-500 text-white hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700"
+									: "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							}`}
+						>
+							{articleTableBodyParams?.returnOnlyIsNotApproved
+								? "Show Approved"
+								: "Hide Approved"}
+						</button>
+
+						{/* Hide Irrelevant Button */}
+						<button
+							onClick={() => dispatch(toggleHideIrrelevant())}
+							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+								articleTableBodyParams?.returnOnlyIsRelevant
+									? "bg-brand-500 text-white hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700"
+									: "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							}`}
+						>
+							{articleTableBodyParams?.returnOnlyIsRelevant
+								? "Show Irrelevant"
+								: "Hide Irrelevant"}
+						</button>
+
+						{/* Refresh Button - lights up when filters change */}
+						<button
+							onClick={handleRefreshWithFilters}
+							disabled={!hasFilterChanges}
+							className={`ml-auto px-6 py-2 text-sm font-medium rounded-lg transition-all ${
+								hasFilterChanges
+									? "bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 shadow-lg"
+									: "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500"
+							}`}
+						>
+							{hasFilterChanges ? "Refresh with New Filters" : "No Changes"}
+						</button>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+						<span>
+							{totalCount === null
+								? "Article count pending"
+								: `${totalCount.toLocaleString()} articles match the current filters`}
+						</span>
+						{chunkLabel && (
+							<span className="rounded-lg bg-gray-100 px-3 py-2 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+								{chunkLabel}
+							</span>
+						)}
+						<div className="ml-auto flex items-center gap-2">
+							<button
+								onClick={handlePreviousChunk}
+								disabled={currentChunkIndex === 0 || loadingTable}
+								className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 transition-all hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							>
+								Prev
+							</button>
+							<button
+								onClick={handleNextChunk}
+								disabled={!hasMore || nextCursor === null || loadingTable}
+								className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 transition-all hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+							>
+								Next
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>

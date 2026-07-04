@@ -1,5 +1,7 @@
 const WITH_RATINGS_DEFAULT_LIMIT = 20000;
 const WITH_RATINGS_MAX_LIMIT = 40000;
+const ARTICLES_LIST_DEFAULT_LIMIT = 20000;
+const ARTICLES_LIST_MAX_LIMIT = 40000;
 
 function clampLimit(
   requested: unknown,
@@ -18,4 +20,10 @@ function clampLimit(
   return Math.min(Math.floor(requestedNumber), maxLimit);
 }
 
-export { WITH_RATINGS_DEFAULT_LIMIT, WITH_RATINGS_MAX_LIMIT, clampLimit };
+export {
+  WITH_RATINGS_DEFAULT_LIMIT,
+  WITH_RATINGS_MAX_LIMIT,
+  ARTICLES_LIST_DEFAULT_LIMIT,
+  ARTICLES_LIST_MAX_LIMIT,
+  clampLimit,
+};

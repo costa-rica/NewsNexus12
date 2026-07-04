@@ -29,6 +29,8 @@ const { getLastThursdayAt20hInNyTimeZone } = require("../modules/common");
 const {
   sqlQueryArticles,
   sqlQueryArticlesWithStatesApprovedReportContract,
+  sqlQueryArticleIdsForArticlesRoute,
+  sqlQueryCountArticlesForArticlesRoute,
   sqlQueryArticleIdsForWithRatingsRoute,
   sqlQueryCountArticlesForWithRatingsRoute,
   sqlQueryArticlesForWithRatingsRoute,
@@ -41,6 +43,8 @@ const {
 } = require("../modules/queriesSql");
 import logger from "../modules/logger";
 import {
+  ARTICLES_LIST_DEFAULT_LIMIT,
+  ARTICLES_LIST_MAX_LIMIT,
   WITH_RATINGS_DEFAULT_LIMIT,
   WITH_RATINGS_MAX_LIMIT,
   clampLimit,
@@ -59,21 +63,64 @@ function parseNumericId(value: string): number | null {
 // 🔹 POST /articles: filtered list of articles
 router.post("/", authenticateToken, async (req: Request, res: Response) => {
   logger.info("- POST /articles");
+  const startTime = Date.now();
 
   const {
     returnOnlyThisPublishedDateOrAfter,
     returnOnlyThisCreatedAtDateOrAfter,
     returnOnlyIsNotApproved,
     returnOnlyIsRelevant,
+    limit,
+    cursor,
   } = req.body;
 
   logger.info("req.body:");
   logger.info(JSON.stringify(req.body, null, 2));
 
-  // const articlesArray = await sqlQueryArticlesOld({
+  const effectiveLimit = clampLimit(
+    limit,
+    ARTICLES_LIST_DEFAULT_LIMIT,
+    ARTICLES_LIST_MAX_LIMIT,
+  );
+  const filters = {
+    returnOnlyThisPublishedDateOrAfter,
+    returnOnlyThisCreatedAtDateOrAfter,
+    returnOnlyIsNotApproved,
+    returnOnlyIsRelevant,
+  };
+  const cursorValue = cursor ?? null;
+  const idsWithExtraRow = await sqlQueryArticleIdsForArticlesRoute(
+    filters,
+    cursorValue,
+    effectiveLimit,
+  );
+  const hasMore = idsWithExtraRow.length > effectiveLimit;
+  const trimmedArticleIds = idsWithExtraRow.slice(0, effectiveLimit);
+  const nextCursor =
+    hasMore && trimmedArticleIds.length > 0
+      ? trimmedArticleIds[trimmedArticleIds.length - 1]
+      : null;
+  const totalCount =
+    cursorValue === null
+      ? await sqlQueryCountArticlesForArticlesRoute(filters)
+      : null;
+
+  if (trimmedArticleIds.length === 0) {
+    const timeToRenderResponseFromApiInSeconds =
+      (Date.now() - startTime) / 1000;
+    return res.json({
+      articlesArray: [],
+      articleCount: 0,
+      limit: effectiveLimit,
+      nextCursor: null,
+      hasMore: false,
+      totalCount,
+      timeToRenderResponseFromApiInSeconds,
+    });
+  }
+
   const articlesArray = await sqlQueryArticles({
-    publishedDate: returnOnlyThisPublishedDateOrAfter,
-    createdAt: returnOnlyThisCreatedAtDateOrAfter,
+    articleIds: trimmedArticleIds,
   });
 
   logger.info(
@@ -82,7 +129,8 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
   );
 
   // Create Article - State Map for modifing the articlesArray
-  const articlesArrayWithStates = await sqlQueryArticlesWithStates();
+  const articlesArrayWithStates =
+    await sqlQueryArticlesWithStates(trimmedArticleIds);
   const statesByArticleId = new Map();
   for (const entry of articlesArrayWithStates) {
     if (!statesByArticleId.has(entry.articleId)) {
@@ -96,7 +144,8 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
   }
 
   // Create ARticle - Relevants Map for modifying the articleArray
-  const articlesArrayWithRelevants = await sqlQueryArticlesIsRelevant();
+  const articlesArrayWithRelevants =
+    await sqlQueryArticlesIsRelevant(trimmedArticleIds);
   const isRelevantByArticleId = new Map();
   for (const entry of articlesArrayWithRelevants) {
     if (!isRelevantByArticleId.has(entry.articleId)) {
@@ -108,7 +157,8 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
   }
 
   // Create Article - Approved Map for modifying the articlesArray
-  const articlesArrayWithApproveds = await sqlQueryArticlesApproved();
+  const articlesArrayWithApproveds =
+    await sqlQueryArticlesApproved(trimmedArticleIds);
   const approvedByUserIdByArticleId = new Map();
   for (const entry of articlesArrayWithApproveds) {
     if (!approvedByUserIdByArticleId.has(entry.articleId)) {
@@ -190,21 +240,20 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
     }
   }
 
-  let articlesArrayGrouped = Array.from(articlesMap.values());
+  const articlesArrayGrouped = Array.from(articlesMap.values());
 
-  if (returnOnlyIsNotApproved) {
-    articlesArrayGrouped = articlesArrayGrouped.filter((article: any) => {
-      return !article.articleIsApproved;
-    });
-  }
+  const timeToRenderResponseFromApiInSeconds =
+    (Date.now() - startTime) / 1000;
 
-  if (returnOnlyIsRelevant) {
-    articlesArrayGrouped = articlesArrayGrouped.filter((article: any) => {
-      return article.ArticleIsRelevant;
-    });
-  }
-
-  res.json({ articlesArray: articlesArrayGrouped });
+  res.json({
+    articlesArray: articlesArrayGrouped,
+    articleCount: articlesArrayGrouped.length,
+    limit: effectiveLimit,
+    nextCursor,
+    hasMore,
+    totalCount,
+    timeToRenderResponseFromApiInSeconds,
+  });
 });
 
 // 🔹 GET /articles/approved
