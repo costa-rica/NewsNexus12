@@ -1,5 +1,14 @@
 # Scripts
 
+## AI approver review legend counts
+
+1. Run:
+   ```bash
+   node scripts/ai-approver-review-legend-counts.mjs
+   ```
+2. The script reads Postgres settings from env or common `.env` files, counts `Articles` by AI Approver review legend bucket, prints the buckets in the terminal, and writes `scripts/output/ai_approver_review_legend_counts.csv`.
+3. Optional: add `--scope review-defaults` to approximate the review page default filters.
+
 ## Testing
 
 1. Install and reload the test service:

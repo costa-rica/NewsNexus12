@@ -30,6 +30,7 @@ dist/
 build/
 .next/
 *.tsbuildinfo
+scripts/output/
 
 # Logs
 _logs/
