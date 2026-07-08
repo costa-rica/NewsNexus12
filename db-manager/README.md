@@ -7,6 +7,7 @@ Database management CLI tool for NewsNexus12 monorepo. Provides operations for d
 - **Database Status** - Query article counts, approval status, relevance ratings, and age metrics
 - **Article Deletion** - Remove stale articles older than a configurable threshold (protects approved/relevant articles)
 - **Article Trim** - Delete N oldest eligible articles by published date
+- **No-State Article Deletion** - Preview or delete articles whose latest AI state assignment resolves to `No state`
 - **Database Backup** - Create compressed ZIP files containing CSV exports of all database tables
 - **Zip Import** - Full replenish: drop and rebuild schema, load CSVs in topological order, reset sequences
 - **Drop DB** - Wipe all data and rebuild an empty schema (Postgres equivalent of deleting the SQLite file)
@@ -46,9 +47,12 @@ npm start -- --dry_run --zip_file /path/to.zip   # Validate ZIP against scratch 
 npm start -- --delete_articles                   # Delete unapproved articles >180 days old
 npm start -- --delete_articles 90                # Delete unapproved articles >90 days old
 npm start -- --delete_articles_trim 100          # Delete 100 oldest eligible articles
+npm start -- --delete_articles_no_state --dry_run # Preview No state AI-assigned article deletion
+npm start -- --delete_articles_no_state 100       # Delete 100 eligible No state AI-assigned articles
+npm start -- --delete_articles_no_state           # Delete all eligible No state AI-assigned articles
 ```
 
-Flags can be combined (except `--dry_run` and `--drop_db`, which exit after completing). Execution order: backup, import, trim, delete, then status.
+Flags can be combined (except `--dry_run` and `--drop_db`, which exit after completing). Execution order: backup, import, trim, delete, no-state delete, then status.
 
 ## CLI Flags
 
@@ -57,9 +61,10 @@ Flags can be combined (except `--dry_run` and `--drop_db`, which exit after comp
 | `--create_backup` | None | Create a ZIP backup of all database tables |
 | `--zip_file` | Path | Full replenish: drop schema, import ZIP, reset sequences |
 | `--drop_db` | None | Wipe all data and rebuild empty schema |
-| `--dry_run` | None (requires `--zip_file`) | Validate a ZIP against a scratch DB without touching live data |
+| `--dry_run` | None (requires `--zip_file` or `--delete_articles_no_state`) | Validate a ZIP against a scratch DB, or preview no-state deletion |
 | `--delete_articles` | Days (optional) | Delete articles older than N days (default: 180) |
 | `--delete_articles_trim` | Count | Delete N oldest eligible articles |
+| `--delete_articles_no_state` | Count (optional) | Delete articles whose latest AI state assignment resolves to `No state` |
 
 ## Development
 
@@ -102,7 +107,7 @@ npm run clean
 ```
 db-manager/
 ├── src/
-│   ├── index.ts                 # Main entry point (IIFE orchestration)
+│   ├── index.ts                 # Main entry point and runDbManager orchestration
 │   ├── lib.ts                   # Library entry point (importable by other packages)
 │   ├── config/
 │   │   └── logger.ts            # Winston logger configuration
@@ -110,6 +115,7 @@ db-manager/
 │   │   ├── cli.ts               # CLI argument parser with Levenshtein suggestions
 │   │   ├── status.ts            # Database status reporting
 │   │   ├── deleteArticles.ts    # Article deletion operations (batch processing)
+│   │   ├── deleteArticlesNoState.ts # Preview/delete No state AI-assigned articles
 │   │   ├── backup.ts            # Database backup to ZIP/CSV
 │   │   ├── zipImport.ts         # ZIP import: schema rebuild, topological load, sequence reset
 │   │   └── dryRunValidator.ts   # Dry-run validation against a scratch Postgres database
@@ -126,6 +132,8 @@ db-manager/
 │       ├── logger.test.ts       # Logger configuration tests
 │       ├── status.test.ts       # Status module tests (mocked DB)
 │       ├── deleteArticles.test.ts  # Deletion logic tests (mocked DB)
+│       ├── deleteArticlesNoState.test.ts # No-state deletion tests (mocked DB)
+│       ├── indexRouting.test.ts # CLI routing tests (mocked modules)
 │       ├── backup.test.ts       # Backup module tests (mocked DB + real FS)
 │       └── zipImport.test.ts    # Import module tests (real ZIPs + mocked DB)
 ├── package.json

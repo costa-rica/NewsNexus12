@@ -35,6 +35,7 @@ npm start -- --delete_articles 90                # Delete unapproved articles >9
 npm start -- --delete_articles_trim 100          # Delete 100 oldest eligible articles
 npm start -- --delete_articles_no_state --dry_run # Preview deletion of No state AI-assigned articles
 npm start -- --delete_articles_no_state 100       # Delete 100 eligible No state AI-assigned articles
+npm start -- --delete_articles_no_state           # Delete all eligible No state AI-assigned articles
 ```
 
 Flags can be combined. Execution order is always: backup, import, trim, delete, no-state delete, then status.
