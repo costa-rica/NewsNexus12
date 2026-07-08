@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this package.
 
 ## Project Overview
 
-db-manager is a TypeScript CLI tool for managing the NewsNexus12 SQLite database. It handles article cleanup, database backups, and ZIP-based import/restore. It is part of the NewsNexus12 monorepo and depends on `@newsnexus/db-models` (local `file:../db-models` dependency).
+db-manager is a TypeScript CLI tool for managing the NewsNexus12 Postgres database. It handles article cleanup, database backups, ZIP-based import/restore, schema reset, and dry-run import validation. It is part of the NewsNexus12 monorepo and depends on `@newsnexus/db-models` (local `file:../db-models` dependency).
 
 ## Development Commands
 
@@ -62,7 +62,8 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 | **cli**            | `src/modules/cli.ts`            | CLI argument parser with Levenshtein distance typo suggestions           |
 | **deleteArticles** | `src/modules/deleteArticles.ts` | Article deletion (batch size: 5000). Protects approved/relevant articles |
 | **backup**         | `src/modules/backup.ts`         | ZIP/CSV backup creation (compression level 9)                            |
-| **zipImport**      | `src/modules/zipImport.ts`      | ZIP import with date sanitization (invalid dates become NULL)            |
+| **zipImport**      | `src/modules/zipImport.ts`      | ZIP import: schema rebuild, topological load, sequence reset             |
+| **dryRunValidator** | `src/modules/dryRunValidator.ts` | Dry-run validation against a scratch Postgres database                 |
 | **status**         | `src/modules/status.ts`         | Database status reporting                                                |
 | **logger**         | `src/config/logger.ts`          | Winston logger configuration                                             |
 
@@ -71,8 +72,12 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 - **Article protection:** Articles in `ArticleApproved` or `ArticleIsRelevant` tables are never deleted.
 - **Batch processing:** Deletions run in batches of 5000 with progress logging.
 - **Default delete threshold:** 180 days.
-- **Foreign keys:** Disabled during ZIP import, re-enabled in a `finally` block.
+- **Topological import:** ZIP import loads tables in `MODEL_LOAD_ORDER` so foreign key constraints are satisfied without disabling them; orphaned rows (legacy SQLite data) are skipped with warnings.
 - **Date sanitization:** Invalid dates in imported CSVs are normalized to NULL with warnings.
+- **Boolean coercion:** SQLite-style `"0"`/`"1"` boolean values are converted to Postgres booleans on import.
+- **Sequence reset:** After import, all serial `id` sequences are reset to `MAX(id)` so new inserts do not collide.
+- **Schema rebuild:** `--zip_file` and `--drop_db` both use `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public` + `sequelize.sync()` to guarantee a clean state, then re-grant `PG_APP_ROLE` if configured.
+- **Dry-run isolation:** `--dry_run` spawns a child process with `PG_DATABASE` overridden to a scratch DB name (`newsnexus_dry_run_<timestamp>`), so the parent process connection is never used for destructive operations. The scratch DB is dropped even if the import fails.
 
 ## Logging
 
@@ -95,21 +100,26 @@ tail -f /home/limited_user/logs/NewsNexus12DbManager.log
 
 Configured via `.env` in the package root. See `.env.example` for the template.
 
-| Variable          | Required | Default | Purpose                                                |
-| ----------------- | -------- | ------- | ------------------------------------------------------ |
-| `NODE_ENV`        | Yes      | --      | `development`, `testing`, or `production`              |
-| `NAME_APP`        | Yes      | --      | App name (used in log filename)                        |
-| `PATH_TO_LOGS`    | Yes      | --      | Absolute path to logs directory                        |
-| `LOG_MAX_SIZE`    | No       | 5       | Max log file size in MB                                |
-| `LOG_MAX_FILES`   | No       | 5       | Max rotated log files                                  |
-| `PATH_DATABASE`   | Yes      | --      | Absolute path to database directory                    |
-| `NAME_DB`         | Yes      | --      | Database filename                                      |
-| `PATH_DB_BACKUPS` | Yes\*    | --      | Backup output directory (\*only for `--create_backup`) |
+| Variable          | Required | Default  | Purpose                                                |
+| ----------------- | -------- | -------- | ------------------------------------------------------ |
+| `NODE_ENV`        | Yes      | --       | `development`, `testing`, or `production`              |
+| `NAME_APP`        | Yes      | --       | App name (used in log filename)                        |
+| `PATH_TO_LOGS`    | Yes      | --       | Absolute path to logs directory                        |
+| `LOG_MAX_SIZE`    | No       | 5        | Max log file size in MB                                |
+| `LOG_MAX_FILES`   | No       | 5        | Max rotated log files                                  |
+| `PG_HOST`         | Yes      | --       | Postgres host                                          |
+| `PG_PORT`         | Yes      | --       | Postgres port                                          |
+| `PG_DATABASE`     | Yes      | --       | Postgres database name                                 |
+| `PG_USER`         | Yes      | --       | Postgres user                                          |
+| `PG_PASSWORD`     | Yes      | --       | Postgres password                                      |
+| `PG_SCHEMA`       | No       | `public` | Postgres schema                                        |
+| `PG_APP_ROLE`     | No       | --       | App role re-granted access after schema rebuild        |
+| `PATH_DB_BACKUPS` | Yes\*    | --       | Backup output directory (\*only for `--create_backup`) |
 
 ## Database
 
 - **Type:** Postgres via Sequelize 6
-- `PS_` prefixed variables — Postgres database location (used by api and db-models)
+- `PG_` prefixed variables — Postgres database location (used by api and db-models)
 - **Models:** Imported from `@newsnexus/db-models`. Key tables: `Article`, `ArticleApproved`, `ArticleIsRelevant`
 - Models are initialized via `initModels()` from db-models
 
@@ -122,4 +132,4 @@ npm test                          # Run all tests
 npx jest path/to/test.ts          # Run a single test file
 ```
 
-Test suites are in `tests/smoke/` (4 suites) and `tests/modules/` (5 suites).
+Test suites are in `tests/smoke/` (3 suites) and `tests/modules/` (6 suites). All tests use mocked database models — no real database is required.
