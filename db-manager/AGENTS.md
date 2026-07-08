@@ -15,7 +15,7 @@ npm start
 # Build TypeScript to dist/
 npm run build
 
-# Run tests (Jest, 146 tests)
+# Run tests (Jest, 201 tests)
 npm test
 
 # Clean compiled output
@@ -36,11 +36,14 @@ npm start -- --delete_articles_trim 100          # Delete 100 oldest eligible ar
 npm start -- --delete_articles_no_state --dry_run # Preview deletion of No state AI-assigned articles
 npm start -- --delete_articles_no_state 100       # Delete 100 eligible No state AI-assigned articles
 npm start -- --delete_articles_no_state           # Delete all eligible No state AI-assigned articles
+npm start -- --delete_articles_retired_sources --dry_run # Preview retired-source article deletion
+npm start -- --delete_articles_retired_sources 100       # Delete 100 eligible retired-source articles
+npm start -- --delete_articles_retired_sources           # Delete all eligible retired-source articles
 ```
 
-Flags can be combined. Execution order is always: backup, import, trim, delete, no-state delete, then status.
+Flags can be combined. Execution order is always: backup, import, trim, delete, no-state delete, retired-sources delete, then status.
 
-`--dry_run` is valid with `--zip_file` for scratch database import validation, or with `--delete_articles_no_state` for a read-only no-state deletion preview. `--dry_run` alone is invalid.
+`--dry_run` is valid with `--zip_file` for scratch database import validation, with `--delete_articles_no_state` for a read-only no-state deletion preview, or with `--delete_articles_retired_sources` for a read-only retired-source deletion preview. `--dry_run` alone is invalid.
 
 ### Running in Production
 
@@ -67,6 +70,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 | **cli**            | `src/modules/cli.ts`            | CLI argument parser with Levenshtein distance typo suggestions           |
 | **deleteArticles** | `src/modules/deleteArticles.ts` | Article deletion (batch size: 5000). Protects approved/relevant articles |
 | **deleteArticlesNoState** | `src/modules/deleteArticlesNoState.ts` | Preview/delete articles whose latest AI state assignment resolves to `No state` |
+| **deleteArticlesRetiredSources** | `src/modules/deleteArticlesRetiredSources.ts` | Preview/delete articles found by retired aggregator sources |
 | **backup**         | `src/modules/backup.ts`         | ZIP/CSV backup creation (compression level 9)                            |
 | **zipImport**      | `src/modules/zipImport.ts`      | ZIP import: schema rebuild, topological load, sequence reset             |
 | **dryRunValidator** | `src/modules/dryRunValidator.ts` | Dry-run validation against a scratch Postgres database                 |
@@ -77,6 +81,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 
 - **Article protection:** Articles in `ArticleApproved` or `ArticleIsRelevant` tables are never deleted.
 - **No-state deletion protection:** `--delete_articles_no_state` protects articles with any `ArticleIsRelevant`, `ArticleApproved`, `ArticlesApproved02`, or `ArticleReportContract` row.
+- **Retired-source deletion protection:** `--delete_articles_retired_sources` only targets articles found through retired aggregator source rows (`NewsAPI`, `GNews`, `NewsData.IO`) and protects articles with any `ArticleIsRelevant`, `ArticleApproved`, `ArticlesApproved02`, or `ArticleReportContract` row.
 - **Batch processing:** Deletions run in batches of 5000 with progress logging.
 - **Default delete threshold:** 180 days.
 - **Topological import:** ZIP import loads tables in `MODEL_LOAD_ORDER` so foreign key constraints are satisfied without disabling them; orphaned rows (legacy SQLite data) are skipped with warnings.
@@ -86,6 +91,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 - **Schema rebuild:** `--zip_file` and `--drop_db` both use `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public` + `sequelize.sync()` to guarantee a clean state, then re-grant `PG_APP_ROLE` if configured.
 - **Dry-run isolation:** `--dry_run` spawns a child process with `PG_DATABASE` overridden to a scratch DB name (`newsnexus_dry_run_<timestamp>`), so the parent process connection is never used for destructive operations. The scratch DB is dropped even if the import fails.
 - **No-state dry run:** `--delete_articles_no_state --dry_run` is read-only against the configured database and logs candidate counts, protection exclusions, reason-code breakdown, and sample rows.
+- **Retired-source dry run:** `--delete_articles_retired_sources --dry_run` is read-only against the configured database and logs candidate counts, protection exclusions, per-source breakdown, missing-source warnings, and sample rows.
 
 ## Logging
 

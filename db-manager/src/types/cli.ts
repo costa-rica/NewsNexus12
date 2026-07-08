@@ -3,6 +3,8 @@ export type CliOptions = {
   deleteArticlesTrimCount?: number;
   deleteArticlesNoState?: boolean;
   deleteArticlesNoStateLimit?: number;
+  deleteArticlesRetiredSources?: boolean;
+  deleteArticlesRetiredSourcesLimit?: number;
   zipFilePath?: string;
   createBackup?: boolean;
   dryRun?: boolean;

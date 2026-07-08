@@ -5,6 +5,7 @@ const KNOWN_FLAGS = [
   "--delete_articles",
   "--delete_articles_trim",
   "--delete_articles_no_state",
+  "--delete_articles_retired_sources",
   "--zip_file",
   "--create_backup",
   "--dry_run",
@@ -136,6 +137,28 @@ export function parseCliArgs(args: string[]): CliOptions {
         options.deleteArticlesNoStateLimit = parsePositiveInteger(
           value,
           "--delete_articles_no_state",
+        );
+      }
+
+      continue;
+    }
+
+    if (flagToken === "--delete_articles_retired_sources") {
+      options.deleteArticlesRetiredSources = true;
+
+      let value: string | undefined;
+
+      if (inlineValue !== undefined) {
+        value = inlineValue;
+      } else if (args[i + 1] && !args[i + 1].startsWith("--")) {
+        value = args[i + 1];
+        i += 1;
+      }
+
+      if (value !== undefined) {
+        options.deleteArticlesRetiredSourcesLimit = parsePositiveInteger(
+          value,
+          "--delete_articles_retired_sources",
         );
       }
 

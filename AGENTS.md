@@ -56,7 +56,7 @@ cd worker-node && npm run build
 cd worker-node && npm test
 ```
 
-No test frameworks are configured for db-models, portal, or worker-python. db-manager uses Jest (146 tests).
+No test frameworks are configured for db-models, portal, or worker-python. db-manager uses Jest (201 tests).
 
 ## Architecture Details
 

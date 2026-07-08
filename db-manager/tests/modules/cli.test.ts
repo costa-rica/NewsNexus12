@@ -109,6 +109,60 @@ describe("CLI argument parser", () => {
       expect(result.deleteArticlesNoState).toBe(true);
     });
 
+    it("parses --delete_articles_retired_sources with no value", () => {
+      const result = parseCliArgs(["--delete_articles_retired_sources"]);
+      expect(result.deleteArticlesRetiredSources).toBe(true);
+      expect(result.deleteArticlesRetiredSourcesLimit).toBeUndefined();
+      expect(result.deleteArticlesDays).toBeUndefined();
+      expect(result.deleteArticlesTrimCount).toBeUndefined();
+      expect(result.deleteArticlesNoState).toBeUndefined();
+    });
+
+    it("parses --delete_articles_retired_sources 100 with a space-separated value", () => {
+      const result = parseCliArgs(["--delete_articles_retired_sources", "100"]);
+      expect(result.deleteArticlesRetiredSources).toBe(true);
+      expect(result.deleteArticlesRetiredSourcesLimit).toBe(100);
+      expect(result.deleteArticlesDays).toBeUndefined();
+      expect(result.deleteArticlesTrimCount).toBeUndefined();
+      expect(result.deleteArticlesNoState).toBeUndefined();
+    });
+
+    it("parses --delete_articles_retired_sources=100 with an equals-separated value", () => {
+      const result = parseCliArgs(["--delete_articles_retired_sources=100"]);
+      expect(result.deleteArticlesRetiredSources).toBe(true);
+      expect(result.deleteArticlesRetiredSourcesLimit).toBe(100);
+      expect(result.deleteArticlesDays).toBeUndefined();
+      expect(result.deleteArticlesTrimCount).toBeUndefined();
+      expect(result.deleteArticlesNoState).toBeUndefined();
+    });
+
+    it("throws on --delete_articles_retired_sources 0 (non-positive)", () => {
+      expect(() =>
+        parseCliArgs(["--delete_articles_retired_sources", "0"]),
+      ).toThrow("--delete_articles_retired_sources requires a positive integer");
+    });
+
+    it("throws on --delete_articles_retired_sources -5 (negative)", () => {
+      expect(() =>
+        parseCliArgs(["--delete_articles_retired_sources", "-5"]),
+      ).toThrow("Invalid value for --delete_articles_retired_sources: -5");
+    });
+
+    it("throws on invalid number value for --delete_articles_retired_sources", () => {
+      expect(() =>
+        parseCliArgs(["--delete_articles_retired_sources", "abc"]),
+      ).toThrow("Invalid value for --delete_articles_retired_sources: abc");
+    });
+
+    it("parses --dry_run --delete_articles_retired_sources without combo validation", () => {
+      const result = parseCliArgs([
+        "--dry_run",
+        "--delete_articles_retired_sources",
+      ]);
+      expect(result.dryRun).toBe(true);
+      expect(result.deleteArticlesRetiredSources).toBe(true);
+    });
+
     it("parses --zip_file /path/to/file.zip with a space-separated value", () => {
       const result = parseCliArgs(["--zip_file", "/path/to/file.zip"]);
       expect(result.zipFilePath).toBe("/path/to/file.zip");
@@ -207,6 +261,12 @@ describe("CLI argument parser", () => {
     it("throws on malformed delete_articles flag with a suggestion", () => {
       expect(() => parseCliArgs(["--delete_articles90"])).toThrow(
         "Unknown argument: --delete_articles90. Did you mean --delete_articles?",
+      );
+    });
+
+    it("throws on retired-sources typo with a suggestion", () => {
+      expect(() => parseCliArgs(["--delete_articles_retired_source"])).toThrow(
+        "Unknown argument: --delete_articles_retired_source. Did you mean --delete_articles_retired_sources?",
       );
     });
 

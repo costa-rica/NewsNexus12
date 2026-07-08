@@ -73,22 +73,28 @@ export async function runDbManager(
     const options = parseCliArgs(args);
 
     if (options.dryRun) {
-      if (options.zipFilePath && options.deleteArticlesNoState) {
+      const dryRunTargetCount = [
+        options.zipFilePath,
+        options.deleteArticlesNoState,
+        options.deleteArticlesRetiredSources,
+      ].filter(Boolean).length;
+
+      if (dryRunTargetCount > 1) {
         process.stderr.write(
-          "--dry_run cannot combine --zip_file and --delete_articles_no_state\n",
+          "--dry_run cannot combine --zip_file, --delete_articles_no_state, and --delete_articles_retired_sources\n",
         );
         return 1;
       }
 
-      if (options.zipFilePath && !options.deleteArticlesNoState) {
+      if (options.zipFilePath) {
         const { runDryRunValidator } = await import("./modules/dryRunValidator");
         const result = await runDryRunValidator(options.zipFilePath);
         return result.success ? 0 : 1;
       }
 
-      if (!options.deleteArticlesNoState) {
+      if (dryRunTargetCount === 0) {
         process.stderr.write(
-          "--dry_run requires --zip_file <path> or --delete_articles_no_state\n",
+          "--dry_run requires --zip_file <path>, --delete_articles_no_state, or --delete_articles_retired_sources\n",
         );
         return 1;
       }
@@ -103,6 +109,7 @@ export async function runDbManager(
     } = await import("./modules/deleteArticles");
     const { createDatabaseBackupZipFile } = await import("./modules/backup");
     const { deleteNoStateArticles } = await import("./modules/deleteArticlesNoState");
+    const { deleteRetiredSourcesArticles } = await import("./modules/deleteArticlesRetiredSources");
     const { importZipFileToDatabase, rebuildSchema } = await import("./modules/zipImport");
 
     if (options.dropDb) {
@@ -126,6 +133,16 @@ export async function runDbManager(
       await deleteNoStateArticles({
         dryRun: true,
         limit: options.deleteArticlesNoStateLimit,
+      });
+      await sequelize.close();
+      return 0;
+    }
+
+    if (options.dryRun && options.deleteArticlesRetiredSources) {
+      logger.info("Dry running retired-source article deletion");
+      await deleteRetiredSourcesArticles({
+        dryRun: true,
+        limit: options.deleteArticlesRetiredSourcesLimit,
       });
       await sequelize.close();
       return 0;
@@ -193,6 +210,19 @@ export async function runDbManager(
         limit: options.deleteArticlesNoStateLimit,
       });
       logger.info(`Deleted ${result.deletedCount} no-state articles.`);
+    }
+
+    if (options.deleteArticlesRetiredSources) {
+      const limitLabel =
+        options.deleteArticlesRetiredSourcesLimit === undefined
+          ? "all eligible"
+          : `${options.deleteArticlesRetiredSourcesLimit}`;
+      logger.info(`Deleting ${limitLabel} retired-source articles`);
+      const result = await deleteRetiredSourcesArticles({
+        dryRun: false,
+        limit: options.deleteArticlesRetiredSourcesLimit,
+      });
+      logger.info(`Deleted ${result.deletedCount} retired-source articles.`);
     }
 
     const status = await getDatabaseStatus();
