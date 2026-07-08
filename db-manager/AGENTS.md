@@ -33,9 +33,13 @@ npm start -- --zip_file /path/to/backup.zip      # Import ZIP into empty databas
 npm start -- --delete_articles                   # Delete unapproved articles >180 days old
 npm start -- --delete_articles 90                # Delete unapproved articles >90 days old
 npm start -- --delete_articles_trim 100          # Delete 100 oldest eligible articles
+npm start -- --delete_articles_no_state --dry_run # Preview deletion of No state AI-assigned articles
+npm start -- --delete_articles_no_state 100       # Delete 100 eligible No state AI-assigned articles
 ```
 
-Flags can be combined. Execution order is always: backup, import, trim, delete, then status.
+Flags can be combined. Execution order is always: backup, import, trim, delete, no-state delete, then status.
+
+`--dry_run` is valid with `--zip_file` for scratch database import validation, or with `--delete_articles_no_state` for a read-only no-state deletion preview. `--dry_run` alone is invalid.
 
 ### Running in Production
 
@@ -53,7 +57,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 
 ### Entry Point
 
-`src/index.ts` — an IIFE that loads env, parses CLI args, connects to the database, runs operations in order, logs status, and closes the connection.
+`src/index.ts` — exports `runDbManager(args)` and runs it when invoked as the CLI. It loads env, parses CLI args, connects to the database, runs operations in order, logs status, and closes the connection.
 
 ### Modules
 
@@ -61,6 +65,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 | ------------------ | ------------------------------- | ------------------------------------------------------------------------ |
 | **cli**            | `src/modules/cli.ts`            | CLI argument parser with Levenshtein distance typo suggestions           |
 | **deleteArticles** | `src/modules/deleteArticles.ts` | Article deletion (batch size: 5000). Protects approved/relevant articles |
+| **deleteArticlesNoState** | `src/modules/deleteArticlesNoState.ts` | Preview/delete articles whose latest AI state assignment resolves to `No state` |
 | **backup**         | `src/modules/backup.ts`         | ZIP/CSV backup creation (compression level 9)                            |
 | **zipImport**      | `src/modules/zipImport.ts`      | ZIP import: schema rebuild, topological load, sequence reset             |
 | **dryRunValidator** | `src/modules/dryRunValidator.ts` | Dry-run validation against a scratch Postgres database                 |
@@ -70,6 +75,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 ### Key Behaviors
 
 - **Article protection:** Articles in `ArticleApproved` or `ArticleIsRelevant` tables are never deleted.
+- **No-state deletion protection:** `--delete_articles_no_state` protects articles with any `ArticleIsRelevant`, `ArticleApproved`, `ArticlesApproved02`, or `ArticleReportContract` row.
 - **Batch processing:** Deletions run in batches of 5000 with progress logging.
 - **Default delete threshold:** 180 days.
 - **Topological import:** ZIP import loads tables in `MODEL_LOAD_ORDER` so foreign key constraints are satisfied without disabling them; orphaned rows (legacy SQLite data) are skipped with warnings.
@@ -78,6 +84,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 - **Sequence reset:** After import, all serial `id` sequences are reset to `MAX(id)` so new inserts do not collide.
 - **Schema rebuild:** `--zip_file` and `--drop_db` both use `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public` + `sequelize.sync()` to guarantee a clean state, then re-grant `PG_APP_ROLE` if configured.
 - **Dry-run isolation:** `--dry_run` spawns a child process with `PG_DATABASE` overridden to a scratch DB name (`newsnexus_dry_run_<timestamp>`), so the parent process connection is never used for destructive operations. The scratch DB is dropped even if the import fails.
+- **No-state dry run:** `--delete_articles_no_state --dry_run` is read-only against the configured database and logs candidate counts, protection exclusions, reason-code breakdown, and sample rows.
 
 ## Logging
 

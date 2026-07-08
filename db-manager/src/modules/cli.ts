@@ -4,6 +4,7 @@ export const DEFAULT_DELETE_DAYS = 180;
 const KNOWN_FLAGS = [
   "--delete_articles",
   "--delete_articles_trim",
+  "--delete_articles_no_state",
   "--zip_file",
   "--create_backup",
   "--dry_run",
@@ -14,6 +15,18 @@ function parseNumber(value: string, flagName: string): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || Number.isNaN(parsed)) {
     throw new Error(`Invalid value for ${flagName}: ${value}`);
+  }
+  return parsed;
+}
+
+function parsePositiveInteger(value: string, flagName: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`Invalid value for ${flagName}: ${value}`);
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (parsed <= 0) {
+    throw new Error(`${flagName} requires a positive integer`);
   }
   return parsed;
 }
@@ -60,6 +73,18 @@ function suggestFlag(input: string): string | null {
   return bestScore <= 4 ? bestMatch : null;
 }
 
+function splitFlagArg(arg: string): { flagToken: string; inlineValue?: string } {
+  const separatorIndex = arg.indexOf("=");
+  if (separatorIndex === -1) {
+    return { flagToken: arg };
+  }
+
+  return {
+    flagToken: arg.slice(0, separatorIndex),
+    inlineValue: arg.slice(separatorIndex + 1),
+  };
+}
+
 export function parseCliArgs(args: string[]): CliOptions {
   const options: CliOptions = {};
 
@@ -70,11 +95,13 @@ export function parseCliArgs(args: string[]): CliOptions {
       throw new Error(`Unexpected argument: ${arg}`);
     }
 
-    if (arg.startsWith("--delete_articles_trim")) {
+    const { flagToken, inlineValue } = splitFlagArg(arg);
+
+    if (flagToken === "--delete_articles_trim") {
       let value: string | undefined;
 
-      if (arg.includes("=")) {
-        value = arg.split("=")[1];
+      if (inlineValue !== undefined) {
+        value = inlineValue;
       } else if (args[i + 1] && !args[i + 1].startsWith("--")) {
         value = args[i + 1];
         i += 1;
@@ -93,11 +120,33 @@ export function parseCliArgs(args: string[]): CliOptions {
       continue;
     }
 
-    if (arg.startsWith("--delete_articles")) {
+    if (flagToken === "--delete_articles_no_state") {
+      options.deleteArticlesNoState = true;
+
       let value: string | undefined;
 
-      if (arg.includes("=")) {
-        value = arg.split("=")[1];
+      if (inlineValue !== undefined) {
+        value = inlineValue;
+      } else if (args[i + 1] && !args[i + 1].startsWith("--")) {
+        value = args[i + 1];
+        i += 1;
+      }
+
+      if (value !== undefined) {
+        options.deleteArticlesNoStateLimit = parsePositiveInteger(
+          value,
+          "--delete_articles_no_state",
+        );
+      }
+
+      continue;
+    }
+
+    if (flagToken === "--delete_articles") {
+      let value: string | undefined;
+
+      if (inlineValue !== undefined) {
+        value = inlineValue;
       } else if (args[i + 1] && !args[i + 1].startsWith("--")) {
         value = args[i + 1];
         i += 1;
@@ -112,11 +161,11 @@ export function parseCliArgs(args: string[]): CliOptions {
       continue;
     }
 
-    if (arg.startsWith("--zip_file")) {
+    if (flagToken === "--zip_file") {
       let value: string | undefined;
 
-      if (arg.includes("=")) {
-        value = arg.split("=")[1];
+      if (inlineValue !== undefined) {
+        value = inlineValue;
       } else if (args[i + 1] && !args[i + 1].startsWith("--")) {
         value = args[i + 1];
         i += 1;
@@ -130,8 +179,11 @@ export function parseCliArgs(args: string[]): CliOptions {
       continue;
     }
 
-    if (arg.startsWith("--create_backup")) {
-      if (arg.includes("=") || (args[i + 1] && !args[i + 1].startsWith("--"))) {
+    if (flagToken === "--create_backup") {
+      if (
+        inlineValue !== undefined ||
+        (args[i + 1] && !args[i + 1].startsWith("--"))
+      ) {
         throw new Error("--create_backup does not take a value");
       }
 
@@ -139,8 +191,11 @@ export function parseCliArgs(args: string[]): CliOptions {
       continue;
     }
 
-    if (arg.startsWith("--dry_run")) {
-      if (arg.includes("=") || (args[i + 1] && !args[i + 1].startsWith("--"))) {
+    if (flagToken === "--dry_run") {
+      if (
+        inlineValue !== undefined ||
+        (args[i + 1] && !args[i + 1].startsWith("--"))
+      ) {
         throw new Error("--dry_run does not take a value");
       }
 
@@ -148,8 +203,11 @@ export function parseCliArgs(args: string[]): CliOptions {
       continue;
     }
 
-    if (arg.startsWith("--drop_db")) {
-      if (arg.includes("=") || (args[i + 1] && !args[i + 1].startsWith("--"))) {
+    if (flagToken === "--drop_db") {
+      if (
+        inlineValue !== undefined ||
+        (args[i + 1] && !args[i + 1].startsWith("--"))
+      ) {
         throw new Error("--drop_db does not take a value");
       }
 

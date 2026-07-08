@@ -66,18 +66,32 @@ async function databaseHasData(): Promise<boolean> {
   return false;
 }
 
-(async () => {
+export async function runDbManager(
+  args: string[] = process.argv.slice(2),
+): Promise<number> {
   try {
-    const options = parseCliArgs(process.argv.slice(2));
+    const options = parseCliArgs(args);
 
     if (options.dryRun) {
-      if (!options.zipFilePath) {
-        process.stderr.write("--dry_run requires --zip_file <path>\n");
-        process.exit(1);
+      if (options.zipFilePath && options.deleteArticlesNoState) {
+        process.stderr.write(
+          "--dry_run cannot combine --zip_file and --delete_articles_no_state\n",
+        );
+        return 1;
       }
-      const { runDryRunValidator } = await import("./modules/dryRunValidator");
-      const result = await runDryRunValidator(options.zipFilePath);
-      process.exit(result.success ? 0 : 1);
+
+      if (options.zipFilePath && !options.deleteArticlesNoState) {
+        const { runDryRunValidator } = await import("./modules/dryRunValidator");
+        const result = await runDryRunValidator(options.zipFilePath);
+        return result.success ? 0 : 1;
+      }
+
+      if (!options.deleteArticlesNoState) {
+        process.stderr.write(
+          "--dry_run requires --zip_file <path> or --delete_articles_no_state\n",
+        );
+        return 1;
+      }
     }
 
     initModels();
@@ -88,6 +102,7 @@ async function databaseHasData(): Promise<boolean> {
       deleteOldestEligibleArticles,
     } = await import("./modules/deleteArticles");
     const { createDatabaseBackupZipFile } = await import("./modules/backup");
+    const { deleteNoStateArticles } = await import("./modules/deleteArticlesNoState");
     const { importZipFileToDatabase, rebuildSchema } = await import("./modules/zipImport");
 
     if (options.dropDb) {
@@ -95,7 +110,7 @@ async function databaseHasData(): Promise<boolean> {
       await rebuildSchema();
       logger.info("--drop_db: schema rebuilt successfully. All tables are empty.");
       await sequelize.close();
-      return;
+      return 0;
     }
 
     // --zip_file and --drop_db both call rebuildSchema() which creates the schema from
@@ -104,6 +119,16 @@ async function databaseHasData(): Promise<boolean> {
     // healthy schema before they can run.
     if (!options.zipFilePath) {
       await ensureDatabaseExists();
+    }
+
+    if (options.dryRun && options.deleteArticlesNoState) {
+      logger.info("Dry running no-state article deletion");
+      await deleteNoStateArticles({
+        dryRun: true,
+        limit: options.deleteArticlesNoStateLimit,
+      });
+      await sequelize.close();
+      return 0;
     }
 
     if (options.createBackup) {
@@ -157,15 +182,37 @@ async function databaseHasData(): Promise<boolean> {
       );
     }
 
+    if (options.deleteArticlesNoState) {
+      const limitLabel =
+        options.deleteArticlesNoStateLimit === undefined
+          ? "all eligible"
+          : `${options.deleteArticlesNoStateLimit}`;
+      logger.info(`Deleting ${limitLabel} no-state articles`);
+      const result = await deleteNoStateArticles({
+        dryRun: false,
+        limit: options.deleteArticlesNoStateLimit,
+      });
+      logger.info(`Deleted ${result.deletedCount} no-state articles.`);
+    }
+
     const status = await getDatabaseStatus();
     logStatus(status);
 
     await sequelize.close();
+    return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Fatal error: ${message}`, { error });
     console.error(message);
     await delay(100);
-    process.exit(1);
+    return 1;
   }
-})();
+}
+
+if (require.main === module) {
+  runDbManager().then((exitCode) => {
+    if (exitCode !== 0) {
+      process.exit(exitCode);
+    }
+  });
+}
