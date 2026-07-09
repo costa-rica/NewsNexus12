@@ -192,25 +192,25 @@ Include a body noting the batch and review-page route wiring.
 
 ## Phase 4 - Documentation and env examples
 
-- [ ] Update `worker-python/.env.example`:
-  - [ ] Add `USE_OPEN_AI_API=false` or a commented equivalent showing the new default.
-  - [ ] Keep `OPENAI_API_KEY` present as optional and label it for OpenAI API mode.
-  - [ ] Add `AI_APPROVER_MODEL_NAME=gpt-4o-mini`.
-  - [ ] Add `AI_APPROVER_CODEX_TIMEOUT_SECONDS=180`.
-- [ ] Update `worker-python/AGENTS.md`:
-  - [ ] Replace statements that `OPENAI_API_KEY` is required.
-  - [ ] Document the selection table:
+- [x] Update `worker-python/.env.example`:
+  - [x] Add `USE_OPEN_AI_API=false` or a commented equivalent showing the new default.
+  - [x] Keep `OPENAI_API_KEY` present as optional and label it for OpenAI API mode.
+  - [x] Add `AI_APPROVER_MODEL_NAME=gpt-4o-mini`.
+  - [x] Add `AI_APPROVER_CODEX_TIMEOUT_SECONDS=180`.
+- [x] Update `worker-python/AGENTS.md`:
+  - [x] Replace statements that `OPENAI_API_KEY` is required.
+  - [x] Document the selection table:
     - `USE_OPEN_AI_API=true` plus key -> OpenAI API.
     - `USE_OPEN_AI_API=true` without key -> Codex CLI with warning.
     - `USE_OPEN_AI_API` unset or false -> Codex CLI.
-  - [ ] Document that Codex CLI is the default backend and requires `codex` on `PATH` at startup.
-  - [ ] Document that `AI_APPROVER_MODEL_NAME` applies to both API and CLI and is passed as `-m` to `codex exec`.
-  - [ ] Document that Codex backend usage totals are zero because the client returns empty usage.
-  - [ ] Document that existing deployments with `OPENAI_API_KEY` but no `USE_OPEN_AI_API=true` will switch to Codex CLI after the change.
-  - [ ] Add troubleshooting guidance for missing `codex` on `PATH` under service managers and for Codex model rejection.
-- [ ] Update `worker-python/README.md` if its AI approver execution section still says it always creates `AiApproverOpenAIClient` or always calls OpenAI.
-- [ ] Update `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` if it contains setup guidance that makes `OPENAI_API_KEY` mandatory or omits the new backend selection.
-- [ ] Do not edit real `.env` files or commit secrets.
+  - [x] Document that Codex CLI is the default backend and requires `codex` on `PATH` at startup.
+  - [x] Document that `AI_APPROVER_MODEL_NAME` applies to both API and CLI and is passed as `-m` to `codex exec`.
+  - [x] Document that Codex backend usage totals are zero because the client returns empty usage.
+  - [x] Document that existing deployments with `OPENAI_API_KEY` but no `USE_OPEN_AI_API=true` will switch to Codex CLI after the change.
+  - [x] Add troubleshooting guidance for missing `codex` on `PATH` under service managers and for Codex model rejection.
+- [x] Update `worker-python/README.md` if its AI approver execution section still says it always creates `AiApproverOpenAIClient` or always calls OpenAI.
+- [x] Update `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` if it contains setup guidance that makes `OPENAI_API_KEY` mandatory or omits the new backend selection.
+- [x] Do not edit real `.env` files or commit secrets.
 
 ### Phase 4 verification
 

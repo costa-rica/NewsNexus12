@@ -115,7 +115,9 @@ runner. The runner:
 
 1. Loads `AiApproverConfig.from_env()`.
 2. Opens `AiApproverRepository`.
-3. Creates `AiApproverOpenAIClient`.
+3. Creates a scoring client via `create_ai_approver_client` — the Codex CLI
+   backend by default, or `AiApproverOpenAIClient` when `USE_OPEN_AI_API=true`
+   with `OPENAI_API_KEY` set.
 4. Calls `AiApproverOrchestrator`.
 5. Writes queue result fields such as `promptCount`, `articleCount`,
    `attemptCount`, token usage, and `statusText`.
@@ -133,7 +135,9 @@ Batch runs call `AiApproverOrchestrator.run_score(...)`:
 - Skips articles that already have an `ArticleApproveds` row.
 - Optionally requires valid state rows in `ArticleStateContracts02`.
 - Builds each prompt by replacing `{articleTitle}` and `{articleContent}`.
-- Calls OpenAI chat completions with JSON object response format.
+- Scores each prompt through the selected backend: `codex exec` per article by
+  default, or OpenAI chat completions with JSON object response format when
+  the API backend is active. Codex-backed jobs report zero token usage.
 - Inserts one result row per article/prompt attempt into
   `AiApproverArticleScores`.
 
@@ -157,7 +161,8 @@ Rows are written to `AiApproverArticleScores` with:
 - `resultStatus = 'completed'` when `score` is numeric and `reason` is non-empty.
 - `resultStatus = 'invalid_response'` when the model returns JSON that does not
   match the expected shape.
-- `resultStatus = 'failed'` when the OpenAI call or response parsing raises.
+- `resultStatus = 'failed'` when the backend call (Codex CLI subprocess or
+  OpenAI API) or response parsing raises.
 - `jobId` set to the queue job ID.
 
 Successful gatekeeper prompt payloads must include JSON with:

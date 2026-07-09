@@ -115,17 +115,33 @@ PG_PORT=...
 PG_DATABASE=...
 PG_USER=...
 PG_PASSWORD=...
+```
+
+Backend selection (both optional; the Codex CLI is the default backend and
+requires the `codex` binary on `PATH`, authenticated via the Codex CLI login):
+
+```env
+USE_OPEN_AI_API=false
 OPENAI_API_KEY=...
 ```
+
+- `USE_OPEN_AI_API=true` plus `OPENAI_API_KEY` -> OpenAI API backend.
+- `USE_OPEN_AI_API=true` without a key -> Codex CLI, with a logged warning.
+- `USE_OPEN_AI_API` unset or `false` -> Codex CLI, even if a key is present.
 
 Optional AI approver settings:
 
 ```env
 AI_APPROVER_MODEL_NAME=gpt-4o-mini
+AI_APPROVER_CODEX_TIMEOUT_SECONDS=180
 AI_APPROVER_BATCH_SIZE=10
 AI_APPROVER_MODE=legacy
 AI_APPROVER_GATEKEEPER_REJECT_CONFIDENCE_THRESHOLD=0.85
 ```
+
+`AI_APPROVER_MODEL_NAME` applies to both backends (OpenAI API model param and
+`codex exec -m` flag). Codex-backed jobs report zero token usage and run
+slower per article than API-backed jobs.
 
 Recommended first gatekeeper test:
 

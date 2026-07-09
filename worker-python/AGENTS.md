@@ -223,7 +223,9 @@ The weekly worker-node orchestrator does not explicitly send `mode`, so weekly r
 
 - `AiApproverConfig`
 - `AiApproverRepository`
-- `AiApproverOpenAIClient`
+- a scoring client via `create_ai_approver_client` (Codex CLI backend by
+  default, `AiApproverOpenAIClient` when `USE_OPEN_AI_API=true` with
+  `OPENAI_API_KEY` set)
 - `AiApproverOrchestrator`
 
 5. `AiApproverOrchestrator.run_score(...)` executes the scoring loop:
@@ -233,7 +235,9 @@ The weekly worker-node orchestrator does not explicitly send `mode`, so weekly r
 - uses `ArticleContents02.content` when available, otherwise
   `Articles.description`
 - builds each prompt by replacing `{articleTitle}` and `{articleContent}`
-- calls OpenAI with `response_format={"type": "json_object"}`
+- scores each prompt through the selected backend (Codex CLI `codex exec`
+  by default; OpenAI chat completions with
+  `response_format={"type": "json_object"}` when the API backend is active)
 - inserts one score row per article/prompt attempt into
   `AiApproverArticleScores`
 
@@ -310,16 +314,33 @@ against every eligible batch article. Prompt text is stored in
 `promptInMarkdown` and must include `{articleTitle}` and `{articleContent}` if
 the article fields should be injected.
 
-The OpenAI client expects prompt output as JSON. Valid responses have numeric
-`score` and non-empty `reason`. Invalid JSON shapes are persisted as
-`invalid_response`; OpenAI/runtime exceptions are persisted as `failed`.
+Both scoring backends expect prompt output as JSON. Valid category responses
+have numeric `score` and non-empty `reason`. Invalid JSON shapes are persisted
+as `invalid_response`; backend/runtime exceptions are persisted as `failed`.
 
-The current client uses:
+Backend selection (`create_ai_approver_client`):
 
-- `OPENAI_API_KEY`
-- `AI_APPROVER_MODEL_NAME`, default `gpt-4o-mini`
-- `temperature=0.2`
-- JSON object response format
+- `USE_OPEN_AI_API=true` plus `OPENAI_API_KEY` -> OpenAI API backend.
+- `USE_OPEN_AI_API=true` without `OPENAI_API_KEY` -> Codex CLI backend, with
+  a logged soft-fallback warning.
+- `USE_OPEN_AI_API` unset or `false` -> Codex CLI backend (the default),
+  regardless of whether a key is present.
+
+The OpenAI API backend uses `AI_APPROVER_MODEL_NAME` (default `gpt-4o-mini`),
+`temperature=0.2`, and JSON object response format.
+
+The Codex CLI backend runs one `codex exec` subprocess per article/prompt with
+`--ephemeral --skip-git-repo-check -s read-only --output-last-message` and
+passes `AI_APPROVER_MODEL_NAME` as `-m`. It authenticates through the
+operator's existing Codex CLI login, requires `codex` on `PATH` at startup,
+and reports zero token usage (`usagePromptTokens`, `usageCompletionTokens`,
+and `usageTotalTokens` are always 0 for Codex-backed jobs). Codex calls are
+substantially slower than API calls (a full agent session per article), so
+Codex-backed batch jobs take longer without being hung.
+
+Migration note: existing deployments that have `OPENAI_API_KEY` but do not set
+`USE_OPEN_AI_API=true` switch to the Codex CLI backend after this change. Add
+`USE_OPEN_AI_API=true` to stay on the OpenAI API.
 
 ## Environment variables
 
@@ -358,9 +379,12 @@ Required:
 
 - Postgres user used by the AI approver.
 
-9. `OPENAI_API_KEY`
+9. AI approver backend requirement (one of the two)
 
-- Required by AI approver startup validation and by OpenAI scoring calls.
+- Codex CLI backend (default): the `codex` binary must resolve on `PATH` at
+  startup, authenticated via the operator's Codex CLI login.
+- OpenAI API backend: set `USE_OPEN_AI_API=true` and provide
+  `OPENAI_API_KEY`.
 
 Optional:
 
@@ -394,7 +418,12 @@ Optional:
 6. AI approver tuning
 
 - `PG_PASSWORD` default empty
-- `AI_APPROVER_MODEL_NAME` default `gpt-4o-mini`
+- `USE_OPEN_AI_API` default `false` (Codex CLI backend is the default)
+- `OPENAI_API_KEY` default empty; only used by the OpenAI API backend
+- `AI_APPROVER_MODEL_NAME` default `gpt-4o-mini`; applies to both backends
+  (OpenAI API model param and `codex exec -m` flag)
+- `AI_APPROVER_CODEX_TIMEOUT_SECONDS` default `180`; per-article `codex exec`
+  subprocess timeout
 - `AI_APPROVER_BATCH_SIZE` default `10`
 
 `AI_APPROVER_BATCH_SIZE` is validated by config but current route execution
@@ -437,11 +466,19 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 - Ensure the referenced AI entity and related `EntityWhoCategorizedArticles` row exist in the shared database.
 
 4. Common issue: worker fails at startup with `PG_HOST`, `PG_PORT`,
-   `PG_DATABASE`, `PG_USER`, or `OPENAI_API_KEY` missing
+   `PG_DATABASE`, or `PG_USER` missing
 
 - Ensure `worker-python/.env` is present.
-- Ensure the AI approver Postgres and OpenAI variables are populated.
+- Ensure the AI approver Postgres variables are populated.
 - Do not print secrets in logs or documentation when troubleshooting.
+
+4b. Common issue: worker fails at startup with `codex CLI not found on PATH`
+
+- The Codex CLI backend is the default; startup requires the `codex` binary
+  unless `USE_OPEN_AI_API=true` with `OPENAI_API_KEY` selects the API backend.
+- Under service managers (launchd/pm2/systemd) the minimal `PATH` often does
+  not include nvm-installed binaries; extend the service `PATH` so `codex`
+  resolves, or switch to the OpenAI API backend.
 
 5. Common issue: `job not found`
 
@@ -474,7 +511,12 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 9. Common issue: AI approver rows have `failed`
 
 - Inspect `AiApproverArticleScores.errorCode` and `errorMessage`.
-- Check OpenAI connectivity, model name, and API key configuration.
+- On the OpenAI API backend, check OpenAI connectivity, model name, and API
+  key configuration.
+- On the Codex CLI backend, check that the CLI login is still valid and that
+  the Codex CLI accepts `AI_APPROVER_MODEL_NAME`; if the CLI rejects the
+  model (`codex exec failed with exit code ...` in `errorMessage`), set
+  `AI_APPROVER_MODEL_NAME` to a Codex-supported model.
 - Check whether prompt output was invalid JSON that raised during parsing.
 
 10. Common issue: completed job but no deduper rows
