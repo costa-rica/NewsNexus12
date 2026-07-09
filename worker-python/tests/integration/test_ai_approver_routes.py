@@ -231,17 +231,34 @@ def test_ai_approver_job_supports_queue_cancel(
 
 
 @pytest.mark.integration
-def test_main_import_fails_when_ai_approver_env_missing(
+def test_main_import_startup_backend_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import dotenv
     import src.main as main_module
+    import src.modules.ai_approver.config as ai_approver_config
 
     monkeypatch.setattr(dotenv, "load_dotenv", lambda *args, **kwargs: False)
+
+    # A missing OPENAI_API_KEY no longer fails startup: with USE_OPEN_AI_API=true
+    # it soft-falls back to the Codex CLI backend, which boots when codex resolves.
+    monkeypatch.setenv("USE_OPEN_AI_API", "true")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        ai_approver_config.shutil, "which", lambda name: "/usr/local/bin/codex"
+    )
+    importlib.reload(main_module)
+
+    # Default (flag unset) selects the Codex CLI backend; startup fails
+    # deterministically when the codex binary is not on PATH.
+    monkeypatch.delenv("USE_OPEN_AI_API", raising=False)
+    monkeypatch.setattr(ai_approver_config.shutil, "which", lambda name: None)
 
     with pytest.raises(SystemExit):
         importlib.reload(main_module)
 
+    # Restore the forced test bootstrap state so backend selection does not
+    # leak into other route/app tests.
+    monkeypatch.setenv("USE_OPEN_AI_API", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
     importlib.reload(main_module)

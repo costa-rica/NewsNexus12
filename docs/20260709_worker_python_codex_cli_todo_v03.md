@@ -24,49 +24,49 @@ Do not change `AiApproverOrchestrator` or repository behavior unless a test prov
 
 ## Phase 1 - Configuration selection and deterministic test bootstrap
 
-- [ ] Update `worker-python/tests/conftest.py` before changing startup validation so ordinary test collection stays deterministic:
-  - [ ] Force the test process onto the OpenAI API backend before `from src.main import app` by assigning `os.environ["USE_OPEN_AI_API"] = "true"`.
-  - [ ] Do not use `os.environ.setdefault("USE_OPEN_AI_API", "true")`; a host or CI value of `USE_OPEN_AI_API=false` must not be allowed to defeat the test bootstrap.
-  - [ ] Keep the existing fake `OPENAI_API_KEY`.
-  - [ ] Do not require the Codex CLI binary during ordinary route/app tests.
-  - [ ] Do not later weaken or remove this forced bootstrap to make Codex-default unit tests pass; isolate those tests instead.
-- [ ] Update `worker-python/src/modules/ai_approver/config.py`:
-  - [ ] Remove `OPENAI_API_KEY` from `REQUIRED_STARTUP_ENV_KEYS`; keep the Postgres startup keys.
-  - [ ] Add `TRUE_VALUES`, `FALSE_VALUES`, and `_parse_bool(value, key)` matching the deduper boolean semantics.
-  - [ ] Add `use_open_ai_api: bool` and `codex_timeout_seconds: int` to `AiApproverConfig`.
-  - [ ] Parse `USE_OPEN_AI_API` as optional with default `false`.
-  - [ ] Parse `AI_APPROVER_CODEX_TIMEOUT_SECONDS` as optional positive integer with default `180`.
-  - [ ] Keep `OPENAI_API_KEY` optional in `from_env()`; store the stripped value, possibly empty.
-  - [ ] Keep `AI_APPROVER_MODEL_NAME` defaulting to `gpt-4o-mini`.
-  - [ ] Add a `use_codex_cli` computed property implementing `not (use_open_ai_api and openai_api_key)`.
-  - [ ] Log a warning when `USE_OPEN_AI_API=true` but `OPENAI_API_KEY` is empty, because this soft-falls back to Codex CLI.
-  - [ ] Raise `AiApproverConfigError` for unrecognized boolean values and non-positive timeout values.
-- [ ] Rework `validate_ai_approver_startup_env()`:
-  - [ ] Continue to raise for missing Postgres startup keys.
-  - [ ] Compute the effective backend from `USE_OPEN_AI_API` plus `OPENAI_API_KEY`.
-  - [ ] If the effective backend is OpenAI API, do not check for `codex` on `PATH`.
-  - [ ] If the effective backend is Codex CLI, require `shutil.which("codex")` to resolve.
-  - [ ] If `USE_OPEN_AI_API=true` and the key is missing, log the soft-fallback warning and then enforce Codex CLI binary availability.
-- [ ] Update `worker-python/tests/unit/ai_approver/test_config.py`:
-  - [ ] Replace the existing `test_validate_startup_env_requires_openai_key`.
-  - [ ] Cover default selection: `USE_OPEN_AI_API` unset or false means Codex CLI, even if `OPENAI_API_KEY` is set.
-  - [ ] Cover API selection: `USE_OPEN_AI_API=true` plus key means OpenAI API.
-  - [ ] Cover soft fallback: `USE_OPEN_AI_API=true` without key means Codex CLI and logs a warning.
-  - [ ] Cover invalid boolean values.
-  - [ ] Cover `AI_APPROVER_CODEX_TIMEOUT_SECONDS` default, valid override, invalid integer, and non-positive value.
-  - [ ] Cover startup validation requiring `codex` only on the effective Codex CLI path by monkeypatching `shutil.which`.
-  - [ ] Add an explicit startup validation test proving `USE_OPEN_AI_API=true` plus a key bypasses Codex binary validation even when `shutil.which("codex")` returns `None`.
-  - [ ] For tests that exercise `USE_OPEN_AI_API` unset through `AiApproverConfig.from_env()` or `validate_ai_approver_startup_env()`, explicitly call `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` so the forced `tests/conftest.py` value is not read.
-  - [ ] For tests that exercise `USE_OPEN_AI_API=false`, explicitly call `monkeypatch.setenv("USE_OPEN_AI_API", "false")`.
-  - [ ] When a config/startup test calls `from_env()` or `validate_ai_approver_startup_env()`, set the required `PG_*` env values in that test or fixture so failures are about backend selection, not missing database env.
-  - [ ] Do not change `tests/conftest.py` away from the forced `USE_OPEN_AI_API=true` bootstrap to satisfy these unit tests.
-- [ ] Rewrite `worker-python/tests/integration/test_ai_approver_routes.py::test_main_import_fails_when_ai_approver_env_missing` for the new optional-key/backend-selection behavior:
-  - [ ] Do not keep an assertion that deleting only `OPENAI_API_KEY` must make `importlib.reload(src.main)` raise `SystemExit`.
-  - [ ] Make the test deterministic by monkeypatching `shutil.which` inside the ai_approver config module or at the exact lookup point used by startup validation.
-  - [ ] Cover the new missing-key fallback explicitly: with required Postgres env present, `USE_OPEN_AI_API=true`, `OPENAI_API_KEY` deleted, and `shutil.which("codex")` returning a fake path, reloading `src.main` should not fail solely because the API key is missing.
-  - [ ] Cover the Codex CLI startup failure explicitly: with required Postgres env present, the effective backend set to Codex CLI, and `shutil.which("codex")` returning `None`, reloading `src.main` should fail deterministically.
-  - [ ] Restore any process environment or module state needed so the test does not leak backend selection into other route/app tests.
-  - [ ] If this integration test uses the "unset" default selection path, explicitly remove the forced bootstrap value with `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` inside the test.
+- [x] Update `worker-python/tests/conftest.py` before changing startup validation so ordinary test collection stays deterministic:
+  - [x] Force the test process onto the OpenAI API backend before `from src.main import app` by assigning `os.environ["USE_OPEN_AI_API"] = "true"`.
+  - [x] Do not use `os.environ.setdefault("USE_OPEN_AI_API", "true")`; a host or CI value of `USE_OPEN_AI_API=false` must not be allowed to defeat the test bootstrap.
+  - [x] Keep the existing fake `OPENAI_API_KEY`.
+  - [x] Do not require the Codex CLI binary during ordinary route/app tests.
+  - [x] Do not later weaken or remove this forced bootstrap to make Codex-default unit tests pass; isolate those tests instead.
+- [x] Update `worker-python/src/modules/ai_approver/config.py`:
+  - [x] Remove `OPENAI_API_KEY` from `REQUIRED_STARTUP_ENV_KEYS`; keep the Postgres startup keys.
+  - [x] Add `TRUE_VALUES`, `FALSE_VALUES`, and `_parse_bool(value, key)` matching the deduper boolean semantics.
+  - [x] Add `use_open_ai_api: bool` and `codex_timeout_seconds: int` to `AiApproverConfig`.
+  - [x] Parse `USE_OPEN_AI_API` as optional with default `false`.
+  - [x] Parse `AI_APPROVER_CODEX_TIMEOUT_SECONDS` as optional positive integer with default `180`.
+  - [x] Keep `OPENAI_API_KEY` optional in `from_env()`; store the stripped value, possibly empty.
+  - [x] Keep `AI_APPROVER_MODEL_NAME` defaulting to `gpt-4o-mini`.
+  - [x] Add a `use_codex_cli` computed property implementing `not (use_open_ai_api and openai_api_key)`.
+  - [x] Log a warning when `USE_OPEN_AI_API=true` but `OPENAI_API_KEY` is empty, because this soft-falls back to Codex CLI.
+  - [x] Raise `AiApproverConfigError` for unrecognized boolean values and non-positive timeout values.
+- [x] Rework `validate_ai_approver_startup_env()`:
+  - [x] Continue to raise for missing Postgres startup keys.
+  - [x] Compute the effective backend from `USE_OPEN_AI_API` plus `OPENAI_API_KEY`.
+  - [x] If the effective backend is OpenAI API, do not check for `codex` on `PATH`.
+  - [x] If the effective backend is Codex CLI, require `shutil.which("codex")` to resolve.
+  - [x] If `USE_OPEN_AI_API=true` and the key is missing, log the soft-fallback warning and then enforce Codex CLI binary availability.
+- [x] Update `worker-python/tests/unit/ai_approver/test_config.py`:
+  - [x] Replace the existing `test_validate_startup_env_requires_openai_key`.
+  - [x] Cover default selection: `USE_OPEN_AI_API` unset or false means Codex CLI, even if `OPENAI_API_KEY` is set.
+  - [x] Cover API selection: `USE_OPEN_AI_API=true` plus key means OpenAI API.
+  - [x] Cover soft fallback: `USE_OPEN_AI_API=true` without key means Codex CLI and logs a warning.
+  - [x] Cover invalid boolean values.
+  - [x] Cover `AI_APPROVER_CODEX_TIMEOUT_SECONDS` default, valid override, invalid integer, and non-positive value.
+  - [x] Cover startup validation requiring `codex` only on the effective Codex CLI path by monkeypatching `shutil.which`.
+  - [x] Add an explicit startup validation test proving `USE_OPEN_AI_API=true` plus a key bypasses Codex binary validation even when `shutil.which("codex")` returns `None`.
+  - [x] For tests that exercise `USE_OPEN_AI_API` unset through `AiApproverConfig.from_env()` or `validate_ai_approver_startup_env()`, explicitly call `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` so the forced `tests/conftest.py` value is not read.
+  - [x] For tests that exercise `USE_OPEN_AI_API=false`, explicitly call `monkeypatch.setenv("USE_OPEN_AI_API", "false")`.
+  - [x] When a config/startup test calls `from_env()` or `validate_ai_approver_startup_env()`, set the required `PG_*` env values in that test or fixture so failures are about backend selection, not missing database env.
+  - [x] Do not change `tests/conftest.py` away from the forced `USE_OPEN_AI_API=true` bootstrap to satisfy these unit tests.
+- [x] Rewrite `worker-python/tests/integration/test_ai_approver_routes.py::test_main_import_fails_when_ai_approver_env_missing` for the new optional-key/backend-selection behavior:
+  - [x] Do not keep an assertion that deleting only `OPENAI_API_KEY` must make `importlib.reload(src.main)` raise `SystemExit`.
+  - [x] Make the test deterministic by monkeypatching `shutil.which` inside the ai_approver config module or at the exact lookup point used by startup validation.
+  - [x] Cover the new missing-key fallback explicitly: with required Postgres env present, `USE_OPEN_AI_API=true`, `OPENAI_API_KEY` deleted, and `shutil.which("codex")` returning a fake path, reloading `src.main` should not fail solely because the API key is missing.
+  - [x] Cover the Codex CLI startup failure explicitly: with required Postgres env present, the effective backend set to Codex CLI, and `shutil.which("codex")` returning `None`, reloading `src.main` should fail deterministically.
+  - [x] Restore any process environment or module state needed so the test does not leak backend selection into other route/app tests.
+  - [x] If this integration test uses the "unset" default selection path, explicitly remove the forced bootstrap value with `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` inside the test.
 
 ### Phase 1 verification
 
