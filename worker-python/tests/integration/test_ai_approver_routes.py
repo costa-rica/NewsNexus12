@@ -230,6 +230,123 @@ def test_ai_approver_job_supports_queue_cancel(
     assert engine.on_idle(timeout=1) is True
 
 
+def _install_runner_fakes(monkeypatch: pytest.MonkeyPatch, summary: dict):
+    from types import SimpleNamespace
+
+    from src.routes import ai_approver as ai_approver_routes
+
+    sentinel_config = object()
+    sentinel_client = object()
+    factory_calls: list[object] = []
+    orchestrator_clients: list[object] = []
+
+    class FakeConfig:
+        default_mode = "legacy"
+        gatekeeper_reject_confidence_threshold = 0.85
+
+        @staticmethod
+        def from_env():
+            fake = SimpleNamespace(
+                default_mode="legacy",
+                gatekeeper_reject_confidence_threshold=0.85,
+                sentinel=sentinel_config,
+            )
+            return fake
+
+    class FakeRepository:
+        def __init__(self, config) -> None:
+            self.config = config
+
+        def close(self) -> None:
+            pass
+
+    def fake_factory(config):
+        factory_calls.append(config)
+        return sentinel_client
+
+    class FakeOrchestrator:
+        def __init__(self, repository, client) -> None:
+            orchestrator_clients.append(client)
+
+        def run_score(self, **kwargs):
+            return summary
+
+        def run_single_score(self, **kwargs):
+            return summary
+
+    monkeypatch.setattr(ai_approver_routes, "AiApproverConfig", FakeConfig)
+    monkeypatch.setattr(ai_approver_routes, "AiApproverRepository", FakeRepository)
+    monkeypatch.setattr(ai_approver_routes, "create_ai_approver_client", fake_factory)
+    monkeypatch.setattr(ai_approver_routes, "AiApproverOrchestrator", FakeOrchestrator)
+    monkeypatch.setattr(ai_approver_routes, "_append_job_log", lambda *a, **k: None)
+    monkeypatch.setattr(ai_approver_routes, "_update_job_result_fields", lambda *a, **k: None)
+
+    context = SimpleNamespace(jobId="0001", is_cancel_requested=lambda: False)
+    return context, factory_calls, orchestrator_clients, sentinel_client
+
+
+@pytest.mark.integration
+def test_batch_runner_uses_client_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.routes import ai_approver as ai_approver_routes
+
+    summary = {
+        "promptCount": 1,
+        "articleCount": 1,
+        "attemptCount": 1,
+        "mode": "legacy",
+        "gatekeeperPromptVersionId": None,
+        "gatekeeperAttemptCount": 0,
+        "gatekeeperPassCount": 0,
+        "gatekeeperRejectCount": 0,
+        "gatekeeperManualReviewCount": 0,
+        "gatekeeperInvalidResponseCount": 0,
+        "gatekeeperFailedCount": 0,
+        "categoryPromptCount": 1,
+        "categoryAttemptCount": 1,
+        "categorySkippedCount": 0,
+        "estimatedCategoryCallsAvoided": 0,
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    }
+    context, factory_calls, orchestrator_clients, sentinel_client = _install_runner_fakes(
+        monkeypatch, summary
+    )
+
+    runner = ai_approver_routes.create_ai_approver_runner(
+        limit=1,
+        require_state_assignment=True,
+        state_ids=None,
+    )
+    runner(context)
+
+    assert len(factory_calls) == 1
+    assert orchestrator_clients == [sentinel_client]
+
+
+@pytest.mark.integration
+def test_review_page_runner_uses_client_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.routes import ai_approver as ai_approver_routes
+
+    summary = {
+        "promptCount": 1,
+        "articleCount": 1,
+        "attemptCount": 1,
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "contentSource": "articleContents02",
+    }
+    context, factory_calls, orchestrator_clients, sentinel_client = _install_runner_fakes(
+        monkeypatch, summary
+    )
+
+    runner = ai_approver_routes.create_review_page_ai_approver_runner(
+        article_id=1,
+        prompt_version_id=1,
+    )
+    runner(context)
+
+    assert len(factory_calls) == 1
+    assert orchestrator_clients == [sentinel_client]
+
+
 @pytest.mark.integration
 def test_main_import_startup_backend_selection(
     monkeypatch: pytest.MonkeyPatch,

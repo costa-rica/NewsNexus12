@@ -154,16 +154,16 @@ Include a body noting the subprocess invocation, output parsing behavior, and er
 
 ## Phase 3 - Route integration and workflow regression coverage
 
-- [ ] Update `worker-python/src/routes/ai_approver.py`:
-  - [ ] Replace the `AiApproverOpenAIClient` import with `create_ai_approver_client`.
-  - [ ] In `create_ai_approver_runner`, replace `AiApproverOpenAIClient(config)` with `create_ai_approver_client(config)`.
-  - [ ] In `create_review_page_ai_approver_runner`, replace `AiApproverOpenAIClient(config)` with `create_ai_approver_client(config)`.
-  - [ ] Keep endpoint names, request shapes, queue result fields, cancellation handling, and repository lifecycle unchanged.
-- [ ] Add or update route tests if needed:
-  - [ ] Prove the queued batch runner uses the client factory.
-  - [ ] Prove the review-page runner uses the client factory.
-  - [ ] Keep route tests on the OpenAI API backend through the forced `tests/conftest.py` bootstrap unless a test explicitly isolates and monkeypatches the Codex path.
-- [ ] Confirm existing orchestrator tests still pass with client fakes returning empty usage dictionaries, since Codex returns zero token usage.
+- [x] Update `worker-python/src/routes/ai_approver.py`:
+  - [x] Replace the `AiApproverOpenAIClient` import with `create_ai_approver_client`.
+  - [x] In `create_ai_approver_runner`, replace `AiApproverOpenAIClient(config)` with `create_ai_approver_client(config)`.
+  - [x] In `create_review_page_ai_approver_runner`, replace `AiApproverOpenAIClient(config)` with `create_ai_approver_client(config)`.
+  - [x] Keep endpoint names, request shapes, queue result fields, cancellation handling, and repository lifecycle unchanged.
+- [x] Add or update route tests if needed:
+  - [x] Prove the queued batch runner uses the client factory.
+  - [x] Prove the review-page runner uses the client factory.
+  - [x] Keep route tests on the OpenAI API backend through the forced `tests/conftest.py` bootstrap unless a test explicitly isolates and monkeypatches the Codex path.
+- [x] Confirm existing orchestrator tests still pass with client fakes returning empty usage dictionaries, since Codex returns zero token usage.
 
 ### Phase 3 verification
 

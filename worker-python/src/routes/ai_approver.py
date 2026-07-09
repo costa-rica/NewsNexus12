@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.modules.ai_approver.client import AiApproverOpenAIClient
+from src.modules.ai_approver.client import create_ai_approver_client
 from src.modules.ai_approver.config import (
     AiApproverConfig,
     parse_ai_approver_mode,
@@ -140,7 +140,7 @@ def create_ai_approver_runner(
                 else config.gatekeeper_reject_confidence_threshold
             )
             repository = AiApproverRepository(config)
-            client = AiApproverOpenAIClient(config)
+            client = create_ai_approver_client(config)
             orchestrator = AiApproverOrchestrator(repository, client)
             summary = orchestrator.run_score(
                 limit=limit,
@@ -237,7 +237,7 @@ def create_review_page_ai_approver_runner(
         try:
             config = AiApproverConfig.from_env()
             repository = AiApproverRepository(config)
-            client = AiApproverOpenAIClient(config)
+            client = create_ai_approver_client(config)
             orchestrator = AiApproverOrchestrator(repository, client)
             summary = orchestrator.run_single_score(
                 article_id=article_id,
