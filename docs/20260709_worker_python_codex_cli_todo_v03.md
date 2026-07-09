@@ -89,49 +89,49 @@ Include a body noting the test bootstrap contract, the rewritten startup integra
 
 ## Phase 2 - Codex CLI client and factory
 
-- [ ] Update `worker-python/src/modules/ai_approver/client.py`:
-  - [ ] Leave `AiApproverOpenAIClient` behavior unchanged except for imports needed by the new code.
-  - [ ] Add `AiApproverCodexCliClient` with the same public contract: `score_article(prompt: str) -> dict[str, Any]`.
-  - [ ] Execute Codex with:
+- [x] Update `worker-python/src/modules/ai_approver/client.py`:
+  - [x] Leave `AiApproverOpenAIClient` behavior unchanged except for imports needed by the new code.
+  - [x] Add `AiApproverCodexCliClient` with the same public contract: `score_article(prompt: str) -> dict[str, Any]`.
+  - [x] Execute Codex with:
 
     ```bash
     codex exec --ephemeral --skip-git-repo-check -s read-only \
       --output-last-message <tempfile> -m <AI_APPROVER_MODEL_NAME> <prompt>
     ```
 
-  - [ ] Use `subprocess.run(..., capture_output=True, text=True, timeout=config.codex_timeout_seconds, cwd=tempfile.gettempdir())`.
-  - [ ] Create and clean up a temporary output file for `--output-last-message`.
-  - [ ] Read the final message from the output file, not from stdout.
-  - [ ] Parse the output with `json.loads` first.
-  - [ ] Add a fallback parser that extracts from the first `{` through the last `}` in the output file content, then parses that substring.
-  - [ ] Return `{"payload": parsed_payload, "usage": {}}` on success.
-  - [ ] Raise `AiApproverProcessorError` for non-zero exit code, timeout, empty output, and unparseable output.
-  - [ ] Include a truncated stdout/stderr tail in subprocess error messages, without logging prompt text or secrets.
-  - [ ] Do not use `--output-schema`.
-- [ ] Add `create_ai_approver_client(config)` in `client.py`:
-  - [ ] Return `AiApproverCodexCliClient(config)` when `config.use_codex_cli` is true.
-  - [ ] Return `AiApproverOpenAIClient(config)` otherwise.
-- [ ] Add `worker-python/tests/unit/ai_approver/test_client.py` if it does not exist:
-  - [ ] Mock `subprocess.run` and temporary output behavior for successful JSON output.
-  - [ ] Assert the command contains `codex`, `exec`, `--ephemeral`, `--skip-git-repo-check`, `-s read-only`, `--output-last-message`, `-m`, the configured model, and the prompt as a positional argument.
-  - [ ] Assert `cwd` is a neutral temp directory and timeout comes from config.
-  - [ ] Cover fallback JSON parsing for prefixed/fenced output.
-  - [ ] Cover non-zero exit code with stderr/stdout included in truncated form.
-  - [ ] Cover `subprocess.TimeoutExpired`.
-  - [ ] Cover empty output file.
-  - [ ] Cover junk output that cannot parse.
-  - [ ] Cover factory selection for the three required combinations:
+  - [x] Use `subprocess.run(..., capture_output=True, text=True, timeout=config.codex_timeout_seconds, cwd=tempfile.gettempdir())`.
+  - [x] Create and clean up a temporary output file for `--output-last-message`.
+  - [x] Read the final message from the output file, not from stdout.
+  - [x] Parse the output with `json.loads` first.
+  - [x] Add a fallback parser that extracts from the first `{` through the last `}` in the output file content, then parses that substring.
+  - [x] Return `{"payload": parsed_payload, "usage": {}}` on success.
+  - [x] Raise `AiApproverProcessorError` for non-zero exit code, timeout, empty output, and unparseable output.
+  - [x] Include a truncated stdout/stderr tail in subprocess error messages, without logging prompt text or secrets.
+  - [x] Do not use `--output-schema`.
+- [x] Add `create_ai_approver_client(config)` in `client.py`:
+  - [x] Return `AiApproverCodexCliClient(config)` when `config.use_codex_cli` is true.
+  - [x] Return `AiApproverOpenAIClient(config)` otherwise.
+- [x] Add `worker-python/tests/unit/ai_approver/test_client.py` if it does not exist:
+  - [x] Mock `subprocess.run` and temporary output behavior for successful JSON output.
+  - [x] Assert the command contains `codex`, `exec`, `--ephemeral`, `--skip-git-repo-check`, `-s read-only`, `--output-last-message`, `-m`, the configured model, and the prompt as a positional argument.
+  - [x] Assert `cwd` is a neutral temp directory and timeout comes from config.
+  - [x] Cover fallback JSON parsing for prefixed/fenced output.
+  - [x] Cover non-zero exit code with stderr/stdout included in truncated form.
+  - [x] Cover `subprocess.TimeoutExpired`.
+  - [x] Cover empty output file.
+  - [x] Cover junk output that cannot parse.
+  - [x] Cover factory selection for the three required combinations:
     - `USE_OPEN_AI_API=true` plus key -> OpenAI client.
     - `USE_OPEN_AI_API=true` without key -> Codex client.
     - `USE_OPEN_AI_API` unset or false -> Codex client, regardless of key.
-  - [ ] Factory-selection tests may construct `AiApproverConfig` directly to avoid process-env coupling.
-  - [ ] If factory-selection tests instead build configs through `AiApproverConfig.from_env()`, they must explicitly isolate each backend case:
-    - [ ] Use `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` for the unset case.
-    - [ ] Use `monkeypatch.setenv("USE_OPEN_AI_API", "false")` for the false case.
-    - [ ] Use `monkeypatch.setenv("USE_OPEN_AI_API", "true")` for true cases.
-    - [ ] Set or delete `OPENAI_API_KEY` per case instead of relying on the bootstrap value from `tests/conftest.py`.
-    - [ ] Set required `PG_*` env values when calling `from_env()`.
-  - [ ] Do not alter the forced `USE_OPEN_AI_API=true` test bootstrap to make factory tests pass.
+  - [x] Factory-selection tests may construct `AiApproverConfig` directly to avoid process-env coupling.
+  - [x] If factory-selection tests instead build configs through `AiApproverConfig.from_env()`, they must explicitly isolate each backend case:
+    - [x] Use `monkeypatch.delenv("USE_OPEN_AI_API", raising=False)` for the unset case.
+    - [x] Use `monkeypatch.setenv("USE_OPEN_AI_API", "false")` for the false case.
+    - [x] Use `monkeypatch.setenv("USE_OPEN_AI_API", "true")` for true cases.
+    - [x] Set or delete `OPENAI_API_KEY` per case instead of relying on the bootstrap value from `tests/conftest.py`.
+    - [x] Set required `PG_*` env values when calling `from_env()`.
+  - [x] Do not alter the forced `USE_OPEN_AI_API=true` test bootstrap to make factory tests pass.
 
 ### Phase 2 verification
 

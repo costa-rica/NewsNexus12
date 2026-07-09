@@ -95,8 +95,8 @@ class AiApproverConfig:
     batch_size: int
     default_mode: str
     gatekeeper_reject_confidence_threshold: float
-    use_open_ai_api: bool
-    codex_timeout_seconds: int
+    use_open_ai_api: bool = False
+    codex_timeout_seconds: int = 180
 
     @property
     def dsn(self) -> str:
