@@ -117,7 +117,9 @@ runner. The runner:
 2. Opens `AiApproverRepository`.
 3. Creates a scoring client via `create_ai_approver_client` — the Codex CLI
    backend by default, or `AiApproverOpenAIClient` when `USE_OPEN_AI_API=true`
-   with `OPENAI_API_KEY` set.
+   with `OPENAI_API_KEY` set. For CLI mode, set `AI_APPROVER_MODEL_NAME` to a
+   Codex-supported model (e.g. `gpt-5.4-mini`); the default `gpt-4o-mini` is
+   rejected by Codex with a ChatGPT login.
 4. Calls `AiApproverOrchestrator`.
 5. Writes queue result fields such as `promptCount`, `articleCount`,
    `attemptCount`, token usage, and `statusText`.

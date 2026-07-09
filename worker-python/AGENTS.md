@@ -331,7 +331,13 @@ The OpenAI API backend uses `AI_APPROVER_MODEL_NAME` (default `gpt-4o-mini`),
 
 The Codex CLI backend runs one `codex exec` subprocess per article/prompt with
 `--ephemeral --skip-git-repo-check -s read-only --output-last-message` and
-passes `AI_APPROVER_MODEL_NAME` as `-m`. It authenticates through the
+passes `AI_APPROVER_MODEL_NAME` as `-m`.
+
+Codex model support: manual validation on 2026-07-09 (codex-cli 0.142.5,
+ChatGPT login) showed the CLI rejects the default `gpt-4o-mini` ("not
+supported when using Codex with a ChatGPT account"), so operators using the
+Codex CLI backend must set `AI_APPROVER_MODEL_NAME` to a Codex-supported
+model. `gpt-5.4-mini` was validated working; the CLI default is `gpt-5.5`. It authenticates through the
 operator's existing Codex CLI login, requires `codex` on `PATH` at startup,
 and reports zero token usage (`usagePromptTokens`, `usageCompletionTokens`,
 and `usageTotalTokens` are always 0 for Codex-backed jobs). Codex calls are

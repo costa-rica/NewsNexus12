@@ -238,15 +238,15 @@ Include a body noting env selection, startup behavior, and migration impact.
 
 ## Phase 5 - Manual Codex CLI validation
 
-- [ ] In an operator environment with the Codex CLI installed and authenticated, verify the default CLI path manually.
-- [ ] Confirm `codex` resolves from the same environment used to run worker-python:
+- [x] In an operator environment with the Codex CLI installed and authenticated, verify the default CLI path manually.
+- [x] Confirm `codex` resolves from the same environment used to run worker-python:
 
 ```bash
 which codex
 codex --version
 ```
 
-- [ ] Run one minimal `codex exec` call using the default model name from the plan:
+- [x] Run one minimal `codex exec` call using the default model name from the plan:
 
 ```bash
 tmpfile="$(mktemp)"
@@ -257,9 +257,9 @@ cat "$tmpfile"
 rm -f "$tmpfile"
 ```
 
-- [ ] If the Codex CLI rejects `gpt-4o-mini`, document in `worker-python/AGENTS.md` and `worker-python/README.md` that operators must set `AI_APPROVER_MODEL_NAME` to a Codex-supported model for CLI mode.
-- [ ] If the manual command works, document that the default model was manually validated with the current CLI/login environment.
-- [ ] Do not run a real AI approver database job unless the operator explicitly requests it.
+- [x] If the Codex CLI rejects `gpt-4o-mini`, document in `worker-python/AGENTS.md` and `worker-python/README.md` that operators must set `AI_APPROVER_MODEL_NAME` to a Codex-supported model for CLI mode.
+- [x] If the manual command works, document that the default model was manually validated with the current CLI/login environment.
+- [x] Do not run a real AI approver database job unless the operator explicitly requests it.
 
 ### Phase 5 verification
 
@@ -282,18 +282,18 @@ If no files changed during manual validation, no commit is required. Instead, re
 
 ## Final implementation verification
 
-- [ ] From `worker-python/`, run:
+- [x] From `worker-python/`, run:
 
 ```bash
 make test
 ```
 
-- [ ] If available in the environment, run any existing formatting or lint command documented by the package. Do not invent new tooling.
-- [ ] Confirm `git status --short` contains only intentional implementation, test, and documentation changes.
-- [ ] Confirm no `.env` files, secrets, lockfiles, package files, unrelated docs, or unrelated source files changed.
-- [ ] Confirm all completed TODO checkboxes are checked before the final implementation handoff.
-- [ ] Provide the operator with:
-  - [ ] Test commands run and results.
-  - [ ] Commit hashes or note if commits were not requested/performed.
-  - [ ] Manual Codex CLI validation result, including whether the default `gpt-4o-mini` model was accepted.
-  - [ ] Any deployment note needed for environments that should remain on OpenAI API mode.
+- [x] If available in the environment, run any existing formatting or lint command documented by the package. Do not invent new tooling.
+- [x] Confirm `git status --short` contains only intentional implementation, test, and documentation changes.
+- [x] Confirm no `.env` files, secrets, lockfiles, package files, unrelated docs, or unrelated source files changed.
+- [x] Confirm all completed TODO checkboxes are checked before the final implementation handoff.
+- [x] Provide the operator with:
+  - [x] Test commands run and results.
+  - [x] Commit hashes or note if commits were not requested/performed.
+  - [x] Manual Codex CLI validation result, including whether the default `gpt-4o-mini` model was accepted.
+  - [x] Any deployment note needed for environments that should remain on OpenAI API mode.
