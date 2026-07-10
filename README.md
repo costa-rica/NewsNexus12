@@ -4,7 +4,6 @@ This project is the monorepo of applicaitons that are part of the News Nexus eco
 
 - This News Nexus 12 project is built off the News Nexus 11 project with changing database infrastructure from SQLite to PostGres.
 
-
 ## Setup
 
 Run from root of project.
@@ -52,10 +51,24 @@ npm run start:portal
 cd worker-python && source venv/bin/activate && uvicorn src.main:app --host 0.0.0.0 --port 5000
 ```
 
+#### start / stop on servers
+
+```bash
+# Start
+sudo systemctl start newsnexus12-api.service
+sudo systemctl start newsnexus12-worker-node.service
+sudo systemctl start newsnexus12-worker-python.service
+sudo systemctl start newsnexus12-portal.service
+# Stop
+sudo systemctl stop newsnexus12-api.service
+sudo systemctl stop newsnexus12-worker-node.service
+sudo systemctl stop newsnexus12-worker-python.service
+sudo systemctl stop newsnexus12-portal.service
+```
+
 ## Key Documentation
 
 - `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` — AI Approver setup, prompt roles, gatekeeper modes, weekly automation behavior, and `N/A` troubleshooting.
-
 
 ## Directory Structure
 
