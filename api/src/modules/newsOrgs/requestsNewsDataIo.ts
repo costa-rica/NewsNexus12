@@ -56,7 +56,6 @@ export async function storeNewsDataIoArticles(
         bodySource: "aggregator-feed",
         extractionSource: "final-url",
         successDetails: "Seeded from NewsData.io article content",
-        missingDetails: "NewsData.io article content missing",
         shortDetails: "NewsData.io article content too short",
       });
       countOfArticlesSavedToDbFromRequest += 1;

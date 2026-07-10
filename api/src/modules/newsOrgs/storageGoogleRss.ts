@@ -138,7 +138,6 @@ export async function storeRequestAndArticles(
       content: item.content,
       bodySource: "rss-feed",
       successDetails: "Seeded from Google RSS item content",
-      missingDetails: "RSS item content missing; triggering Google-to-publisher scrape",
       shortDetails: "RSS item content too short; triggering Google-to-publisher scrape"
     });
     if (seedResult === "needs-scrape") {

@@ -111,7 +111,6 @@ export async function storeNewsApiArticles(
         bodySource: "aggregator-feed",
         extractionSource: "final-url",
         successDetails: "Seeded from NewsAPI article content",
-        missingDetails: "NewsAPI article content missing",
         shortDetails: "NewsAPI article content too short",
       });
       countOfArticlesSavedToDbFromRequest += 1;

@@ -27,7 +27,6 @@ describe('articleContents02Seed', () => {
       bodySource: 'aggregator-feed',
       extractionSource: 'final-url',
       successDetails: 'Seeded from aggregator content',
-      missingDetails: 'Aggregator content missing',
       shortDetails: 'Aggregator content too short'
     });
 
@@ -70,7 +69,6 @@ describe('articleContents02Seed', () => {
       bodySource: 'aggregator-feed',
       extractionSource: 'final-url',
       successDetails: 'Seeded from aggregator content',
-      missingDetails: 'Aggregator content missing',
       shortDetails: 'Aggregator content too short'
     });
 
@@ -90,5 +88,48 @@ describe('articleContents02Seed', () => {
       googleStatusCode: null,
       publisherStatusCode: null
     });
+  });
+
+  test('does not create a row when feed content is missing', async () => {
+    mockFindAll.mockResolvedValueOnce([]);
+
+    const result = await upsertArticleContents02Seed({
+      articleId: 66,
+      discoveryUrl: 'https://example.com/article',
+      title: 'Example',
+      content: null,
+      bodySource: 'rss-feed',
+      successDetails: 'Seeded from Google RSS item content',
+      shortDetails: 'RSS item content too short'
+    });
+
+    expect(result).toBe('needs-scrape');
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('does not touch an existing row when feed content is missing', async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    mockFindAll.mockResolvedValueOnce([
+      {
+        id: 7,
+        status: 'fail',
+        content: null,
+        update
+      }
+    ]);
+
+    const result = await upsertArticleContents02Seed({
+      articleId: 77,
+      discoveryUrl: 'https://example.com/article',
+      title: 'Example',
+      content: '   ',
+      bodySource: 'rss-feed',
+      successDetails: 'Seeded from Google RSS item content',
+      shortDetails: 'RSS item content too short'
+    });
+
+    expect(result).toBe('needs-scrape');
+    expect(update).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 });

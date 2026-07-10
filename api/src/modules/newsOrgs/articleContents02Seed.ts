@@ -12,7 +12,6 @@ export type ArticleContents02SeedInput = {
   title?: string | null;
   content?: string | null;
   successDetails: string;
-  missingDetails: string;
   shortDetails: string;
   bodySource: ArticleContents02SeedBodySource;
   extractionSource?: "final-url" | "none";
@@ -98,6 +97,14 @@ export const upsertArticleContents02Seed = async (
   }
 
   const normalizedContent = normalizeSeedContent(input.content);
+
+  // No feed content: do not create a placeholder row. An existing row would
+  // make the worker-node scraper skip the article, so the follow-up scrape
+  // must find no row for it to run.
+  if (!normalizedContent) {
+    return "needs-scrape";
+  }
+
   const isUsable = hasUsableSeedContent(normalizedContent);
 
   const seedPayload = {
@@ -108,14 +115,10 @@ export const upsertArticleContents02Seed = async (
     title: input.title ?? null,
     content: normalizedContent,
     status: isUsable ? "success" : "fail",
-    failureType: !isUsable && normalizedContent ? "short_content" : null,
-    details: isUsable
-      ? input.successDetails
-      : normalizedContent
-        ? input.shortDetails
-        : input.missingDetails,
+    failureType: isUsable ? null : "short_content",
+    details: isUsable ? input.successDetails : input.shortDetails,
     extractionSource: input.extractionSource ?? "none",
-    bodySource: normalizedContent ? input.bodySource : "none",
+    bodySource: input.bodySource,
     googleStatusCode: null,
     publisherStatusCode: null,
   };
