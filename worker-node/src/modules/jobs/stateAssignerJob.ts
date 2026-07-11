@@ -393,14 +393,19 @@ const runLegacyWorkflow = async (
     getCanonicalContent02Row: dependencies.getCanonicalContent02Row
   });
 
-  logger.info(`Starting to process ${articles.length} articles`);
-
   const analyzeArticle =
     context.aiConfig.backend === 'openai' ? analyzeWithOpenAi : analyzeWithCodexCli;
   const iterationTimeoutMs =
     context.aiConfig.backend === 'openai'
       ? DEFAULT_ITERATION_TIMEOUT_MS
       : context.aiConfig.codexTimeoutMs;
+
+  logger.info('State assigner AI backend selected', {
+    backend: context.aiConfig.backend,
+    modelName: context.aiConfig.modelName,
+    iterationTimeoutMs
+  });
+  logger.info(`Starting to process ${articles.length} articles`);
 
   await processAssignments({
     articles,
