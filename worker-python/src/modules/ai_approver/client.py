@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 from typing import Any
 
+from loguru import logger
+
 from src.modules.ai_approver.config import AiApproverConfig
 from src.modules.ai_approver.errors import AiApproverProcessorError
 
@@ -148,6 +150,12 @@ class AiApproverCodexCliClient:
 def create_ai_approver_client(
     config: AiApproverConfig,
 ) -> AiApproverOpenAIClient | AiApproverCodexCliClient:
+    backend = "codex_cli" if config.use_codex_cli else "openai_api"
+    logger.info(
+        "event=ai_approver_backend_selected backend={} model={}",
+        backend,
+        config.model_name,
+    )
     if config.use_codex_cli:
         return AiApproverCodexCliClient(config)
     return AiApproverOpenAIClient(config)

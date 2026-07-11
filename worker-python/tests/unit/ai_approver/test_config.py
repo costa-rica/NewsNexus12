@@ -30,6 +30,12 @@ def _capture_warnings() -> Iterator[list[str]]:
 def test_from_env_reads_required_values(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_pg_env(monkeypatch)
     monkeypatch.setenv("OPENAI_API_KEY", "secret")
+    # Assertions below cover defaults; the developer .env (loaded by the test
+    # bootstrap) may override these optional vars, so clear them here.
+    monkeypatch.delenv("AI_APPROVER_MODEL_NAME", raising=False)
+    monkeypatch.delenv("AI_APPROVER_MODE", raising=False)
+    monkeypatch.delenv("AI_APPROVER_GATEKEEPER_REJECT_CONFIDENCE_THRESHOLD", raising=False)
+    monkeypatch.delenv("AI_APPROVER_CODEX_TIMEOUT_SECONDS", raising=False)
 
     config = AiApproverConfig.from_env()
 
