@@ -53,21 +53,21 @@ If anything fails, fix the code so the functionality remains and the checks pass
 
 **Phase boundary rule: this phase only creates new files in `src/modules/state-assigner/` and their tests. `src/modules/jobs/stateAssignerJob.ts` is NOT modified in this phase** — its local `analyzeArticleWithOpenAi`, `buildPrompt`, and validation stay in place and in use until Phase 4. The temporary duplication between the job file and the new modules is intentional and lasts exactly one phase; Phase 4 deletes the job-local copies.
 
-- [ ] Create `src/modules/state-assigner/prompt.ts` exporting `buildStateAssignerPrompt(template: string, article: { title: string; content: string }): string` with the same substitution as the job's current `buildPrompt` (`{articleTitle}`, `{articleContent}`). Both clients (Phases 2 and 3) must use this helper — do not duplicate the replacement logic in either client.
-- [ ] Create `src/modules/state-assigner/responseParsing.ts` exporting `parseChatGptResponse(raw: string): ChatGptResponse`:
-  - [ ] Try `JSON.parse(raw)`; on failure, extract the substring from the first `{` to the last `}` and parse that; if still unparseable or not an object → throw descriptive error.
-  - [ ] Validate the parsed object exactly as the job's `analyzeArticleWithOpenAi` does today: `occuredInTheUS` must be boolean; `reasoning` must be a non-empty string.
-  - [ ] Define (or move here) the shared `ChatGptResponse` interface; in Phase 4 the job will import it from here (until then the job keeps its own local definition — do not touch the job file yet).
-- [ ] Create `src/modules/state-assigner/openAiClient.ts` with `analyzeArticleWithOpenAi(...)` as an *extracted copy* of the job's current function, adapted to the new shapes:
-  - [ ] Takes the `openai` variant of `StateAssignerAiConfig`; model comes from `aiConfig.modelName` instead of the hardcoded `'gpt-4o-mini'`.
-  - [ ] Uses `buildStateAssignerPrompt` and `parseChatGptResponse`.
-  - [ ] Same fetch call, headers, temperature, error messages, and abort-signal behavior as the job-local original. Do not resurrect the commented-out raw-response file writes.
-- [ ] Create `tests/modules/stateAssignerResponseParsing.test.ts`:
-  - [ ] Strict JSON parses.
-  - [ ] JSON wrapped in preamble/suffix text parses via brace extraction.
-  - [ ] Garbage / no braces / non-object JSON → error.
-  - [ ] Missing `occuredInTheUS`, wrong-type `occuredInTheUS`, missing/empty `reasoning` → errors matching current messages.
-- [ ] (Optional but recommended) A small test for `buildStateAssignerPrompt` covering both placeholders.
+- [x] Create `src/modules/state-assigner/prompt.ts` exporting `buildStateAssignerPrompt(template: string, article: { title: string; content: string }): string` with the same substitution as the job's current `buildPrompt` (`{articleTitle}`, `{articleContent}`). Both clients (Phases 2 and 3) must use this helper — do not duplicate the replacement logic in either client.
+- [x] Create `src/modules/state-assigner/responseParsing.ts` exporting `parseChatGptResponse(raw: string): ChatGptResponse`:
+  - [x] Try `JSON.parse(raw)`; on failure, extract the substring from the first `{` to the last `}` and parse that; if still unparseable or not an object → throw descriptive error.
+  - [x] Validate the parsed object exactly as the job's `analyzeArticleWithOpenAi` does today: `occuredInTheUS` must be boolean; `reasoning` must be a non-empty string.
+  - [x] Define (or move here) the shared `ChatGptResponse` interface; in Phase 4 the job will import it from here (until then the job keeps its own local definition — do not touch the job file yet).
+- [x] Create `src/modules/state-assigner/openAiClient.ts` with `analyzeArticleWithOpenAi(...)` as an *extracted copy* of the job's current function, adapted to the new shapes:
+  - [x] Takes the `openai` variant of `StateAssignerAiConfig`; model comes from `aiConfig.modelName` instead of the hardcoded `'gpt-4o-mini'`.
+  - [x] Uses `buildStateAssignerPrompt` and `parseChatGptResponse`.
+  - [x] Same fetch call, headers, temperature, error messages, and abort-signal behavior as the job-local original. Do not resurrect the commented-out raw-response file writes.
+- [x] Create `tests/modules/stateAssignerResponseParsing.test.ts`:
+  - [x] Strict JSON parses.
+  - [x] JSON wrapped in preamble/suffix text parses via brace extraction.
+  - [x] Garbage / no braces / non-object JSON → error.
+  - [x] Missing `occuredInTheUS`, wrong-type `occuredInTheUS`, missing/empty `reasoning` → errors matching current messages.
+- [x] (Optional but recommended) A small test for `buildStateAssignerPrompt` covering both placeholders.
 
 ## Phase 3 — Codex CLI client
 
