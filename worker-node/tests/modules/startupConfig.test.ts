@@ -11,7 +11,6 @@ const requiredEnv = {
   PATH_TO_SEMANTIC_SCORER_DIR: "/tmp/semantic",
   PATH_TO_LOGS: "/tmp/logs",
   NODE_ENV: "testing",
-  KEY_OPEN_AI: "abc123",
   PATH_TO_STATE_ASSIGNER_FILES: "/tmp/chatgpt",
   NAME_APP: "worker-node",
   PG_HOST: "localhost",
@@ -24,6 +23,21 @@ const requiredEnv = {
 };
 
 describe("startup config validation", () => {
+  it("loads without KEY_OPEN_AI because state assigner can use codex by default", () => {
+    const config = loadAppConfig(requiredEnv);
+
+    expect(config.keyOpenAi).toBeUndefined();
+  });
+
+  it("keeps KEY_OPEN_AI when provided for OpenAI API mode", () => {
+    const config = loadAppConfig({
+      ...requiredEnv,
+      KEY_OPEN_AI: "abc123",
+    });
+
+    expect(config.keyOpenAi).toBe("abc123");
+  });
+
   it("validates DELETE_ARTICLES_BATCH_SIZE when provided", () => {
     expect(() =>
       loadAppConfig({
@@ -74,6 +88,7 @@ describe("startup config validation", () => {
     expect(stderrSpy).toHaveBeenCalledWith(
       expect.stringContaining("Missing required environment variables"),
     );
+    expect(stderrSpy).not.toHaveBeenCalledWith(expect.stringContaining("KEY_OPEN_AI"));
 
     stderrSpy.mockRestore();
   });

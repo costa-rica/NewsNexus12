@@ -9,9 +9,13 @@ import {
   ArticleAutomationTargetingInput,
   validateArticleAutomationTargetingInput
 } from '../modules/articleTargeting';
+import {
+  resolveStateAssignerAiConfig,
+  StateAssignerAiConfig
+} from '../modules/state-assigner/config';
 
 export interface StateAssignerStartInput extends ArticleAutomationTargetingInput {
-  keyOpenAi: string;
+  aiConfig: StateAssignerAiConfig;
   pathToStateAssignerFiles: string;
 }
 
@@ -19,22 +23,8 @@ interface StateAssignerRouteDependencies {
   queueEngine: GlobalQueueEngine;
   env: NodeJS.ProcessEnv;
   buildJobHandler: (input: StateAssignerStartInput) => QueueJobHandler;
+  resolveAiConfig?: typeof resolveStateAssignerAiConfig;
 }
-
-const resolveOpenAiKey = (env: NodeJS.ProcessEnv): string => {
-  const value = env.KEY_OPEN_AI;
-
-  if (!value || value.trim() === '') {
-    throw AppError.validation([
-      {
-        field: 'KEY_OPEN_AI',
-        message: 'KEY_OPEN_AI env var is required'
-      }
-    ]);
-  }
-
-  return value.trim();
-};
 
 const resolveStateAssignerFilesPath = (env: NodeJS.ProcessEnv): string => {
   const value = env.PATH_TO_STATE_ASSIGNER_FILES;
@@ -55,16 +45,22 @@ export const createStateAssignerRouter = (
   dependencies: StateAssignerRouteDependencies = {
     queueEngine: globalQueueEngine,
     env: process.env,
-    buildJobHandler: createStateAssignerJobHandler
+    buildJobHandler: createStateAssignerJobHandler,
+    resolveAiConfig: resolveStateAssignerAiConfig
   }
 ): Router => {
   const router = Router();
-  const { queueEngine, env, buildJobHandler } = dependencies;
+  const {
+    queueEngine,
+    env,
+    buildJobHandler,
+    resolveAiConfig = resolveStateAssignerAiConfig
+  } = dependencies;
 
   router.post('/start-job', async (req, res, next) => {
     try {
       const endpointName = '/state-assigner/start-job';
-      const openAiKey = resolveOpenAiKey(env);
+      const aiConfig = resolveAiConfig(env);
       const pathToStateAssignerFiles = resolveStateAssignerFilesPath(env);
       const body = validateArticleAutomationTargetingInput(req.body);
 
@@ -72,6 +68,8 @@ export const createStateAssignerRouter = (
         endpointName,
         targetArticleThresholdDaysOld: body.targetArticleThresholdDaysOld,
         targetArticleStateReviewCount: body.targetArticleStateReviewCount,
+        backend: aiConfig.backend,
+        modelName: aiConfig.modelName,
         pathToStateAssignerFiles
       });
 
@@ -79,7 +77,7 @@ export const createStateAssignerRouter = (
         endpointName,
         run: buildJobHandler({
           ...body,
-          keyOpenAi: openAiKey,
+          aiConfig,
           pathToStateAssignerFiles
         })
       });

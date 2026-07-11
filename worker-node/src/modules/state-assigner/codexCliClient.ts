@@ -13,8 +13,6 @@ import { ChatGptResponse, parseChatGptResponse } from './responseParsing';
 const OUTPUT_TAIL_CHARS = 400;
 const CODEX_KILL_GRACE_MS = 5_000;
 
-type CodexStateAssignerConfig = Extract<StateAssignerAiConfig, { backend: 'codex-cli' }>;
-
 interface CodexChildProcess extends EventEmitter, CancelableProcessHandle {
   stdin: Writable;
   stdout: Readable;
@@ -179,7 +177,7 @@ const waitForClose = async (
 };
 
 export const analyzeArticleWithCodexCli = async (
-  aiConfig: CodexStateAssignerConfig,
+  aiConfig: StateAssignerAiConfig,
   stateAssignerDirectories: StateAssignerDirectories,
   promptTemplate: string,
   article: StateAssignerPromptArticle,
@@ -187,6 +185,10 @@ export const analyzeArticleWithCodexCli = async (
   registerCancelableProcess: (handle: CancelableProcessHandle) => void,
   dependencies: AnalyzeArticleWithCodexCliDependencies = {}
 ): Promise<ChatGptResponse> => {
+  if (aiConfig.backend !== 'codex-cli') {
+    throw new Error('Codex CLI state assigner client requires the codex-cli backend');
+  }
+
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'state-assigner-codex-'));
   const outputPath = path.join(tempDir, 'last-message.txt');
   await fs.writeFile(outputPath, '', 'utf8');

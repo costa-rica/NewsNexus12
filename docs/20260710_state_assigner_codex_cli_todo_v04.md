@@ -98,47 +98,47 @@ This phase removes the Phase 2 duplication: the job file switches to the `src/mo
 
 **Test strategy for this phase (decided, do not improvise):** the Phase 4 tests exercise the **real** `runLegacyWorkflow` with **every** external effect injected as a narrow dependency — no test database, no seeded rows, no real prompt directories, no `jest.mock` module mocking, and no injected replacement `runLegacyWorkflow`. Backend selection and timeout selection are asserted by inspecting the options object the real `runLegacyWorkflow` passes to an injected fake `processAssignments`.
 
-- [ ] Replace `keyOpenAi: string` in `StateAssignerJobInput` (and `StateAssignerJobContext`) with `aiConfig: StateAssignerAiConfig`.
-- [ ] Add `registerCancelableProcess: (handle: CancelableProcessHandle) => void` to `StateAssignerJobContext`; forward it from `QueueExecutionContext` in `createStateAssignerJobHandler` (today only `jobId` and `signal` are forwarded).
-- [ ] Change the injected `analyzeArticle` signature to `(aiConfig, stateAssignerDirectories, promptTemplate, article, signal, registerCancelableProcess)`; update `ProcessStateAssignmentsOptions` accordingly (replace `keyOpenAi` with `aiConfig`, add `registerCancelableProcess`). The OpenAI client ignores the hook; the codex client uses it.
-- [ ] Extend `StateAssignerJobDependencies` with the following seams. All are optional in the TypeScript interface with the real implementation as the production default (same pattern as the existing `selectArticles`), but **implementing every seam below is required** — the Phase 4 tests depend on them:
-  - [ ] `analyzeWithOpenAi?: typeof analyzeArticleWithOpenAi` (default: real client from `openAiClient.ts`)
-  - [ ] `analyzeWithCodexCli?: typeof analyzeArticleWithCodexCli` (default: real client from `codexCliClient.ts`)
-  - [ ] `processAssignments?: typeof processStateAssignmentsWithTimeout` (default: the real function) — required seam: the timeout- and analyzer-selection tests assert on its captured options.
-  - [ ] Workflow-setup seams so tests never touch DB or filesystem:
-    - [ ] `ensureDb?: typeof ensureDbReady` (default: real)
-    - [ ] `ensureDirectories?: typeof ensureStateAssignerDirectories` (default: real)
-    - [ ] `syncPrompts?: (promptsDir: string) => Promise<void>` (default: the module's `syncPromptFilesToDatabase`)
-    - [ ] `resolveEntityWhoCategorizes?: () => Promise<number>` (default: the module's `resolveEntityWhoCategorizesId`)
-    - [ ] `loadPrompt?: () => Promise<PromptData>` (default: the module's `getPrompt`)
-  - [ ] `createStateAssignerJobHandler` threads all of these into `runLegacyWorkflow` the same way `selectArticles` / `enrichContent02` / `getCanonicalContent02Row` already flow.
-- [ ] In `runLegacyWorkflow`: use the injected setup seams in place of the direct calls; select the analyzer by `aiConfig.backend` (`analyzeWithOpenAi` vs `analyzeWithCodexCli`); call `processAssignments` with `iterationTimeoutMs` selected by backend: `DEFAULT_ITERATION_TIMEOUT_MS` (10 s) for `openai`, `aiConfig.codexTimeoutMs` for `codex-cli`.
-- [ ] Delete the job-local `analyzeArticleWithOpenAi`, `buildPrompt`, inline response validation, and local `ChatGptResponse` definition; import `ChatGptResponse` from `responseParsing.ts` (re-export from the job file if existing importers reference it there — check `grep -rn "ChatGptResponse" worker-node/src worker-node/tests` and keep those imports compiling). Persistence, prompt sync, targeting, enrichment, and `NewsNexusLlmStateAssigner01` attribution stay untouched.
-- [ ] Update `tests/modules/stateAssignerJob.test.ts`:
-  - [ ] Fix the existing two tests for the new input/context/analyzer shapes.
-  - [ ] Add a shared helper that runs the real `runLegacyWorkflow` (via `createStateAssignerJobHandler` with no `runLegacyWorkflow` override) with all seams injected as fakes: `ensureDb`/`ensureDirectories`/`syncPrompts` resolve trivially (`ensureDirectories` returns a fake `StateAssignerDirectories` object), `resolveEntityWhoCategorizes` returns a fixed id, `loadPrompt` returns a fixed `PromptData`, `selectArticles` returns one fake article, `enrichContent02` returns an empty summary, `getCanonicalContent02Row` returns null (falls back to description), and `processAssignments` is a jest fn capturing its options.
-  - [ ] Add: analyzer chosen by backend — with an `openai` config, the captured `processAssignments` options' `analyzeArticle` is the injected `analyzeWithOpenAi` fake; with a `codex-cli` config, it is the injected `analyzeWithCodexCli` fake.
-  - [ ] Add: iteration timeout selection — captured `iterationTimeoutMs` is `10_000` for the `openai` config and equals `codexTimeoutMs` for the `codex-cli` config.
-  - [ ] Add: `registerCancelableProcess` forwarding — the hook passed to the queue-context handler appears in the captured `processAssignments` options (and is the same function the analyzer will receive).
+- [x] Replace `keyOpenAi: string` in `StateAssignerJobInput` (and `StateAssignerJobContext`) with `aiConfig: StateAssignerAiConfig`.
+- [x] Add `registerCancelableProcess: (handle: CancelableProcessHandle) => void` to `StateAssignerJobContext`; forward it from `QueueExecutionContext` in `createStateAssignerJobHandler` (today only `jobId` and `signal` are forwarded).
+- [x] Change the injected `analyzeArticle` signature to `(aiConfig, stateAssignerDirectories, promptTemplate, article, signal, registerCancelableProcess)`; update `ProcessStateAssignmentsOptions` accordingly (replace `keyOpenAi` with `aiConfig`, add `registerCancelableProcess`). The OpenAI client ignores the hook; the codex client uses it.
+- [x] Extend `StateAssignerJobDependencies` with the following seams. All are optional in the TypeScript interface with the real implementation as the production default (same pattern as the existing `selectArticles`), but **implementing every seam below is required** — the Phase 4 tests depend on them:
+  - [x] `analyzeWithOpenAi?: typeof analyzeArticleWithOpenAi` (default: real client from `openAiClient.ts`)
+  - [x] `analyzeWithCodexCli?: typeof analyzeArticleWithCodexCli` (default: real client from `codexCliClient.ts`)
+  - [x] `processAssignments?: typeof processStateAssignmentsWithTimeout` (default: the real function) — required seam: the timeout- and analyzer-selection tests assert on its captured options.
+  - [x] Workflow-setup seams so tests never touch DB or filesystem:
+    - [x] `ensureDb?: typeof ensureDbReady` (default: real)
+    - [x] `ensureDirectories?: typeof ensureStateAssignerDirectories` (default: real)
+    - [x] `syncPrompts?: (promptsDir: string) => Promise<void>` (default: the module's `syncPromptFilesToDatabase`)
+    - [x] `resolveEntityWhoCategorizes?: () => Promise<number>` (default: the module's `resolveEntityWhoCategorizesId`)
+    - [x] `loadPrompt?: () => Promise<PromptData>` (default: the module's `getPrompt`)
+  - [x] `createStateAssignerJobHandler` threads all of these into `runLegacyWorkflow` the same way `selectArticles` / `enrichContent02` / `getCanonicalContent02Row` already flow.
+- [x] In `runLegacyWorkflow`: use the injected setup seams in place of the direct calls; select the analyzer by `aiConfig.backend` (`analyzeWithOpenAi` vs `analyzeWithCodexCli`); call `processAssignments` with `iterationTimeoutMs` selected by backend: `DEFAULT_ITERATION_TIMEOUT_MS` (10 s) for `openai`, `aiConfig.codexTimeoutMs` for `codex-cli`.
+- [x] Delete the job-local `analyzeArticleWithOpenAi`, `buildPrompt`, inline response validation, and local `ChatGptResponse` definition; import `ChatGptResponse` from `responseParsing.ts` (re-export from the job file if existing importers reference it there — check `grep -rn "ChatGptResponse" worker-node/src worker-node/tests` and keep those imports compiling). Persistence, prompt sync, targeting, enrichment, and `NewsNexusLlmStateAssigner01` attribution stay untouched.
+- [x] Update `tests/modules/stateAssignerJob.test.ts`:
+  - [x] Fix the existing two tests for the new input/context/analyzer shapes.
+  - [x] Add a shared helper that runs the real `runLegacyWorkflow` (via `createStateAssignerJobHandler` with no `runLegacyWorkflow` override) with all seams injected as fakes: `ensureDb`/`ensureDirectories`/`syncPrompts` resolve trivially (`ensureDirectories` returns a fake `StateAssignerDirectories` object), `resolveEntityWhoCategorizes` returns a fixed id, `loadPrompt` returns a fixed `PromptData`, `selectArticles` returns one fake article, `enrichContent02` returns an empty summary, `getCanonicalContent02Row` returns null (falls back to description), and `processAssignments` is a jest fn capturing its options.
+  - [x] Add: analyzer chosen by backend — with an `openai` config, the captured `processAssignments` options' `analyzeArticle` is the injected `analyzeWithOpenAi` fake; with a `codex-cli` config, it is the injected `analyzeWithCodexCli` fake.
+  - [x] Add: iteration timeout selection — captured `iterationTimeoutMs` is `10_000` for the `openai` config and equals `codexTimeoutMs` for the `codex-cli` config.
+  - [x] Add: `registerCancelableProcess` forwarding — the hook passed to the queue-context handler appears in the captured `processAssignments` options (and is the same function the analyzer will receive).
 
 ## Phase 5 — Route and startup config
 
-- [ ] `src/routes/stateAssigner.ts`:
-  - [ ] Delete `resolveOpenAiKey`.
-  - [ ] Extend `StateAssignerRouteDependencies` with `resolveAiConfig?: typeof resolveStateAssignerAiConfig`, defaulting to the real `resolveStateAssignerAiConfig` (which uses the real binary check) in the production default dependency object. Route tests inject a `resolveAiConfig` that returns a deterministic config (or throws `AppError.validation`) so CI never needs `codex` on `PATH`.
-  - [ ] Call the resolver at the route boundary; validation errors flow to `errorHandler` as today.
-  - [ ] Pass the resolved `aiConfig` into `buildJobHandler` (replacing `keyOpenAi`); keep `pathToStateAssignerFiles` resolution unchanged.
-  - [ ] Add resolved `backend` and `modelName` to the "Received state assigner start request" log line. Never log the API key.
-  - [ ] Endpoint name and `202 { jobId, status, endpointName }` response unchanged.
-- [ ] `src/modules/startup/config.ts`:
-  - [ ] Remove `KEY_OPEN_AI` from `REQUIRED_ENV_VARS`; change `AppConfig.keyOpenAi` to `keyOpenAi?: string`, read leniently (undefined when unset). No startup codex-binary check.
-- [ ] Update `tests/routes/stateAssigner.test.ts`:
-  - [ ] Existing tests updated for the new `buildJobHandler` input shape (`aiConfig` instead of `keyOpenAi`), injecting `resolveAiConfig` through the route dependencies.
-  - [ ] Missing `KEY_OPEN_AI` with codex resolvable (injected) → 202 (no longer a 400).
-  - [ ] `USE_OPEN_AI_API=true` without key → 202 via codex fallback.
-  - [ ] Injected resolver throwing the binary-missing `AppError.validation` → 400 `VALIDATION_ERROR`.
-  - [ ] `USE_OPEN_AI_API=true` + key → job handler receives an `openai` config.
-- [ ] Update `tests/modules/startupConfig.test.ts`: startup succeeds without `KEY_OPEN_AI`; `KEY_OPEN_AI` no longer appears in missing-vars errors.
+- [x] `src/routes/stateAssigner.ts`:
+  - [x] Delete `resolveOpenAiKey`.
+  - [x] Extend `StateAssignerRouteDependencies` with `resolveAiConfig?: typeof resolveStateAssignerAiConfig`, defaulting to the real `resolveStateAssignerAiConfig` (which uses the real binary check) in the production default dependency object. Route tests inject a `resolveAiConfig` that returns a deterministic config (or throws `AppError.validation`) so CI never needs `codex` on `PATH`.
+  - [x] Call the resolver at the route boundary; validation errors flow to `errorHandler` as today.
+  - [x] Pass the resolved `aiConfig` into `buildJobHandler` (replacing `keyOpenAi`); keep `pathToStateAssignerFiles` resolution unchanged.
+  - [x] Add resolved `backend` and `modelName` to the "Received state assigner start request" log line. Never log the API key.
+  - [x] Endpoint name and `202 { jobId, status, endpointName }` response unchanged.
+- [x] `src/modules/startup/config.ts`:
+  - [x] Remove `KEY_OPEN_AI` from `REQUIRED_ENV_VARS`; change `AppConfig.keyOpenAi` to `keyOpenAi?: string`, read leniently (undefined when unset). No startup codex-binary check.
+- [x] Update `tests/routes/stateAssigner.test.ts`:
+  - [x] Existing tests updated for the new `buildJobHandler` input shape (`aiConfig` instead of `keyOpenAi`), injecting `resolveAiConfig` through the route dependencies.
+  - [x] Missing `KEY_OPEN_AI` with codex resolvable (injected) → 202 (no longer a 400).
+  - [x] `USE_OPEN_AI_API=true` without key → 202 via codex fallback.
+  - [x] Injected resolver throwing the binary-missing `AppError.validation` → 400 `VALIDATION_ERROR`.
+  - [x] `USE_OPEN_AI_API=true` + key → job handler receives an `openai` config.
+- [x] Update `tests/modules/startupConfig.test.ts`: startup succeeds without `KEY_OPEN_AI`; `KEY_OPEN_AI` no longer appears in missing-vars errors.
 
 ## Phase 6 — Documentation
 

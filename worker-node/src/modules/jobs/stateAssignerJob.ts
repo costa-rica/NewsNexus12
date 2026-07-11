@@ -8,7 +8,7 @@ import {
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import logger, { logWorkflowStart } from '../logger';
-import { QueueExecutionContext } from '../queue/queueEngine';
+import { CancelableProcessHandle, QueueExecutionContext } from '../queue/queueEngine';
 import { ensureStateAssignerDirectories, StateAssignerDirectories } from '../startup/stateAssignerFiles';
 import ensureDbReady from '../db/ensureDbReady';
 import { selectTargetArticles, TargetArticleRecord } from '../articleTargeting';
@@ -17,6 +17,10 @@ import {
   getCanonicalArticleContent02Row,
   hasUsableArticleContent02
 } from '../article-content-02/repository';
+import { StateAssignerAiConfig } from '../state-assigner/config';
+import { analyzeArticleWithCodexCli } from '../state-assigner/codexCliClient';
+import { analyzeArticleWithOpenAi } from '../state-assigner/openAiClient';
+import { ChatGptResponse } from '../state-assigner/responseParsing';
 
 interface StateAssignerArticle {
   id: number;
@@ -32,7 +36,7 @@ interface PromptData {
 export interface StateAssignerJobInput {
   targetArticleThresholdDaysOld: number;
   targetArticleStateReviewCount: number;
-  keyOpenAi: string;
+  aiConfig: StateAssignerAiConfig;
   pathToStateAssignerFiles: string;
   articleIdMinExclusive?: number;
   articleIdMaxInclusive?: number;
@@ -43,36 +47,28 @@ export interface StateAssignerJobInput {
 export interface StateAssignerJobContext extends StateAssignerJobInput {
   jobId: string;
   signal: AbortSignal;
+  registerCancelableProcess: (handle: CancelableProcessHandle) => void;
 }
 
-export interface ChatGptResponse {
-  occuredInTheUS: boolean;
-  reasoning: string;
-  state?: string;
-}
-
-export interface StateAssignerJobDependencies {
-  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<void>;
-  selectArticles?: typeof selectTargetArticles;
-  enrichContent02?: typeof enrichArticleContent02;
-  getCanonicalContent02Row?: typeof getCanonicalArticleContent02Row;
-}
+type AnalyzeStateAssignerArticle = (
+  aiConfig: StateAssignerAiConfig,
+  stateAssignerDirectories: StateAssignerDirectories,
+  promptTemplate: string,
+  article: StateAssignerArticle,
+  signal: AbortSignal,
+  registerCancelableProcess: (handle: CancelableProcessHandle) => void
+) => Promise<ChatGptResponse>;
 
 interface ProcessStateAssignmentsOptions {
   articles: StateAssignerArticle[];
   prompt: PromptData;
   entityWhoCategorizesId: number;
-  keyOpenAi: string;
+  aiConfig: StateAssignerAiConfig;
   stateAssignerDirectories: StateAssignerDirectories;
   iterationTimeoutMs: number;
   signal: AbortSignal;
-  analyzeArticle: (
-    keyOpenAi: string,
-    stateAssignerDirectories: StateAssignerDirectories,
-    promptTemplate: string,
-    article: StateAssignerArticle,
-    signal: AbortSignal
-  ) => Promise<ChatGptResponse>;
+  registerCancelableProcess: (handle: CancelableProcessHandle) => void;
+  analyzeArticle: AnalyzeStateAssignerArticle;
   persistAssignment: (
     articleId: number,
     response: ChatGptResponse,
@@ -84,6 +80,21 @@ interface ProcessStateAssignmentsOptions {
     warn: (message: string) => void;
     error: (message: string) => void;
   };
+}
+
+export interface StateAssignerJobDependencies {
+  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<void>;
+  selectArticles?: typeof selectTargetArticles;
+  enrichContent02?: typeof enrichArticleContent02;
+  getCanonicalContent02Row?: typeof getCanonicalArticleContent02Row;
+  analyzeWithOpenAi?: AnalyzeStateAssignerArticle;
+  analyzeWithCodexCli?: AnalyzeStateAssignerArticle;
+  processAssignments?: (options: ProcessStateAssignmentsOptions) => Promise<void>;
+  ensureDb?: typeof ensureDbReady;
+  ensureDirectories?: typeof ensureStateAssignerDirectories;
+  syncPrompts?: (promptsDir: string) => Promise<void>;
+  resolveEntityWhoCategorizes?: () => Promise<number>;
+  loadPrompt?: () => Promise<PromptData>;
 }
 
 const LEGACY_AI_NAME = 'NewsNexusLlmStateAssigner01';
@@ -187,63 +198,6 @@ const buildStateAssignerArticles = async (
   );
 };
 
-const buildPrompt = (template: string, article: StateAssignerArticle): string =>
-  template.replace('{articleTitle}', article.title).replace('{articleContent}', article.content);
-
-const analyzeArticleWithOpenAi = async (
-  keyOpenAi: string,
-  stateAssignerDirectories: StateAssignerDirectories,
-  promptTemplate: string,
-  article: StateAssignerArticle,
-  signal: AbortSignal
-): Promise<ChatGptResponse> => {
-  const prompt = buildPrompt(promptTemplate, article);
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${keyOpenAi}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3
-    }),
-    signal
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI request failed with status ${response.status}`);
-  }
-
-  const completion = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const rawContent = completion.choices?.[0]?.message?.content;
-  if (!rawContent) {
-    throw new Error('No response content from OpenAI');
-  }
-
-  // Raw ChatGPT responses are no longer persisted to chatgpt_responses.
-  // The response is still parsed in memory below for state assignment.
-  // const responseFileName = `response-${article.id}-${new Date().toISOString().replace(/:/g, '-')}.json`;
-  // const responseFilePath = path.join(stateAssignerDirectories.chatGptResponsesDir, responseFileName);
-  // await fs.writeFile(responseFilePath, rawContent, 'utf8');
-
-  const parsed = JSON.parse(rawContent) as ChatGptResponse;
-
-  if (typeof parsed.occuredInTheUS !== 'boolean') {
-    throw new Error("Invalid response: missing or invalid 'occuredInTheUS'");
-  }
-  if (typeof parsed.reasoning !== 'string' || parsed.reasoning.trim() === '') {
-    throw new Error("Invalid response: missing 'reasoning'");
-  }
-
-  return parsed;
-};
-
 const saveArticleStateContract = async (
   articleId: number,
   response: ChatGptResponse,
@@ -316,10 +270,11 @@ export const processStateAssignmentsWithTimeout = async ({
   articles,
   prompt,
   entityWhoCategorizesId,
-  keyOpenAi,
+  aiConfig,
   stateAssignerDirectories,
   iterationTimeoutMs,
   signal,
+  registerCancelableProcess,
   analyzeArticle,
   persistAssignment,
   log
@@ -336,11 +291,12 @@ export const processStateAssignmentsWithTimeout = async ({
       const result = await runWithIterationTimeout(
         (iterationSignal) =>
           analyzeArticle(
-            keyOpenAi,
+            aiConfig,
             stateAssignerDirectories,
             prompt.content,
             article,
-            iterationSignal
+            iterationSignal,
+            registerCancelableProcess
           ),
         iterationTimeoutMs,
         signal
@@ -369,10 +325,7 @@ export const processStateAssignmentsWithTimeout = async ({
 
 const runLegacyWorkflow = async (
   context: StateAssignerJobContext,
-  dependencies: Pick<
-    StateAssignerJobDependencies,
-    'selectArticles' | 'enrichContent02' | 'getCanonicalContent02Row'
-  > = {}
+  dependencies: StateAssignerJobDependencies = {}
 ): Promise<void> => {
   logWorkflowStart('State Assigner', {
     jobId: context.jobId,
@@ -380,16 +333,27 @@ const runLegacyWorkflow = async (
     targetArticleStateReviewCount: context.targetArticleStateReviewCount
   });
 
-  await ensureDbReady();
-  const stateAssignerDirectories = await ensureStateAssignerDirectories(
-    context.pathToStateAssignerFiles
-  );
-  await syncPromptFilesToDatabase(stateAssignerDirectories.promptsDir);
-
+  const ensureDb = dependencies.ensureDb ?? ensureDbReady;
+  const ensureDirectories = dependencies.ensureDirectories ?? ensureStateAssignerDirectories;
+  const syncPrompts = dependencies.syncPrompts ?? syncPromptFilesToDatabase;
+  const resolveEntityWhoCategorizes =
+    dependencies.resolveEntityWhoCategorizes ?? resolveEntityWhoCategorizesId;
+  const loadPrompt = dependencies.loadPrompt ?? getPrompt;
   const selectArticles = dependencies.selectArticles ?? selectTargetArticles;
   const enrichContent02 = dependencies.enrichContent02 ?? enrichArticleContent02;
-  const entityWhoCategorizesId = await resolveEntityWhoCategorizesId();
-  const prompt = await getPrompt();
+  const analyzeWithOpenAi = dependencies.analyzeWithOpenAi ?? analyzeArticleWithOpenAi;
+  const analyzeWithCodexCli = dependencies.analyzeWithCodexCli ?? analyzeArticleWithCodexCli;
+  const processAssignments =
+    dependencies.processAssignments ?? processStateAssignmentsWithTimeout;
+
+  await ensureDb();
+  const stateAssignerDirectories = await ensureDirectories(
+    context.pathToStateAssignerFiles
+  );
+  await syncPrompts(stateAssignerDirectories.promptsDir);
+
+  const entityWhoCategorizesId = await resolveEntityWhoCategorizes();
+  const prompt = await loadPrompt();
   const candidateArticles = await selectArticles({
     targetArticleStateReviewCount: context.targetArticleStateReviewCount,
     targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
@@ -431,15 +395,23 @@ const runLegacyWorkflow = async (
 
   logger.info(`Starting to process ${articles.length} articles`);
 
-  await processStateAssignmentsWithTimeout({
+  const analyzeArticle =
+    context.aiConfig.backend === 'openai' ? analyzeWithOpenAi : analyzeWithCodexCli;
+  const iterationTimeoutMs =
+    context.aiConfig.backend === 'openai'
+      ? DEFAULT_ITERATION_TIMEOUT_MS
+      : context.aiConfig.codexTimeoutMs;
+
+  await processAssignments({
     articles,
     prompt,
     entityWhoCategorizesId,
-    keyOpenAi: context.keyOpenAi,
+    aiConfig: context.aiConfig,
     stateAssignerDirectories,
-    iterationTimeoutMs: DEFAULT_ITERATION_TIMEOUT_MS,
+    iterationTimeoutMs,
     signal: context.signal,
-    analyzeArticle: analyzeArticleWithOpenAi,
+    registerCancelableProcess: context.registerCancelableProcess,
+    analyzeArticle,
     persistAssignment: saveArticleStateContract,
     log: logger
   });
@@ -451,20 +423,16 @@ export const createStateAssignerJobHandler = (
 ) => {
   const workflowRunner =
     dependencies.runLegacyWorkflow ??
-    ((context: StateAssignerJobContext) =>
-      runLegacyWorkflow(context, {
-        selectArticles: dependencies.selectArticles,
-        enrichContent02: dependencies.enrichContent02,
-        getCanonicalContent02Row: dependencies.getCanonicalContent02Row
-      }));
+    ((context: StateAssignerJobContext) => runLegacyWorkflow(context, dependencies));
 
   return async (queueContext: QueueExecutionContext): Promise<void> => {
     await workflowRunner({
       jobId: queueContext.jobId,
       signal: queueContext.signal,
+      registerCancelableProcess: queueContext.registerCancelableProcess,
       targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
       targetArticleStateReviewCount: input.targetArticleStateReviewCount,
-      keyOpenAi: input.keyOpenAi,
+      aiConfig: input.aiConfig,
       pathToStateAssignerFiles: input.pathToStateAssignerFiles,
       articleIds: input.articleIds,
       includeArticlesThatMightHaveBeenStateAssigned: input.includeArticlesThatMightHaveBeenStateAssigned,

@@ -1,17 +1,21 @@
 import { StateAssignerDirectories } from '../startup/stateAssignerFiles';
+import { CancelableProcessHandle } from '../queue/queueEngine';
 import { StateAssignerAiConfig } from './config';
 import { buildStateAssignerPrompt, StateAssignerPromptArticle } from './prompt';
 import { ChatGptResponse, parseChatGptResponse } from './responseParsing';
 
-type OpenAiStateAssignerConfig = Extract<StateAssignerAiConfig, { backend: 'openai' }>;
-
 export const analyzeArticleWithOpenAi = async (
-  aiConfig: OpenAiStateAssignerConfig,
+  aiConfig: StateAssignerAiConfig,
   stateAssignerDirectories: StateAssignerDirectories,
   promptTemplate: string,
   article: StateAssignerPromptArticle,
-  signal: AbortSignal
+  signal: AbortSignal,
+  registerCancelableProcess?: (handle: CancelableProcessHandle) => void
 ): Promise<ChatGptResponse> => {
+  if (aiConfig.backend !== 'openai') {
+    throw new Error('OpenAI state assigner client requires the openai backend');
+  }
+
   const prompt = buildStateAssignerPrompt(promptTemplate, article);
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -47,6 +51,7 @@ export const analyzeArticleWithOpenAi = async (
   // const responseFilePath = path.join(stateAssignerDirectories.chatGptResponsesDir, responseFileName);
   // await fs.writeFile(responseFilePath, rawContent, 'utf8');
   void stateAssignerDirectories;
+  void registerCancelableProcess;
 
   return parseChatGptResponse(rawContent);
 };

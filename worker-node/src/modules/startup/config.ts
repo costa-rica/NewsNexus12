@@ -3,7 +3,6 @@ const REQUIRED_ENV_VARS = [
   "PATH_TO_SEMANTIC_SCORER_DIR",
   "PATH_TO_LOGS",
   "NODE_ENV",
-  "KEY_OPEN_AI",
   "PATH_TO_STATE_ASSIGNER_FILES",
   "NAME_APP",
   "PG_HOST",
@@ -22,7 +21,7 @@ export interface AppConfig {
   pathToSemanticScorerDir: string;
   pathToLogs: string;
   nodeEnv: RuntimeNodeEnv;
-  keyOpenAi: string;
+  keyOpenAi?: string;
   pathToStateAssignerFiles: string;
   nameApp: string;
   pgHost: string;
@@ -149,7 +148,7 @@ export const loadAppConfig = (
     ),
     pathToLogs: readRequiredString(env, "PATH_TO_LOGS"),
     nodeEnv,
-    keyOpenAi: readRequiredString(env, "KEY_OPEN_AI"),
+    keyOpenAi: env.KEY_OPEN_AI?.trim() || undefined,
     pathToStateAssignerFiles: readRequiredString(
       env,
       "PATH_TO_STATE_ASSIGNER_FILES",

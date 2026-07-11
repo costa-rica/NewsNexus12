@@ -3,20 +3,39 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
+import { AppError } from '../../src/modules/errors/appError';
 import { errorHandler } from '../../src/modules/middleware/errorHandlers';
 import { QueueJobStore } from '../../src/modules/queue/jobStore';
 import { GlobalQueueEngine, QueueExecutionContext } from '../../src/modules/queue/queueEngine';
-import { createStateAssignerRouter } from '../../src/routes/stateAssigner';
+import { StateAssignerAiConfig } from '../../src/modules/state-assigner/config';
+import {
+  createStateAssignerRouter,
+  StateAssignerStartInput
+} from '../../src/routes/stateAssigner';
+
+const codexConfig: StateAssignerAiConfig = {
+  backend: 'codex-cli',
+  modelName: 'gpt-5.4-mini',
+  codexTimeoutMs: 180_000
+};
+
+const openAiConfig: StateAssignerAiConfig = {
+  backend: 'openai',
+  modelName: 'gpt-4o-mini',
+  keyOpenAi: 'test-key'
+};
+
+interface BuildAppOptions {
+  buildJobHandler?: (
+    input: StateAssignerStartInput
+  ) => (context: QueueExecutionContext) => Promise<void>;
+  resolveAiConfig?: (env: NodeJS.ProcessEnv) => StateAssignerAiConfig;
+}
 
 const buildApp = (
   queueEngine: GlobalQueueEngine,
   env: NodeJS.ProcessEnv,
-  buildJobHandler?: (input: {
-    targetArticleThresholdDaysOld: number;
-    targetArticleStateReviewCount: number;
-    keyOpenAi: string;
-    pathToStateAssignerFiles: string;
-  }) => (context: QueueExecutionContext) => Promise<void>
+  options: BuildAppOptions = {}
 ): express.Express => {
   const app = express();
   app.use(express.json());
@@ -25,7 +44,8 @@ const buildApp = (
     createStateAssignerRouter({
       queueEngine,
       env,
-      buildJobHandler: buildJobHandler ?? (() => async () => undefined)
+      buildJobHandler: options.buildJobHandler ?? (() => async () => undefined),
+      resolveAiConfig: options.resolveAiConfig ?? (() => codexConfig)
     })
   );
   app.use(errorHandler);
@@ -57,10 +77,14 @@ describe('stateAssigner routes', () => {
   });
 
   it('validates request body and enqueues state assigner job', async () => {
-    const app = buildApp(queueEngine, {
-      KEY_OPEN_AI: 'test-key',
-      PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
-    });
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      {
+        PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+      },
+      { buildJobHandler }
+    );
 
     const response = await request(app).post('/state-assigner/start-job').send({
       targetArticleThresholdDaysOld: 30,
@@ -73,6 +97,12 @@ describe('stateAssigner routes', () => {
       status: 'queued',
       endpointName: '/state-assigner/start-job'
     });
+    expect(buildJobHandler).toHaveBeenCalledWith({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50,
+      aiConfig: codexConfig,
+      pathToStateAssignerFiles: tempDirPath
+    });
 
     await queueEngine.onIdle();
     const queuedJob = await queueStore.getJobById('job-1');
@@ -81,7 +111,6 @@ describe('stateAssigner routes', () => {
 
   it('returns validation error when request body fields are invalid', async () => {
     const app = buildApp(queueEngine, {
-      KEY_OPEN_AI: 'test-key',
       PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
     });
 
@@ -108,9 +137,7 @@ describe('stateAssigner routes', () => {
   });
 
   it('returns validation error when PATH_TO_STATE_ASSIGNER_FILES is missing', async () => {
-    const app = buildApp(queueEngine, {
-      KEY_OPEN_AI: 'test-key'
-    });
+    const app = buildApp(queueEngine, {});
 
     const response = await request(app).post('/state-assigner/start-job').send({
       targetArticleThresholdDaysOld: 30,
@@ -128,6 +155,108 @@ describe('stateAssigner routes', () => {
           message: 'PATH_TO_STATE_ASSIGNER_FILES env var is required'
         }
       ]
+    });
+  });
+
+  it('accepts a missing OpenAI key when the codex backend is resolvable', async () => {
+    const app = buildApp(queueEngine, {
+      PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+    });
+
+    const response = await request(app).post('/state-assigner/start-job').send({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50
+    });
+
+    expect(response.status).toBe(202);
+  });
+
+  it('allows USE_OPEN_AI_API=true without a key when the resolver falls back to codex', async () => {
+    const resolveAiConfig = jest.fn(() => codexConfig);
+    const app = buildApp(
+      queueEngine,
+      {
+        USE_OPEN_AI_API: 'true',
+        PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+      },
+      { resolveAiConfig }
+    );
+
+    const response = await request(app).post('/state-assigner/start-job').send({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50
+    });
+
+    expect(response.status).toBe(202);
+    expect(resolveAiConfig).toHaveBeenCalledWith({
+      USE_OPEN_AI_API: 'true',
+      PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+    });
+  });
+
+  it('returns validation error when the resolver rejects a missing codex binary', async () => {
+    const app = buildApp(
+      queueEngine,
+      {
+        PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+      },
+      {
+        resolveAiConfig: () => {
+          throw AppError.validation([
+            {
+              field: 'codex',
+              message: 'codex CLI not found on PATH'
+            }
+          ]);
+        }
+      }
+    );
+
+    const response = await request(app).post('/state-assigner/start-job').send({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Request validation failed',
+      status: 400,
+      details: [
+        {
+          field: 'codex',
+          message: 'codex CLI not found on PATH'
+        }
+      ]
+    });
+  });
+
+  it('passes an openai config to the job handler when the resolver selects openai', async () => {
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      {
+        USE_OPEN_AI_API: 'true',
+        KEY_OPEN_AI: 'test-key',
+        PATH_TO_STATE_ASSIGNER_FILES: tempDirPath
+      },
+      {
+        buildJobHandler,
+        resolveAiConfig: () => openAiConfig
+      }
+    );
+
+    const response = await request(app).post('/state-assigner/start-job').send({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50
+    });
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50,
+      aiConfig: openAiConfig,
+      pathToStateAssignerFiles: tempDirPath
     });
   });
 });
