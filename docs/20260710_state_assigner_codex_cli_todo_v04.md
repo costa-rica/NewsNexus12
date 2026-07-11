@@ -1,8 +1,8 @@
 ---
 created_at: 2026-07-10
-updated_at: 2026-07-10
+updated_at: 2026-07-11
 created_by: claude (fable-5)
-modified_by: claude (fable-5)
+modified_by: codex (gpt-5)
 ---
 
 # State Assigner Codex CLI Backend Todo (v04)
@@ -144,16 +144,16 @@ This phase removes the Phase 2 duplication: the job file switches to the `src/mo
 
 Follow the root `AGENTS.md` markdown frontmatter rules for any new file; these are all edits to existing files (frontmatter only updated where the file has it).
 
-- [ ] `worker-node/AGENTS.md`: update the state-assigner section (backend selection rules, codex invocation, backend-aware iteration timeout, cancellation behavior) and the environment-variables section (`KEY_OPEN_AI` → optional; add `USE_OPEN_AI_API`, `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS`). Include the migration note from plan §Migration note and the queue-occupancy caveat (codex articles can take up to the codex timeout each).
-- [ ] `worker-node/README.md`: it currently lists `KEY_OPEN_AI` as required and describes only the OpenAI path — update both, and include the migration note ("to stay on the OpenAI API set `USE_OPEN_AI_API=true`").
-- [ ] Root `AGENTS.md`: update the env-var summary line that lists `KEY_OPEN_AI` as an important worker-node setting.
-- [ ] `docs/CTO_ONBOARDING.md`: update the state-assigner description from "OpenAI API-key based" to backend selection with codex default.
-- [ ] `worker-node/docs/worker-node-api-documentation/endpoints/state-assigner.md`: this file currently documents the old behavior and must be updated in full:
-  - [ ] Runtime dependencies / env prerequisites: `KEY_OPEN_AI` becomes optional (required only with `USE_OPEN_AI_API=true`); add `USE_OPEN_AI_API`, `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS`.
-  - [ ] Validation bullets: replace "Validates `KEY_OPEN_AI` is configured" with backend resolution (codex binary check when the codex backend is selected).
-  - [ ] Error examples: replace the missing-`KEY_OPEN_AI` 400 example with the codex-binary-missing 400 validation error; note that a missing key alone is no longer an error.
-  - [ ] Add a short backend-selection / migration note (codex default; `USE_OPEN_AI_API=true` to stay on the OpenAI API).
-  - [ ] Fix the stale claim that raw JSON responses are written to `chatgpt_responses/` — responses are parsed in memory and not persisted (this is already true in the current code).
-- [ ] `worker-node/docs/worker-node-api-documentation/API_REFERENCE.md`: no content change expected — just confirm the `state-assigner` endpoint link remains valid.
-- [ ] Update any `.env.example`-style file in `worker-node/` if present (check first; skip if none).
-- [ ] Final full check: `cd worker-node && npx tsc -p tsconfig.json --noEmit && npm test && npm run build`.
+- [x] `worker-node/AGENTS.md`: update the state-assigner section (backend selection rules, codex invocation, backend-aware iteration timeout, cancellation behavior) and the environment-variables section (`KEY_OPEN_AI` → optional; add `USE_OPEN_AI_API`, `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS`). Include the migration note from plan §Migration note and the queue-occupancy caveat (codex articles can take up to the codex timeout each).
+- [x] `worker-node/README.md`: it currently lists `KEY_OPEN_AI` as required and describes only the OpenAI path — update both, and include the migration note ("to stay on the OpenAI API set `USE_OPEN_AI_API=true`").
+- [x] Root `AGENTS.md`: update the env-var summary line that lists `KEY_OPEN_AI` as an important worker-node setting.
+- [x] `docs/CTO_ONBOARDING.md`: update the state-assigner description from "OpenAI API-key based" to backend selection with codex default.
+- [x] `worker-node/docs/worker-node-api-documentation/endpoints/state-assigner.md`: this file currently documents the old behavior and must be updated in full:
+  - [x] Runtime dependencies / env prerequisites: `KEY_OPEN_AI` becomes optional (required only with `USE_OPEN_AI_API=true`); add `USE_OPEN_AI_API`, `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS`.
+  - [x] Validation bullets: replace "Validates `KEY_OPEN_AI` is configured" with backend resolution (codex binary check when the codex backend is selected).
+  - [x] Error examples: replace the missing-`KEY_OPEN_AI` 400 example with the codex-binary-missing 400 validation error; note that a missing key alone is no longer an error.
+  - [x] Add a short backend-selection / migration note (codex default; `USE_OPEN_AI_API=true` to stay on the OpenAI API).
+  - [x] Fix the stale claim that raw JSON responses are written to `chatgpt_responses/` — responses are parsed in memory and not persisted (this is already true in the current code).
+- [x] `worker-node/docs/worker-node-api-documentation/API_REFERENCE.md`: no content change expected — just confirm the `state-assigner` endpoint link remains valid.
+- [x] Update any `.env.example`-style file in `worker-node/` if present (check first; skip if none).
+- [x] Final full check: `cd worker-node && npx tsc -p tsconfig.json --noEmit && npm test && npm run build`.

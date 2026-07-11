@@ -150,7 +150,7 @@ Summary:
 
 - Selects recent candidate articles that do not already have state assignments.
 - Loads the latest prompt from DB after syncing prompt markdown files from disk.
-- Sends article content to OpenAI.
+- Sends article content to either the Codex CLI or the OpenAI API.
 - Persists `ArticleStateContract02` rows.
 
 Key files:
@@ -171,11 +171,34 @@ Important behavior:
 - `prompts/`
 - `chatgpt_responses/`
 
-3. The state assigner now performs bounded pre-scrape enrichment before AI analysis.
+3. Backend selection is resolved at the route boundary.
+
+- Codex CLI is the default backend when `USE_OPEN_AI_API` is unset or false-like.
+- To stay on the OpenAI API, set `USE_OPEN_AI_API=true` and keep `KEY_OPEN_AI` populated.
+- `KEY_OPEN_AI` alone no longer selects the OpenAI API backend.
+- If `USE_OPEN_AI_API=true` but `KEY_OPEN_AI` is missing, the workflow logs a warning and falls back to Codex CLI.
+- When Codex CLI is selected, the route validates that a `codex` executable is on the service user's `PATH`; see `../docs/CODEX_CLI_SERVER_SETUP.md`.
+
+4. AI invocation and timeout behavior are backend-aware.
+
+- OpenAI API uses the chat completions endpoint and keeps the 10 second per-article timeout.
+- Codex CLI runs `codex exec --ephemeral --skip-git-repo-check -s read-only --output-last-message <tempfile> -m <model> -` from a neutral temp directory.
+- The Codex prompt is written over stdin, not passed as an argv argument.
+- Codex uses `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` per article, defaulting to 180 seconds.
+- The global worker queue has concurrency 1, so a large Codex-backed batch can occupy the queue for much longer than the old OpenAI path.
+
+5. Cancellation behavior must stay cooperative and child-process aware.
+
+- Queue cancellation forwards `AbortSignal` through the job.
+- Codex child processes are registered with the queue engine.
+- Codex iteration timeout sends `SIGTERM`, waits briefly, then sends `SIGKILL` if the child has not closed.
+
+6. The state assigner now performs bounded pre-scrape enrichment before AI analysis.
 
 - It enriches only the exact candidate set it is already about to process.
 - If scraping fails, the job logs that failure and continues.
 - If durable article content is still unavailable, it falls back to `article.description`.
+- Model responses are parsed in memory and are not persisted to `chatgpt_responses/`.
 
 ### article-content-scraper-02
 
@@ -265,19 +288,25 @@ Common required variables:
 2. `PATH_TO_SEMANTIC_SCORER_DIR`
 3. `PATH_TO_LOGS`
 4. `NODE_ENV`
-5. `KEY_OPEN_AI`
-6. `PATH_TO_STATE_ASSIGNER_FILES`
-7. `NAME_APP`
-8. `NAME_DB`
-9. `PATH_DATABASE`
-10. `PATH_UTILTIES`
-11. `LIMIT_ARTICLE_AGE_IN_DAYS` — positive integer (days) used both as the Google RSS `when:` fallback when a spreadsheet row's `time_range` is empty/invalid, and as the per-row cutoff that rejects RSS items older than the row's effective `time_range`. Required: if missing or not a positive integer, the worker-node process fails fast at startup with a "Missing required environment variables: LIMIT_ARTICLE_AGE_IN_DAYS" error on stderr and exits with code 1.
+5. `PATH_TO_STATE_ASSIGNER_FILES`
+6. `NAME_APP`
+7. `NAME_DB`
+8. `PATH_DATABASE`
+9. `PATH_UTILTIES`
+10. `LIMIT_ARTICLE_AGE_IN_DAYS` — positive integer (days) used both as the Google RSS `when:` fallback when a spreadsheet row's `time_range` is empty/invalid, and as the per-row cutoff that rejects RSS items older than the row's effective `time_range`. Required: if missing or not a positive integer, the worker-node process fails fast at startup with a "Missing required environment variables: LIMIT_ARTICLE_AGE_IN_DAYS" error on stderr and exits with code 1.
 
 Common optional variables:
 
 1. `PORT`
 2. `LOG_MAX_SIZE`
 3. `LOG_MAX_FILES`
+
+State assigner AI backend variables:
+
+1. `USE_OPEN_AI_API` — optional; true-like values (`1`, `true`, `yes`, `on`) select the OpenAI API backend when `KEY_OPEN_AI` is present. Unset or false-like values select Codex CLI.
+2. `KEY_OPEN_AI` — optional at startup; required only to run the OpenAI API backend.
+3. `STATE_ASSIGNER_MODEL_NAME` — optional; defaults to `gpt-4o-mini` for OpenAI API and `gpt-5.4-mini` for Codex CLI.
+4. `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` — optional positive integer; defaults to `180`.
 
 If a route depends on a workflow-specific path or key, validate it at the route boundary and fail with a consistent `AppError.validation(...)` response.
 

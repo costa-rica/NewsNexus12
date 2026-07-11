@@ -1,6 +1,6 @@
 ---
 created_at: 2026-04-27
-updated_at: 2026-05-19
+updated_at: 2026-07-11
 created_by: claude (opus-4.7)
 modified_by: codex (gpt-5)
 ---
@@ -9,7 +9,7 @@ modified_by: codex (gpt-5)
 
 ## 1. Summary
 
-NewsNexus12 is a monorepo for a news-aggregation and analysis platform. It ingests news articles (Google News RSS, NewsAPI, NewsData.io, GNews), persists them in a shared Postgres database via a Sequelize model package, exposes a REST API and a Next.js review portal, and runs analysis workflows (deduper, semantic scorer, location scorer, OpenAI-based state assigner, content scrapers) through two queue-backed worker services — one Node, one Python. There is no monorepo tooling; packages are wired through local `file:` dependencies and built in dependency order. The codebase is mid-migration from SQLite to Postgres (most heavy lifting landed in the last ~30 commits; see `docs/archive/`).
+NewsNexus12 is a monorepo for a news-aggregation and analysis platform. It ingests news articles (Google News RSS, NewsAPI, NewsData.io, GNews), persists them in a shared Postgres database via a Sequelize model package, exposes a REST API and a Next.js review portal, and runs analysis workflows (deduper, semantic scorer, location scorer, backend-selectable state assigner, content scrapers) through two queue-backed worker services — one Node, one Python. There is no monorepo tooling; packages are wired through local `file:` dependencies and built in dependency order. The codebase is mid-migration from SQLite to Postgres (most heavy lifting landed in the last ~30 commits; see `docs/archive/`).
 
 ## 2. Tech stack
 
@@ -18,7 +18,7 @@ NewsNexus12 is a monorepo for a news-aggregation and analysis platform. It inges
 - **Frontend:** Next.js 16 App Router + Turbopack, React 19, Redux Toolkit + redux-persist, TailwindCSS v4
 - **Data:** Postgres 16 via Sequelize 6 (`pg`, `pg-hstore`); `psycopg[binary]` on the Python side
 - **Auth:** JWT (`jsonwebtoken`), bcrypt
-- **Scraping/AI:** Playwright + Puppeteer + cheerio, `@huggingface/transformers`, `sentence-transformers`, OpenAI SDK
+- **Scraping/AI:** Playwright + Puppeteer + cheerio, `@huggingface/transformers`, `sentence-transformers`, Codex CLI, OpenAI SDK/API
 - **Queue:** custom JSON-backed FIFO queue (concurrency 1) implemented per-worker in `worker-node/src/modules/queue/` and `worker-python/src/modules/queue/`
 - **Logging:** Winston (TS), loguru (Python)
 - **CI:** GitHub Actions, single workflow `.github/workflows/postgres-tests.yml` with a Postgres 16 service container, matrixed across `db-models`, `api`, `worker-node`, `db-manager`
@@ -101,7 +101,8 @@ No formal migrations folder — schema is currently driven by `sequelize.sync()`
 
 | Service | Used by | Purpose | Auth | Configured via |
 |---|---|---|---|---|
-| OpenAI | worker-node (state assigner) | Article→state classification | API key | `KEY_OPEN_AI` |
+| Codex CLI | worker-node (state assigner) | Default Article→state classification backend | Codex service-user auth | `USE_OPEN_AI_API=false` or unset; `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` |
+| OpenAI | worker-node (state assigner opt-in) | Article→state classification | API key | `USE_OPEN_AI_API=true`, `KEY_OPEN_AI` |
 | Google News RSS | worker-node (request-google-rss) | Ingest article candidates | none | `PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED` |
 | NewsAPI / NewsData.io / GNews | api ([routes/newsOrgs/](api/src/routes/newsOrgs/)) | Ingest article candidates | API keys | per-route env vars |
 | Hugging Face / sentence-transformers | worker-node (semantic-scorer), worker-python (deduper, location-scorer) | Local embedding models | none (local) | `PATH_TO_SEMANTIC_SCORER_DIR`, model cache |
@@ -139,6 +140,7 @@ Gotchas:
 
 - Rebuild `db-models` after model changes — consumers import from `db-models/dist`.
 - `worker-python` startup fails fast if `PATH_UTILTIES` (note the misspelling — it is the actual var name) or `NAME_AI_ENTITY_LOCATION_SCORER` is missing.
+- `worker-node` state assigner defaults to Codex CLI. To keep using the OpenAI API, set `USE_OPEN_AI_API=true` alongside `KEY_OPEN_AI`; `KEY_OPEN_AI` alone no longer selects the API backend.
 - Set `NEXT_PUBLIC_MODE=workstation` to prefill the portal login form.
 - Portal ESLint forbids `any` — `npm run build` will fail otherwise.
 

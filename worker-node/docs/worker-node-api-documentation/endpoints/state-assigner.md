@@ -9,10 +9,18 @@ All endpoints are prefixed with `/state-assigner`.
 Creates a queued job for the state-assigner process.
 
 - Does not require authentication
-- Validates `KEY_OPEN_AI` is configured
+- Resolves the AI backend from environment variables
 - Validates `PATH_TO_STATE_ASSIGNER_FILES` is configured
 - Validates required request body fields are positive integers
 - Returns `202` when job is accepted into the queue
+
+Backend selection:
+
+- Codex CLI is the default backend when `USE_OPEN_AI_API` is unset or false-like.
+- `USE_OPEN_AI_API=true` with a non-empty `KEY_OPEN_AI` selects the OpenAI API backend.
+- `USE_OPEN_AI_API=true` without a key falls back to Codex CLI and logs a warning.
+- `KEY_OPEN_AI` alone no longer selects the OpenAI API backend.
+- When Codex CLI is selected, the route validates that `codex` is executable on the service user's `PATH`.
 
 Pre-processing behavior:
 
@@ -32,9 +40,10 @@ Prompt behavior:
 - New prompt content is appended to the `Prompts` table if not already present
 - The latest prompt in the database is used for article analysis
 
-ChatGPT response file behavior:
+Model response behavior:
 
-- Raw JSON response content is written per processed article into `chatgpt_responses/`
+- Responses are parsed in memory and are not persisted to `chatgpt_responses/`
+- Codex CLI responses are read from a temporary `--output-last-message` file under the OS temp directory, then cleaned up
 
 ### Parameters
 
@@ -45,8 +54,18 @@ Body fields:
 
 Runtime dependencies:
 
-- `KEY_OPEN_AI` (required env var)
-- `PATH_TO_STATE_ASSIGNER_FILES` (required env var)
+1. `PATH_TO_STATE_ASSIGNER_FILES` (required env var)
+2. `USE_OPEN_AI_API` (optional; true-like values opt into the OpenAI API backend)
+3. `KEY_OPEN_AI` (optional; required only when using the OpenAI API backend)
+4. `STATE_ASSIGNER_MODEL_NAME` (optional; defaults to `gpt-4o-mini` for OpenAI API and `gpt-5.4-mini` for Codex CLI)
+5. `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (optional positive integer; default `180`)
+6. `codex` executable on `PATH` when the Codex CLI backend is selected
+
+Migration note:
+
+- Existing deployments that set `KEY_OPEN_AI` but not `USE_OPEN_AI_API=true` now use Codex CLI by default.
+- To stay on the OpenAI API, set `USE_OPEN_AI_API=true` alongside `KEY_OPEN_AI`.
+- Missing `KEY_OPEN_AI` alone is no longer a validation error.
 
 ### Sample Request
 
@@ -71,7 +90,7 @@ curl --location --request POST 'http://localhost:3002/state-assigner/start-job' 
 
 ### Error responses
 
-1. Missing OpenAI key env var (400)
+1. Codex CLI missing while Codex backend is selected (400)
 
 ```json
 {
@@ -81,8 +100,8 @@ curl --location --request POST 'http://localhost:3002/state-assigner/start-job' 
     "status": 400,
     "details": [
       {
-        "field": "KEY_OPEN_AI",
-        "message": "KEY_OPEN_AI env var is required"
+        "field": "codex",
+        "message": "codex CLI not found on PATH; install the Codex CLI (docs/CODEX_CLI_SERVER_SETUP.md) or set USE_OPEN_AI_API=true with KEY_OPEN_AI"
       }
     ]
   }

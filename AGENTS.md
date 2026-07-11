@@ -115,7 +115,7 @@ Each package reads from its own `.env`. Key variables:
 - `NEXT_PUBLIC_API_BASE_URL` — portal's API endpoint
 - `NEXT_PUBLIC_MODE` — set to `"workstation"` to prefill login form in dev
 - `PATH_TO_PYTHON_VENV`, `PATH_TO_MICROSERVICE_DEDUPER`, `PATH_TO_MICROSERVICE_LOCATION_SCORER` — worker-python paths
-- `PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED`, `PATH_TO_STATE_ASSIGNER_FILES`, `KEY_OPEN_AI` — important worker-node workflow settings
+- `PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED`, `PATH_TO_STATE_ASSIGNER_FILES`, `USE_OPEN_AI_API`, optional `KEY_OPEN_AI`, `STATE_ASSIGNER_MODEL_NAME`, `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` — important worker-node workflow settings
 
 ## Production
 

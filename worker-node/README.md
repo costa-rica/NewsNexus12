@@ -40,7 +40,7 @@ Route group: `/state-assigner`
 Summary:
 
 - selects candidate articles without state assignments
-- sends article content to OpenAI using current prompt
+- sends article content to Codex CLI by default, or to the OpenAI API when opted in
 - writes `ArticleStateContract02` records through `@newsnexus/db-models`
 
 State assigner file layout (`PATH_TO_STATE_ASSIGNER_FILES`):
@@ -52,7 +52,16 @@ Behavior:
 
 - startup ensures both subdirectories exist
 - prompt `.md` files in `prompts/` are loaded and appended to DB if new
-- raw model responses are written to `chatgpt_responses/`
+- model responses are parsed in memory and are not written to `chatgpt_responses/`
+
+Backend selection:
+
+- Codex CLI is the default backend
+- set `USE_OPEN_AI_API=true` with `KEY_OPEN_AI` to stay on the OpenAI API
+- `KEY_OPEN_AI` alone no longer selects the OpenAI API backend
+- `STATE_ASSIGNER_MODEL_NAME` overrides the backend-specific default model
+- `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` controls the Codex per-article timeout, default `180`
+- Codex-backed jobs can take up to the Codex timeout per article and hold the global queue while they run
 
 ## Service routes
 
@@ -117,14 +126,13 @@ Cancellation behavior:
 2. `PATH_TO_SEMANTIC_SCORER_DIR`
 3. `PATH_TO_LOGS`
 4. `NODE_ENV`
-5. `KEY_OPEN_AI`
-6. `PATH_TO_STATE_ASSIGNER_FILES`
-7. `NAME_APP`
-8. `PATH_UTILTIES`
-9. `PG_HOST`
-10. `PG_PORT`
-11. `PG_DATABASE`
-12. `PG_USER`
+5. `PATH_TO_STATE_ASSIGNER_FILES`
+6. `NAME_APP`
+7. `PATH_UTILTIES`
+8. `PG_HOST`
+9. `PG_PORT`
+10. `PG_DATABASE`
+11. `PG_USER`
 
 Optional:
 
@@ -134,6 +142,10 @@ Optional:
 4. `PG_PASSWORD` (default empty for local trust-auth setups)
 5. `PG_SCHEMA` (default `public`)
 6. `DELETE_ARTICLES_BATCH_SIZE` (default `1000`)
+7. `USE_OPEN_AI_API` (default `false`; set true-like to use OpenAI API)
+8. `KEY_OPEN_AI` (required only with `USE_OPEN_AI_API=true`)
+9. `STATE_ASSIGNER_MODEL_NAME` (backend-specific default)
+10. `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (default `180`)
 
 ## Database
 
