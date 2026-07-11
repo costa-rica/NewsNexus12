@@ -27,27 +27,27 @@ If anything fails, fix the code so the functionality remains and the checks pass
 
 ## Phase 1 — AI backend config module
 
-- [ ] Create `src/modules/state-assigner/config.ts` exporting:
-  - [ ] A discriminated union type `StateAssignerAiConfig`:
+- [x] Create `src/modules/state-assigner/config.ts` exporting:
+  - [x] A discriminated union type `StateAssignerAiConfig`:
     - `{ backend: 'openai'; modelName: string; keyOpenAi: string }`
     - `{ backend: 'codex-cli'; modelName: string; codexTimeoutMs: number }`
-  - [ ] A `StateAssignerAiConfigDependencies` type for the injectable pieces (at minimum the codex binary check).
-  - [ ] `resolveStateAssignerAiConfig(env: NodeJS.ProcessEnv, deps?: StateAssignerAiConfigDependencies)` implementing the selection rules from the plan:
+  - [x] A `StateAssignerAiConfigDependencies` type for the injectable pieces (at minimum the codex binary check).
+  - [x] `resolveStateAssignerAiConfig(env: NodeJS.ProcessEnv, deps?: StateAssignerAiConfigDependencies)` implementing the selection rules from the plan:
     - `USE_OPEN_AI_API` true-like (`1`, `true`, `yes`, `on`, case-insensitive; `0`, `false`, `no`, `off` are false-like; empty/unset = false; anything else → validation error) **and** `KEY_OPEN_AI` non-empty → `openai` backend.
     - `USE_OPEN_AI_API` true-like but `KEY_OPEN_AI` empty/missing → `codex-cli` backend, and log a warning through `src/modules/logger.ts` (mirror worker-python's "openai key missing, falling back to codex" message).
     - `USE_OPEN_AI_API` false-like or unset → `codex-cli` backend, even if `KEY_OPEN_AI` is set.
-  - [ ] Model name from `STATE_ASSIGNER_MODEL_NAME` (trimmed); when empty/unset default per backend: `gpt-4o-mini` for `openai`, `gpt-5.4-mini` for `codex-cli`.
-  - [ ] `codexTimeoutMs` from `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (positive integer, default `180`, stored in ms). Non-integer or `<= 0` → validation error.
-  - [ ] All validation failures throw `AppError.validation([...])` (from `src/modules/errors/appError`) with the offending env var as `field`, matching the existing route error shape.
-- [ ] Add a `codex` binary check used only when the resolved backend is `codex-cli`: scan `env.PATH` entries for an executable file named `codex` (Node equivalent of Python's `shutil.which`). Missing → `AppError.validation` naming field `codex` (or similar) with a message telling the operator to install the Codex CLI (`docs/CODEX_CLI_SERVER_SETUP.md`) or set `USE_OPEN_AI_API=true` with `KEY_OPEN_AI`. The check is the injectable member of `StateAssignerAiConfigDependencies` so tests never depend on a real binary.
-- [ ] Create `tests/modules/stateAssignerAiConfig.test.ts` covering the selection matrix:
-  - [ ] Unset/false `USE_OPEN_AI_API` → codex backend (even with `KEY_OPEN_AI` set).
-  - [ ] `USE_OPEN_AI_API=true` + key → openai backend.
-  - [ ] `USE_OPEN_AI_API=true` without key → codex backend and warning logged.
-  - [ ] Invalid `USE_OPEN_AI_API` value → validation error.
-  - [ ] Invalid `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (zero, negative, non-integer) → validation error.
-  - [ ] Per-backend model defaults, and `STATE_ASSIGNER_MODEL_NAME` override for both backends.
-  - [ ] Codex backend with binary check failing → validation error; openai backend never invokes the binary check.
+  - [x] Model name from `STATE_ASSIGNER_MODEL_NAME` (trimmed); when empty/unset default per backend: `gpt-4o-mini` for `openai`, `gpt-5.4-mini` for `codex-cli`.
+  - [x] `codexTimeoutMs` from `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (positive integer, default `180`, stored in ms). Non-integer or `<= 0` → validation error.
+  - [x] All validation failures throw `AppError.validation([...])` (from `src/modules/errors/appError`) with the offending env var as `field`, matching the existing route error shape.
+- [x] Add a `codex` binary check used only when the resolved backend is `codex-cli`: scan `env.PATH` entries for an executable file named `codex` (Node equivalent of Python's `shutil.which`). Missing → `AppError.validation` naming field `codex` (or similar) with a message telling the operator to install the Codex CLI (`docs/CODEX_CLI_SERVER_SETUP.md`) or set `USE_OPEN_AI_API=true` with `KEY_OPEN_AI`. The check is the injectable member of `StateAssignerAiConfigDependencies` so tests never depend on a real binary.
+- [x] Create `tests/modules/stateAssignerAiConfig.test.ts` covering the selection matrix:
+  - [x] Unset/false `USE_OPEN_AI_API` → codex backend (even with `KEY_OPEN_AI` set).
+  - [x] `USE_OPEN_AI_API=true` + key → openai backend.
+  - [x] `USE_OPEN_AI_API=true` without key → codex backend and warning logged.
+  - [x] Invalid `USE_OPEN_AI_API` value → validation error.
+  - [x] Invalid `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (zero, negative, non-integer) → validation error.
+  - [x] Per-backend model defaults, and `STATE_ASSIGNER_MODEL_NAME` override for both backends.
+  - [x] Codex backend with binary check failing → validation error; openai backend never invokes the binary check.
 
 ## Phase 2 — Shared helpers and OpenAI client (additive only)
 
