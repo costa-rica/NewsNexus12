@@ -71,26 +71,26 @@ If anything fails, fix the code so the functionality remains and the checks pass
 
 ## Phase 3 — Codex CLI client
 
-- [ ] Create `src/modules/state-assigner/codexCliClient.ts` exporting `analyzeArticleWithCodexCli(...)`. Follow plan §Design 2 and §3a precisely:
-  - [ ] Build the prompt with `buildStateAssignerPrompt`.
-  - [ ] Create the `--output-last-message` temp file under `os.tmpdir()` (e.g. via `fs.mkdtemp`); delete it (and any temp dir) in a `finally` block on every path.
-  - [ ] Spawn via `child_process.spawn` (injectable for tests): command `codex`, args `['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', '--output-last-message', <tempfile>, '-m', <modelName>, '-']`, `cwd: os.tmpdir()`.
-  - [ ] **stdin delivery with explicit error handling**: attach an `error` listener to `child.stdin` *before* writing; write the full prompt and end the stream, handling write/end callback errors. If the child closes stdin early (e.g. `EPIPE` because codex exited or rejected its flags), do not let the stream error become an unhandled `error`/rejection that could crash the worker — record it and let the child's `close` outcome drive the settled result: the client rejects with a descriptive bounded error (per-article failure), never an unhandled exception.
-  - [ ] Do NOT pass the prompt as an argv element, and do NOT pass the abort signal as the spawn `signal` option (kill handling is explicit, next tasks).
-  - [ ] Register the child with the provided `registerCancelableProcess` hook immediately after spawn (the child's `kill` method satisfies `CancelableProcessHandle` from `src/modules/queue/queueEngine.ts`).
-  - [ ] On the iteration `AbortSignal` firing: send `SIGTERM` to the child; start a 5 s grace timer (module constant, not an env var); if the child's `close` event has not fired when it elapses, send `SIGKILL`. Clear the timer on `close`.
-  - [ ] The returned promise settles only on the child's `close` event (or spawn `error` event) — exactly once, deterministically, on every path (success, non-zero exit, stdin stream error, abort). On abort, reject with an `AbortError`-style error so the existing `runWithIterationTimeout` / `isAbortError` handling in the job treats it as timeout/cancel, not as an article failure.
-  - [ ] Capture bounded stdout/stderr (keep only a ~400-char tail). Non-zero exit, empty output file, or unreadable output file → throw descriptive errors that include the tail.
-  - [ ] Read the output file, parse with `parseChatGptResponse`, return the `ChatGptResponse`.
-- [ ] Create `tests/modules/stateAssignerCodexClient.test.ts` using an injected fake spawn (no real codex binary; a controllable fake child with stdin/stdout/stderr streams, `kill`, and emitted `close`):
-  - [ ] Spawn invocation shape: exact args listed above, `cwd` under tmpdir.
-  - [ ] Prompt is written to stdin and stdin is ended; include one large prompt (several hundred KiB) to pin the stdin delivery path.
-  - [ ] Success path: fake writes JSON to the output file path it was given, exits 0 → parsed `ChatGptResponse` returned.
-  - [ ] **stdin early-close/error path**: fake child emits an `error` on its stdin stream (or destroys stdin) mid-write, then emits `close` with a non-zero code → client rejects with a descriptive bounded error, no unhandled error/rejection escapes, temp file cleaned up.
-  - [ ] Non-zero exit → error including stderr tail; empty output file → error; non-JSON output → error.
-  - [ ] Child registered via `registerCancelableProcess` after spawn.
-  - [ ] Abort: `SIGTERM` sent; fake child ignores it → after the grace period `SIGKILL` sent; promise settles once the fake emits `close`; rejection is recognized by the job's `isAbortError`.
-  - [ ] Temp file cleanup happens on success and on each failure path.
+- [x] Create `src/modules/state-assigner/codexCliClient.ts` exporting `analyzeArticleWithCodexCli(...)`. Follow plan §Design 2 and §3a precisely:
+  - [x] Build the prompt with `buildStateAssignerPrompt`.
+  - [x] Create the `--output-last-message` temp file under `os.tmpdir()` (e.g. via `fs.mkdtemp`); delete it (and any temp dir) in a `finally` block on every path.
+  - [x] Spawn via `child_process.spawn` (injectable for tests): command `codex`, args `['exec', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', '--output-last-message', <tempfile>, '-m', <modelName>, '-']`, `cwd: os.tmpdir()`.
+  - [x] **stdin delivery with explicit error handling**: attach an `error` listener to `child.stdin` *before* writing; write the full prompt and end the stream, handling write/end callback errors. If the child closes stdin early (e.g. `EPIPE` because codex exited or rejected its flags), do not let the stream error become an unhandled `error`/rejection that could crash the worker — record it and let the child's `close` outcome drive the settled result: the client rejects with a descriptive bounded error (per-article failure), never an unhandled exception.
+  - [x] Do NOT pass the prompt as an argv element, and do NOT pass the abort signal as the spawn `signal` option (kill handling is explicit, next tasks).
+  - [x] Register the child with the provided `registerCancelableProcess` hook immediately after spawn (the child's `kill` method satisfies `CancelableProcessHandle` from `src/modules/queue/queueEngine.ts`).
+  - [x] On the iteration `AbortSignal` firing: send `SIGTERM` to the child; start a 5 s grace timer (module constant, not an env var); if the child's `close` event has not fired when it elapses, send `SIGKILL`. Clear the timer on `close`.
+  - [x] The returned promise settles only on the child's `close` event (or spawn `error` event) — exactly once, deterministically, on every path (success, non-zero exit, stdin stream error, abort). On abort, reject with an `AbortError`-style error so the existing `runWithIterationTimeout` / `isAbortError` handling in the job treats it as timeout/cancel, not as an article failure.
+  - [x] Capture bounded stdout/stderr (keep only a ~400-char tail). Non-zero exit, empty output file, or unreadable output file → throw descriptive errors that include the tail.
+  - [x] Read the output file, parse with `parseChatGptResponse`, return the `ChatGptResponse`.
+- [x] Create `tests/modules/stateAssignerCodexClient.test.ts` using an injected fake spawn (no real codex binary; a controllable fake child with stdin/stdout/stderr streams, `kill`, and emitted `close`):
+  - [x] Spawn invocation shape: exact args listed above, `cwd` under tmpdir.
+  - [x] Prompt is written to stdin and stdin is ended; include one large prompt (several hundred KiB) to pin the stdin delivery path.
+  - [x] Success path: fake writes JSON to the output file path it was given, exits 0 → parsed `ChatGptResponse` returned.
+  - [x] **stdin early-close/error path**: fake child emits an `error` on its stdin stream (or destroys stdin) mid-write, then emits `close` with a non-zero code → client rejects with a descriptive bounded error, no unhandled error/rejection escapes, temp file cleaned up.
+  - [x] Non-zero exit → error including stderr tail; empty output file → error; non-JSON output → error.
+  - [x] Child registered via `registerCancelableProcess` after spawn.
+  - [x] Abort: `SIGTERM` sent; fake child ignores it → after the grace period `SIGKILL` sent; promise settles once the fake emits `close`; rejection is recognized by the job's `isAbortError`.
+  - [x] Temp file cleanup happens on success and on each failure path.
 
 ## Phase 4 — Job wiring (`src/modules/jobs/stateAssignerJob.ts`)
 
