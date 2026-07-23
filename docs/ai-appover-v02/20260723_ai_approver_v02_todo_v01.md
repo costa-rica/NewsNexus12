@@ -9,8 +9,8 @@ modified_by: codex (gpt-5)
 
 ## 1. Todo Status
 
-- [ ] Treat `20260723_ai_approver_v02_prd_v02.md` as the product source of truth.
-- [ ] Treat `20260723_ai_approver_v02_plan_v02.md` as the accepted implementation plan.
+- [x] Treat `20260723_ai_approver_v02_prd_v02.md` as the product source of truth.
+- [x] Treat `20260723_ai_approver_v02_plan_v02.md` as the accepted implementation plan.
 - [ ] Complete phases in order unless a dependency is explicitly documented.
 - [ ] Keep V01 code, routes, tables, data, and direct backend access intact.
 - [ ] Stop and consult the operator before expanding an implementation boundary.
@@ -49,27 +49,27 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 4.1 V01 inventory
 
-- [ ] Create `docs/ai-appover-v02/20260723_ai_approver_v01_safe_removal_report.md`.
-- [ ] Give the report the required four-key YAML frontmatter.
-- [ ] Inventory V01 portal pages, components, navigation, review fields, and data requests.
-- [ ] Inventory V01 API routes, modules, authentication, and database access.
-- [ ] Inventory V01 worker-python routes, configuration, repository, client, and orchestrator.
-- [ ] Inventory worker-node and weekly-orchestrator dependencies on V01 behavior.
-- [ ] Inventory V01 models, associations, indexes, backup, restore, and import paths.
-- [ ] Inventory V01 tests, operational documentation, environment variables, and production procedures.
-- [ ] Identify which V01 elements are hidden in this release and which remain directly callable.
-- [ ] Describe safe future removal steps without authorizing removal.
-- [ ] Confirm the report remains separate from the post-implementation clarification report.
+- [x] Create `docs/ai-appover-v02/20260723_ai_approver_v01_safe_removal_report.md`.
+- [x] Give the report the required four-key YAML frontmatter.
+- [x] Inventory V01 portal pages, components, navigation, review fields, and data requests.
+- [x] Inventory V01 API routes, modules, authentication, and database access.
+- [x] Inventory V01 worker-python routes, configuration, repository, client, and orchestrator.
+- [x] Inventory worker-node and weekly-orchestrator dependencies on V01 behavior.
+- [x] Inventory V01 models, associations, indexes, backup, restore, and import paths.
+- [x] Inventory V01 tests, operational documentation, environment variables, and production procedures.
+- [x] Identify which V01 elements are hidden in this release and which remain directly callable.
+- [x] Describe safe future removal steps without authorizing removal.
+- [x] Confirm the report remains separate from the post-implementation clarification report.
 
 ### 4.2 Phase 0 validation and commit
 
-- [ ] Compare the inventory against repository-wide V01 references.
-- [ ] Confirm every referenced path exists or explain why it is historical.
-- [ ] Confirm the report proposes no V01 deletion in this release.
-- [ ] Obtain operator approval for the pre-implementation report.
-- [ ] Check off completed Phase 0 tasks.
-- [ ] Stage only the Phase 0 documentation.
-- [ ] Commit Phase 0 after approval.
+- [x] Compare the inventory against repository-wide V01 references.
+- [x] Confirm every referenced path exists or explain why it is historical.
+- [x] Confirm the report proposes no V01 deletion in this release.
+- [x] Obtain operator approval for the pre-implementation report.
+- [x] Check off completed Phase 0 tasks.
+- [x] Stage only the Phase 0 documentation.
+- [x] Commit Phase 0 after approval.
 
 ## 5. Phase 1: Database Schema Foundation
 
@@ -643,4 +643,4 @@ No product code begins until this phase is complete and the operator approves th
 - [ ] Confirm every phase has its own passing validation and commit.
 - [ ] Confirm the working tree contains no unintended changes.
 - [ ] Confirm the final implementation matches PRD V02 and Plan V02.
-- [ ] Submit this todo for assessing-agent review before implementation begins.
+- [x] Submit this todo for assessing-agent review before implementation begins.
