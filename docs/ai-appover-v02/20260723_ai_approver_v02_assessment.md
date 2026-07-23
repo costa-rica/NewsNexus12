@@ -213,7 +213,14 @@ What exactly is the V02 continuation watermark?
 
 ##### Operator response
 
-I don't understand this ? elaborate in details.
+This is good question. Let's remove my past requireemtn to score until the last scored article, since we alwasy coutn backwards and early stopped run will prevent aruns from going back.
+
+WE want there to be two approaches from the AI approver v02 in teh automations page. 1) The user will input how many articles back from the last added article to analyze. Or 2) the user can signal they want all articles up to the last article in teh `ArticleApproveds` table with `isApproved` is true.
+The automations page shoudl have a modal display that will show this option.
+
+If the count option (i.e. user enters in a count of artilces to predict) is selected, then the default shoudl be stop at the last article with a `ArticleApproveds` table with `isApproved` is true. But let's add a checkbox for this option to say go past last approved, skippping any approved to go beyond.
+
+By default only artilces withe scraped content shoudl be predicted. lets adda checkbox to override teh default and tell teh run to predict articles taht only have descriptions and no ArticleContents02 rows.
 
 #### 8. Initial approved boundary
 
@@ -221,11 +228,15 @@ When there is no V02 history, does “up to the last approved article” mean st
 
 ##### Operator response
 
+Stop before the highest articleId in ArticleApproveds; approved articles are excluded anyway, so the boundary article itself is not analyzed.
+
 #### 9. Approved-row exclusion
 
 Should any `ArticleApproveds` row exclude an article, or only a row where `isApproved` is true?
 
 ##### Operator response
+
+Exclude only articles with an ArticleApproveds row where isApproved is true; rejected or cleared rows should not block analysis.
 
 #### 10. Insufficient eligible rows
 
@@ -233,17 +244,23 @@ If fewer eligible articles exist in the resolved range, should the run stop belo
 
 ##### Operator response
 
+Stop when the resolved range is exhausted, even below the requested count; report actual counts in the run summary rather than crossing the watermark.
+
 #### 11. New-prompt continuation
 
 When a new prompt becomes active, should V02 continue from the global watermark or reprocess earlier articles with the new prompt?
 
 ##### Operator response
 
+No reprocessing. If we need this we'll work on a new feature. New prompts still respect the existing watermarks.
+
 #### 12. Automatic retries
 
 Should failed and invalid responses retry automatically on the next run?
 
 ##### Operator response
+
+Yes. Articles whose latest result is failed or invalid_response stay eligible on the next run; completed predictions are never retried automatically. Only retry once during a new run and continue to skip. Do not retry a failed or invalid_response on a current run.
 
 ### State and content eligibility
 
@@ -253,11 +270,15 @@ Does any valid `ArticleStateContracts02` row qualify, or must the latest row qua
 
 ##### Operator response
 
+Latest row must have an integer value for stateId column in the `ArticleStateContracts02` table.
+
 #### 14. AI state verification
 
 How should the implementation verify that a state assignment came from the AI state assigner rather than another source?
 
 ##### Operator response
+
+If ArticleStateContracts02 is written only by the worker-node state assigner, row presence suffices.
 
 #### 15. Content fallback
 
@@ -265,11 +286,15 @@ Should an article require successful `ArticleContents02` content, matching the h
 
 ##### Operator response
 
+default require successful ArticleContents02 content (skip any with only description), matching the tested harness. When job is triggered via portal's automatoins page, there will be anoption to allow for predicting on description, but that must be intentional by the user.
+
 #### 16. Multiple content rows
 
 If several `ArticleContents02` rows exist, should V02 use the latest successful row or the longest successful content?
 
 ##### Operator response
+
+Use the latest successful ArticleContents02 row
 
 #### 17. Article-count meaning
 
@@ -281,6 +306,8 @@ Does the requested article count mean:
 
 ##### Operator response
 
+Attempted model calls: the number of eligible articles sent to the model, regardless of completion.
+
 ### Prompt integrity
 
 #### 18. Active-prompt requirement
@@ -289,11 +316,15 @@ Must there be exactly one active prompt at all times, or may there temporarily b
 
 ##### Operator response
 
+Allow zero active prompts temporarily; block starting a run until exactly one prompt is active, with a clear portal error.
+
 #### 19. Prompt immutability
 
 Does any prediction row make a prompt immutable, including failed and invalid-response rows?
 
 ##### Operator response
+
+Yes. Any prediction row, including failed or invalid_response, freezes the prompt, since the rendered prompt already influenced stored results.
 
 #### 20. Prompt reactivation
 
@@ -301,17 +332,23 @@ May an inactive but previously used prompt be reactivated?
 
 ##### Operator response
 
+Yes. Previously used prompts may be reactivated unchanged.
+
 #### 21. Prompt-title rules
 
 Should prompt titles be unique, or are duplicate and blank titles acceptable?
 
 ##### Operator response
 
+No, if title already exists, prevent submission of prompt. When no title is given, display a fallback like "Prompt_id_12" (where `12` is the prompt_id) when the title is blank.
+
 #### 22. Rendered-prompt audit
 
 Should the stored prediction include a snapshot or hash of the final rendered prompt for audit purposes?
 
 ##### Operator response
+
+do not store the prompt or rendered prompt again in AiApproverArticlePredictionsV02. The foreign key is sufficient.
 
 ### Review and rollout
 
@@ -326,11 +363,15 @@ Where should operators edit `humanValidation` and `humanComment`?
 
 ##### Operator response
 
+The existing article review page. The ai-approver-v02 column whose modal shows reasoning and has form for human validation and comment.
+
 #### 24. Prediction effects
 
 Should V02 predictions affect article approval, filtering, reports, or orchestration, or remain advisory in the first release?
 
 ##### Operator response
+
+Advisory only. The ai-approver-v02 column should be visible by default in the article review page.
 
 #### 25. Observation period
 
@@ -338,17 +379,23 @@ Should V02 initially run in a non-destructive observation period before V01 acce
 
 ##### Operator response
 
+No separate observation period is needed. V02 predictions are advisory, and V01 is being hidden rather than removed.
+
 #### 26. Future orchestration
 
 Should V02 ever replace the V01 step in a future weekly orchestrator, or remain manually triggered?
 
 ##### Operator response
 
+Remain manually triggered in this release. Revisit orchestration only after validation data shows V02 accuracy is acceptable.
+
 #### 27. V01 removal report
 
 Is a separate pre-implementation V01 removal report still required in addition to this assessment?
 
 ##### Operator response
+
+Yes. The first instructions require the removal report before any V02 code is written; keep it a separate document in docs/ai-appover-v02.
 
 #### 28. Schema deployment
 
@@ -358,11 +405,15 @@ What production schema-deployment method should be used?
 
 ##### Operator response
 
+Add the tables via a db-manager migration script run manually against production, since API startup does not alter existing databases. Confirm method during planning.
+
 #### 29. Production model access
 
 Has `gpt-5.4-mini` been confirmed as available to the production Codex CLI account?
 
 ##### Operator response
+
+Yes
 
 ## Operator comments
 

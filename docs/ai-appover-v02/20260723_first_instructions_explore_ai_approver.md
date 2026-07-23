@@ -16,7 +16,7 @@ We need to make a new ai approver. The key features:
 
 We will add a section in the /articles/automations page that triggers a request to the api and the api directs the request to the worker-python.
 
-At the default the ai approver v02 flow should work backwards from teh last article added (highest articleId value). The /articles/automations page section should have an input to say how many articles it will analyze. The default analysis flow will got back to the artilce that was last analyzed by this flow. If no article has been analzyed with this flow. The default will be to analyze up to the last approved artilce i.e artilceIds in ArticleApproved table.
+At the default the ai approver v02 flow should work backwards from teh last article added (highest articleId value). The /articles/automations page section should have an input to say how many articles it will analyze. The default analysis flow will got back to the last article with a `ArticleApproveds` table with `isApproved` is true.
 
 ### other defaults
 
