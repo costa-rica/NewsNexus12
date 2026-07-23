@@ -342,67 +342,67 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 7.1 Shared worker proxy support
 
-- [ ] Extract worker-python base-URL handling into a shared API module.
-- [ ] Extract Axios error forwarding into the same shared API support.
-- [ ] Update the existing automation router to use the shared helpers without behavior changes.
-- [ ] Preserve existing authentication, status codes, and V01 route paths.
+- [x] Extract worker-python base-URL handling into a shared API module.
+- [x] Extract Axios error forwarding into the same shared API support.
+- [x] Update the existing automation router to use the shared helpers without behavior changes.
+- [x] Preserve existing authentication, status codes, and V01 route paths.
 
 ### 7.2 V02 automation router
 
-- [ ] Create `api/src/routes/automations/ai-approver-v02.ts`.
-- [ ] Mount it at `/automations/ai-approver-v02`.
-- [ ] Require existing authenticated-user middleware.
-- [ ] Add preview and start proxy routes.
-- [ ] Add latest accepted-run and run-by-ID routes.
-- [ ] Add queued-or-running cancel behavior.
-- [ ] Combine generic queue status with the V02 database-run summary where required.
-- [ ] Exclude draft and expired previews from operator execution status.
-- [ ] Return clear validation, conflict, expired-preview, and worker configuration errors.
+- [x] Create `api/src/routes/automations/ai-approver-v02.ts`.
+- [x] Mount it at `/automations/ai-approver-v02`.
+- [x] Require existing authenticated-user middleware.
+- [x] Add preview and start proxy routes.
+- [x] Add latest accepted-run and run-by-ID routes.
+- [x] Add queued-or-running cancel behavior.
+- [x] Combine generic queue status with the V02 database-run summary where required.
+- [x] Exclude draft and expired previews from operator execution status.
+- [x] Return clear validation, conflict, expired-preview, and worker configuration errors.
 
 ### 7.3 V02 analysis router
 
-- [ ] Create `api/src/routes/analysis/ai-approver-v02.ts`.
-- [ ] Mount it at `/analysis/ai-approver-v02`.
-- [ ] Require existing authenticated-user middleware.
-- [ ] Add prompt list, create, edit-unused, activate, and deactivate routes.
-- [ ] Do not add a prompt delete route.
-- [ ] Normalize blank titles to null.
-- [ ] Return a clear conflict for duplicate non-null titles.
-- [ ] Reject edits when `firstUsedAt` is set.
-- [ ] Allow a used prompt to be reactivated without changing it.
-- [ ] Switch active prompts transactionally.
-- [ ] Protect against multiple active prompts.
-- [ ] Add batch prediction reads for review-table article IDs.
-- [ ] Add one-article prediction-detail reads.
-- [ ] Add independent human-validation and human-comment writes.
-- [ ] Support clearing either review field without clearing the other.
-- [ ] Prevent review routes from modifying prediction or audit fields.
-- [ ] Return clear not-found and invalid-validation errors.
+- [x] Create `api/src/routes/analysis/ai-approver-v02.ts`.
+- [x] Mount it at `/analysis/ai-approver-v02`.
+- [x] Require existing authenticated-user middleware.
+- [x] Add prompt list, create, edit-unused, activate, and deactivate routes.
+- [x] Do not add a prompt delete route.
+- [x] Normalize blank titles to null.
+- [x] Return a clear conflict for duplicate non-null titles.
+- [x] Reject edits when `firstUsedAt` is set.
+- [x] Allow a used prompt to be reactivated without changing it.
+- [x] Switch active prompts transactionally.
+- [x] Protect against multiple active prompts.
+- [x] Add batch prediction reads for review-table article IDs.
+- [x] Add one-article prediction-detail reads.
+- [x] Add independent human-validation and human-comment writes.
+- [x] Support clearing either review field without clearing the other.
+- [x] Prevent review routes from modifying prediction or audit fields.
+- [x] Return clear not-found and invalid-validation errors.
 
 ### 7.4 API tests
 
-- [ ] Test authentication on every portal-facing V02 route.
-- [ ] Test worker proxy success and normalized failures.
-- [ ] Test preview, start, status, detail, and cancellation routes.
-- [ ] Test duplicate-run and expired-preview responses.
-- [ ] Test prompt creation, title normalization, activation, deactivation, and immutability.
-- [ ] Test reactivation of a used prompt without editing it.
-- [ ] Test that no prompt deletion route exists.
-- [ ] Test multiple-active-prompt protection.
-- [ ] Test batch and detail prediction reads.
-- [ ] Test true, false, null, comment-only, and independent-clear review writes.
-- [ ] Test that V01 API routes remain directly callable.
-- [ ] Test that V02 review writes have no article-approval side effects.
+- [x] Test authentication on every portal-facing V02 route.
+- [x] Test worker proxy success and normalized failures.
+- [x] Test preview, start, status, detail, and cancellation routes.
+- [x] Test duplicate-run and expired-preview responses.
+- [x] Test prompt creation, title normalization, activation, deactivation, and immutability.
+- [x] Test reactivation of a used prompt without editing it.
+- [x] Test that no prompt deletion route exists.
+- [x] Test multiple-active-prompt protection.
+- [x] Test batch and detail prediction reads.
+- [x] Test true, false, null, comment-only, and independent-clear review writes.
+- [x] Test that V01 API routes remain directly callable.
+- [x] Test that V02 review writes have no article-approval side effects.
 
 ### 7.5 Phase 3 validation and commit
 
-- [ ] Run `cd db-models && npm run build`.
-- [ ] Run `cd api && npm run build`.
-- [ ] Run `cd api && npm test -- --runInBand`.
-- [ ] Fix all Phase 3 failures and rerun affected checks.
-- [ ] Check off completed Phase 3 tasks.
-- [ ] Review and stage only Phase 3 changes.
-- [ ] Commit Phase 3 after every required check passes.
+- [x] Run `cd db-models && npm run build`.
+- [x] Run `cd api && npm run build`.
+- [x] Run `cd api && npm test -- --runInBand`.
+- [x] Fix all Phase 3 failures and rerun affected checks.
+- [x] Check off completed Phase 3 tasks.
+- [x] Review and stage only Phase 3 changes.
+- [x] Commit Phase 3 after every required check passes.
 
 ## 8. Phase 4: Portal Experience
 

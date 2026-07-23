@@ -5,6 +5,13 @@ import multer from 'multer';
 import path from 'path';
 import { authenticateToken } from '../../modules/userAuthentication';
 import logger from '../../modules/logger';
+import {
+  forwardAxiosError,
+  forwardWorkerNodeAxiosError,
+  forwardWorkerPythonAxiosError,
+  getRequiredWorkerNodeBaseUrl,
+  getRequiredWorkerPythonBaseUrl,
+} from '../../modules/workerProxy';
 
 const router = express.Router();
 
@@ -12,116 +19,12 @@ type RequestWithFile = express.Request & {
   file?: any;
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function getAutomationExcelDir(): string | null {
   return process.env.PATH_TO_AUTOMATION_EXCEL_FILES || null;
 }
 
-function getWorkerNodeBaseUrl(): string | null {
-  const rawValue = process.env.URL_BASE_NEWS_NEXUS_WORKER_NODE || '';
-  const trimmedValue = rawValue.trim();
-
-  if (!trimmedValue) {
-    return null;
-  }
-
-  return trimmedValue.replace(/\/+$/, '');
-}
-
-function getWorkerPythonBaseUrl(): string | null {
-  const rawValue = process.env.URL_BASE_NEWS_NEXUS_PYTHON_QUEUER || '';
-  const trimmedValue = rawValue.trim();
-
-  if (!trimmedValue) {
-    return null;
-  }
-
-  return trimmedValue.replace(/\/+$/, '');
-}
-
-function getRequiredWorkerNodeBaseUrl(res: express.Response): string | null {
-  const workerNodeBaseUrl = getWorkerNodeBaseUrl();
-
-  if (!workerNodeBaseUrl) {
-    res.status(500).json({
-      result: false,
-      message: 'URL_BASE_NEWS_NEXUS_WORKER_NODE is not configured.',
-    });
-    return null;
-  }
-
-  return workerNodeBaseUrl;
-}
-
-function getRequiredWorkerPythonBaseUrl(res: express.Response): string | null {
-  const workerPythonBaseUrl = getWorkerPythonBaseUrl();
-
-  if (!workerPythonBaseUrl) {
-    res.status(500).json({
-      result: false,
-      message: 'URL_BASE_NEWS_NEXUS_PYTHON_QUEUER is not configured.',
-    });
-    return null;
-  }
-
-  return workerPythonBaseUrl;
-}
-
-function forwardAxiosError(res: express.Response, error: unknown): express.Response {
-  if (axios.isAxiosError(error)) {
-    return res.status(error.response?.status || 500).json(
-      error.response?.data || {
-        result: false,
-        message: error.message,
-      }
-    );
-  }
-
-  return res.status(500).json({
-    result: false,
-    message: getErrorMessage(error),
-  });
-}
-
-function forwardWorkerPythonAxiosError(
-  res: express.Response,
-  error: unknown
-): express.Response {
-  if (
-    axios.isAxiosError(error) &&
-    !error.response &&
-    error.code === 'ECONNREFUSED'
-  ) {
-    return res.status(502).json({
-      result: false,
-      message:
-        'Unable to reach the worker-python app. Make sure the worker-python service is running and try again.',
-    });
-  }
-
-  return forwardAxiosError(res, error);
-}
-
-function forwardWorkerNodeAxiosError(
-  res: express.Response,
-  error: unknown
-): express.Response {
-  if (
-    axios.isAxiosError(error) &&
-    !error.response &&
-    error.code === 'ECONNREFUSED'
-  ) {
-    return res.status(502).json({
-      result: false,
-      message:
-        'Unable to reach the worker-node app. Make sure the worker-node service is running and try again.',
-    });
-  }
-
-  return forwardAxiosError(res, error);
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 const storage = multer.diskStorage({
