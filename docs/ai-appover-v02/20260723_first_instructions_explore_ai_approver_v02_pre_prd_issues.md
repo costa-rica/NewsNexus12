@@ -29,11 +29,15 @@ Claude assessment Q5 enforces uniqueness per article per prompt version. But cod
 
 #### Operator response
 
+Resolved by conflict 1: no DB unique constraint; the app keeps one row per articleId, updating in place on retry. Safe because only one V02 run executes at a time.
+
 ### 3. Meaning of the article count
 
 Codex Q7 mode 1 is "how many articles back from the last added article" (a positional range by articleId), and Q10 agrees (stop when the resolved range is exhausted). But Q17 says the count means attempted model calls. Going 100 back might yield only 40 eligible articles. Decide: is that run finished (positional meaning) or should it keep scanning until 100 attempts are made?
 
 #### Operator response
+
+Positional meaning, matching Q7: scan N articleIds back from the last added article; the run finishes when that range is exhausted, even if fewer model calls occur.
 
 ### 4. Stale watermark language
 
@@ -59,11 +63,15 @@ Claude assessment Q4 says stop after 3 errors in a row or 5 non-useful predictio
 
 #### Operator response
 
+Errors mean Codex CLI failures: stop after 3 consecutive. Non-useful means invalid_response results: stop after 5 consecutive. Both counters reset on any successful prediction.
+
 ### 2. Retry-once scope
 
 Codex Q12 says retry once during a new run and continue to skip. Unclear if that means once ever or once per subsequent run. "Continue to skip" suggests permanently skipped after one retry, which requires tracking a retry count. The prediction table design has no retry-count column yet.
 
 #### Operator response
+
+Retry once ever: add an attemptCount column and skip articles with attemptCount of 2 or more. Row replacement otherwise erases the record that a retry already happened.
 
 ### 3. State-assigner verification
 
@@ -79,6 +87,8 @@ Codex Q21 says titles must be unique but blank titles are allowed with a display
 
 #### Operator response
 
+Yes, multiple blank-title prompts may coexist. Store blank titles as null and enforce uniqueness only among non-null titles, so the constraint ignores blanks.
+
 ### 5. Latest state row eligibility
 
 Codex Q13 says the latest ArticleStateContracts02 row must have an integer stateId. Implied but unstated: if the latest row lacks one while an older row has one, the article is ineligible. Confirm.
@@ -93,11 +103,15 @@ Codex Q6 remains deliberately open: whether worker-python can safely stop failin
 
 #### Operator response
 
+Remove V01’s startup-fatal validation. Validate V01 on demand, return clear job errors, and keep shared infrastructure and V02 validation mandatory.
+
 ### 7. V02 table names and count
 
 The first instructions suggest `AiApproverArticleScoreV02` and `AiApproverPromptVersionV02`. The codex assessment recommends prediction terminology and an optional run table. Confirm the model names, physical table names, and whether `AiApproverRunsV02` is required.
 
 #### Operator response
+
+Use codex naming: AiApproverPromptVersionsV02 and AiApproverArticlePredictionsV02. Include AiApproverRunsV02; run history supports the circuit breaker, single-run lock, and status polling.
 
 ### 8. Hardcoded prompt versioning
 
@@ -105,11 +119,15 @@ Q22 rejects storing the rendered prompt because the prompt-version foreign key i
 
 #### Operator response
 
+Store a hardcoded pipelineVersion string on each prediction row; bump it whenever worker-python's article wrapper or response instructions change. Cheap and makes audits exact.
+
 ### 9. State error eligibility
 
 Q13 requires the latest state row to contain an integer `stateId`, but does not address `isDeterminedToBeError`. Confirm whether the latest row must also have `isDeterminedToBeError` set to false.
 
 #### Operator response
+
+Yes: the latest row must have an integer stateId and isDeterminedToBeError not true, so error-flagged assignments do not qualify articles.
 
 ### 10. Successful content definition
 
@@ -117,11 +135,15 @@ Q15 and Q16 require the latest successful `ArticleContents02` row. Define whethe
 
 #### Operator response
 
+Success requires both status success and nonblank content. Take the title from Articles, since worker-python injects title and content separately.
+
 ### 11. Cancellation behavior
 
 Claude Q2 asks whether release one needs cancellation, but the response addresses only manual status refresh. Confirm whether V02 should reuse the current worker-python cancel action or omit cancellation.
 
 #### Operator response
+
+Reuse the existing worker-python cancel action for V02 jobs; it pairs naturally with the reused status polling and costs little to include.
 
 ### 12. Schema deployment mechanism
 
@@ -129,11 +151,15 @@ Codex Q28 requests a “db-manager migration script,” but the repository has n
 
 #### Operator response
 
+Use a standalone db-manager script that creates only the new V02 tables, committed to the repo and run manually against production; no general migration framework needed.
+
 ### 13. Prompt edit and run race
 
 Q19 freezes a prompt after any prediction row exists. A run could resolve an unused active prompt while an operator edits it before the first row is inserted. Define transactional locking or mark the prompt used when the run is accepted.
 
 #### Operator response
+
+Mark the prompt used inside the run-acceptance transaction, before article selection; edits then fail immediately rather than racing the first prediction row.
 
 ### 14. Run-mode preview count
 
@@ -141,8 +167,12 @@ Claude Q5 requests that the until-last-approved option include the number of art
 
 #### Operator response
 
+Yes: the modal preview should count eligible model calls after all filters, so the shown number matches what the run will actually attempt.
+
 ### 15. V01 inaccessible meaning
 
 Q1, Q2, and Q4 say V01 portal features should be inaccessible without deleting files, while Q5 keeps direct APIs active. Define whether inaccessible portal URLs return 404, redirect, or render no controls.
 
 #### Operator response
+
+Remove navigation links and return the portal's standard not-found page for V01 URLs; no redirects. API and worker endpoints remain directly callable.
