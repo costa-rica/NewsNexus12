@@ -261,6 +261,7 @@ Should failed and invalid responses retry automatically on the next run?
 ##### Operator response
 
 Yes. Articles whose latest result is failed or invalid_response stay eligible on the next run; completed predictions are never retried automatically. Only retry once during a new run and continue to skip. Do not retry a failed or invalid_response on a current run.
+A retry will replace teh row. The current implementation will only have one prediction per article.
 
 ### State and content eligibility
 

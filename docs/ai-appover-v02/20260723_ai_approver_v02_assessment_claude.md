@@ -51,4 +51,8 @@ Is one prediction per article per prompt version enforced with a unique constrai
 
 #### Operator response
 
-Enforce unqiue constraint on one prediction per article per prompt version. For now let's make it if an article id has been analyzed by V02 once it will not be analyzed again. This brings up a good question. If a run has been started but then stops before the total set of articles is analyzed or the last articleId is run then the ai-appover-v02 flow will prevent us from going back. I think when the run is triggered there shoudl be a modal that says two options (radio buttons): 1)run n articles count with an input that allows the user to enter a count of articles to go backwards, 2)run until last articledId report (include the number of articles),
+No db unique enforcment. But the worker-node or any app that writes to the V02 predicitons table will overwrite existing rows but not add multiple rows for the same artilceId.
+
+One prediction per article.
+
+This brings up a good question. If a run has been started but then stops before the total set of articles is analyzed or the last articleId is run then the ai-appover-v02 flow will prevent us from going back. I think when the run is triggered there shoudl be a modal that says two options (radio buttons): 1)run n articles count with an input that allows the user to enter a count of articles to go backwards, 2)run until last articledId report (include the number of articles),
