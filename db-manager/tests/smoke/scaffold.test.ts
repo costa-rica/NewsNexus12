@@ -31,6 +31,7 @@ describe("Phase 1: Package scaffolding", () => {
       expect(packageJson.scripts).toHaveProperty("build");
       expect(packageJson.scripts).toHaveProperty("start");
       expect(packageJson.scripts).toHaveProperty("test");
+      expect(packageJson.scripts).toHaveProperty("schema:ai-approver-v02");
     });
 
     it("has dependency on @newsnexus/db-models", () => {

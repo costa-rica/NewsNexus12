@@ -245,6 +245,21 @@ describe("Zip import module", () => {
       expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("Article"));
       expect(indexOf("OrchestratorRunStep")).toBeLessThan(indexOf("Article"));
     });
+
+    it("loads AI Approver V02 parents before predictions", () => {
+      expect(indexOf("AiApproverPromptVersionV02")).toBeLessThan(
+        indexOf("AiApproverRunV02"),
+      );
+      expect(indexOf("AiApproverPromptVersionV02")).toBeLessThan(
+        indexOf("AiApproverArticlePredictionV02"),
+      );
+      expect(indexOf("AiApproverRunV02")).toBeLessThan(
+        indexOf("AiApproverArticlePredictionV02"),
+      );
+      expect(indexOf("Article")).toBeLessThan(
+        indexOf("AiApproverArticlePredictionV02"),
+      );
+    });
   });
 
   describe("importZipFileToDatabase()", () => {

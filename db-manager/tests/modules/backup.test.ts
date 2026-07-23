@@ -1,3 +1,4 @@
+import AdmZip from "adm-zip";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -11,6 +12,15 @@ jest.mock("@newsnexus/db-models", () => ({
     findAll: jest.fn(),
   },
   User: {
+    findAll: jest.fn(),
+  },
+  AiApproverPromptVersionV02: {
+    findAll: jest.fn(),
+  },
+  AiApproverRunV02: {
+    findAll: jest.fn(),
+  },
+  AiApproverArticlePredictionV02: {
     findAll: jest.fn(),
   },
   // Add a non-model export to test filtering
@@ -45,6 +55,9 @@ describe("Backup module", () => {
     (db.Article.findAll as jest.Mock).mockReset();
     (db.ArticleApproved.findAll as jest.Mock).mockReset();
     (db.User.findAll as jest.Mock).mockReset();
+    (db.AiApproverPromptVersionV02.findAll as jest.Mock).mockReset();
+    (db.AiApproverRunV02.findAll as jest.Mock).mockReset();
+    (db.AiApproverArticlePredictionV02.findAll as jest.Mock).mockReset();
   });
 
   afterEach(() => {
@@ -137,6 +150,33 @@ describe("Backup module", () => {
       expect(entryNames).toContain("Article.csv");
       expect(entryNames).toContain("ArticleApproved.csv");
       expect(entryNames).not.toContain("User.csv");
+    });
+
+    it("includes AI Approver V02 models discovered through package exports", async () => {
+      (db.Article.findAll as jest.Mock).mockResolvedValue([]);
+      (db.ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (db.User.findAll as jest.Mock).mockResolvedValue([]);
+      (db.AiApproverPromptVersionV02.findAll as jest.Mock).mockResolvedValue([
+        { id: 1, promptInMarkdown: "Prompt" },
+      ]);
+      (db.AiApproverRunV02.findAll as jest.Mock).mockResolvedValue([
+        { id: 2, activePromptVersionId: 1 },
+      ]);
+      (db.AiApproverArticlePredictionV02.findAll as jest.Mock).mockResolvedValue([
+        { id: 3, articleId: 4, runId: 2 },
+      ]);
+
+      const zipPath = await createDatabaseBackupZipFile();
+      const zip = new AdmZip(zipPath);
+      const entryNames = zip.getEntries().map((entry) => entry.entryName);
+
+      expect(entryNames).toEqual(
+        expect.arrayContaining([
+          "AiApproverPromptVersionV02.csv",
+          "AiApproverRunV02.csv",
+          "AiApproverArticlePredictionV02.csv",
+        ]),
+      );
     });
 
     it("logs backup directory and creation messages", async () => {

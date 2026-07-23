@@ -8,6 +8,31 @@ import {
 	initAiApproverPromptVersion,
 	AiApproverPromptVersion,
 } from "./AiApproverPromptVersion";
+import {
+	initAiApproverPromptVersionV02,
+	AiApproverPromptVersionV02,
+} from "./AiApproverPromptVersionV02";
+import type { AiApproverPromptVersionV02Attributes } from "./AiApproverPromptVersionV02";
+import {
+	initAiApproverRunV02,
+	AiApproverRunV02,
+} from "./AiApproverRunV02";
+import type {
+	AiApproverRunV02Attributes,
+	AiApproverRunV02Status,
+	AiApproverV02ContentSource,
+	AiApproverV02SelectionItem,
+	AiApproverV02SelectionMode,
+} from "./AiApproverRunV02";
+import {
+	initAiApproverArticlePredictionV02,
+	AiApproverArticlePredictionV02,
+} from "./AiApproverArticlePredictionV02";
+import type {
+	AiApproverArticlePredictionV02Attributes,
+	AiApproverV02Prediction,
+	AiApproverV02ResultStatus,
+} from "./AiApproverArticlePredictionV02";
 import { initArticle, Article } from "./Article";
 import { initArticleApproved, ArticleApproved } from "./ArticleApproved";
 import { initArticleContents02, ArticleContents02 } from "./ArticleContents02";
@@ -90,6 +115,9 @@ import { resetAllSequences } from "../utils/resetSequences";
 export function initModels() {
 	initAiApproverArticleScore();
 	initAiApproverPromptVersion();
+	initAiApproverPromptVersionV02();
+	initAiApproverRunV02();
+	initAiApproverArticlePredictionV02();
 	initArticle();
 	initArticleApproved();
 	initArticleContents02();
@@ -126,6 +154,9 @@ export function initModels() {
 		sequelize,
 		AiApproverArticleScore,
 		AiApproverPromptVersion,
+		AiApproverPromptVersionV02,
+		AiApproverRunV02,
+		AiApproverArticlePredictionV02,
 		Article,
 		ArticleApproved,
 		ArticleContents02,
@@ -158,7 +189,21 @@ export function initModels() {
 	};
 }
 
-export type { OrchestratorRunMode, OrchestratorRunStatus, OrchestratorRunStepName, OrchestratorRunStepStatus };
+export type {
+	AiApproverArticlePredictionV02Attributes,
+	AiApproverPromptVersionV02Attributes,
+	AiApproverRunV02Attributes,
+	AiApproverRunV02Status,
+	AiApproverV02ContentSource,
+	AiApproverV02Prediction,
+	AiApproverV02ResultStatus,
+	AiApproverV02SelectionItem,
+	AiApproverV02SelectionMode,
+	OrchestratorRunMode,
+	OrchestratorRunStatus,
+	OrchestratorRunStepName,
+	OrchestratorRunStepStatus,
+};
 
 export {
 	sequelize,
@@ -167,6 +212,9 @@ export {
 	resetAllSequences,
 	AiApproverArticleScore,
 	AiApproverPromptVersion,
+	AiApproverPromptVersionV02,
+	AiApproverRunV02,
+	AiApproverArticlePredictionV02,
 	Article,
 	ArticleApproved,
 	ArticleContents02,

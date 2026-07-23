@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/index.ts",
+    "schema:ai-approver-v02": "ts-node src/standalone/installAiApproverV02Schema.ts",
     "test": "jest",
     "clean": "rm -rf dist"
   },

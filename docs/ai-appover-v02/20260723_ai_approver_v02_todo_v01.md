@@ -75,89 +75,89 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 5.1 Prompt model
 
-- [ ] Add `AiApproverPromptVersionV02` in `db-models/src/models`.
-- [ ] Use physical table name `AiApproverPromptVersionsV02`.
-- [ ] Add `id`, nullable `title`, `promptInMarkdown`, `isActive`, and nullable `firstUsedAt`.
-- [ ] Add standard `createdAt` and `updatedAt` timestamps.
-- [ ] Normalize blank prompt titles to null at the write boundary.
-- [ ] Add partial uniqueness for non-null titles.
-- [ ] Add an index supporting active-prompt lookup.
-- [ ] Add database or transactional protection against multiple active prompts.
+- [x] Add `AiApproverPromptVersionV02` in `db-models/src/models`.
+- [x] Use physical table name `AiApproverPromptVersionsV02`.
+- [x] Add `id`, nullable `title`, `promptInMarkdown`, `isActive`, and nullable `firstUsedAt`.
+- [x] Add standard `createdAt` and `updatedAt` timestamps.
+- [x] Normalize blank prompt titles to null at the write boundary.
+- [x] Add partial uniqueness for non-null titles.
+- [x] Add an index supporting active-prompt lookup.
+- [x] Add database or transactional protection against multiple active prompts.
 
 ### 5.2 Run model
 
-- [ ] Add `AiApproverRunV02` in `db-models/src/models`.
-- [ ] Use physical table name `AiApproverRunsV02`.
-- [ ] Add prompt, queue-job, selection-mode, option, boundary, count, model, status, reason, and timestamp fields from PRD section 12.3.
-- [ ] Add preview token and expiration fields required by the accepted plan.
-- [ ] Add `draft` and `expired` as preview lifecycle statuses alongside the required execution statuses.
-- [ ] Store selection snapshots as bounded metadata without article content or rendered prompts.
-- [ ] Define each selection object with `articleId`, `contentSource`, and nullable `articleContents02Id`.
-- [ ] Add indexes for `jobId`, `status`, `createdAt`, and status-plus-preview-expiration.
-- [ ] Ensure counter defaults are valid for both preview and accepted runs.
+- [x] Add `AiApproverRunV02` in `db-models/src/models`.
+- [x] Use physical table name `AiApproverRunsV02`.
+- [x] Add prompt, queue-job, selection-mode, option, boundary, count, model, status, reason, and timestamp fields from PRD section 12.3.
+- [x] Add preview token and expiration fields required by the accepted plan.
+- [x] Add `draft` and `expired` as preview lifecycle statuses alongside the required execution statuses.
+- [x] Store selection snapshots as bounded metadata without article content or rendered prompts.
+- [x] Define each selection object with `articleId`, `contentSource`, and nullable `articleContents02Id`.
+- [x] Add indexes for `jobId`, `status`, `createdAt`, and status-plus-preview-expiration.
+- [x] Ensure counter defaults are valid for both preview and accepted runs.
 
 ### 5.3 Prediction model
 
-- [ ] Add `AiApproverArticlePredictionV02` in `db-models/src/models`.
-- [ ] Use physical table name `AiApproverArticlePredictionsV02`.
-- [ ] Add every field required by PRD section 12.4.
-- [ ] Restrict `prediction` to `approved`, `irrelevant`, or null.
-- [ ] Restrict `resultStatus` to `completed`, `failed`, or `invalid_response`.
-- [ ] Require completed rows to have a prediction and nonblank reasoning.
-- [ ] Require non-completed rows to have a null prediction.
-- [ ] Restrict `attemptCount` to 1 or 2.
-- [ ] Keep `humanValidation` nullable boolean and `humanComment` nullable text.
-- [ ] Add indexes for article, prompt, latest run, result status, and prediction.
-- [ ] Do not add a database unique constraint on `articleId` in this release.
+- [x] Add `AiApproverArticlePredictionV02` in `db-models/src/models`.
+- [x] Use physical table name `AiApproverArticlePredictionsV02`.
+- [x] Add every field required by PRD section 12.4.
+- [x] Restrict `prediction` to `approved`, `irrelevant`, or null.
+- [x] Restrict `resultStatus` to `completed`, `failed`, or `invalid_response`.
+- [x] Require completed rows to have a prediction and nonblank reasoning.
+- [x] Require non-completed rows to have a null prediction.
+- [x] Restrict `attemptCount` to 1 or 2.
+- [x] Keep `humanValidation` nullable boolean and `humanComment` nullable text.
+- [x] Add indexes for article, prompt, latest run, result status, and prediction.
+- [x] Do not add a database unique constraint on `articleId` in this release.
 
 ### 5.4 Registration and associations
 
-- [ ] Register all three models in `db-models/src/models/_index.ts`.
-- [ ] Add their dependency order to `db-models/src/models/_loadOrder.ts`.
-- [ ] Add prompt-to-run and prompt-to-prediction associations.
-- [ ] Add article-to-prediction and run-to-prediction associations.
-- [ ] Confirm model exports reach API, db-manager, backup, restore, and test initialization.
-- [ ] Verify existing V01 model names, exports, and associations remain unchanged.
+- [x] Register all three models in `db-models/src/models/_index.ts`.
+- [x] Add their dependency order to `db-models/src/models/_loadOrder.ts`.
+- [x] Add prompt-to-run and prompt-to-prediction associations.
+- [x] Add article-to-prediction and run-to-prediction associations.
+- [x] Confirm model exports reach API, db-manager, backup, restore, and test initialization.
+- [x] Verify existing V01 model names, exports, and associations remain unchanged.
 
 ### 5.5 Dedicated schema installer
 
-- [ ] Add a db-manager command that installs only the three V02 tables.
-- [ ] Initialize shared models before inspecting or creating V02 tables.
-- [ ] Use `queryInterface.describeTable` to inspect existing tables.
-- [ ] Inspect required indexes and foreign keys through query-interface metadata.
-- [ ] Validate columns, types, nullability, indexes, and references before mutation.
-- [ ] Treat a complete compatible installation as a successful no-op.
-- [ ] Fail before mutation when an existing V02 table is partial or incompatible.
-- [ ] Call `sync` only for absent V02 models in dependency order.
-- [ ] Never pass `force` or `alter`.
-- [ ] Print created, retained, and rejected schema outcomes clearly.
-- [ ] Return a nonzero exit code on installer failure.
-- [ ] Add the workstation and production package commands.
+- [x] Add a db-manager command that installs only the three V02 tables.
+- [x] Initialize shared models before inspecting or creating V02 tables.
+- [x] Use `queryInterface.describeTable` to inspect existing tables.
+- [x] Inspect required indexes and foreign keys through query-interface metadata.
+- [x] Validate columns, types, nullability, indexes, and references before mutation.
+- [x] Treat a complete compatible installation as a successful no-op.
+- [x] Fail before mutation when an existing V02 table is partial or incompatible.
+- [x] Call `sync` only for absent V02 models in dependency order.
+- [x] Never pass `force` or `alter`.
+- [x] Print created, retained, and rejected schema outcomes clearly.
+- [x] Return a nonzero exit code on installer failure.
+- [x] Add the workstation and production package commands.
 
 ### 5.6 Database tests and documentation
 
-- [ ] Add Phase 1 model and installer coverage to the db-manager Jest suite.
-- [ ] Test model initialization and associations.
-- [ ] Test field constraints and required indexes.
-- [ ] Test partial non-null title uniqueness.
-- [ ] Test active-prompt protection.
-- [ ] Test an empty V02 schema installation.
-- [ ] Test an already-installed compatible schema.
-- [ ] Test a partial or incompatible existing table.
-- [ ] Test a compatible table missing a required index or foreign key.
-- [ ] Test that the installer does not modify unrelated or V01 tables.
-- [ ] Document backup prerequisites, verification queries, and destructive rollback order.
-- [ ] State that normal application rollback retains the V02 tables.
+- [x] Add Phase 1 model and installer coverage to the db-manager Jest suite.
+- [x] Test model initialization and associations.
+- [x] Test field constraints and required indexes.
+- [x] Test partial non-null title uniqueness.
+- [x] Test active-prompt protection.
+- [x] Test an empty V02 schema installation.
+- [x] Test an already-installed compatible schema.
+- [x] Test a partial or incompatible existing table.
+- [x] Test a compatible table missing a required index or foreign key.
+- [x] Test that the installer does not modify unrelated or V01 tables.
+- [x] Document backup prerequisites, verification queries, and destructive rollback order.
+- [x] State that normal application rollback retains the V02 tables.
 
 ### 5.7 Phase 1 validation and commit
 
-- [ ] Run `cd db-models && npm run build`.
-- [ ] Run `cd db-manager && npm run build`.
-- [ ] Run `cd db-manager && npm test -- --runInBand`.
-- [ ] Fix all Phase 1 failures and rerun affected checks.
-- [ ] Check off completed Phase 1 tasks.
-- [ ] Review and stage only Phase 1 changes.
-- [ ] Commit Phase 1 after every required check passes.
+- [x] Run `cd db-models && npm run build`.
+- [x] Run `cd db-manager && npm run build`.
+- [x] Run `cd db-manager && npm test -- --runInBand`.
+- [x] Fix all Phase 1 failures and rerun affected checks.
+- [x] Check off completed Phase 1 tasks.
+- [x] Review and stage only Phase 1 changes.
+- [x] Commit Phase 1 after every required check passes.
 
 ## 6. Phase 2: Worker-Python V02 Core
 

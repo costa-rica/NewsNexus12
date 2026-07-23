@@ -1,5 +1,8 @@
 import { AiApproverArticleScore } from "./AiApproverArticleScore";
 import { AiApproverPromptVersion } from "./AiApproverPromptVersion";
+import { AiApproverArticlePredictionV02 } from "./AiApproverArticlePredictionV02";
+import { AiApproverPromptVersionV02 } from "./AiApproverPromptVersionV02";
+import { AiApproverRunV02 } from "./AiApproverRunV02";
 import { Article } from "./Article";
 import { ArticleApproved } from "./ArticleApproved";
 import { ArticleContents02 } from "./ArticleContents02";
@@ -37,6 +40,28 @@ export function applyAssociations(): void {
 	});
 	AiApproverArticleScore.belongsTo(AiApproverPromptVersion, {
 		foreignKey: "promptVersionId",
+	});
+
+	// --- AI Approver V02 associations ---
+	AiApproverPromptVersionV02.hasMany(AiApproverRunV02, {
+		foreignKey: "activePromptVersionId",
+	});
+	AiApproverRunV02.belongsTo(AiApproverPromptVersionV02, {
+		foreignKey: "activePromptVersionId",
+	});
+
+	AiApproverPromptVersionV02.hasMany(AiApproverArticlePredictionV02, {
+		foreignKey: "promptVersionId",
+	});
+	AiApproverArticlePredictionV02.belongsTo(AiApproverPromptVersionV02, {
+		foreignKey: "promptVersionId",
+	});
+
+	AiApproverRunV02.hasMany(AiApproverArticlePredictionV02, {
+		foreignKey: "runId",
+	});
+	AiApproverArticlePredictionV02.belongsTo(AiApproverRunV02, {
+		foreignKey: "runId",
 	});
 
 	// --- EntityWhoCategorizedArticle associations ---
@@ -149,6 +174,9 @@ export function applyAssociations(): void {
 
 	Article.hasMany(AiApproverArticleScore, { foreignKey: "articleId" });
 	AiApproverArticleScore.belongsTo(Article, { foreignKey: "articleId" });
+
+	Article.hasOne(AiApproverArticlePredictionV02, { foreignKey: "articleId" });
+	AiApproverArticlePredictionV02.belongsTo(Article, { foreignKey: "articleId" });
 
 	// --- ArticleDuplicateAnalysis associations ---
 	Article.hasMany(ArticleDuplicateAnalysis, {

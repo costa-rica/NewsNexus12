@@ -58,6 +58,18 @@ npm start -- --delete_articles_retired_sources           # Delete all eligible r
 
 Flags can be combined (except `--dry_run` and `--drop_db`, which exit after completing). Execution order: backup, import, trim, delete, no-state delete, retired-sources delete, then status.
 
+## AI Approver V02 Schema Installer
+
+The dedicated installer creates or validates only the three AI Approver V02 tables:
+
+```bash
+npm run schema:ai-approver-v02
+```
+
+It does not use `force` or `alter`. It rejects partial or incompatible existing V02 tables before creating an absent table.
+
+See `../docs/ai-appover-v02/20260723_ai_approver_v02_schema_operations.md` for backup prerequisites, production usage, verification queries, and rollback.
+
 ## CLI Flags
 
 | Flag | Argument | Description |
@@ -124,7 +136,10 @@ db-manager/
 │   │   ├── deleteArticlesRetiredSources.ts # Preview/delete retired-source articles
 │   │   ├── backup.ts            # Database backup to ZIP/CSV
 │   │   ├── zipImport.ts         # ZIP import: schema rebuild, topological load, sequence reset
+│   │   ├── installAiApproverV02Schema.ts # Dedicated V02 schema validation and installation
 │   │   └── dryRunValidator.ts   # Dry-run validation against a scratch Postgres database
+│   ├── standalone/
+│   │   └── installAiApproverV02Schema.ts # AI Approver V02 schema command
 │   └── types/
 │       ├── cli.ts               # CLI options type definitions
 │       └── status.ts            # Database status type definitions
