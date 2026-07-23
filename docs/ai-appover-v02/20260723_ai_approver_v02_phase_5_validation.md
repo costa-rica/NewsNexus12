@@ -79,11 +79,15 @@ modified_by: codex (gpt-5)
 
 5. Portal verification
 
-   - Browser verification covered V02 automation rendering, V01 not-found routing, and review-column defaults.
-   - V02 state transitions are backed by worker and API tests because browser QA did not execute a live Codex call.
+   - Browser verification used an authenticated disposable operator and an isolated PostgreSQL database.
+   - Mode A completed one planned prediction through preview, confirmation, queueing, execution, status, and review.
+   - Mode B completed two planned predictions through the same flow.
+   - A deterministic fake Codex executable produced local E2E responses without a live model call.
+   - Review validation and comments were saved and cleared independently.
+   - V01 not-found routing and V01/V02 review-column defaults were verified.
 
 ## 4. Intentionally unavailable checks
 
-- No live Codex CLI model call was made.
+- No live Codex CLI model call was made. Local E2E execution used a deterministic fake executable.
 - No production database backup, schema installation, deployment, or smoke test was performed.
 - These actions require the explicit operator approvals retained in Phase 6.

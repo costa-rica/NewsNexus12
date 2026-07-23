@@ -70,6 +70,10 @@ modified_by: codex (gpt-5)
 - API: 26 suites and 183 tests passed.
 - portal lint passed with zero warnings.
 - portal production build passed.
+- authenticated local Mode A completed one prediction.
+- authenticated local Mode B completed two predictions.
+- local review validation and comments saved and cleared independently.
+- the local E2E run used an isolated database and deterministic fake Codex executable.
 
 Detailed evidence is in:
 

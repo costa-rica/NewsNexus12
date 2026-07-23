@@ -618,7 +618,7 @@ No product code begins until this phase is complete and the operator approves th
 
 ## 11. Final Acceptance Checklist
 
-- [ ] An authenticated operator can preview and start both V02 modes.
+- [x] An authenticated operator can preview and start both V02 modes.
 - [x] Every preview applies the documented range and eligibility rules.
 - [x] A confirmed run executes its frozen selection and source choices.
 - [x] Zero-eligible, expired, invalid, and conflicting starts are blocked clearly.
@@ -633,7 +633,7 @@ No product code begins until this phase is complete and the operator approves th
 - [x] V01 portal entry points are hidden while V01 backend compatibility remains.
 - [x] V01 configuration cannot prevent worker startup.
 - [x] The dedicated schema installer is safe, repeatable, and documented.
-- [ ] All automated and manual checks pass.
+- [x] All automated and manual checks pass.
 - [x] Pre-implementation and post-implementation reports are complete.
 - [ ] The operator has approved the production procedure.
 
