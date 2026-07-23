@@ -163,180 +163,180 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 6.1 Module and route isolation
 
-- [ ] Create a separate `worker-python/src/modules/ai_approver_v02` package.
-- [ ] Create a separate `worker-python/src/routes/ai_approver_v02.py` route module.
-- [ ] Mount worker routes under `/ai-approver-v02`.
-- [ ] Leave V01 `/ai-approver` routes and module names unchanged.
-- [ ] Reuse the global queue engine without mixing V01 and V02 product state.
-- [ ] Use the V02 database run ID as the queue handler input.
+- [x] Create a separate `worker-python/src/modules/ai_approver_v02` package.
+- [x] Create a separate `worker-python/src/routes/ai_approver_v02.py` route module.
+- [x] Mount worker routes under `/ai-approver-v02`.
+- [x] Leave V01 `/ai-approver` routes and module names unchanged.
+- [x] Reuse the global queue engine without mixing V01 and V02 product state.
+- [x] Use the V02 database run ID as the queue handler input.
 
 ### 6.2 V02 configuration
 
-- [ ] Add V02-only configuration for PostgreSQL settings.
-- [ ] Add `AI_APPROVER_V02_MODEL_NAME` with default `gpt-5.4-mini`.
-- [ ] Add `AI_APPROVER_V02_CODEX_TIMEOUT_SECONDS`.
-- [ ] Add `AI_APPROVER_V02_EXPIRED_PREVIEW_RETENTION_DAYS` with default seven.
-- [ ] Validate positive timeout and retention values.
-- [ ] Validate Codex CLI availability.
-- [ ] Do not depend on V01 environment-variable names.
-- [ ] Return clear V02 configuration errors from V02 routes.
+- [x] Add V02-only configuration for PostgreSQL settings.
+- [x] Add `AI_APPROVER_V02_MODEL_NAME` with default `gpt-5.4-mini`.
+- [x] Add `AI_APPROVER_V02_CODEX_TIMEOUT_SECONDS`.
+- [x] Add `AI_APPROVER_V02_EXPIRED_PREVIEW_RETENTION_DAYS` with default seven.
+- [x] Validate positive timeout and retention values.
+- [x] Validate Codex CLI availability.
+- [x] Do not depend on V01 environment-variable names.
+- [x] Return clear V02 configuration errors from V02 routes.
 
 ### 6.3 SQL-side preview selection
 
-- [ ] Implement selection in PostgreSQL instead of loading a broad Mode B range into Python.
-- [ ] Resolve the highest current `Articles.id` at preview time.
-- [ ] Resolve the highest approved article ID using only `isApproved = true`.
-- [ ] Implement Mode A as an article-position range with default count 25.
-- [ ] Reject non-integer or non-positive Mode A counts.
-- [ ] Truncate Mode A before the approved boundary by default.
-- [ ] Allow Mode A to cross the boundary only when explicitly requested.
-- [ ] Continue Mode A without truncation when no approved boundary exists.
-- [ ] Make Mode B unavailable when no approved boundary exists.
-- [ ] Stop Mode B before the approved boundary.
-- [ ] Exclude every approved article even when Mode A crosses the boundary.
-- [ ] Resolve the latest state row by highest `ArticleStateContracts02.id`.
-- [ ] Require an integer state ID and `isDeterminedToBeError = false`.
-- [ ] Resolve the latest usable successful content row by highest `ArticleContents02.id`.
-- [ ] Require nonblank scraped content by default.
-- [ ] Use nonblank article description only when fallback is enabled and scraped content is unusable.
-- [ ] Record the selected source and nullable content-row ID.
-- [ ] Exclude completed V02 predictions.
-- [ ] Include first-attempt `failed` and `invalid_response` rows for one retry.
-- [ ] Exclude rows with `attemptCount >= 2`.
-- [ ] Return selections in descending article-ID order.
-- [ ] Do not expand Mode A to compensate for ineligible articles.
-- [ ] Return no draft when the resolved eligible count is zero.
+- [x] Implement selection in PostgreSQL instead of loading a broad Mode B range into Python.
+- [x] Resolve the highest current `Articles.id` at preview time.
+- [x] Resolve the highest approved article ID using only `isApproved = true`.
+- [x] Implement Mode A as an article-position range with default count 25.
+- [x] Reject non-integer or non-positive Mode A counts.
+- [x] Truncate Mode A before the approved boundary by default.
+- [x] Allow Mode A to cross the boundary only when explicitly requested.
+- [x] Continue Mode A without truncation when no approved boundary exists.
+- [x] Make Mode B unavailable when no approved boundary exists.
+- [x] Stop Mode B before the approved boundary.
+- [x] Exclude every approved article even when Mode A crosses the boundary.
+- [x] Resolve the latest state row by highest `ArticleStateContracts02.id`.
+- [x] Require an integer state ID and `isDeterminedToBeError = false`.
+- [x] Resolve the latest usable successful content row by highest `ArticleContents02.id`.
+- [x] Require nonblank scraped content by default.
+- [x] Use nonblank article description only when fallback is enabled and scraped content is unusable.
+- [x] Record the selected source and nullable content-row ID.
+- [x] Exclude completed V02 predictions.
+- [x] Include first-attempt `failed` and `invalid_response` rows for one retry.
+- [x] Exclude rows with `attemptCount >= 2`.
+- [x] Return selections in descending article-ID order.
+- [x] Do not expand Mode A to compensate for ineligible articles.
+- [x] Return no draft when the resolved eligible count is zero.
 
 ### 6.4 Draft preview lifecycle
 
-- [ ] Create a draft run only for a nonempty eligible preview.
-- [ ] Store selection mode, options, boundaries, counts, model, and frozen selection objects.
-- [ ] Generate a short-lived, unguessable preview token.
-- [ ] Return the draft run ID, token, resolved bounds, and planned count.
-- [ ] Centralize stale-preview maintenance in one repository operation.
-- [ ] Change past-expiration drafts to `expired` atomically.
-- [ ] Set `endingReason = preview_expired` and `endedAt`.
-- [ ] Delete only expired, unaccepted previews older than the retention period.
-- [ ] Invoke maintenance before preview, acceptance, and preview-administration reads.
-- [ ] Reject acceptance of an expired or invalid preview.
-- [ ] Exclude `draft` and `expired` from latest-run, execution-history, and metric queries.
+- [x] Create a draft run only for a nonempty eligible preview.
+- [x] Store selection mode, options, boundaries, counts, model, and frozen selection objects.
+- [x] Generate a short-lived, unguessable preview token.
+- [x] Return the draft run ID, token, resolved bounds, and planned count.
+- [x] Centralize stale-preview maintenance in one repository operation.
+- [x] Change past-expiration drafts to `expired` atomically.
+- [x] Set `endingReason = preview_expired` and `endedAt`.
+- [x] Delete only expired, unaccepted previews older than the retention period.
+- [x] Invoke maintenance before preview, acceptance, and preview-administration reads.
+- [x] Reject acceptance of an expired or invalid preview.
+- [x] Exclude `draft` and `expired` from latest-run, execution-history, and metric queries.
 
 ### 6.5 Transactional acceptance
 
-- [ ] Take a PostgreSQL transaction-scoped advisory lock during acceptance.
-- [ ] Lock and reload the draft run inside the transaction.
-- [ ] Verify the preview token and expiration.
-- [ ] Verify no V02 run is `queued` or `running`.
-- [ ] Verify exactly one active prompt exists.
-- [ ] Mark the active prompt used before accepting the run.
-- [ ] Promote the draft to `queued` and commit before queue submission.
-- [ ] Submit the accepted run ID to the existing queue engine.
-- [ ] Persist the returned queue job ID.
-- [ ] Mark the run failed with a clear reason when enqueueing fails.
-- [ ] Return a conflict for duplicate or racing acceptance attempts.
-- [ ] Keep V01 jobs outside the V02 active-run restriction.
+- [x] Take a PostgreSQL transaction-scoped advisory lock during acceptance.
+- [x] Lock and reload the draft run inside the transaction.
+- [x] Verify the preview token and expiration.
+- [x] Verify no V02 run is `queued` or `running`.
+- [x] Verify exactly one active prompt exists.
+- [x] Mark the active prompt used before accepting the run.
+- [x] Promote the draft to `queued` and commit before queue submission.
+- [x] Submit the accepted run ID to the existing queue engine.
+- [x] Persist the returned queue job ID.
+- [x] Mark the run failed with a clear reason when enqueueing fails.
+- [x] Return a conflict for duplicate or racing acceptance attempts.
+- [x] Keep V01 jobs outside the V02 active-run restriction.
 
 ### 6.6 Prompt renderer and Codex client
 
-- [ ] Keep the operator prompt separate from the hardcoded article wrapper.
-- [ ] Inject the article title and selected content as values.
-- [ ] Add a hardcoded JSON-only response instruction.
-- [ ] Define a hardcoded `pipelineVersion`.
-- [ ] Document when the pipeline version must increment.
-- [ ] Invoke Codex in an isolated read-only process.
-- [ ] Use a neutral temporary working directory.
-- [ ] Enforce the configured model and timeout.
-- [ ] Capture the final response through a temporary output file.
-- [ ] Clean temporary files after success, failure, cancellation, and timeout.
-- [ ] Extract exactly one JSON object.
-- [ ] Accept only `approved` or `irrelevant` with nonblank reasoning.
-- [ ] Normalize malformed model output to `invalid_response`.
-- [ ] Normalize CLI, timeout, and process failures to `failed`.
-- [ ] Redact article title, content, and rendered prompts from stored errors and logs.
-- [ ] Perform one logical invocation per article in a run.
+- [x] Keep the operator prompt separate from the hardcoded article wrapper.
+- [x] Inject the article title and selected content as values.
+- [x] Add a hardcoded JSON-only response instruction.
+- [x] Define a hardcoded `pipelineVersion`.
+- [x] Document when the pipeline version must increment.
+- [x] Invoke Codex in an isolated read-only process.
+- [x] Use a neutral temporary working directory.
+- [x] Enforce the configured model and timeout.
+- [x] Capture the final response through a temporary output file.
+- [x] Clean temporary files after success, failure, cancellation, and timeout.
+- [x] Extract exactly one JSON object.
+- [x] Accept only `approved` or `irrelevant` with nonblank reasoning.
+- [x] Normalize malformed model output to `invalid_response`.
+- [x] Normalize CLI, timeout, and process failures to `failed`.
+- [x] Redact article title, content, and rendered prompts from stored errors and logs.
+- [x] Perform one logical invocation per article in a run.
 
 ### 6.7 Prediction repository
 
-- [ ] Centralize all V02 prediction writes in one repository.
-- [ ] Insert a first-attempt row only when no row exists for the article.
-- [ ] Reject or safely resolve a duplicate first-attempt insert.
-- [ ] Update the existing row for an allowed retry.
-- [ ] Increment retry `attemptCount` from 1 to 2.
-- [ ] Reuse the existing row's original prompt version for a retry.
-- [ ] Refresh every attempt-derived field listed in PRD section 10.6.
-- [ ] Preserve row ID, article ID, prompt relationship, creation time, and human-review fields.
-- [ ] Prevent a third automatic attempt.
-- [ ] Store bounded metadata without rendered prompts or duplicated content.
-- [ ] Keep model execution outside database transactions.
+- [x] Centralize all V02 prediction writes in one repository.
+- [x] Insert a first-attempt row only when no row exists for the article.
+- [x] Reject or safely resolve a duplicate first-attempt insert.
+- [x] Update the existing row for an allowed retry.
+- [x] Increment retry `attemptCount` from 1 to 2.
+- [x] Reuse the existing row's original prompt version for a retry.
+- [x] Refresh every attempt-derived field listed in PRD section 10.6.
+- [x] Preserve row ID, article ID, prompt relationship, creation time, and human-review fields.
+- [x] Prevent a third automatic attempt.
+- [x] Store bounded metadata without rendered prompts or duplicated content.
+- [x] Keep model execution outside database transactions.
 
 ### 6.8 Frozen-selection execution
 
-- [ ] Process frozen selection objects in descending article-ID order.
-- [ ] Reload the exact recorded `ArticleContents02` row for scraped-content selections.
-- [ ] Reload the same article's description for description selections.
-- [ ] Never switch to a newer content row or another source during execution.
-- [ ] Skip a missing, unsuccessful, or blank frozen source.
-- [ ] Increment `skippedCount` without creating a prediction row.
-- [ ] Use the run's active prompt for new prediction rows.
-- [ ] Use the existing row's original prompt for retries.
-- [ ] Leave every unattempted article without a prediction row.
+- [x] Process frozen selection objects in descending article-ID order.
+- [x] Reload the exact recorded `ArticleContents02` row for scraped-content selections.
+- [x] Reload the same article's description for description selections.
+- [x] Never switch to a newer content row or another source during execution.
+- [x] Skip a missing, unsuccessful, or blank frozen source.
+- [x] Increment `skippedCount` without creating a prediction row.
+- [x] Use the run's active prompt for new prediction rows.
+- [x] Use the existing row's original prompt for retries.
+- [x] Leave every unattempted article without a prediction row.
 
 ### 6.9 Counts, circuit breakers, cancellation, and reconciliation
 
-- [ ] Change accepted runs from `queued` to `running` when execution starts.
-- [ ] Update attempted and outcome counters after each final article outcome.
-- [ ] Track CLI failures and invalid responses independently.
-- [ ] Increment only the matching breaker counter.
-- [ ] Reset both breaker counters after a completed prediction.
-- [ ] Stop after three CLI failures since the last completion.
-- [ ] Stop after five invalid responses since the last completion.
-- [ ] Persist the breaker type and partial counts before terminal completion.
-- [ ] Check the queue cancellation event before every article.
-- [ ] Finish canceled runs with `canceled` and retain completed results.
-- [ ] Finish successful runs with `completed`.
-- [ ] Use `failed` only for accepted execution or enqueue failures.
-- [ ] Reconcile stale `queued` and `running` database rows after restart.
-- [ ] Expose database-run detail alongside generic queue status.
+- [x] Change accepted runs from `queued` to `running` when execution starts.
+- [x] Update attempted and outcome counters after each final article outcome.
+- [x] Track CLI failures and invalid responses independently.
+- [x] Increment only the matching breaker counter.
+- [x] Reset both breaker counters after a completed prediction.
+- [x] Stop after three CLI failures since the last completion.
+- [x] Stop after five invalid responses since the last completion.
+- [x] Persist the breaker type and partial counts before terminal completion.
+- [x] Check the queue cancellation event before every article.
+- [x] Finish canceled runs with `canceled` and retain completed results.
+- [x] Finish successful runs with `completed`.
+- [x] Use `failed` only for accepted execution or enqueue failures.
+- [x] Reconcile stale `queued` and `running` database rows after restart.
+- [x] Expose database-run detail alongside generic queue status.
 
 ### 6.10 V01 startup isolation
 
-- [ ] Remove V01-only configuration from fatal startup validation.
-- [ ] Log a nonfatal startup warning when V01 configuration is invalid.
-- [ ] Keep V01 validation in the V01 job request or runner path.
-- [ ] Make a directly requested invalid V01 job fail clearly.
-- [ ] Keep shared database, queue, and V02 validation fatal.
-- [ ] Verify unrelated worker routes still start.
+- [x] Remove V01-only configuration from fatal startup validation.
+- [x] Log a nonfatal startup warning when V01 configuration is invalid.
+- [x] Keep V01 validation in the V01 job request or runner path.
+- [x] Make a directly requested invalid V01 job fail clearly.
+- [x] Keep shared database, queue, and V02 validation fatal.
+- [x] Verify unrelated worker routes still start.
 
 ### 6.11 Worker tests
 
-- [ ] Add focused config, preview, repository, renderer, client, and orchestrator unit tests.
-- [ ] Add V02 route and queue integration tests.
-- [ ] Test both selection modes and missing-boundary behavior.
-- [ ] Test every eligibility filter and description fallback.
-- [ ] Test zero-result preview behavior.
-- [ ] Test concurrent acceptance and advisory locking.
-- [ ] Test stale draft expiration, history exclusion, and retention.
-- [ ] Test exact content-row reuse after a newer row appears.
-- [ ] Test skipping when the frozen source becomes unusable.
-- [ ] Test one-row-per-article behavior and one permitted retry.
-- [ ] Test original-prompt retention during retries.
-- [ ] Test pipeline-version persistence.
-- [ ] Test temporary-file cleanup and article-text error redaction.
-- [ ] Test independent circuit breakers and alternating failures.
-- [ ] Test cancellation and restart reconciliation.
-- [ ] Test V01 nonfatal startup and direct-request failure behavior.
-- [ ] Mock Codex execution in automated tests.
+- [x] Add focused config, preview, repository, renderer, client, and orchestrator unit tests.
+- [x] Add V02 route and queue integration tests.
+- [x] Test both selection modes and missing-boundary behavior.
+- [x] Test every eligibility filter and description fallback.
+- [x] Test zero-result preview behavior.
+- [x] Test concurrent acceptance and advisory locking.
+- [x] Test stale draft expiration, history exclusion, and retention.
+- [x] Test exact content-row reuse after a newer row appears.
+- [x] Test skipping when the frozen source becomes unusable.
+- [x] Test one-row-per-article behavior and one permitted retry.
+- [x] Test original-prompt retention during retries.
+- [x] Test pipeline-version persistence.
+- [x] Test temporary-file cleanup and article-text error redaction.
+- [x] Test independent circuit breakers and alternating failures.
+- [x] Test cancellation and restart reconciliation.
+- [x] Test V01 nonfatal startup and direct-request failure behavior.
+- [x] Mock Codex execution in automated tests.
 
 ### 6.12 Phase 2 validation and commit
 
-- [ ] Run focused V02 worker unit tests.
-- [ ] Run V02 worker route integration tests.
-- [ ] Run `cd worker-python && pytest`.
-- [ ] Perform the available Python type or lint checks, or record that none are configured.
-- [ ] Fix all Phase 2 failures and rerun affected checks.
-- [ ] Check off completed Phase 2 tasks.
-- [ ] Review and stage only Phase 2 changes.
-- [ ] Commit Phase 2 after every required check passes.
+- [x] Run focused V02 worker unit tests.
+- [x] Run V02 worker route integration tests.
+- [x] Run `cd worker-python && pytest`.
+- [x] Record that no Python type checker or linter is configured for worker-python.
+- [x] Fix all Phase 2 failures and rerun affected checks.
+- [x] Check off completed Phase 2 tasks.
+- [x] Review and stage only Phase 2 changes.
+- [x] Commit Phase 2 after every required check passes.
 
 ## 7. Phase 3: API Surface
 

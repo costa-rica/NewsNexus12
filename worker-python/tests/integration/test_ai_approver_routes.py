@@ -6,6 +6,7 @@ from time import sleep
 
 import pytest
 
+from src.modules.ai_approver.errors import AiApproverConfigError
 from src.modules.queue.engine import GlobalQueueEngine, QueueJobCanceledError
 from src.modules.queue.store import QueueJobStore
 
@@ -348,34 +349,91 @@ def test_review_page_runner_uses_client_factory(monkeypatch: pytest.MonkeyPatch)
 
 
 @pytest.mark.integration
+def test_direct_v01_job_fails_clearly_when_config_is_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.routes import ai_approver as ai_approver_routes
+
+    observed: dict[str, object] = {}
+    monkeypatch.setattr(
+        ai_approver_routes.AiApproverConfig,
+        "from_env",
+        lambda: (_ for _ in ()).throw(
+            AiApproverConfigError("V01 configuration is invalid")
+        ),
+    )
+    monkeypatch.setattr(
+        ai_approver_routes,
+        "_update_job_result_fields",
+        lambda _job_id, fields: observed.update(fields),
+    )
+    monkeypatch.setattr(
+        ai_approver_routes,
+        "_append_job_log",
+        lambda *args, **kwargs: None,
+    )
+    runner = ai_approver_routes.create_ai_approver_runner(
+        limit=1,
+        require_state_assignment=True,
+        state_ids=None,
+    )
+
+    with pytest.raises(AiApproverConfigError, match="V01 configuration is invalid"):
+        runner(
+            SimpleNamespace(
+                jobId="0001",
+                is_cancel_requested=lambda: False,
+            )
+        )
+
+    assert observed["statusText"] == "failed"
+    assert observed["error"] == "V01 configuration is invalid"
+
+
+@pytest.mark.integration
 def test_main_import_startup_backend_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import dotenv
     import src.main as main_module
     import src.modules.ai_approver.config as ai_approver_config
+    import src.modules.ai_approver_v02.config as ai_approver_v02_config
 
     monkeypatch.setattr(dotenv, "load_dotenv", lambda *args, **kwargs: False)
-
-    # A missing OPENAI_API_KEY no longer fails startup: with USE_OPEN_AI_API=true
-    # it soft-falls back to the Codex CLI backend, which boots when codex resolves.
-    monkeypatch.setenv("USE_OPEN_AI_API", "true")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(
-        ai_approver_config.shutil, "which", lambda name: "/usr/local/bin/codex"
+        ai_approver_v02_config,
+        "validate_ai_approver_v02_startup_env",
+        lambda: None,
+    )
+
+    # Invalid V01-only configuration is now a nonfatal startup warning.
+    monkeypatch.setattr(
+        ai_approver_config,
+        "validate_ai_approver_startup_env",
+        lambda: (_ for _ in ()).throw(RuntimeError("invalid V01 config")),
     )
     importlib.reload(main_module)
 
-    # Default (flag unset) selects the Codex CLI backend; startup fails
-    # deterministically when the codex binary is not on PATH.
-    monkeypatch.delenv("USE_OPEN_AI_API", raising=False)
-    monkeypatch.setattr(ai_approver_config.shutil, "which", lambda name: None)
-
+    # Invalid V02 configuration remains fatal.
+    monkeypatch.setattr(
+        ai_approver_v02_config,
+        "validate_ai_approver_v02_startup_env",
+        lambda: (_ for _ in ()).throw(RuntimeError("invalid V02 config")),
+    )
     with pytest.raises(SystemExit):
         importlib.reload(main_module)
 
-    # Restore the forced test bootstrap state so backend selection does not
-    # leak into other route/app tests.
-    monkeypatch.setenv("USE_OPEN_AI_API", "true")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    # Restore the forced test bootstrap state.
+    monkeypatch.setattr(
+        ai_approver_v02_config,
+        "validate_ai_approver_v02_startup_env",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        ai_approver_config,
+        "validate_ai_approver_startup_env",
+        lambda: None,
+    )
     importlib.reload(main_module)

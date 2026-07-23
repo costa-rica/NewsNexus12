@@ -11,12 +11,18 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
 from src.logger import setup_logger
-from src.modules.deduper.config import validate_startup_env
 from src.modules.ai_approver.config import validate_ai_approver_startup_env
+from src.modules.ai_approver_v02.config import (
+    AiApproverV02Config,
+    validate_ai_approver_v02_startup_env,
+)
+from src.modules.ai_approver_v02.repository import AiApproverV02Repository
+from src.modules.deduper.config import validate_startup_env
 from src.modules.location_scorer.config import validate_location_scorer_startup_env
 from src.modules.queue.config import validate_queue_startup_env
 from src.modules.orchestrator.lock_middleware import OrchestratorLockMiddleware
 from src.routes.ai_approver import router as ai_approver_router
+from src.routes.ai_approver_v02 import router as ai_approver_v02_router
 from src.routes.deduper import router as deduper_router
 from src.routes.index import router as index_router
 from src.routes.location_scorer import router as location_scorer_router
@@ -68,7 +74,7 @@ setup_logger()
 
 try:
     validate_startup_env()
-    validate_ai_approver_startup_env()
+    validate_ai_approver_v02_startup_env()
     validate_location_scorer_startup_env()
     validate_queue_startup_env()
 except Exception as exc:
@@ -76,12 +82,39 @@ except Exception as exc:
     _terminate_uvicorn_reloader_parent()
     raise SystemExit(1) from exc
 
+try:
+    validate_ai_approver_startup_env()
+except Exception as exc:
+    logger.warning(
+        "event=ai_approver_v01_startup_validation_failed "
+        "v01_jobs_will_fail_until_configured error={}",
+        exc,
+    )
+
+if not _is_testing_environment():
+    try:
+        v02_repository = AiApproverV02Repository(AiApproverV02Config.from_env())
+        reconciled_count = v02_repository.reconcile_incomplete_runs()
+        v02_repository.maintain_stale_previews()
+        logger.info(
+            "event=ai_approver_v02_startup_reconciled count={}",
+            reconciled_count,
+        )
+    except Exception as exc:
+        logger.critical("event=ai_approver_v02_startup_database_failed error={}", exc)
+        _terminate_uvicorn_reloader_parent()
+        raise SystemExit(1) from exc
+    finally:
+        if "v02_repository" in locals():
+            v02_repository.close()
+
 logger.info("event=startup_complete")
 
 app = FastAPI(title="NewsNexus Python Queuer", version="0.2.0")
 app.add_middleware(OrchestratorLockMiddleware)
 app.include_router(index_router)
 app.include_router(ai_approver_router)
+app.include_router(ai_approver_v02_router)
 app.include_router(deduper_router)
 app.include_router(location_scorer_router)
 app.include_router(queue_info_router)

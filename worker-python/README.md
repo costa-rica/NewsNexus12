@@ -42,6 +42,7 @@ Focused AI approver tests:
 
 ```bash
 pytest tests/integration/test_ai_approver_routes.py tests/unit/ai_approver
+pytest tests/integration/test_ai_approver_v02_routes.py tests/unit/ai_approver_v02
 ```
 
 ## Queue status endpoints
@@ -55,6 +56,37 @@ All queued workflows share these status routes:
 
 The queue runs one job at a time. Cancellation is cooperative, so long-running
 workflow code must check the queue execution context between units of work.
+
+## AI Approver V02 flow
+
+V02 is isolated under `/ai-approver-v02` and uses the shared worker queue.
+Its routes are:
+
+- `POST /ai-approver-v02/preview`
+- `POST /ai-approver-v02/start`
+- `GET /ai-approver-v02/runs/latest`
+- `GET /ai-approver-v02/runs/{run_id}`
+- `POST /ai-approver-v02/runs/{run_id}/cancel`
+
+Preview creates a short-lived database draft with a frozen selection. Start
+accepts that exact draft, commits it as queued, and submits only its database
+run ID to the queue. Draft and expired previews are excluded from execution
+history.
+
+V02 uses these dedicated settings:
+
+- `AI_APPROVER_V02_MODEL_NAME`, default `gpt-5.4-mini`
+- `AI_APPROVER_V02_CODEX_TIMEOUT_SECONDS`, default `180`
+- `AI_APPROVER_V02_EXPIRED_PREVIEW_RETENTION_DAYS`, default `7`
+- `AI_APPROVER_V02_PREVIEW_TTL_MINUTES`, default `15`
+
+The hardcoded pipeline version is stored with each prediction. Increment it
+whenever the V02 article wrapper or JSON response instruction changes. Editing
+only the operator-managed prompt does not change the pipeline version.
+
+V01 configuration errors are startup warnings. A directly requested V01 job
+still validates V01 configuration and fails clearly when it is invalid. Shared
+worker settings and V02 configuration remain fatal at startup.
 
 ## AI Approver flow
 
