@@ -512,53 +512,53 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 9.1 End-to-end scenarios
 
-- [ ] Verify preview, confirmation, queueing, execution, persistence, status, and review for a new prediction.
-- [ ] Verify a failed first attempt updates the same row on one later retry.
-- [ ] Verify no automatic third attempt is selected or written.
-- [ ] Verify a used prompt becomes immutable.
-- [ ] Verify a new prompt affects new predictions but not completed or retry prompt relationships.
-- [ ] Verify cancellation leaves unattempted articles without prediction rows.
-- [ ] Verify reopening the same range selects eligible unattempted and retryable articles.
-- [ ] Verify Mode A behavior with and without an approved boundary.
-- [ ] Verify Mode B rejects a missing approved boundary.
-- [ ] Verify alternating failure types cannot evade either circuit breaker.
-- [ ] Verify an abandoned preview expires without appearing as a failed run.
-- [ ] Verify a newer content row does not replace the frozen row.
-- [ ] Verify an unusable frozen source increments skipped count without a prediction row.
-- [ ] Verify two acceptance requests cannot create two active V02 runs.
+- [x] Verify preview, confirmation, queueing, execution, persistence, status, and review for a new prediction.
+- [x] Verify a failed first attempt updates the same row on one later retry.
+- [x] Verify no automatic third attempt is selected or written.
+- [x] Verify a used prompt becomes immutable.
+- [x] Verify a new prompt affects new predictions but not completed or retry prompt relationships.
+- [x] Verify cancellation leaves unattempted articles without prediction rows.
+- [x] Verify reopening the same range selects eligible unattempted and retryable articles.
+- [x] Verify Mode A behavior with and without an approved boundary.
+- [x] Verify Mode B rejects a missing approved boundary.
+- [x] Verify alternating failure types cannot evade either circuit breaker.
+- [x] Verify an abandoned preview expires without appearing as a failed run.
+- [x] Verify a newer content row does not replace the frozen row.
+- [x] Verify an unusable frozen source increments skipped count without a prediction row.
+- [x] Verify two acceptance requests cannot create two active V02 runs.
 
 ### 9.2 V01 and product-side-effect regression
 
-- [ ] Verify V01 automation cards and prompt navigation are inaccessible in the portal.
-- [ ] Verify the V01 review column remains available but hidden by default.
-- [ ] Verify direct V01 API and worker-python calls remain available.
-- [ ] Verify invalid V01 configuration does not stop worker startup.
-- [ ] Verify a direct invalid V01 request fails clearly.
-- [ ] Verify V02 predictions never create `ArticleApproveds` rows.
-- [ ] Verify V02 review writes do not change relevance, reports, or orchestration.
-- [ ] Verify existing non-approver worker and API routes still function.
-- [ ] Verify backup and import paths include the new models without altering old data.
+- [x] Verify V01 automation cards and prompt navigation are inaccessible in the portal.
+- [x] Verify the V01 review column remains available but hidden by default.
+- [x] Verify direct V01 API and worker-python calls remain available.
+- [x] Verify invalid V01 configuration does not stop worker startup.
+- [x] Verify a direct invalid V01 request fails clearly.
+- [x] Verify V02 predictions never create `ArticleApproveds` rows.
+- [x] Verify V02 review writes do not change relevance, reports, or orchestration.
+- [x] Verify existing non-approver worker and API routes still function.
+- [x] Verify backup and import paths include the new models without altering old data.
 
 ### 9.3 Full validation matrix
 
-- [ ] Run `cd db-models && npm run build`.
-- [ ] Run `cd db-manager && npm run build`.
-- [ ] Run `cd db-manager && npm test -- --runInBand`.
-- [ ] Run `cd worker-python && pytest`.
-- [ ] Run `cd api && npm run build`.
-- [ ] Run `cd api && npm test -- --runInBand`.
-- [ ] Run `cd portal && npm run lint`.
-- [ ] Run `cd portal && npm run build`.
-- [ ] Record test counts and any intentionally unavailable checks.
-- [ ] Fix every regression and rerun the affected package and integration checks.
+- [x] Run `cd db-models && npm run build`.
+- [x] Run `cd db-manager && npm run build`.
+- [x] Run `cd db-manager && npm test -- --runInBand`.
+- [x] Run `cd worker-python && pytest`.
+- [x] Run `cd api && npm run build`.
+- [x] Run `cd api && npm test -- --runInBand`.
+- [x] Run `cd portal && npm run lint`.
+- [x] Run `cd portal && npm run build`.
+- [x] Record test counts and any intentionally unavailable checks.
+- [x] Fix every regression and rerun the affected package and integration checks.
 
 ### 9.4 Phase 5 commit
 
-- [ ] Check off completed Phase 5 tasks.
-- [ ] Review the complete implementation diff against PRD V02 and Plan V02.
-- [ ] Confirm no implementation-boundary item was added.
-- [ ] Review and stage only Phase 5 changes.
-- [ ] Commit Phase 5 after every required check passes.
+- [x] Check off completed Phase 5 tasks.
+- [x] Review the complete implementation diff against PRD V02 and Plan V02.
+- [x] Confirm no implementation-boundary item was added.
+- [x] Review and stage only Phase 5 changes.
+- [x] Commit Phase 5 after every required check passes.
 
 ## 10. Phase 6: Documentation and Deployment Preparation
 

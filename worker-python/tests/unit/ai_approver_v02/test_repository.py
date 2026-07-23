@@ -13,6 +13,7 @@ from src.modules.ai_approver_v02.errors import (
     AiApproverV02ConflictError,
     AiApproverV02NoEligibleArticlesError,
 )
+from src.modules.ai_approver_v02.orchestrator import AiApproverV02Orchestrator
 from src.modules.ai_approver_v02.prompts import PIPELINE_VERSION
 from src.modules.ai_approver_v02.repository import AiApproverV02Repository
 from src.modules.ai_approver_v02.types import ArticleInput, ModelOutcome
@@ -212,6 +213,61 @@ def _create_repository() -> AiApproverV02Repository:
     return AiApproverV02Repository(_config())
 
 
+class _CompletedClient:
+    def evaluate(self, _prompt: str) -> ModelOutcome:
+        return ModelOutcome(
+            status="completed",
+            prediction="approved",
+            reasoning="meets the operator criteria",
+        )
+
+
+@pytest.mark.integration
+def test_preview_to_execution_persists_advisory_prediction() -> None:
+    repository = _create_repository()
+    try:
+        preview = repository.create_preview(
+            selection_mode="article_position_count",
+            requested_article_count=1,
+            allow_past_approved_boundary=False,
+            allow_description_fallback=False,
+        )
+        accepted = repository.accept_preview(
+            preview["id"],
+            preview["previewToken"],
+        )
+        result = AiApproverV02Orchestrator(
+            repository,
+            _CompletedClient(),
+        ).run(accepted["id"], lambda: False)
+    finally:
+        repository.close()
+
+    with psycopg.connect(get_test_dsn(), row_factory=dict_row) as conn:
+        run = conn.execute(
+            'SELECT * FROM "AiApproverRunsV02" WHERE id = %s',
+            (accepted["id"],),
+        ).fetchone()
+        prediction = conn.execute(
+            """
+            SELECT *
+            FROM "AiApproverArticlePredictionsV02"
+            WHERE "articleId" = 6
+            """
+        ).fetchone()
+        approval_count = conn.execute(
+            'SELECT COUNT(*) AS count FROM "ArticleApproveds"'
+        ).fetchone()["count"]
+
+    assert result["status"] == "completed"
+    assert run["status"] == "completed"
+    assert run["attemptedCount"] == 1
+    assert run["completedCount"] == 1
+    assert prediction["prediction"] == "approved"
+    assert prediction["attemptCount"] == 1
+    assert approval_count == 2
+
+
 @pytest.mark.integration
 def test_preview_filters_without_expanding_mode_a() -> None:
     repository = _create_repository()
@@ -300,6 +356,18 @@ def test_acceptance_is_single_use_and_freezes_prompt() -> None:
 @pytest.mark.integration
 def test_retry_updates_same_row_and_preserves_human_fields() -> None:
     repository = _create_repository()
+    article = ArticleInput(
+        article_id=3,
+        title="T3",
+        content="C3",
+        content_source="article_contents_02",
+        article_contents_02_id=3,
+    )
+    completed_outcome = ModelOutcome(
+        status="completed",
+        prediction="irrelevant",
+        reasoning="new reason",
+    )
     with psycopg.connect(get_test_dsn()) as conn:
         conn.execute(
             """
@@ -312,20 +380,18 @@ def test_retry_updates_same_row_and_preserves_human_fields() -> None:
         repository.persist_outcome(
             run_id=101,
             prompt_version_id=2,
-            article=ArticleInput(
-                article_id=3,
-                title="T3",
-                content="C3",
-                content_source="article_contents_02",
-                article_contents_02_id=3,
-            ),
+            article=article,
             model_name="new-model",
-            outcome=ModelOutcome(
-                status="completed",
-                prediction="irrelevant",
-                reasoning="new reason",
-            ),
+            outcome=completed_outcome,
         )
+        with pytest.raises(AiApproverV02ConflictError):
+            repository.persist_outcome(
+                run_id=102,
+                prompt_version_id=2,
+                article=article,
+                model_name="new-model",
+                outcome=completed_outcome,
+            )
     finally:
         repository.close()
 
@@ -344,6 +410,53 @@ def test_retry_updates_same_row_and_preserves_human_fields() -> None:
     assert rows[0]["humanValidation"] is True
     assert rows[0]["humanComment"] == "keep"
     assert rows[0]["pipelineVersion"] == PIPELINE_VERSION
+    with psycopg.connect(get_test_dsn()) as conn:
+        approval_count = conn.execute(
+            'SELECT COUNT(*) FROM "ArticleApproveds"'
+        ).fetchone()[0]
+    assert approval_count == 2
+
+
+@pytest.mark.integration
+def test_retry_keeps_original_prompt_and_new_articles_use_run_prompt() -> None:
+    repository = _create_repository()
+    try:
+        retry_prompt = repository.get_prompt_for_article(3, 1)
+        new_article_prompt = repository.get_prompt_for_article(1, 1)
+    finally:
+        repository.close()
+
+    assert retry_prompt["id"] == 2
+    assert retry_prompt["promptInMarkdown"] == "old prompt"
+    assert new_article_prompt["id"] == 1
+    assert new_article_prompt["promptInMarkdown"] == "operator prompt"
+
+
+@pytest.mark.integration
+def test_second_failed_attempt_is_not_selected_again() -> None:
+    repository = _create_repository()
+    with psycopg.connect(get_test_dsn()) as conn:
+        conn.execute(
+            """
+            UPDATE "AiApproverArticlePredictionsV02"
+            SET "attemptCount" = 2
+            WHERE "articleId" = 3
+            """
+        )
+    try:
+        preview = repository.create_preview(
+            selection_mode="article_position_count",
+            requested_article_count=4,
+            allow_past_approved_boundary=False,
+            allow_description_fallback=False,
+        )
+    finally:
+        repository.close()
+
+    selected_ids = [
+        item["articleId"] for item in preview["selectionSnapshot"]
+    ]
+    assert selected_ids == [6]
 
 
 @pytest.mark.integration
