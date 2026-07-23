@@ -37,6 +37,9 @@ export interface Article {
 	aiApproverGatekeeperReasonCode?: string | null;
 	aiApproverGatekeeperResultStatus?: string | null;
 	aiApproverGatekeeperScoreId?: number | null;
+	aiApproverV02PredictionId?: number | null;
+	aiApproverV02Prediction?: "approved" | "irrelevant" | null;
+	aiApproverV02ResultStatus?: string | null;
 	hasArticleContent?: boolean;
 	stateAssignment?: StateAssignment | null;
 }
@@ -114,6 +117,38 @@ export interface AiApproverArticleDetailsResponse {
 	categoryScores: AiApproverScoreRow[];
 	legacyCategoryScores: AiApproverScoreRow[];
 	scores: AiApproverScoreRow[];
+}
+
+export interface AiApproverPromptVersionV02 {
+	id: number;
+	title: string | null;
+	promptInMarkdown: string;
+	isActive: boolean;
+	firstUsedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface AiApproverPredictionV02 {
+	id: number;
+	articleId: number;
+	promptVersionId: number;
+	runId: number;
+	resultStatus: "completed" | "failed" | "invalid_response";
+	prediction: "approved" | "irrelevant" | null;
+	reasoning: string | null;
+	errorCode: string | null;
+	errorMessage: string | null;
+	attemptCount: number;
+	modelName: string;
+	pipelineVersion: string;
+	contentSource: "article_contents_02" | "description";
+	metadata: Record<string, unknown> | null;
+	humanValidation: boolean | null;
+	humanComment: string | null;
+	createdAt: string;
+	updatedAt: string;
+	promptVersion?: AiApproverPromptVersionV02 | null;
 }
 
 // Article Report Contract (junction table between articles and reports)

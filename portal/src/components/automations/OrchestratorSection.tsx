@@ -641,7 +641,7 @@ export function OrchestratorSection() {
 
   return (
     <>
-      <CollapsibleAutomationSection title="Weekly Orchestrator" defaultOpen={false}>
+      <CollapsibleAutomationSection title="Weekly Orchestrator V01" defaultOpen={false}>
         <div className="space-y-6">
 
           {/* Step configuration */}

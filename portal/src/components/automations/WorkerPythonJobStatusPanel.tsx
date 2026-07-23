@@ -32,6 +32,7 @@ type WorkerPythonJobRecord = {
 };
 
 type WorkerPythonJobStatusPanelProps = {
+  allowCancel?: boolean;
   endpointName: string;
   refreshSignal?: number;
   title: string;
@@ -104,6 +105,7 @@ function getStatusClasses(status: WorkerPythonJobRecord["status"]): string {
 }
 
 export function WorkerPythonJobStatusPanel({
+  allowCancel = true,
   endpointName,
   refreshSignal = 0,
   title,
@@ -204,7 +206,8 @@ export function WorkerPythonJobStatusPanel({
     }
   };
 
-  const canCancel = job?.status === "queued" || job?.status === "running";
+  const canCancel =
+    allowCancel && (job?.status === "queued" || job?.status === "running");
 
   return (
     <>

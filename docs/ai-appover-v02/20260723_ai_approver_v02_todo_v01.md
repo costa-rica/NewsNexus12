@@ -408,105 +408,105 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 8.1 V02 automation section
 
-- [ ] Create a dedicated `AiApproverV02Section`.
-- [ ] Reuse `CollapsibleAutomationSection` where appropriate.
-- [ ] Display the active prompt title or fallback label.
-- [ ] Link to the V02 prompt-management page.
-- [ ] Add a control that opens the V02 run-configuration modal.
-- [ ] Show the latest accepted V02 run and queue status.
-- [ ] Add manual refresh and queued-or-running cancellation.
-- [ ] Disable start for an active V02 run, no prompt, multiple prompts, or required-load failure.
-- [ ] Keep V01 jobs independent from the V02 disabled state.
+- [x] Create a dedicated `AiApproverV02Section`.
+- [x] Reuse `CollapsibleAutomationSection` where appropriate.
+- [x] Display the active prompt title or fallback label.
+- [x] Link to the V02 prompt-management page.
+- [x] Add a control that opens the V02 run-configuration modal.
+- [x] Show the latest accepted V02 run and queue status.
+- [x] Add manual refresh and queued-or-running cancellation.
+- [x] Disable start for an active V02 run, no prompt, multiple prompts, or required-load failure.
+- [x] Keep V01 jobs independent from the V02 disabled state.
 
 ### 8.2 Run-configuration modal
 
-- [ ] Add mutually exclusive Mode A and Mode B controls.
-- [ ] Default Mode A count to 25.
-- [ ] Require a positive integer without adding a product maximum.
-- [ ] Default approved-boundary crossing off.
-- [ ] Default description fallback off.
-- [ ] Explain and disable Mode B when no approved boundary exists.
-- [ ] Request a fresh preview after relevant options change.
-- [ ] Display resolved bounds and planned eligible model calls.
-- [ ] Explain that final attempts may be lower than the preview count.
-- [ ] Disable confirmation for zero eligible articles.
-- [ ] Close or cancel without starting a job.
-- [ ] Confirm using the preview run ID and token without recalculation.
-- [ ] Require a refreshed preview after expiration.
-- [ ] Prevent duplicate confirmation submissions.
+- [x] Add mutually exclusive Mode A and Mode B controls.
+- [x] Default Mode A count to 25.
+- [x] Require a positive integer without adding a product maximum.
+- [x] Default approved-boundary crossing off.
+- [x] Default description fallback off.
+- [x] Explain and disable Mode B when no approved boundary exists.
+- [x] Request a fresh preview after relevant options change.
+- [x] Display resolved bounds and planned eligible model calls.
+- [x] Explain that final attempts may be lower than the preview count.
+- [x] Disable confirmation for zero eligible articles.
+- [x] Close or cancel without starting a job.
+- [x] Confirm using the preview run ID and token without recalculation.
+- [x] Require a refreshed preview after expiration.
+- [x] Prevent duplicate confirmation submissions.
 
 ### 8.3 V02 run status
 
-- [ ] Compose the generic worker status panel with a V02 run-summary panel.
-- [ ] Show run or queue-job ID and selection mode.
-- [ ] Show planned, attempted, completed, failed, invalid, and skipped counts.
-- [ ] Show cancellation or circuit-breaker reason.
-- [ ] Show start and end timestamps when present.
-- [ ] Avoid showing draft or expired previews as failed executions.
-- [ ] Preserve generic status-panel behavior for existing consumers.
+- [x] Compose the generic worker status panel with a V02 run-summary panel.
+- [x] Show run or queue-job ID and selection mode.
+- [x] Show planned, attempted, completed, failed, invalid, and skipped counts.
+- [x] Show cancellation or circuit-breaker reason.
+- [x] Show start and end timestamps when present.
+- [x] Avoid showing draft or expired previews as failed executions.
+- [x] Preserve generic status-panel behavior for existing consumers.
 
 ### 8.4 V02 prompt-management page
 
-- [ ] Add `/articles/automations/ai-approver-v02-prompts`.
-- [ ] Add list, create, edit-unused, activate, and deactivate interactions.
-- [ ] Provide title and Markdown prompt fields.
-- [ ] Explain that title and content are injected by the worker.
-- [ ] Do not expose model, placeholder, response-schema, or delete controls.
-- [ ] Show active and used states clearly.
-- [ ] Show the defined fallback label for a blank prompt title.
-- [ ] Disable editing for a used prompt.
-- [ ] Handle duplicate-title and multiple-active errors clearly.
+- [x] Add `/articles/automations/ai-approver-v02-prompts`.
+- [x] Add list, create, edit-unused, activate, and deactivate interactions.
+- [x] Provide title and Markdown prompt fields.
+- [x] Explain that title and content are injected by the worker.
+- [x] Do not expose model, placeholder, response-schema, or delete controls.
+- [x] Show active and used states clearly.
+- [x] Show the defined fallback label for a blank prompt title.
+- [x] Disable editing for a used prompt.
+- [x] Handle duplicate-title and multiple-active errors clearly.
 
 ### 8.5 Article review V02 data
 
-- [ ] Fetch V02 predictions in article-ID batches.
-- [ ] Merge V02 fields without overwriting V01 fields.
-- [ ] Add a review-table column labeled with `V02`.
-- [ ] Make the V02 column visible by default.
-- [ ] Show `approved` or `irrelevant` only for completed predictions.
-- [ ] Show `N/A` when no completed V02 prediction exists.
-- [ ] Make displayed predictions open the V02 details modal.
-- [ ] Keep the column advisory with no approval, relevance, report, or workflow side effects.
+- [x] Fetch V02 predictions in article-ID batches.
+- [x] Merge V02 fields without overwriting V01 fields.
+- [x] Add a review-table column labeled with `V02`.
+- [x] Make the V02 column visible by default.
+- [x] Show `approved` or `irrelevant` only for completed predictions.
+- [x] Show `N/A` when no completed V02 prediction exists.
+- [x] Make displayed predictions open the V02 details modal.
+- [x] Keep the column advisory with no approval, relevance, report, or workflow side effects.
 
 ### 8.6 V02 details and human review
 
-- [ ] Show prediction, reasoning, prompt display name, model, pipeline version, and timestamp.
-- [ ] Ask whether AI Approver V02 was correct.
-- [ ] Save Yes as true and No as false.
-- [ ] Clear validation to null.
-- [ ] Save a comment with or without validation.
-- [ ] Save validation with or without a comment.
-- [ ] Clear either field without clearing the other.
-- [ ] Refresh local review state after a successful save.
-- [ ] Surface API validation and save errors.
+- [x] Show prediction, reasoning, prompt display name, model, pipeline version, and timestamp.
+- [x] Ask whether AI Approver V02 was correct.
+- [x] Save Yes as true and No as false.
+- [x] Clear validation to null.
+- [x] Save a comment with or without validation.
+- [x] Save validation with or without a comment.
+- [x] Clear either field without clearing the other.
+- [x] Refresh local review state after a successful save.
+- [x] Surface API validation and save errors.
 
 ### 8.7 V01 portal hiding
 
-- [ ] Rename visible terminology to `Weekly Orchestrator V01` and `AI Approver V01` where retained.
-- [ ] Remove the V01 automation sections from the rendered automations page.
-- [ ] Do not mount hidden V01 controls that remain keyboard-accessible.
-- [ ] Remove navigation to `/articles/automations/ai-approver-prompts`.
-- [ ] Make the direct V01 prompt page render the standard not-found page.
-- [ ] Do not redirect the V01 prompt page to V02.
-- [ ] Preserve the V01 page and component source files.
-- [ ] Rename the V01 review label for clarity.
-- [ ] Make the V01 review column hidden by default.
-- [ ] Preserve V01 review loading and modal behavior.
+- [x] Rename visible terminology to `Weekly Orchestrator V01` and `AI Approver V01` where retained.
+- [x] Remove the V01 automation sections from the rendered automations page.
+- [x] Do not mount hidden V01 controls that remain keyboard-accessible.
+- [x] Remove navigation to `/articles/automations/ai-approver-prompts`.
+- [x] Make the direct V01 prompt page render the standard not-found page.
+- [x] Do not redirect the V01 prompt page to V02.
+- [x] Preserve the V01 page and component source files.
+- [x] Rename the V01 review label for clarity.
+- [x] Make the V01 review column hidden by default.
+- [x] Preserve V01 review loading and modal behavior.
 
 ### 8.8 Phase 4 validation and commit
 
-- [ ] Run `cd portal && npm run lint`.
-- [ ] Run `cd portal && npm run build`.
-- [ ] Manually verify both preview modes and zero-result behavior.
-- [ ] Manually verify expired preview and active-run blocking behavior.
-- [ ] Manually verify status refresh and cancellation.
-- [ ] Manually verify prompt creation, activation, and used-prompt locking.
-- [ ] Manually verify V01 not-found routing and review-column defaults.
-- [ ] Manually verify V02 validation and comment clearing.
-- [ ] Fix all Phase 4 failures and rerun affected checks.
-- [ ] Check off completed Phase 4 tasks.
-- [ ] Review and stage only Phase 4 changes.
-- [ ] Commit Phase 4 after every required check passes.
+- [x] Run `cd portal && npm run lint`.
+- [x] Run `cd portal && npm run build`.
+- [x] Manually verify both preview modes and zero-result behavior.
+- [x] Manually verify expired preview and active-run blocking behavior.
+- [x] Manually verify status refresh and cancellation.
+- [x] Manually verify prompt creation, activation, and used-prompt locking.
+- [x] Manually verify V01 not-found routing and review-column defaults.
+- [x] Manually verify V02 validation and comment clearing.
+- [x] Fix all Phase 4 failures and rerun affected checks.
+- [x] Check off completed Phase 4 tasks.
+- [x] Review and stage only Phase 4 changes.
+- [x] Commit Phase 4 after every required check passes.
 
 ## 9. Phase 5: Cross-Package Integration and Regression
 

@@ -154,7 +154,7 @@ export function AiApproverSection() {
 
   return (
     <>
-      <CollapsibleAutomationSection title="AI Approver" defaultOpen={false}>
+      <CollapsibleAutomationSection title="AI Approver V01" defaultOpen={false}>
         <div className="space-y-6">
           <div className="space-y-3">
             <p className="text-sm text-gray-600 dark:text-gray-400">

@@ -125,6 +125,7 @@ interface TableReviewArticlesProps {
 	onDeleteArticle?: (article: Article) => void;
 	onStateAssignmentClick?: (articleId: number) => void;
 	onAiApproverClick?: (articleId: number) => void;
+	onAiApproverV02Click?: (articleId: number) => void;
 	onArticleContentClick?: (articleId: number) => void;
 }
 
@@ -141,6 +142,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	onDeleteArticle,
 	onStateAssignmentClick,
 	onAiApproverClick,
+	onAiApproverV02Click,
 	onArticleContentClick,
 }) => {
 	const [isStateFilterOpen, setIsStateFilterOpen] = useState(false);
@@ -153,6 +155,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
 		locationClassifierScore: false,
+		aiApproverTopScore: false,
 	});
 	const stateFilterRef = useRef<HTMLDivElement | null>(null);
 
@@ -496,10 +499,50 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 						}
 					),
 					columnHelper.accessor(
+						(row) =>
+							row.aiApproverV02ResultStatus === "completed"
+								? row.aiApproverV02Prediction ?? undefined
+								: undefined,
+						{
+							id: "aiApproverV02Prediction",
+							header: "AI Approver V02",
+							enableSorting: true,
+							sortUndefined: "last",
+							cell: ({ row, getValue }) => {
+								const prediction = getValue();
+								if (!prediction) {
+									return (
+										<div className="text-center text-xs text-gray-400">
+											N/A
+										</div>
+									);
+								}
+								return (
+									<div className="flex justify-center">
+										<button
+											type="button"
+											onClick={() =>
+												onAiApproverV02Click?.(row.original.id)
+											}
+											className={`rounded-full px-3 py-2 text-xs font-semibold ${
+												prediction === "approved"
+													? "bg-success-100 text-success-700"
+													: "bg-warning-100 text-warning-700"
+											}`}
+											title="Open AI Approver V02 details"
+										>
+											{prediction}
+										</button>
+									</div>
+								);
+							},
+						}
+					),
+					columnHelper.accessor(
 						getAiApproverSortValue,
 						{
 							id: "aiApproverTopScore",
-							header: "AI Approver",
+							header: "AI Approver V01",
 							enableSorting: true,
 							sortUndefined: "last",
 							sortingFn: "basic",
@@ -712,6 +755,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			onDeleteArticle,
 			onStateAssignmentClick,
 			onAiApproverClick,
+			onAiApproverV02Click,
 			onArticleContentClick,
 			showReviewedColumn,
 			showRelevantColumn,
