@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { CollapsibleAutomationSection } from "@/components/automations/CollapsibleAutomationSection";
 import { WorkerPythonJobStatusPanel } from "@/components/automations/WorkerPythonJobStatusPanel";
 import { Modal } from "@/components/ui/modal";
+import { InfoIcon } from "@/icons";
 import { useAppSelector } from "@/store/hooks";
 import type { AiApproverPromptVersionV02 } from "@/types/article";
 
@@ -49,6 +50,41 @@ function messageFromBody(body: unknown): string {
 
 function displayPrompt(prompt: AiApproverPromptVersionV02): string {
   return prompt.title?.trim() || `Prompt_id_${prompt.id}`;
+}
+
+type InfoTooltipProps = {
+  children: React.ReactNode;
+  label: string;
+};
+
+function InfoTooltip({ children, label }: InfoTooltipProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const tooltipId = useId();
+
+  return (
+    <span className="relative inline-flex overflow-visible">
+      <button
+        type="button"
+        aria-describedby={isOpen ? tooltipId : undefined}
+        aria-expanded={isOpen}
+        aria-label={label}
+        onBlur={() => setIsOpen(false)}
+        onClick={() => setIsOpen((current) => !current)}
+        className="inline-flex h-6 w-6 items-center justify-center overflow-visible rounded-full text-gray-400 transition-colors hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-gray-500 dark:hover:text-gray-300"
+      >
+        <InfoIcon className="h-5 w-5 overflow-visible" />
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className={`absolute left-1/2 top-full z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg transition-all dark:bg-gray-700 ${
+          isOpen ? "visible opacity-100" : "pointer-events-none invisible opacity-0"
+        }`}
+      >
+        {children}
+      </span>
+    </span>
+  );
 }
 
 export function AiApproverV02Section() {
@@ -253,12 +289,12 @@ export function AiApproverV02Section() {
     <>
       <CollapsibleAutomationSection title="AI Approver V02" defaultOpen>
         <div className="space-y-5">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Preview a frozen article selection, then queue advisory binary
             predictions. V02 never approves or rejects articles automatically.
           </p>
-          <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800/60">
-            <p>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+            <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
               Active prompt:{" "}
               {activePrompts.length === 1
                 ? displayPrompt(activePrompts[0])
@@ -266,20 +302,24 @@ export function AiApproverV02Section() {
                   ? "None"
                   : "Configuration error: multiple active prompts"}
             </p>
-            {loadError ? <p className="mt-2 text-error-600">{loadError}</p> : null}
+            {loadError ? (
+              <p className="mt-2 text-sm text-error-600 dark:text-error-400">
+                {loadError}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               disabled={startDisabled}
               onClick={() => setIsModalOpen(true)}
-              className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
             >
               Configure and preview run
             </button>
             <Link
               href="/articles/automations/ai-approver-v02-prompts"
-              className="rounded-lg border border-gray-300 px-5 py-2 text-sm dark:border-gray-700"
+              className="inline-flex items-center rounded-lg border border-gray-200 px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Manage V02 prompts
             </Link>
@@ -289,7 +329,7 @@ export function AiApproverV02Section() {
                 setJobRefreshSignal((current) => current + 1);
                 void fetchState();
               }}
-              className="rounded-lg border border-gray-300 px-5 py-2 text-sm dark:border-gray-700"
+              className="rounded-lg border border-gray-200 px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Refresh status
             </button>
@@ -298,17 +338,19 @@ export function AiApproverV02Section() {
                 type="button"
                 disabled={isCanceling}
                 onClick={() => void cancelRun()}
-                className="rounded-lg border border-error-300 px-5 py-2 text-sm text-error-600 disabled:opacity-50"
+                className="rounded-lg border border-error-300 px-5 py-2 text-sm font-medium text-error-600 transition-colors hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-error-700 dark:text-error-400 dark:hover:bg-error-900/20"
               >
                 {isCanceling ? "Canceling..." : "Cancel run"}
               </button>
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-            <h3 className="font-medium">Latest accepted V02 run</h3>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
+              Latest accepted V02 run
+            </h3>
             {latestRun ? (
-              <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
+              <div className="mt-3 grid gap-2 text-sm text-gray-600 dark:text-gray-400 md:grid-cols-3">
                 <span>Run: {latestRun.id}</span>
                 <span>Queue job: {latestRun.jobId || "Pending"}</span>
                 <span>Status: {latestRun.status}</span>
@@ -334,7 +376,9 @@ export function AiApproverV02Section() {
                 ) : null}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-gray-500">No accepted run yet.</p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                No accepted run yet.
+              </p>
             )}
           </div>
 
@@ -348,41 +392,60 @@ export function AiApproverV02Section() {
       </CollapsibleAutomationSection>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <div className="w-full max-w-2xl rounded-2xl bg-white p-6 dark:bg-gray-900">
-          <h2 className="text-xl font-semibold">Configure AI Approver V02</h2>
+        <div className="w-full max-w-2xl rounded-2xl bg-white p-6 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+            Configure AI Approver V02
+          </h2>
           <div className="mt-5 space-y-4">
             <div className="flex flex-wrap gap-4 text-sm">
-              <label>
-                <input
-                  type="radio"
-                  checked={mode === "article_position_count"}
-                  onChange={() => {
-                    invalidatePreview();
-                    setMode("article_position_count");
-                  }}
-                />{" "}
-                Mode A: article positions
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  checked={mode === "until_last_approved"}
-                  disabled={boundaryUnavailable}
-                  onChange={() => {
-                    invalidatePreview();
-                    setMode("until_last_approved");
-                  }}
-                />{" "}
-                Mode B: until last approved
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    checked={mode === "article_position_count"}
+                    onChange={() => {
+                      invalidatePreview();
+                      setMode("article_position_count");
+                    }}
+                    className="h-4 w-4 border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+                  />
+                  Mode A: article positions
+                </label>
+                <InfoTooltip label="About Mode A">
+                  Choose how many article records to scan, starting with the
+                  newest article ID and moving backward. Ineligible articles are
+                  skipped, so the number of predictions may be lower than the
+                  requested position count.
+                </InfoTooltip>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    checked={mode === "until_last_approved"}
+                    disabled={boundaryUnavailable}
+                    onChange={() => {
+                      invalidatePreview();
+                      setMode("until_last_approved");
+                    }}
+                    className="h-4 w-4 border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+                  />
+                  Mode B: until last approved
+                </label>
+                <InfoTooltip label="About Mode B">
+                  Start with the newest article ID and scan backward until just
+                  before the latest approved article ID. This mode is unavailable
+                  when no approved article exists.
+                </InfoTooltip>
+              </div>
             </div>
             {boundaryUnavailable ? (
-              <p className="text-sm text-warning-600">
+              <p className="text-sm text-warning-600 dark:text-warning-400">
                 Mode B is unavailable because no approved boundary exists.
               </p>
             ) : null}
             {mode === "article_position_count" ? (
-              <label className="block text-sm">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Article position count
                 <input
                   type="number"
@@ -393,23 +456,32 @@ export function AiApproverV02Section() {
                     invalidatePreview();
                     setCount(event.target.value);
                   }}
-                  className="mt-1 block w-full rounded-lg border p-2 dark:bg-gray-800"
+                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </label>
             ) : null}
-            <label className="block text-sm">
-              <input
-                type="checkbox"
-                checked={allowPastBoundary}
-                disabled={mode !== "article_position_count"}
-                onChange={(event) => {
-                  invalidatePreview();
-                  setAllowPastBoundary(event.target.checked);
-                }}
-              />{" "}
-              Allow Mode A to cross the approved boundary
-            </label>
-            <label className="block text-sm">
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={allowPastBoundary}
+                  disabled={mode !== "article_position_count"}
+                  onChange={(event) => {
+                    invalidatePreview();
+                    setAllowPastBoundary(event.target.checked);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+                />
+                Allow Mode A to cross the approved boundary
+              </label>
+              <InfoTooltip label="About crossing the approved boundary">
+                By default, Mode A stops before the latest approved article ID.
+                Turn this on to let AI Approver V02 analyze and predict eligible
+                articles with lower article IDs. Articles already approved are
+                still skipped.
+              </InfoTooltip>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <input
                 type="checkbox"
                 checked={allowDescription}
@@ -417,16 +489,21 @@ export function AiApproverV02Section() {
                   invalidatePreview();
                   setAllowDescription(event.target.checked);
                 }}
-              />{" "}
+                className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+              />
               Allow description when scraped content is unavailable
             </label>
-            {modalError ? <p className="text-sm text-error-600">{modalError}</p> : null}
+            {modalError ? (
+              <p className="text-sm text-error-600 dark:text-error-400">
+                {modalError}
+              </p>
+            ) : null}
             {preview ? (
-              <div className="rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
                 <p>Highest article ID: {preview.highestArticleIdAtStart}</p>
                 <p>Approved boundary: {preview.approvedBoundaryArticleId ?? "None"}</p>
                 <p>Planned eligible model calls: {preview.plannedEligibleCount}</p>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   Final attempts may be lower because of cancellation, runtime
                   changes, or circuit breakers.
                 </p>
@@ -436,7 +513,7 @@ export function AiApproverV02Section() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg border px-4 py-2 text-sm"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 Close
               </button>
@@ -444,7 +521,7 @@ export function AiApproverV02Section() {
                 type="button"
                 disabled={isPreviewing}
                 onClick={() => void requestPreview()}
-                className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 {isPreviewing ? "Previewing..." : "Refresh preview"}
               </button>
@@ -456,7 +533,7 @@ export function AiApproverV02Section() {
                   isStarting
                 }
                 onClick={() => void startPreview()}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm text-white disabled:opacity-50"
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
               >
                 {isStarting ? "Starting..." : "Confirm and start"}
               </button>

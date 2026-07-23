@@ -122,36 +122,38 @@ export default function AiApproverV02PromptsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-title-xl text-gray-700 dark:text-gray-300">
+          <h1 className="text-title-xl font-semibold text-gray-800 dark:text-white/90">
             AI Approver V02 Prompts
           </h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             The worker injects article title, article content, and the response
             schema. Store only the operator&apos;s evaluation instructions here.
           </p>
         </div>
         <Link
           href="/articles/automations"
-          className="rounded-lg border px-4 py-2 text-sm dark:border-gray-700"
+          className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           Back to automations
         </Link>
       </div>
 
       {error ? (
-        <div className="rounded-lg bg-error-50 p-3 text-sm text-error-700">
+        <div className="rounded-lg bg-error-50 p-3 text-sm text-error-700 dark:bg-error-900/20 dark:text-error-400">
           {error}
         </div>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
-        <section className="rounded-2xl border bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">Prompt versions</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-white/90">
+              Prompt versions
+            </h2>
             <button
               type="button"
               onClick={clearForm}
-              className="rounded-lg bg-brand-500 px-3 py-2 text-sm text-white"
+              className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700"
             >
               New prompt
             </button>
@@ -160,15 +162,17 @@ export default function AiApproverV02PromptsPage() {
             {prompts.map((prompt) => (
               <div
                 key={prompt.id}
-                className="rounded-lg border p-3 dark:border-gray-700"
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]"
               >
                 <button
                   type="button"
                   onClick={() => selectPrompt(prompt)}
-                  className="w-full text-left"
+                  className="w-full text-left text-gray-700 dark:text-gray-300"
                 >
-                  <span className="font-medium">{displayName(prompt)}</span>
-                  <span className="mt-1 block text-xs text-gray-500">
+                  <span className="font-semibold text-gray-800 dark:text-white/90">
+                    {displayName(prompt)}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                     {prompt.isActive ? "Active" : "Inactive"} ·{" "}
                     {prompt.firstUsedAt ? "Used and locked" : "Unused"}
                   </span>
@@ -176,52 +180,54 @@ export default function AiApproverV02PromptsPage() {
                 <button
                   type="button"
                   onClick={() => void setActive(prompt, !prompt.isActive)}
-                  className="mt-3 rounded border px-3 py-1 text-xs dark:border-gray-600"
+                  className="mt-3 rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   {prompt.isActive ? "Deactivate" : "Activate"}
                 </button>
               </div>
             ))}
             {prompts.length === 0 ? (
-              <p className="text-sm text-gray-500">No V02 prompts yet.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No V02 prompts yet.
+              </p>
             ) : null}
           </div>
         </section>
 
-        <section className="rounded-2xl border bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h2 className="font-semibold">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+          <h2 className="font-semibold text-gray-800 dark:text-white/90">
             {selected ? `Edit ${displayName(selected)}` : "Create prompt"}
           </h2>
           {selected?.firstUsedAt ? (
-            <p className="mt-2 text-sm text-warning-600">
+            <p className="mt-2 text-sm text-warning-600 dark:text-warning-400">
               This prompt has been used and cannot be edited. It may still be
               activated unchanged.
             </p>
           ) : null}
-          <label className="mt-4 block text-sm">
+          <label className="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Optional title
             <input
               value={title}
               disabled={Boolean(selected?.firstUsedAt)}
               onChange={(event) => setTitle(event.target.value)}
-              className="mt-1 block w-full rounded-lg border p-2 dark:bg-gray-800"
+              className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </label>
-          <label className="mt-4 block text-sm">
+          <label className="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Markdown operator prompt
             <textarea
               value={promptText}
               disabled={Boolean(selected?.firstUsedAt)}
               onChange={(event) => setPromptText(event.target.value)}
               rows={16}
-              className="mt-1 block w-full rounded-lg border p-3 font-mono text-sm dark:bg-gray-800"
+              className="mt-2 block w-full rounded-lg border border-gray-300 p-3 font-mono text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </label>
           <button
             type="button"
             disabled={isSaving || Boolean(selected?.firstUsedAt)}
             onClick={() => void savePrompt()}
-            className="mt-4 rounded-lg bg-brand-500 px-5 py-2 text-sm text-white disabled:opacity-50"
+            className="mt-4 rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
           >
             {isSaving ? "Saving..." : selected ? "Save changes" : "Create prompt"}
           </button>
