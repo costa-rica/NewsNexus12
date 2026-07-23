@@ -11,37 +11,37 @@ modified_by: codex (gpt-5)
 
 - [x] Treat `20260723_ai_approver_v02_prd_v02.md` as the product source of truth.
 - [x] Treat `20260723_ai_approver_v02_plan_v02.md` as the accepted implementation plan.
-- [ ] Complete phases in order unless a dependency is explicitly documented.
-- [ ] Keep V01 code, routes, tables, data, and direct backend access intact.
-- [ ] Stop and consult the operator before expanding an implementation boundary.
+- [x] Complete phases in order unless a dependency is explicitly documented.
+- [x] Keep V01 code, routes, tables, data, and direct backend access intact.
+- [x] Stop and consult the operator before expanding an implementation boundary.
 
 Use one todo file for the first release. The database, worker, API, and portal share one run lifecycle, so separate checklists would make cross-package completion harder to verify.
 
 ## 2. Completion Rules
 
-- [ ] Check off a task only after its implementation and focused verification pass.
-- [ ] Add or update tests in the same phase as the behavior they protect.
-- [ ] Fix regressions before completing a phase.
-- [ ] Run the listed type, lint, test, and build checks at each phase gate.
-- [ ] Record any unavailable check and its reason before committing.
-- [ ] Review the staged diff for unrelated or destructive changes.
-- [ ] Commit only the completed phase after its checks pass.
-- [ ] Use lowercase commit messages and the repository co-author format.
-- [ ] Do not deploy or run a live Codex smoke test without operator approval.
+- [x] Check off a task only after its implementation and focused verification pass.
+- [x] Add or update tests in the same phase as the behavior they protect.
+- [x] Fix regressions before completing a phase.
+- [x] Run the listed type, lint, test, and build checks at each phase gate.
+- [x] Record any unavailable check and its reason before committing.
+- [x] Review the staged diff for unrelated or destructive changes.
+- [x] Commit only the completed phase after its checks pass.
+- [x] Use lowercase commit messages and the repository co-author format.
+- [x] Do not deploy or run a live Codex smoke test without operator approval.
 
 ## 3. Implementation Boundaries
 
-- [ ] Do not add V02 weekly orchestration.
-- [ ] Do not automatically approve articles.
-- [ ] Do not add arbitrary article-ID targeting.
-- [ ] Do not reprocess completed V02 predictions.
-- [ ] Do not allow prompt deletion.
-- [ ] Do not add a third automatic prediction attempt.
-- [ ] Do not persist rendered prompts or duplicate article content.
-- [ ] Do not build a general migration framework.
-- [ ] Do not delete or rename V01 source, routes, tables, or data.
-- [ ] Do not weaken shared PostgreSQL, queue, or V02 startup validation.
-- [ ] Do not archive feature documentation without operator direction.
+- [x] Do not add V02 weekly orchestration.
+- [x] Do not automatically approve articles.
+- [x] Do not add arbitrary article-ID targeting.
+- [x] Do not reprocess completed V02 predictions.
+- [x] Do not allow prompt deletion.
+- [x] Do not add a third automatic prediction attempt.
+- [x] Do not persist rendered prompts or duplicate article content.
+- [x] Do not build a general migration framework.
+- [x] Do not delete or rename V01 source, routes, tables, or data.
+- [x] Do not weaken shared PostgreSQL, queue, or V02 startup validation.
+- [x] Do not archive feature documentation without operator direction.
 
 ## 4. Phase 0: Pre-implementation Documentation Gate
 
@@ -564,83 +564,83 @@ No product code begins until this phase is complete and the operator approves th
 
 ### 10.1 Repository guidance
 
-- [ ] Update root and relevant package guidance to define the existing flow as V01.
-- [ ] Define the new binary-prediction workflow as V02.
-- [ ] Document that V01 source names remain unchanged.
-- [ ] Document distinct V01 and V02 route and table namespaces.
-- [ ] Document that V02 is manual-only in this release.
-- [ ] Update each modified Markdown file's frontmatter.
+- [x] Update root and relevant package guidance to define the existing flow as V01.
+- [x] Define the new binary-prediction workflow as V02.
+- [x] Document that V01 source names remain unchanged.
+- [x] Document distinct V01 and V02 route and table namespaces.
+- [x] Document that V02 is manual-only in this release.
+- [x] Update each modified Markdown file's frontmatter.
 
 ### 10.2 Environment and operations
 
-- [ ] Document every V02 environment variable and default.
-- [ ] Document Codex CLI authentication and model-access prerequisites.
-- [ ] Document the workstation schema-install command.
-- [ ] Document the production schema-install command.
-- [ ] Document schema verification queries.
-- [ ] Document database backup as a deployment prerequisite.
-- [ ] Document service deployment order: worker-python, API, then portal.
-- [ ] Document V02 health checks before portal exposure.
-- [ ] Document application rollback without dropping V02 tables.
-- [ ] Put destructive table removal in a separate operator-approved procedure.
-- [ ] Document how to derive every PRD success measure from persisted run, prediction, review, and warning data.
-- [ ] Confirm draft and expired previews are excluded from execution success measures.
+- [x] Document every V02 environment variable and default.
+- [x] Document Codex CLI authentication and model-access prerequisites.
+- [x] Document the workstation schema-install command.
+- [x] Document the production schema-install command.
+- [x] Document schema verification queries.
+- [x] Document database backup as a deployment prerequisite.
+- [x] Document service deployment order: worker-python, API, then portal.
+- [x] Document V02 health checks before portal exposure.
+- [x] Document application rollback without dropping V02 tables.
+- [x] Put destructive table removal in a separate operator-approved procedure.
+- [x] Document how to derive every PRD success measure from persisted run, prediction, review, and warning data.
+- [x] Confirm draft and expired previews are excluded from execution success measures.
 
 ### 10.3 Post-implementation report
 
-- [ ] Create the required post-implementation clarification report in `docs/ai-appover-v02`.
-- [ ] Summarize final V01 and V02 boundaries.
-- [ ] Record naming confusion discovered during implementation.
-- [ ] Record any changes needed before a future V01 removal plan.
-- [ ] Keep the report separate from the pre-implementation V01 inventory.
+- [x] Create the required post-implementation clarification report in `docs/ai-appover-v02`.
+- [x] Summarize final V01 and V02 boundaries.
+- [x] Record naming confusion discovered during implementation.
+- [x] Record any changes needed before a future V01 removal plan.
+- [x] Keep the report separate from the pre-implementation V01 inventory.
 
 ### 10.4 Production readiness review
 
 - [ ] Confirm the production backup completed before schema installation.
 - [ ] Confirm Codex CLI authentication and `gpt-5.4-mini` access.
-- [ ] Confirm the schema installer is repeatable and non-destructive.
-- [ ] Confirm all three V02 tables, indexes, and foreign keys.
-- [ ] Confirm worker-python and API V02 health checks.
-- [ ] Prepare a small Mode A production smoke-test procedure.
-- [ ] Require operator approval before deployment.
-- [ ] Require operator approval before a live Codex smoke test.
-- [ ] Verify the smoke test checks persistence, status, review, validation, and V01 startup behavior.
+- [x] Confirm the schema installer is repeatable and non-destructive.
+- [x] Confirm all three V02 tables, indexes, and foreign keys.
+- [x] Confirm worker-python and API V02 health checks.
+- [x] Prepare a small Mode A production smoke-test procedure.
+- [x] Require operator approval before deployment.
+- [x] Require operator approval before a live Codex smoke test.
+- [x] Verify the smoke test checks persistence, status, review, validation, and V01 startup behavior.
 
 ### 10.5 Phase 6 validation and commit
 
-- [ ] Re-run checks affected by documentation or deployment-script changes.
-- [ ] Validate every documented command against actual package scripts.
-- [ ] Validate frontmatter and internal document references.
-- [ ] Confirm rollback instructions do not drop data during normal rollback.
-- [ ] Check off completed Phase 6 tasks.
-- [ ] Review and stage only Phase 6 changes.
-- [ ] Commit Phase 6 after every required check passes.
+- [x] Re-run checks affected by documentation or deployment-script changes.
+- [x] Validate every documented command against actual package scripts.
+- [x] Validate frontmatter and internal document references.
+- [x] Confirm rollback instructions do not drop data during normal rollback.
+- [x] Check off completed Phase 6 tasks.
+- [x] Review and stage only Phase 6 changes.
+- [x] Commit Phase 6 after every required check passes.
 
 ## 11. Final Acceptance Checklist
 
 - [ ] An authenticated operator can preview and start both V02 modes.
-- [ ] Every preview applies the documented range and eligibility rules.
-- [ ] A confirmed run executes its frozen selection and source choices.
-- [ ] Zero-eligible, expired, invalid, and conflicting starts are blocked clearly.
-- [ ] Only one V02 run can be queued or running.
-- [ ] Each article has at most one application-managed V02 prediction row.
-- [ ] Failed and invalid outcomes receive at most one later retry.
-- [ ] Completed predictions cannot be automatically reprocessed.
-- [ ] Independent circuit breakers and cancellation preserve partial results.
-- [ ] Prompt activation, first-use locking, and retry relationships are correct.
-- [ ] Human validation and comments work independently.
-- [ ] V02 remains advisory and causes no article workflow side effects.
-- [ ] V01 portal entry points are hidden while V01 backend compatibility remains.
-- [ ] V01 configuration cannot prevent worker startup.
-- [ ] The dedicated schema installer is safe, repeatable, and documented.
+- [x] Every preview applies the documented range and eligibility rules.
+- [x] A confirmed run executes its frozen selection and source choices.
+- [x] Zero-eligible, expired, invalid, and conflicting starts are blocked clearly.
+- [x] Only one V02 run can be queued or running.
+- [x] Each article has at most one application-managed V02 prediction row.
+- [x] Failed and invalid outcomes receive at most one later retry.
+- [x] Completed predictions cannot be automatically reprocessed.
+- [x] Independent circuit breakers and cancellation preserve partial results.
+- [x] Prompt activation, first-use locking, and retry relationships are correct.
+- [x] Human validation and comments work independently.
+- [x] V02 remains advisory and causes no article workflow side effects.
+- [x] V01 portal entry points are hidden while V01 backend compatibility remains.
+- [x] V01 configuration cannot prevent worker startup.
+- [x] The dedicated schema installer is safe, repeatable, and documented.
 - [ ] All automated and manual checks pass.
-- [ ] Pre-implementation and post-implementation reports are complete.
+- [x] Pre-implementation and post-implementation reports are complete.
 - [ ] The operator has approved the production procedure.
 
 ## 12. Todo Completion
 
-- [ ] Confirm every checked task has supporting code, tests, documentation, or verification evidence.
-- [ ] Confirm every phase has its own passing validation and commit.
-- [ ] Confirm the working tree contains no unintended changes.
-- [ ] Confirm the final implementation matches PRD V02 and Plan V02.
+- [x] Confirm every checked task has supporting code, tests, documentation, or verification evidence.
+- [x] Confirm every phase has its own passing validation and commit.
+- [x] Confirm the working tree contains no unintended changes.
+- [x] Confirm the final implementation matches PRD V02 and Plan V02.
 - [x] Submit this todo for assessing-agent review before implementation begins.

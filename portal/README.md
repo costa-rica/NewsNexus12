@@ -20,6 +20,15 @@ The goal of NewsNexus12Portal is to faithfully re-create and enhance the functio
 - Uses Redux for state management
 - Uses TypeScript
 
+## AI Approver versions
+
+- The automations page exposes only the manual AI Approver V02 controls.
+- V01 automation and prompt entry points are hidden and direct prompt routes return the standard not-found page.
+- V01 component source remains in the repository for compatibility and future removal planning.
+- The review table keeps V01 data in a column hidden by default.
+- The V02 review column is visible by default and remains advisory.
+- V02 prompt management uses `/articles/automations/ai-approver-v02-prompts`.
+
 ## Project Structure
 
 ```

@@ -4,6 +4,15 @@
 
 This project is the migration of the NewsNexus12API project to TypeScript
 
+## AI Approver route versions
+
+- Existing AI Approver routes are V01 and retain their source names and route contracts.
+- V02 worker proxy routes use `/automations/ai-approver-v02`.
+- V02 prompt, prediction, and review routes use `/analysis/ai-approver-v02`.
+- V02 routes require the existing JWT authentication middleware.
+- V02 review updates affect only V02 prediction review fields.
+- V02 does not write article approval, relevance, report, or orchestration data.
+
 ## Tests
 
 Testing currently uses Jest, with Supertest for endpoint smoke checks.

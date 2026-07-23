@@ -68,7 +68,21 @@ sudo systemctl stop newsnexus12-portal.service
 
 ## Key Documentation
 
-- `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` — AI Approver setup, prompt roles, gatekeeper modes, weekly automation behavior, and `N/A` troubleshooting.
+- `worker-python/docs/20260502_HOW_TO_USE_AI_APPROVER.md` — AI Approver V01 setup, prompt roles, gatekeeper modes, weekly automation behavior, and `N/A` troubleshooting.
+- `docs/ai-appover-v02/20260723_ai_approver_v02_operations.md` — AI Approver V02 configuration, deployment, health checks, rollback, and smoke testing.
+- `docs/ai-appover-v02/20260723_ai_approver_v02_schema_operations.md` — safe V02 schema installation and verification.
+
+## AI Approver Versions
+
+- V01 is the existing score and gatekeeper workflow.
+- V01 backend routes, table names, and source identifiers remain unchanged.
+- V01 automation cards and prompt pages are hidden in the portal.
+- V01 review data remains available in a column hidden by default.
+- V02 is the manual-only binary `approved` or `irrelevant` prediction workflow.
+- V02 is advisory and never changes article approval, relevance, reports, or orchestration.
+- V02 worker routes use `/ai-approver-v02`.
+- V02 API routes use `/automations/ai-approver-v02` and `/analysis/ai-approver-v02`.
+- V02 data uses only tables whose names end in `V02`.
 
 ## Directory Structure
 

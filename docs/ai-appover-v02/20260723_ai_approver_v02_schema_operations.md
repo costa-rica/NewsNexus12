@@ -129,19 +129,10 @@ Use application rollback to:
 
 ## 7. Destructive Schema Rollback
 
-Dropping V02 tables destroys V02 data. It requires:
+Dropping V02 tables is not part of this installation or normal rollback.
 
-1. separate operator approval
-2. a verified backup
-3. confirmation that no V02 process is running
-4. confirmation that application rollback is insufficient
+The separate operator-approved procedure is:
 
-If approved, drop in dependency order:
+- `20260723_ai_approver_v02_destructive_removal_procedure.md`
 
-```sql
-DROP TABLE "AiApproverArticlePredictionsV02";
-DROP TABLE "AiApproverRunsV02";
-DROP TABLE "AiApproverPromptVersionsV02";
-```
-
-This destructive procedure is not part of normal deployment or normal application rollback.
+Do not use that procedure without a verified backup and explicit approval for the destructive action.

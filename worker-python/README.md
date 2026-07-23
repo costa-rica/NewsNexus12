@@ -88,11 +88,11 @@ V01 configuration errors are startup warnings. A directly requested V01 job
 still validates V01 configuration and fails clearly when it is invalid. Shared
 worker settings and V02 configuration remain fatal at startup.
 
-## AI Approver flow
+## AI Approver V01 flow
 
 Full operator guidance for prompt setup, gatekeeper rollout, weekly automation behavior, queue result checks, and `N/A` troubleshooting is in `docs/20260502_HOW_TO_USE_AI_APPROVER.md`.
 
-The AI approver has two worker-python entry points:
+V01 source identifiers and route names remain unchanged. The V01 worker has two entry points:
 
 - `POST /ai-approver/start-job`
 - `POST /ai-approver/review-page/start-job`
