@@ -323,6 +323,33 @@ def test_mode_b_requires_boundary() -> None:
 
 
 @pytest.mark.integration
+def test_mode_b_explains_when_latest_article_is_approved() -> None:
+    repository = _create_repository()
+    try:
+        with psycopg.connect(get_test_dsn()) as conn:
+            conn.execute(
+                """
+                INSERT INTO "ArticleApproveds"("articleId", "isApproved")
+                VALUES (6, TRUE)
+                """
+            )
+        with pytest.raises(AiApproverV02NoEligibleArticlesError) as error:
+            repository.create_preview(
+                selection_mode="until_last_approved",
+                requested_article_count=None,
+                allow_past_approved_boundary=False,
+                allow_description_fallback=False,
+            )
+    finally:
+        repository.close()
+
+    assert str(error.value) == (
+        "No eligible articles were found: the latest article ID (6) is also "
+        "the latest approved article ID. Add newer articles before using Mode B."
+    )
+
+
+@pytest.mark.integration
 def test_acceptance_is_single_use_and_freezes_prompt() -> None:
     repository = _create_repository()
     try:

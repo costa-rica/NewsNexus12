@@ -1249,7 +1249,6 @@ export default function ReviewArticles() {
 				<ModalReviewArticleContent
 					articleId={reviewArticleContentArticleId}
 					onClose={() => setReviewArticleContentArticleId(null)}
-					onScoresUpdated={handleAiApproverArticleUpdate}
 				/>
 			)}
 		</div>

@@ -254,6 +254,15 @@ class AiApproverV02Repository:
                     raise AiApproverV02BoundaryUnavailableError(
                         "Mode B requires an approved article boundary"
                     )
+                if (
+                    selection_mode == "until_last_approved"
+                    and highest_id == boundary_id
+                ):
+                    raise AiApproverV02NoEligibleArticlesError(
+                        "No eligible articles were found: "
+                        f"the latest article ID ({highest_id}) is also the latest "
+                        "approved article ID. Add newer articles before using Mode B."
+                    )
 
                 rows = conn.execute(
                     self._preview_query(

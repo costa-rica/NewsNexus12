@@ -444,22 +444,34 @@ export function AiApproverV02Section() {
                 Mode B is unavailable because no approved boundary exists.
               </p>
             ) : null}
-            {mode === "article_position_count" ? (
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Article position count
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={count}
-                  onChange={(event) => {
-                    invalidatePreview();
-                    setCount(event.target.value);
-                  }}
-                  className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-              </label>
-            ) : null}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {mode === "article_position_count"
+                ? "Article position count"
+                : "Planned eligible article count"}
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={
+                  mode === "article_position_count"
+                    ? count
+                    : preview
+                      ? String(preview.plannedEligibleCount)
+                      : ""
+                }
+                placeholder={
+                  mode === "until_last_approved"
+                    ? "Refresh preview to calculate"
+                    : undefined
+                }
+                disabled={mode === "until_last_approved"}
+                onChange={(event) => {
+                  invalidatePreview();
+                  setCount(event.target.value);
+                }}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-800/60 dark:disabled:text-gray-300"
+              />
+            </label>
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
