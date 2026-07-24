@@ -24,18 +24,18 @@ const columnHelper = createColumnHelper<Article>();
 const UNASSIGNED_STATE_FILTER_VALUE = "__unassigned__";
 const NO_STATE_LABEL = "No state";
 
-const stateAssignmentFilterFn: FilterFn<Article> = (row, columnId, filterValue) => {
-	const selectedStates = Array.isArray(filterValue)
+const multiSelectStringFilterFn: FilterFn<Article> = (row, columnId, filterValue) => {
+	const selectedValues = Array.isArray(filterValue)
 		? filterValue.filter((value): value is string => typeof value === "string")
 		: [];
 
-	if (selectedStates.length === 0) {
+	if (selectedValues.length === 0) {
 		return true;
 	}
 
 	const rowValue = row.getValue<string | undefined>(columnId);
 	const normalizedRowValue = rowValue?.trim() || UNASSIGNED_STATE_FILTER_VALUE;
-	return selectedStates.includes(normalizedRowValue);
+	return selectedValues.includes(normalizedRowValue);
 };
 
 function getAiApproverSortValue(article: Article): number | undefined {
@@ -102,7 +102,7 @@ function getGatekeeperBadge(article: Article): {
 	};
 }
 
-interface StateFilterOption {
+interface ColumnFilterOption {
 	value: string;
 	label: string;
 	count: number;
@@ -146,6 +146,8 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	onArticleContentClick,
 }) => {
 	const [isStateFilterOpen, setIsStateFilterOpen] = useState(false);
+	const [isAiApproverV02FilterOpen, setIsAiApproverV02FilterOpen] =
+		useState(false);
 	const [pagination, setPagination] = useState<PaginationState>({
 		pageIndex: 0,
 		pageSize: 10,
@@ -158,8 +160,9 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 		aiApproverTopScore: false,
 	});
 	const stateFilterRef = useRef<HTMLDivElement | null>(null);
+	const aiApproverV02FilterRef = useRef<HTMLDivElement | null>(null);
 
-	const stateFilterOptions = useMemo<StateFilterOption[]>(() => {
+	const stateFilterOptions = useMemo<ColumnFilterOption[]>(() => {
 		const stateCounts = new Map<string, number>();
 		let noStateCount = 0;
 
@@ -206,6 +209,41 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			: [];
 	}, [columnFilters]);
 
+	const aiApproverV02FilterOptions = useMemo<ColumnFilterOption[]>(() => {
+		let approvedCount = 0;
+		let irrelevantCount = 0;
+
+		for (const article of data) {
+			if (
+				article.aiApproverV02ResultStatus !== "completed" ||
+				!article.aiApproverV02Prediction
+			) {
+				continue;
+			}
+
+			if (article.aiApproverV02Prediction === "approved") {
+				approvedCount += 1;
+			} else if (article.aiApproverV02Prediction === "irrelevant") {
+				irrelevantCount += 1;
+			}
+		}
+
+		return [
+			{ value: "approved", label: "Approved", count: approvedCount },
+			{ value: "irrelevant", label: "Irrelevant", count: irrelevantCount },
+		];
+	}, [data]);
+
+	const selectedAiApproverV02FilterValues = useMemo(() => {
+		const activeFilter = columnFilters.find(
+			(filter) => filter.id === "aiApproverV02Prediction"
+		)?.value;
+
+		return Array.isArray(activeFilter)
+			? activeFilter.filter((value): value is string => typeof value === "string")
+			: [];
+	}, [columnFilters]);
+
 	useEffect(() => {
 		if (!isStateFilterOpen) {
 			return;
@@ -223,6 +261,24 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 		document.addEventListener("mousedown", handlePointerDown);
 		return () => document.removeEventListener("mousedown", handlePointerDown);
 	}, [isStateFilterOpen]);
+
+	useEffect(() => {
+		if (!isAiApproverV02FilterOpen) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if (
+				aiApproverV02FilterRef.current &&
+				!aiApproverV02FilterRef.current.contains(event.target as Node)
+			) {
+				setIsAiApproverV02FilterOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handlePointerDown);
+		return () => document.removeEventListener("mousedown", handlePointerDown);
+	}, [isAiApproverV02FilterOpen]);
 
 	const updateStateFilter = useCallback((nextValues: string[]) => {
 		setColumnFilters((currentFilters) => {
@@ -253,6 +309,38 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 
 		updateStateFilter(nextValues);
 	}, [selectedStateFilterValues, updateStateFilter]);
+
+	const updateAiApproverV02Filter = useCallback((nextValues: string[]) => {
+		setColumnFilters((currentFilters) => {
+			const remainingFilters = currentFilters.filter(
+				(filter) => filter.id !== "aiApproverV02Prediction"
+			);
+
+			if (nextValues.length === 0) {
+				return remainingFilters;
+			}
+
+			return [
+				...remainingFilters,
+				{ id: "aiApproverV02Prediction", value: nextValues },
+			];
+		});
+
+		setPagination((prev) => ({
+			...prev,
+			pageIndex: 0,
+		}));
+	}, []);
+
+	const toggleAiApproverV02FilterValue = useCallback((value: string) => {
+		const nextValues = selectedAiApproverV02FilterValues.includes(value)
+			? selectedAiApproverV02FilterValues.filter(
+					(currentValue) => currentValue !== value
+				)
+			: [...selectedAiApproverV02FilterValues, value];
+
+		updateAiApproverV02Filter(nextValues);
+	}, [selectedAiApproverV02FilterValues, updateAiApproverV02Filter]);
 
 	const columns = useMemo(
 		() => {
@@ -505,9 +593,107 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 								: undefined,
 						{
 							id: "aiApproverV02Prediction",
-							header: "AI Approver V02",
+							header: () => (
+								<div
+									ref={aiApproverV02FilterRef}
+									className="relative flex items-center gap-2"
+								>
+									<span>AI Approver V02</span>
+									<button
+										type="button"
+										onClick={(event) => {
+											event.stopPropagation();
+											setIsAiApproverV02FilterOpen((prev) => !prev);
+										}}
+										className={`inline-flex h-6 w-6 items-center justify-center rounded border text-[10px] transition-colors ${
+											selectedAiApproverV02FilterValues.length > 0
+												? "border-brand-500 bg-brand-50 text-brand-600 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-300"
+												: "border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200"
+										}`}
+										title="Filter AI Approver V02 predictions"
+										aria-label="Filter AI Approver V02 predictions"
+										aria-expanded={isAiApproverV02FilterOpen}
+									>
+										<svg
+											viewBox="0 0 20 20"
+											fill="none"
+											className="h-3.5 w-3.5"
+											stroke="currentColor"
+											strokeWidth="1.8"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M3.5 5h13" />
+											<path d="M6.5 10h7" />
+											<path d="M8.75 15h2.5" />
+										</svg>
+									</button>
+
+									{isAiApproverV02FilterOpen && (
+										<div
+											className="absolute left-0 top-full z-30 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-3 text-xs normal-case shadow-xl dark:border-gray-700 dark:bg-gray-900"
+											onClick={(event) => event.stopPropagation()}
+										>
+											<div className="mb-3 flex items-center justify-between gap-3">
+												<div>
+													<p className="font-semibold text-gray-900 dark:text-white/90">
+														Filter predictions
+													</p>
+													<p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+														Show only rows matching the selected prediction.
+													</p>
+												</div>
+												{selectedAiApproverV02FilterValues.length > 0 && (
+													<button
+														type="button"
+														onClick={() => updateAiApproverV02Filter([])}
+														className="text-[11px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200"
+													>
+														Clear
+													</button>
+												)}
+											</div>
+
+											<div className="space-y-1">
+												{aiApproverV02FilterOptions.map((option) => {
+													const isSelected =
+														selectedAiApproverV02FilterValues.includes(
+															option.value
+														);
+
+													return (
+														<label
+															key={option.value}
+															className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+														>
+															<span className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+																<input
+																	type="checkbox"
+																	checked={isSelected}
+																	onChange={() =>
+																		toggleAiApproverV02FilterValue(
+																			option.value
+																		)
+																	}
+																	className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
+																/>
+																<span>{option.label}</span>
+															</span>
+															<span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+																{option.count}
+															</span>
+														</label>
+													);
+												})}
+											</div>
+										</div>
+									)}
+								</div>
+							),
 							enableSorting: true,
 							sortUndefined: "last",
+							filterFn: multiSelectStringFilterFn,
 							cell: ({ row, getValue }) => {
 								const prediction = getValue();
 								if (!prediction) {
@@ -656,7 +842,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 
 									{isStateFilterOpen && (
 										<div
-											className="absolute left-0 top-full z-30 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-3 text-xs normal-case shadow-xl dark:border-gray-700 dark:bg-gray-900"
+											className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-3 text-xs normal-case shadow-xl dark:border-gray-700 dark:bg-gray-900"
 											onClick={(event) => event.stopPropagation()}
 										>
 											<div className="mb-3 flex items-center justify-between gap-3">
@@ -714,7 +900,7 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 							enableSorting: true,
 							sortUndefined: "last",
 							sortingFn: "alphanumeric",
-							filterFn: stateAssignmentFilterFn,
+							filterFn: multiSelectStringFilterFn,
 							cell: ({ row }) => {
 								const stateName = row.original.stateAssignment?.stateName;
 								const hasAiStateReview = Boolean(row.original.stateAssignment);
@@ -761,10 +947,15 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			showRelevantColumn,
 			showDeleteColumn,
 			isStateFilterOpen,
+			isAiApproverV02FilterOpen,
 			selectedStateFilterValues,
+			selectedAiApproverV02FilterValues,
 			stateFilterOptions,
+			aiApproverV02FilterOptions,
 			toggleStateFilterValue,
+			toggleAiApproverV02FilterValue,
 			updateStateFilter,
+			updateAiApproverV02Filter,
 		]
 	);
 

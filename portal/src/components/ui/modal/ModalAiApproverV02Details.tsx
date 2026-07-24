@@ -116,20 +116,16 @@ export default function ModalAiApproverV02Details({
     }
   };
 
+  const hasCommentChanges =
+    prediction !== null && comment !== (prediction.humanComment ?? "");
+
   return (
     <Modal isOpen onClose={onClose}>
       <div className="w-full max-w-2xl rounded-2xl bg-white p-6 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-        <div className="flex items-start justify-between gap-4">
+        <div className="pr-14 sm:pr-16">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
             AI Approver V02 Details
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Close
-          </button>
         </div>
         {error ? (
           <p className="mt-4 text-sm text-error-600 dark:text-error-400">
@@ -194,16 +190,26 @@ export default function ModalAiApproverV02Details({
                 <button
                   type="button"
                   disabled={isSaving}
+                  aria-pressed={prediction.humanValidation === true}
                   onClick={() => void save({ humanValidation: true })}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    prediction.humanValidation === true
+                      ? "border-success-500 bg-success-500 text-white hover:bg-success-600 dark:border-success-600 dark:bg-success-600 dark:hover:bg-success-700"
+                      : "border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
                 >
                   Yes
                 </button>
                 <button
                   type="button"
                   disabled={isSaving}
+                  aria-pressed={prediction.humanValidation === false}
                   onClick={() => void save({ humanValidation: false })}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    prediction.humanValidation === false
+                      ? "border-error-500 bg-error-500 text-white hover:bg-error-600 dark:border-error-600 dark:bg-error-600 dark:hover:bg-error-700"
+                      : "border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`}
                 >
                   No
                 </button>
@@ -215,14 +221,6 @@ export default function ModalAiApproverV02Details({
                 >
                   Clear validation
                 </button>
-                <span className="self-center text-sm text-gray-500 dark:text-gray-400">
-                  Current:{" "}
-                  {prediction.humanValidation === null
-                    ? "Not reviewed"
-                    : prediction.humanValidation
-                      ? "Yes"
-                      : "No"}
-                </span>
               </div>
             </div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -239,7 +237,11 @@ export default function ModalAiApproverV02Details({
                 type="button"
                 disabled={isSaving}
                 onClick={() => void save({ humanComment: comment })}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  hasCommentChanges
+                    ? "border-brand-500 bg-brand-500 text-white hover:bg-brand-600 dark:border-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700"
+                    : "border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
               >
                 Save comment
               </button>

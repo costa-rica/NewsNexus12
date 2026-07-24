@@ -431,9 +431,16 @@ export default function ReviewArticles() {
 	);
 
 	const mergeAiApproverV02Predictions = useCallback(
-		(articles: Article[], predictions: AiApproverV02PredictionMap) =>
+		(
+			articles: Article[],
+			predictions: AiApproverV02PredictionMap,
+			preserveMissing = false
+		) =>
 			articles.map((article) => {
 				const prediction = predictions[String(article.id)];
+				if (!prediction && preserveMissing) {
+					return article;
+				}
 				return {
 					...article,
 					aiApproverV02PredictionId: prediction?.id ?? null,
@@ -558,7 +565,7 @@ export default function ReviewArticles() {
 					articleId,
 				]);
 				setArticlesArray((current) =>
-					mergeAiApproverV02Predictions(current, predictions)
+					mergeAiApproverV02Predictions(current, predictions, true)
 				);
 			} catch (error) {
 				console.error("Error refreshing AI Approver V02 prediction:", error);
