@@ -170,6 +170,49 @@ modified_by: claude (haiku-4.5)
 - Usually managed by the operator, not the AI coding agent.
 - Agents: these files are kept for reference only; do not review them when scanning the project to build context.
 
+## Human-readable documents
+
+Treat these as strong operator preferences rather than strict requirements. If they conflict with a requested document structure, template, or established heading hierarchy, preserve the intended structure and adapt these preferences to fit.
+
+- Use plain, human-readable language.
+- Do not use bold text.
+- Prefer bullets and numbering over long paragraphs.
+- Keep each paragraph under 50 words.
+- Multiple short paragraphs are acceptable.
+- Keep sections focused and easy for the operator to scan and answer.
+
+## Open questions created by agents
+
+Use an open-questions section when the operator asks for one or when unresolved decisions would materially help the document.
+
+- Make open questions the final section of the PRD, plan, or other agent-authored document.
+- Use `## Open Questions` as the section heading.
+- If the document's required structure uses different heading levels, adjust the hierarchy while preserving the pattern below.
+- Give each question its own numbered `###` heading.
+- Keep the numbered question heading description to 40 characters or fewer.
+- Put the full question below its heading.
+- Focus each question on one decision.
+- Bullets are acceptable when they make choices or context easier to scan.
+- Add a `#### Operator Response` subsection under every question.
+- Leave the operator response empty unless an agent recommendation would be useful.
+- When providing a recommendation, begin it with the agent's name in parentheses.
+- Prefer recommendations under 30 words.
+- Apply the human-readable document preferences to questions and recommendations.
+
+Example:
+
+```markdown
+## Open Questions
+
+### 1. Default date range
+
+Should a report without dates cover the trailing seven days, including today?
+
+#### Operator Response
+
+(codex) Recommend the trailing seven days in the Toggl user timezone.
+```
+
 ## Commit Message Guidance
 
 ### Guidelines
