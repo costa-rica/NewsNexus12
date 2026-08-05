@@ -37,7 +37,8 @@
     "typescript": "^5"
   },
   "overrides": {
-    "postcss": "8.5.16"
+    "postcss": "8.5.23",
+    "sharp": "0.35.3"
   },
   "optionalDependencies": {
     "@tailwindcss/oxide-darwin-arm64": "^4.2.0"
