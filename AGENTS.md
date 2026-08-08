@@ -2,6 +2,18 @@
 
 This file provides guidance to the engineers or AI agents when working with code in this repository.
 
+## Workflows
+
+Workflows are named instruction files. When the operator invokes one by name, read the referenced file and follow it.
+
+### plan-and-vet
+
+See `docs/PLAN_AND_VET.md`.
+
+### NickVault
+
+For work involving the NickVault knowledge base, read and follow `docs/NICKVAULT_INSTRUCTIONS_MAC.md`. These instructions apply only to NickVault work and do not change the project's runtime behavior or engineering requirements.
+
 ## Repository Overview
 
 NewsNexus12 is a monorepo for a news aggregation and analysis platform. It has no formal monorepo tooling (no Lerna/Nx/Turborepo) — packages are linked via local `file:` dependencies.
@@ -137,29 +149,30 @@ Every generated `.md` file will begin with a YAML frontmatter block delimited by
 
 ```yaml
 ---
-created_at: YYYY-MM-DD
-updated_at: YYYY-MM-DD
-created_by: <agent name> (<model>)
-modified_by: <agent name> (<model>)
+created_at: YYYY-MM-DDTHH:MM:SSZ
+updated_at: YYYY-MM-DDTHH:MM:SSZ
+created_by: <agent name> (<model>) <machine>
+modified_by: <agent name> (<model>) <machine>
 ---
 ```
 
 Rules:
 
+- `created_at` / `updated_at` are UTC timestamps in ISO 8601 format: `YYYY-MM-DDTHH:MM:SSZ`. Use a 24-hour clock with zero-padded hours, minutes, and seconds; the trailing `Z` identifies UTC.
 - `created_at` is set once, at file creation, and MUST NEVER be modified on later edits.
-- `updated_at` is rewritten to today's date on every modification.
+- `updated_at` is rewritten to the current UTC timestamp on every modification.
 - `created_by` is set once, at file creation, and MUST NEVER be modified on later edits.
 - `modified_by` is rewritten on every modification. On the very first write, set it to the same value as `created_by`.
 - `modified_by` must be one line containing only the latest modifier.
-- The `created_by` / `modified_by` value uses the format `<agent name> (<model>)`, lowercase only, with no email addresses and no angle brackets.
+- The `created_by` / `modified_by` value uses the format `<agent name> (<model>) <machine>`, lowercase only, with no email addresses and no angle brackets. The machine is mandatory so the operator can identify which host wrote the file.
+- For a legacy document whose immutable `created_at` or `created_by` uses the former format, preserve those values. Apply the new format to `updated_at` and `modified_by` when editing it.
 
 Acceptable examples:
 
 ```yaml
-created_by: claude (sonnet-4)
-created_by: claude (opus-4.7)
-created_by: codex (gpt-5)
-modified_by: claude (haiku-4.5)
+created_by: claude (opus-4.7) macbook-air
+created_by: codex (gpt-5.5) fsdc-avatar09
+modified_by: claude (haiku-4.5) macbook-air
 ```
 
 ### Archive Subfolder

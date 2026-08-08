@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-05T16:50:25Z
-updated_at: 2026-08-05T16:50:25Z
+updated_at: 2026-08-06T01:16:09Z
 created_by: codex (gpt-5) macbook-air
 modified_by: codex (gpt-5) macbook-air
 ---
@@ -18,6 +18,10 @@ modified_by: codex (gpt-5) macbook-air
 ## Purpose
 
 This template tells a network project agent, or NPA, how to work with NickVault. The project repository's `AGENTS.md` should point to its local copy of this file rather than repeat these rules.
+
+## nick-knowledge-base
+
+`nick-knowledge-base` means NickVault at the vault root in the path block, never the NPA's current project repository. A request to create a context file for the `nick-knowledge-base` directs the NPA to write under the context root and follow `_canon/spec-context.md`.
 
 ## Read boundary
 

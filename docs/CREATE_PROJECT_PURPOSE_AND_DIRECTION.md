@@ -1,40 +1,45 @@
 ---
 created_at: 2026-05-29T22:52:22Z
-updated_at: 2026-08-05T21:32:12Z
+updated_at: 2026-08-05T23:02:07Z
 created_by: claude (unknown-model) unknown-machine
 modified_by: codex (gpt-5) macbook-air
 ---
 
 # Create Project Purpose and Direction
 
-A reusable workflow for producing one document that explains why a project exists, what purpose it serves, and where it is going.
+A reusable guide for deciding whether a project needs a purpose-and-direction document and, when useful, producing one that explains why the project exists.
 
-This workflow is referred to as `create-project-purpose-and-direction`. It pairs with the Technical Project Overview, which owns technical reality. Together they form the project's living project context.
+This workflow is referred to as `create-project-purpose-and-direction`. It covers context that is distinct from the repository's technical reality, which remains the responsibility of the Technical Project Overview.
 
-The prompt is single-pass. The operator supplies or identifies the available inputs in the initial request. The agent does not pause for questions or confirmation; unresolved material becomes explicit open questions in the document.
+The document is optional. A script, investigation, experiment, or repository ancillary to a larger project may not need an independent purpose-and-direction document. The agent and operator decide this before writing.
 
 ---
 
 ## How to use this workflow
 
 1. Copy the prompt block below into the agent's first message.
-2. Include or identify the source documents the agent should use.
-3. Name the project and desired repository output path when it differs from the default.
-4. Review the completed repository document.
-5. When accurate, update `Context/onboardings/<Project>_Purpose_And_Direction.md` in NickVault, using the canonical project name with underscores.
+2. Identify the project and any repository or external documents the agent should review.
+3. Let the agent review those materials and discuss whether a separate purpose-and-direction document would be useful.
+4. If the document is useful, agree on any sections needed beyond the one-paragraph summary and purpose.
+5. Review the completed repository document.
+6. When the operator wants a living NickVault profile and the project has a canonical crosswalk entry, update `Context/project_profiles/<Project>_Purpose_And_Direction.md` using the canonical project name with underscores.
 
 ---
 
 ## The prompt
 
 ```
-Produce one Markdown document named `YYYYMMDD_PROJECT_PURPOSE_AND_DIRECTION.md`, using today's date, that explains this project's purpose, spirit, current state, and intended direction.
+Help the operator decide whether this project needs a separate purpose-and-direction document. The document, when useful, should give a new collaborator concise context about why the project exists without duplicating its technical overview.
 
-The reader is a capable collaborator who has never seen the project. Give them the understanding they would otherwise spend two weeks of meetings acquiring.
+Review the documents the operator supplies or identifies. These may be inside the repository or at external paths. Use only the identified external material; do not expand the review into unrelated files.
 
-This is a single-pass request. Use the documents supplied or identified by the operator and any accessible matching Technical Project Overview. Do not pause to request more documents, ask blocking questions, summarize for confirmation, or wait for another response. Record material gaps and unresolved questions in the final section instead of guessing.
+After reviewing the available material, tell the operator whether a separate document appears useful and why. Ask whether the operator wants it created. A separate document may be unnecessary when the work is a script, investigation, experiment, ancillary repository, or already covered adequately by an authoritative brief, PRD, statement of work, or parent-project document.
 
-Do not infer product strategy from the codebase. The objective must come from operator-provided material, existing product documents, and explicit operator statements.
+If the operator has already confirmed that the document is needed, do not ask again.
+
+Before writing, discuss whether the supplied material calls for any sections beyond the two listed below. The operator decides which additional subjects are useful. Do not introduce additional sections by default.
+
+Do not infer purpose or strategy from implementation details. Base the document on operator statements and the supplied or identified purpose-bearing material. Use technical detail only when it is needed to explain the purpose.
 
 ## Output path
 
@@ -55,60 +60,35 @@ modified_by: <agent name> (<model>) <machine>
 
 Use UTC timestamps and lowercase machine-bearing identity values. On later edits, preserve `created_at` and `created_by`; update only `updated_at` and `modified_by`.
 
-## Inputs
-
-Use whatever relevant material the operator supplied or identified, including:
-
-- the matching Technical Project Overview;
-- proposals, pitch decks, and statements of work;
-- customer research and interview notes;
-- sales or marketing material;
-- strategic memos, OKRs, and roadmaps;
-- competitive analyses and meeting notes;
-- public product artifacts.
-
-Cite the source of each material claim. Distinguish operator statements, documentary evidence, and inference.
-
 ## Output structure
 
-Use these sections in order:
+Unless the operator agrees to additional sections, create only:
 
 1. One-paragraph summary
 2. Purpose
-3. People served
-4. The problem
-5. Intended value
-6. Spirit and principles
-7. Strategic bets and assumptions
-8. Current state
-9. Intended direction
-10. What success means
-11. Open risks and unknowns
-12. Open questions for the project owner
 
-For an unsupported section, state `Not established in the supplied material` and briefly identify what is missing. Do not invent an answer.
-
-The final open-questions section contains only questions whose answers would materially improve the onboarding document. Do not require answers before completing this version.
+Additional sections are chosen through discussion with the operator, especially when external documentation contains context that would be useful to preserve. The former standard list of recommended sections does not apply.
 
 ## Constraints
 
-- Be terse and factual.
-- Cite sources near the claims they support.
-- Label inference as inference.
-- Do not invent strategy, metrics, customers, or rationale.
-- Avoid marketing language.
-- Target 1,000–1,800 words.
-- Do not exceed 1,800 words unless the operator authorized it in the initial request.
+- Keep the document useful, concise, and distinct from technical documentation.
+- Cite identified source documents where that helps the reader trace important context.
+- Do not invent strategy, metrics, customers, rationale, or missing context.
+- Let the supplied material set the length and never pad the document.
+- Do not exceed 1,800 words.
+- Do not modify, create, or delete any file other than the output document. Do not run builds, installs, migrations, or tests. Do not commit or push.
 
-Write the file in this pass. Report its path and summarize its contents in one paragraph.
+When the operator confirms the document is needed and the sections are settled, write it and report its path. If the operator decides it is unnecessary, do not create a file and briefly record that outcome in the response.
 ```
 
 ---
 
 ## Notes for Nick
 
-- This captures why the project exists, who it serves, the problem and intended value, its spirit and principles, strategic bets, current state, direction, success, and risks.
-- Sparse inputs produce an honest document with explicit gaps, not a fabricated strategy.
-- The matching Technical Project Overview remains the technical half.
-- After review, update `Context/onboardings/<Project>_Purpose_And_Direction.md` as an undated living document with four-key, machine-bearing frontmatter.
+- A short document is a valid result.
+- No document is also a valid result when a separate purpose layer would not add useful context.
+- The operator and agent choose any sections beyond the summary and purpose after reviewing the available material.
+- External files may be used when the operator identifies them for review.
+- The Technical Project Overview remains separate and does not require a matching purpose-and-direction document.
+- After review, update `Context/project_profiles/<Project>_Purpose_And_Direction.md` only when the operator wants a living profile for a canonical project.
 - Refresh after a major pivot, funding event, or customer change.

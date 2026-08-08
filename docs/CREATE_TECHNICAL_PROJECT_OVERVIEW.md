@@ -1,6 +1,6 @@
 ---
 created_at: 2026-05-29T22:52:22Z
-updated_at: 2026-08-05T21:32:12Z
+updated_at: 2026-08-07T23:41:18Z
 created_by: claude (unknown-model) unknown-machine
 modified_by: codex (gpt-5) macbook-air
 ---
@@ -19,7 +19,7 @@ This workflow is referred to as `create-technical-project-overview`. The project
 2. Paste it into your AI coding agent's first message inside the project repo.
 3. Review the agent's questions before it writes; correct any wrong assumptions.
 4. After the agent writes the file (default path: `docs/YYYYMMDD_TECHNICAL_PROJECT_OVERVIEW.md` if a `docs/` directory exists, otherwise `./YYYYMMDD_TECHNICAL_PROJECT_OVERVIEW.md` at the repo root), review it.
-5. When the file is accurate, copy it into NickVault as `Context/onboardings/<Project>_Technical_Project_Overview.md`, using the canonical project name with underscores.
+5. When the file is accurate, copy it into NickVault as `Context/project_profiles/<Project>_Technical_Project_Overview.md`, using the canonical project name with underscores.
 
 ---
 
@@ -105,9 +105,6 @@ What's tested, how, and how to run the tests. Be honest about coverage gaps if t
 ### 10. Active areas of work
 Based on the last 30 commits and any TODO/FIXME/WIP markers: what is the team currently focused on? Where are the rough edges? List 3-5 items.
 
-### 11. Open questions for the project owner
-What did you find unclear, contradictory, or undocumented that the project owner should clarify? List as bullet points. This is the most valuable section for the owner.
-
 ## Constraints
 
 - **Be terse.** Every sentence should earn its place.
@@ -117,6 +114,7 @@ What did you find unclear, contradictory, or undocumented that the project owner
 - **Flag uncertainty.** "Appears to" / "based on commits since X" is better than asserting something you inferred.
 - **No invented "why".** If you cannot tell from the code why a choice was made, say so or skip it.
 - **Target length: 800-1500 words.** If the project genuinely needs more, ask before exceeding 1500.
+- **Read-only except the output.** Do not modify, create, or delete any file other than the output document. Do not run builds, installs, migrations, or tests. Do not commit or push.
 
 ## Before you write
 
@@ -134,5 +132,5 @@ After resolving any material question, investigate and write the file. Report th
 ## Notes for Nick
 
 - What this does not capture: strategic intent, the user or customer, why the project exists, what done looks like, and the underlying bets. The matching Project Purpose and Direction document owns that layer.
-- NickVault copy: after review, update `Context/onboardings/<Project>_Technical_Project_Overview.md` as an undated living document with four-key, machine-bearing frontmatter.
+- NickVault copy: after review, update `Context/project_profiles/<Project>_Technical_Project_Overview.md` as an undated living document with four-key, machine-bearing frontmatter.
 - Refreshing: projects evolve. Re-run the workflow every quarter or after a major refactor. The agent should diff against the previous file rather than rewriting from scratch.

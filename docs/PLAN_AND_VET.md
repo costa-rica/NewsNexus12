@@ -1,8 +1,8 @@
 ---
 created_at: 2026-06-15
-updated_at: 2026-06-15
+updated_at: 2026-08-05T22:28:27Z
 created_by: codex (gpt-5)
-modified_by: codex (gpt-5)
+modified_by: codex (gpt-5) macbook-air
 ---
 
 # Plan and Vet
@@ -28,6 +28,8 @@ Otherwise, the todo creator — the planner agent by default — takes the lates
 ## File location and versioning
 
 All plan, todo, and assessment files are written to the repository's root-level `docs/` directory by default.
+
+Every generated plan, todo, and assessment file must use the YAML frontmatter standard in the repository's root `AGENTS.md`.
 
 Agents never overwrite an existing file. The `_v##` naming convention exists precisely so that each step writes a **new** file — a new plan version, a new todo version, or a new assessment is always a separate file (for example, assessing v02 of a plan produces a new `..._plan_v02_assessment_{agent}.md`, leaving the v01 assessment untouched). An agent should only modify an existing file when the operator explicitly directs it to.
 
