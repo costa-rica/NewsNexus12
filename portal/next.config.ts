@@ -14,16 +14,10 @@ const appVersionScriptPath = fileURLToPath(
 );
 
 function readAppVersion(): string {
-	try {
-		return (
-			execFileSync(process.execPath, [appVersionScriptPath], {
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-			}).trim() || "dev"
-		);
-	} catch {
-		return "dev";
-	}
+	return execFileSync(process.execPath, [appVersionScriptPath], {
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "inherit"],
+	}).trim();
 }
 
 const nextConfig: NextConfig = {
