@@ -1,11 +1,26 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const trunkRefs = ["main", "origin/main"];
+const projectFolderPattern = /^NewsNexus(\d+)$/;
+
+export function getMajorVersion(projectFolderName = basename(repoRoot)) {
+	const match = projectFolderName.match(projectFolderPattern);
+
+	if (!match) {
+		throw new Error(
+			`[app-version] Invalid monorepo folder name "${projectFolderName}". ` +
+				'Expected "NewsNexus##", with one or more digits after "NewsNexus". ' +
+				"Portal startup and builds require this naming convention."
+		);
+	}
+
+	return match[1];
+}
 
 function runGit(args) {
 	return execFileSync("git", args, {
@@ -27,25 +42,46 @@ function resolveTrunkRef() {
 	return null;
 }
 
+function readEnvironmentCounts() {
+	const mainCount = process.env.NEWSNEXUS_MAIN_COMMIT_COUNT;
+	const branchCount = process.env.NEWSNEXUS_BRANCH_COMMIT_COUNT;
+
+	if (mainCount === undefined && branchCount === undefined) return null;
+
+	if (!/^\d+$/.test(mainCount ?? "") || !/^\d+$/.test(branchCount ?? "")) {
+		throw new Error(
+			"[app-version] NEWSNEXUS_MAIN_COMMIT_COUNT and " +
+				"NEWSNEXUS_BRANCH_COMMIT_COUNT must both be non-negative integers."
+		);
+	}
+
+	return { mainCount, branchCount };
+}
+
 export function getAppVersion() {
+	const majorVersion = getMajorVersion();
+
 	try {
 		const isShallow = runGit(["rev-parse", "--is-shallow-repository"]);
-		if (isShallow === "true") return "dev";
+		if (isShallow === "true") throw new Error("Git history is shallow.");
 
 		const trunkRef = resolveTrunkRef();
-		if (!trunkRef) return "dev";
+		if (!trunkRef) throw new Error("No main branch reference is available.");
 
 		const base = runGit(["merge-base", "HEAD", trunkRef]);
 		const mainCount = runGit(["rev-list", "--count", base]);
 		const branchCount = runGit(["rev-list", "--count", `${base}..HEAD`]);
 
 		if (!/^\d+$/.test(mainCount) || !/^\d+$/.test(branchCount)) {
-			return "dev";
+			return `${majorVersion}.dev`;
 		}
 
-		return `${mainCount}.${branchCount}`;
+		return `${majorVersion}.${mainCount}.${branchCount}`;
 	} catch {
-		return "dev";
+		const environmentCounts = readEnvironmentCounts();
+		if (!environmentCounts) return `${majorVersion}.dev`;
+
+		return `${majorVersion}.${environmentCounts.mainCount}.${environmentCounts.branchCount}`;
 	}
 }
 
