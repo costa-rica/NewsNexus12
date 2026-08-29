@@ -8,10 +8,6 @@ import { importZipFileToDatabase } from "@newsnexus/db-manager";
 
 const router = express.Router();
 const {
-  AiApproverArticleScore,
-  AiApproverPromptVersion,
-  OrchestratorRun,
-  OrchestratorRunStep,
   User,
   ArticleKeywordContract,
   EntityWhoCategorizedArticle,
@@ -42,10 +38,6 @@ const {
 } = require("@newsnexus/db-models");
 
 const tableRegistry = {
-  AiApproverArticleScore,
-  AiApproverPromptVersion,
-  OrchestratorRun,
-  OrchestratorRunStep,
   User,
   ArticleKeywordContract,
   EntityWhoCategorizedArticle,

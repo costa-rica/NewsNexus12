@@ -287,46 +287,6 @@ describe("news org automations routes", () => {
     );
   });
 
-  test("POST /automations/ai-approver/start-job proxies worker-python response", async () => {
-    mockAxios.post.mockResolvedValue({
-      data: {
-        endpointName: "/ai-approver/start-job",
-        jobId: "job-ai-1",
-        status: "queued",
-      },
-      status: 202,
-    });
-
-    const app = buildApp();
-    const response = await request(app)
-      .post("/automations/ai-approver/start-job")
-      .send({
-        limit: 25,
-        requireStateAssignment: true,
-        stateIds: [5, 12],
-      });
-
-    expect(response.status).toBe(202);
-    expect(response.body).toEqual({
-      endpointName: "/ai-approver/start-job",
-      jobId: "job-ai-1",
-      status: "queued",
-    });
-    expect(mockAxios.post).toHaveBeenCalledWith(
-      "http://worker-python/ai-approver/start-job",
-      {
-        limit: 25,
-        requireStateAssignment: true,
-        stateIds: [5, 12],
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-  });
-
   test("POST /automations/semantic-scorer/start-job returns worker-node unavailable message on connection refusal", async () => {
     mockAxios.isAxiosError.mockReturnValue(true);
     mockAxios.post.mockRejectedValue({
@@ -413,8 +373,8 @@ describe("news org automations routes", () => {
     mockAxios.get.mockResolvedValue({
       data: {
         job: {
-          endpointName: "/ai-approver/review-page/start-job",
-          jobId: "job-review-1",
+          endpointName: "/location-scorer/start-job",
+          jobId: "job-location-1",
           status: "completed",
         },
       },
@@ -423,19 +383,19 @@ describe("news org automations routes", () => {
 
     const app = buildApp();
     const response = await request(app).get(
-      "/automations/worker-python/check-status/job-review-1",
+      "/automations/worker-python/check-status/job-location-1",
     );
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       job: {
-        endpointName: "/ai-approver/review-page/start-job",
-        jobId: "job-review-1",
+        endpointName: "/location-scorer/start-job",
+        jobId: "job-location-1",
         status: "completed",
       },
     });
     expect(mockAxios.get).toHaveBeenCalledWith(
-      "http://worker-python/queue-info/check-status/job-review-1",
+      "http://worker-python/queue-info/check-status/job-location-1",
     );
   });
 

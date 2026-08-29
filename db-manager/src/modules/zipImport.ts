@@ -131,6 +131,20 @@ function getJsonFields(model: { rawAttributes?: Record<string, unknown> }): stri
     .map(([field]) => field);
 }
 
+export function filterRecordToModelAttributes(
+  record: Record<string, string | null>,
+  model: { rawAttributes?: Record<string, unknown> },
+): Record<string, string | null> {
+  if (!model.rawAttributes) {
+    return record;
+  }
+
+  const allowedFields = new Set(Object.keys(model.rawAttributes));
+  return Object.fromEntries(
+    Object.entries(record).filter(([field]) => allowedFields.has(field)),
+  );
+}
+
 export function normalizeDateValue(value: unknown, typeKey: "DATE" | "DATEONLY"): string | null {
   if (value === null || value === undefined) {
     return null;
@@ -429,7 +443,7 @@ async function importCsvFileInBatches(
 
     stream.on("data", (row) => {
       stream.pause();
-      batch.push(row);
+      batch.push(filterRecordToModelAttributes(row, model));
 
       void (async () => {
         try {

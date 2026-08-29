@@ -1,5 +1,3 @@
-import { AiApproverArticleScore } from "./AiApproverArticleScore";
-import { AiApproverPromptVersion } from "./AiApproverPromptVersion";
 import { AiApproverArticlePredictionV02 } from "./AiApproverArticlePredictionV02";
 import { AiApproverPromptVersionV02 } from "./AiApproverPromptVersionV02";
 import { AiApproverRunV02 } from "./AiApproverRunV02";
@@ -30,18 +28,8 @@ import { Report } from "./Report";
 import { State } from "./State";
 import { User } from "./User";
 import { WebsiteDomain } from "./WebsiteDomain";
-import { OrchestratorRun } from "./OrchestratorRun";
-import { OrchestratorRunStep } from "./OrchestratorRunStep";
 
 export function applyAssociations(): void {
-	// --- AI Approver associations ---
-	AiApproverPromptVersion.hasMany(AiApproverArticleScore, {
-		foreignKey: "promptVersionId",
-	});
-	AiApproverArticleScore.belongsTo(AiApproverPromptVersion, {
-		foreignKey: "promptVersionId",
-	});
-
 	// --- AI Approver V02 associations ---
 	AiApproverPromptVersionV02.hasMany(AiApproverRunV02, {
 		foreignKey: "activePromptVersionId",
@@ -171,9 +159,6 @@ export function applyAssociations(): void {
 
 	Article.hasMany(ArticleStateContract02, { foreignKey: "articleId" });
 	ArticleStateContract02.belongsTo(Article, { foreignKey: "articleId" });
-
-	Article.hasMany(AiApproverArticleScore, { foreignKey: "articleId" });
-	AiApproverArticleScore.belongsTo(Article, { foreignKey: "articleId" });
 
 	Article.hasOne(AiApproverArticlePredictionV02, { foreignKey: "articleId" });
 	AiApproverArticlePredictionV02.belongsTo(Article, { foreignKey: "articleId" });
@@ -307,36 +292,6 @@ export function applyAssociations(): void {
 	});
 	ArticleStateContract02.belongsTo(EntityWhoCategorizedArticle, {
 		foreignKey: "entityWhoCategorizesId",
-	});
-
-	// --- OrchestratorRun associations ---
-	User.hasMany(OrchestratorRun, { foreignKey: "userId" });
-	OrchestratorRun.belongsTo(User, { foreignKey: "userId" });
-
-	OrchestratorRun.belongsTo(OrchestratorRun, {
-		foreignKey: "sourceOrchestratorRunId",
-		as: "sourceRun",
-	});
-	OrchestratorRun.hasMany(OrchestratorRun, {
-		foreignKey: "sourceOrchestratorRunId",
-		as: "continuationRuns",
-	});
-
-	OrchestratorRun.hasMany(OrchestratorRunStep, {
-		foreignKey: "orchestratorRunId",
-		as: "steps",
-	});
-	OrchestratorRunStep.belongsTo(OrchestratorRun, {
-		foreignKey: "orchestratorRunId",
-	});
-
-	OrchestratorRun.hasMany(NewsApiRequest, {
-		foreignKey: "orchestratorRunId",
-		as: "newsApiRequests",
-	});
-	NewsApiRequest.belongsTo(OrchestratorRun, {
-		foreignKey: "orchestratorRunId",
-		as: "orchestratorRun",
 	});
 
 	console.log("✅ Associations have been set up");

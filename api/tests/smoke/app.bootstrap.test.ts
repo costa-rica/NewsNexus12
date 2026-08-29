@@ -22,4 +22,14 @@ describe("app bootstrap smoke tests", () => {
     expect(response.text).toContain("<!DOCTYPE html>");
     expect(response.text).toContain("API v12");
   });
+
+  test.each([
+    ["post", "/automations/orchestrator/start"],
+    ["post", "/automations/ai-approver/start-job"],
+    ["get", "/analysis/ai-approver/prompts"],
+  ] as const)("%s %s is not available", async (method, route) => {
+    const response = await request(app)[method](route);
+
+    expect(response.status).toBe(404);
+  });
 });

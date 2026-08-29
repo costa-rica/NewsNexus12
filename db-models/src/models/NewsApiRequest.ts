@@ -4,7 +4,6 @@ import { sequelize } from './_connection';
 interface NewsApiRequestAttributes {
   id: number;
   newsArticleAggregatorSourceId: number;
-  orchestratorRunId: number | null;
   countOfArticlesReceivedFromRequest: number | null;
   countOfArticlesSavedToDbFromRequest: number | null;
   countOfArticlesAvailableFromRequest: number | null;
@@ -18,12 +17,11 @@ interface NewsApiRequestAttributes {
   isFromAutomation: boolean;
 }
 
-interface NewsApiRequestCreationAttributes extends Optional<NewsApiRequestAttributes, 'id' | 'orchestratorRunId' | 'countOfArticlesReceivedFromRequest' | 'countOfArticlesSavedToDbFromRequest' | 'countOfArticlesAvailableFromRequest' | 'dateStartOfRequest' | 'dateEndOfRequest' | 'status' | 'url' | 'andString' | 'orString' | 'notString' | 'isFromAutomation'> {}
+interface NewsApiRequestCreationAttributes extends Optional<NewsApiRequestAttributes, 'id' | 'countOfArticlesReceivedFromRequest' | 'countOfArticlesSavedToDbFromRequest' | 'countOfArticlesAvailableFromRequest' | 'dateStartOfRequest' | 'dateEndOfRequest' | 'status' | 'url' | 'andString' | 'orString' | 'notString' | 'isFromAutomation'> {}
 
 export class NewsApiRequest extends Model<NewsApiRequestAttributes, NewsApiRequestCreationAttributes> implements NewsApiRequestAttributes {
   public id!: number;
   public newsArticleAggregatorSourceId!: number;
-  public orchestratorRunId!: number | null;
   public countOfArticlesReceivedFromRequest!: number | null;
   public countOfArticlesSavedToDbFromRequest!: number | null;
   public countOfArticlesAvailableFromRequest!: number | null;
@@ -51,10 +49,6 @@ export function initNewsApiRequest() {
     newsArticleAggregatorSourceId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-    },
-    orchestratorRunId: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
     },
     countOfArticlesReceivedFromRequest: {
       type: DataTypes.INTEGER,

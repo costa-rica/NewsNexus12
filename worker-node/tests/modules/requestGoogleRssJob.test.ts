@@ -13,8 +13,7 @@ import {
   createRssSeedResult,
   DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
   GoogleRssJobResult,
-  mapRssItems,
-  shouldSkipRowForResumePlan
+  mapRssItems
 } from '../../src/modules/jobs/requestGoogleRssJob';
 
 const makeQueueContext = (overrides: Partial<{
@@ -201,67 +200,6 @@ describe('requestGoogleRss job handler', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('passes orchestratorRunId to legacy workflow dependency', async () => {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'request-google-rss-job-'));
-    const spreadsheetPath = path.join(tempDir, 'queries.xlsx');
-    await fs.writeFile(spreadsheetPath, 'mock spreadsheet data', 'utf8');
-
-    const runLegacyWorkflow = jest.fn(async () => undefined);
-    const handler = createRequestGoogleRssJobHandler(
-      {
-        spreadsheetPath,
-        doNotRepeatRequestsWithinHours: 0,
-        orchestratorRunId: 42
-      },
-      { runLegacyWorkflow }
-    );
-
-    await handler(makeQueueContext({ jobId: 'job-run-linked' }));
-
-    expect(runLegacyWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({
-        jobId: 'job-run-linked',
-        orchestratorRunId: 42
-      })
-    );
-
-    await fs.rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('passes resumePlan to legacy workflow dependency', async () => {
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'request-google-rss-job-'));
-    const spreadsheetPath = path.join(tempDir, 'queries.xlsx');
-    await fs.writeFile(spreadsheetPath, 'mock spreadsheet data', 'utf8');
-
-    const runLegacyWorkflow = jest.fn(async () => undefined);
-    const resumePlan = {
-      resumeAfterRequestUrl: 'https://news.google.com/rss/search?q=previous',
-      resumeAfterQueryRowIndex: 1,
-      resumeAfterQueryRowId: 101,
-      sourceOrchestratorRunId: 14,
-      continuationRunId: 15
-    };
-    const handler = createRequestGoogleRssJobHandler(
-      {
-        spreadsheetPath,
-        doNotRepeatRequestsWithinHours: 0,
-        resumePlan
-      },
-      { runLegacyWorkflow }
-    );
-
-    await handler(makeQueueContext({ jobId: 'job-resume-plan' }));
-
-    expect(runLegacyWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({
-        jobId: 'job-resume-plan',
-        resumePlan
-      })
-    );
-
-    await fs.rm(tempDir, { recursive: true, force: true });
-  });
-
   it('maps RSS item content from content:encoded', () => {
     const items = mapRssItems([
       {
@@ -335,32 +273,6 @@ describe('requestGoogleRss job handler', () => {
     });
   });
 
-  it('identifies rows through the resume marker as skippable', () => {
-    const row = {
-      id: 110,
-      and_keywords: 'already persisted',
-      and_exact_phrases: '',
-      or_keywords: '',
-      or_exact_phrases: '',
-      time_range: '30d'
-    };
-
-    expect(
-      shouldSkipRowForResumePlan(row, 0, makeGoogleRssUrl('"already persisted" when:30d'), {
-        resumeAfterQueryRowIndex: 0,
-        resumeAfterQueryRowId: 110,
-        resumeAfterRequestUrl: makeGoogleRssUrl('"already persisted" when:30d'),
-        sourceOrchestratorRunId: 14,
-        continuationRunId: 15
-      })
-    ).toBe(true);
-    expect(
-      shouldSkipRowForResumePlan({ ...row, id: 111 }, 1, makeGoogleRssUrl('"next query" when:30d'), {
-        resumeAfterQueryRowIndex: 0,
-        resumeAfterQueryRowId: 110
-      })
-    ).toBe(false);
-  });
 });
 
 describe('requestGoogleRss terminal path results', () => {

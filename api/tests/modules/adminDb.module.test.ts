@@ -5,8 +5,6 @@ jest.mock("../../src/modules/logger", () => ({
 }));
 
 const modelNames = [
-  "AiApproverArticleScore",
-  "AiApproverPromptVersion",
   "ArticleContents02",
   "Article",
   "Prompt",
@@ -23,11 +21,9 @@ const dbMock: Record<string, any> = {
 for (const name of modelNames) {
   dbMock[name] = {
     findAll: jest.fn().mockResolvedValue(
-      name === "AiApproverArticleScore"
-        ? [{ id: 1, articleId: 10, promptVersionId: 2, resultStatus: "completed" }]
-        : name === "AiApproverPromptVersion"
-          ? [{ id: 2, name: "Prompt 1", promptInMarkdown: "# Prompt", isActive: true }]
-          : []
+      name === "ArticleContents02"
+        ? [{ id: 1, articleId: 10, content: "Article content", status: "success" }]
+        : [],
     ),
     bulkCreate: jest.fn(),
   };
@@ -40,7 +36,7 @@ describe("adminDb module", () => {
     jest.clearAllMocks();
   });
 
-  test("createDatabaseBackupZipFile includes dynamically exported AI approver models", async () => {
+  test("createDatabaseBackupZipFile includes dynamically exported retained models", async () => {
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");
@@ -51,8 +47,8 @@ describe("adminDb module", () => {
 
     const zipFilePath = await createDatabaseBackupZipFile();
 
-    expect(dbMock.AiApproverArticleScore.findAll).toHaveBeenCalledWith({ raw: true });
-    expect(dbMock.AiApproverPromptVersion.findAll).toHaveBeenCalledWith({ raw: true });
+    expect(dbMock.ArticleContents02.findAll).toHaveBeenCalledWith({ raw: true });
+    expect(dbMock.Article.findAll).toHaveBeenCalledWith({ raw: true });
     expect(zipFilePath).toContain("db_backup_");
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });

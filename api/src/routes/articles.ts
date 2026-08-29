@@ -1189,6 +1189,7 @@ router.get(
       return res.status(200).json({
         result: true,
         articleId,
+        title: article.title,
         hasArticleContent,
         content: hasArticleContent ? canonicalContentRow?.content ?? null : null,
         contentSource: hasArticleContent ? "article-contents-02" : null,

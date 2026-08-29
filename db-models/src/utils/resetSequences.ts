@@ -11,7 +11,7 @@ type SequenceCapableModel = ModelStatic<any> & {
  * plain string and resolves it like an identifier, so mixed-case table names
  * must be double-quoted to prevent silent lower-casing.
  *
- * e.g. public.AiApproverArticleScores → '"public"."AiApproverArticleScores"'
+ * e.g. public.Articles → '"public"."Articles"'
  */
 function getPgSerialSequenceArg(model: SequenceCapableModel): string {
   const tableName = model.getTableName();

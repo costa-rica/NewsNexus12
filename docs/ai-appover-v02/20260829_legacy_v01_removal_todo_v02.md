@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:05:46Z
+updated_at: 2026-08-29T22:17:39Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -48,11 +48,18 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 
 ## Operator Gate A: Preserve the Pre-removal Database
 
-- [ ] Stop before any legacy model removal. Confirm the operator has authorized this gate and will perform or directly supervise it.
-- [ ] From code that still registers the legacy models, have the operator run `cd db-manager` and `npm start -- --create_backup`.
-- [ ] Record the absolute ZIP path and confirm it remains unchanged for forward replenish and rollback.
-- [ ] Do not run `--drop_db`; no schema change occurs at this gate.
-- [ ] Do not begin Phase 2 until the verified pre-removal ZIP exists.
+- [x] Stop before any legacy model removal. Confirm the operator has authorized this gate and will perform or directly supervise it.
+- [x] From code that still registers the legacy models, have the operator run `cd db-manager` and `npm start -- --create_backup`.
+- [x] Record the absolute ZIP path and confirm it remains unchanged for forward replenish and rollback.
+- [x] Do not run `--drop_db`; no schema change occurs at this gate.
+- [x] Do not begin Phase 2 until the verified pre-removal ZIP exists.
+
+Gate A evidence:
+
+- Operator-supplied ZIP: `/Users/nick/Downloads/db_backup_202608292156564.zip`
+- SHA-256: `184edcb5c4d66e41bd6c934b4e0ed22bcc563f35aac2bd6d933ab25575cf14f0`
+- Readability check confirmed the four legacy model CSVs and old-format `NewsApiRequest.csv` are present.
+- No database drop or import was performed at this gate.
 
 ## Phase 2: Atomic Consumer and Provider Removal
 
@@ -60,58 +67,58 @@ All Phase 2 edits remain in one working-tree integration unit. Remove API and wo
 
 ### Worker-node consumers and runtime
 
-- [ ] Unmount and delete `worker-node/src/routes/orchestrator.ts` and every file under `worker-node/src/modules/orchestrator/`.
-- [ ] Remove `runReconciliation()` and its legacy logging from `worker-node/src/server.ts`.
-- [ ] Delete worker-node orchestrator lock middleware and active-run guard.
-- [ ] Remove the orchestrator router, global start-job lock, and `skipOrchestratorLock` app option from `worker-node/src/app.ts`.
-- [ ] Delete `worker-node/src/modules/google-rss/resumePlanner.ts`.
-- [ ] Remove the complete `googleRssResumePlan` request contract and `X-Orchestrator-Run-Id` handling.
-- [ ] Remove orchestrator, source-run, continuation-run, and resume-position fields from Google RSS route inputs, queue payloads, job context, result metadata, and `NewsApiRequest` persistence.
-- [ ] Preserve normal spreadsheet iteration, RSS requests, article insertion, content seeding, follow-up scraping, retry, cancellation, and query reporting.
-- [ ] Remove `OrchestratorRuns` and `OrchestratorRunSteps` from `ensureDbReady.ts` and rewrite rebuild guidance without a separate schema drop.
-- [ ] Delete orchestrator-, continuation-, lock-, and resume-owned tests; update Google RSS, model metadata, starter-route, and startup readiness coverage for retained behavior.
+- [x] Unmount and delete `worker-node/src/routes/orchestrator.ts` and every file under `worker-node/src/modules/orchestrator/`.
+- [x] Remove `runReconciliation()` and its legacy logging from `worker-node/src/server.ts`.
+- [x] Delete worker-node orchestrator lock middleware and active-run guard.
+- [x] Remove the orchestrator router, global start-job lock, and `skipOrchestratorLock` app option from `worker-node/src/app.ts`.
+- [x] Delete `worker-node/src/modules/google-rss/resumePlanner.ts`.
+- [x] Remove the complete `googleRssResumePlan` request contract and `X-Orchestrator-Run-Id` handling.
+- [x] Remove orchestrator, source-run, continuation-run, and resume-position fields from Google RSS route inputs, queue payloads, job context, result metadata, and `NewsApiRequest` persistence.
+- [x] Preserve normal spreadsheet iteration, RSS requests, article insertion, content seeding, follow-up scraping, retry, cancellation, and query reporting.
+- [x] Remove `OrchestratorRuns` and `OrchestratorRunSteps` from `ensureDbReady.ts` and rewrite rebuild guidance without a separate schema drop.
+- [x] Delete orchestrator-, continuation-, lock-, and resume-owned tests; update Google RSS, model metadata, starter-route, and startup readiness coverage for retained behavior.
 
 ### API consumers and retained content handler
 
-- [ ] Unmount and delete `api/src/routes/automations/orchestrator.ts`.
-- [ ] Unmount and delete `api/src/routes/analysis/ai-approver.ts` and `api/src/modules/analysis/ai-approver.ts`.
-- [ ] Remove only the V01 `/automations/ai-approver/start-job` handler from the shared automations router.
-- [ ] Preserve all V02 routes and shared worker status, cancellation, Excel, Google RSS, scraper, state-assigner, semantic-scorer, and location-scorer proxies.
-- [ ] Remove the four legacy model imports and registrations from the admin database route and tests before deleting their shared exports.
-- [ ] Keep `GET /articles/review-selected-content/:articleId` as the sole authenticated read-only content handler and add `title: article.title` to its successful response.
-- [ ] Preserve numeric validation, not-found behavior, canonical `ArticleContents02` selection, success-state checks, and null-content behavior.
-- [ ] Expand articles-route tests for title, content states, invalid ID, missing article, and authentication.
-- [ ] Delete V01 and orchestrator route tests and add negative app-level tests proving removed paths return ordinary `404` without proxying.
+- [x] Unmount and delete `api/src/routes/automations/orchestrator.ts`.
+- [x] Unmount and delete `api/src/routes/analysis/ai-approver.ts` and `api/src/modules/analysis/ai-approver.ts`.
+- [x] Remove only the V01 `/automations/ai-approver/start-job` handler from the shared automations router.
+- [x] Preserve all V02 routes and shared worker status, cancellation, Excel, Google RSS, scraper, state-assigner, semantic-scorer, and location-scorer proxies.
+- [x] Remove the four legacy model imports and registrations from the admin database route and tests before deleting their shared exports.
+- [x] Keep `GET /articles/review-selected-content/:articleId` as the sole authenticated read-only content handler and add `title: article.title` to its successful response.
+- [x] Preserve numeric validation, not-found behavior, canonical `ArticleContents02` selection, success-state checks, and null-content behavior.
+- [x] Expand articles-route tests for title, content states, invalid ID, missing article, and authentication.
+- [x] Delete V01 and orchestrator route tests and add negative app-level tests proving removed paths return ordinary `404` without proxying.
 
 ### Shared provider and schema graph
 
-- [ ] After consumer imports are gone, delete the `AiApproverPromptVersion`, `AiApproverArticleScore`, `OrchestratorRun`, and `OrchestratorRunStep` model files.
-- [ ] Remove their initialization, exports, return values, type exports, associations, and `MODEL_LOAD_ORDER` entries.
-- [ ] Remove `orchestratorRunId` from `NewsApiRequest` attributes, creation attributes, class declaration, and Sequelize definition.
-- [ ] Preserve all AI Approver V02 models, types, initialization, and associations.
-- [ ] Confirm sequence reset remains generic over retained registered models.
+- [x] After consumer imports are gone, delete the `AiApproverPromptVersion`, `AiApproverArticleScore`, `OrchestratorRun`, and `OrchestratorRunStep` model files.
+- [x] Remove their initialization, exports, return values, type exports, associations, and `MODEL_LOAD_ORDER` entries.
+- [x] Remove `orchestratorRunId` from `NewsApiRequest` attributes, creation attributes, class declaration, and Sequelize definition.
+- [x] Preserve all AI Approver V02 models, types, initialization, and associations.
+- [x] Confirm sequence reset remains generic over retained registered models.
 
 ### Post-removal import compatibility
 
-- [ ] Filter retained CSV records in `db-manager/src/modules/zipImport.ts` to current `rawAttributes` before sanitization and `bulkCreate`.
-- [ ] Convert the Phase 1 fixture to post-removal assertions.
-- [ ] Assert the four deleted-model CSVs are returned and logged as skipped without failing import.
-- [ ] Assert retained `NewsApiRequest` fields reach `bulkCreate` and `orchestratorRunId` does not.
-- [ ] Preserve date, number, boolean, JSON, batching, foreign-key, rebuild, and sequence-reset behavior.
-- [ ] Update load-order and model-metadata tests for the retained graph.
+- [x] Filter retained CSV records in `db-manager/src/modules/zipImport.ts` to current `rawAttributes` before sanitization and `bulkCreate`.
+- [x] Convert the Phase 1 fixture to post-removal assertions.
+- [x] Assert the four deleted-model CSVs are returned and logged as skipped without failing import.
+- [x] Assert retained `NewsApiRequest` fields reach `bulkCreate` and `orchestratorRunId` does not.
+- [x] Preserve date, number, boolean, JSON, batching, foreign-key, rebuild, and sequence-reset behavior.
+- [x] Update load-order and model-metadata tests for the retained graph.
 
 ### Clean output and atomic verification
 
-- [ ] Run `npm run clean` in `db-models` and db-manager.
-- [ ] Remove only the exact ignored `api/dist` and `worker-node/dist` directories after confirming their paths.
-- [ ] Build `db-models` first so all consumers resolve the new provider contract.
-- [ ] Run focused and complete db-manager tests, including the old-backup fixture, then build db-manager.
-- [ ] Run focused API article, automation, admin, V02, and removed-route tests; run the complete API test suite and available endpoint smoke tests; build API.
-- [ ] Run focused worker-node startup, Google RSS, model-metadata, and retained starter-route tests; run the complete worker-node suite; build worker-node.
-- [ ] Search rebuilt `db-models/dist`, `api/dist`, and `worker-node/dist` for deleted filenames, exports, routes, resume contract, and header.
-- [ ] Fix every Phase 2 test, type, build, or stale-output failure before staging anything.
-- [ ] Confirm `git diff --cached` does not contain only one side of the consumer-provider transition.
-- [ ] Mark only completed Phase 2 tasks, stage the full atomic integration, and create one Phase 2 commit referencing this todo Phase 2.
+- [x] Run `npm run clean` in `db-models` and db-manager.
+- [x] Remove only the exact ignored `api/dist` and `worker-node/dist` directories after confirming their paths.
+- [x] Build `db-models` first so all consumers resolve the new provider contract.
+- [x] Run focused and complete db-manager tests, including the old-backup fixture, then build db-manager.
+- [x] Run focused API article, automation, admin, V02, and removed-route tests; run the complete API test suite and available endpoint smoke tests; build API.
+- [x] Run focused worker-node startup, Google RSS, model-metadata, and retained starter-route tests; run the complete worker-node suite; build worker-node.
+- [x] Search rebuilt `db-models/dist`, `api/dist`, and `worker-node/dist` for deleted filenames, exports, routes, resume contract, and header.
+- [x] Fix every Phase 2 test, type, build, or stale-output failure before staging anything.
+- [x] Confirm `git diff --cached` does not contain only one side of the consumer-provider transition.
+- [x] Mark only completed Phase 2 tasks, stage the full atomic integration, and create one Phase 2 commit referencing this todo Phase 2.
 
 ## Phase 3: Worker-Python V01 and Lock Removal
 

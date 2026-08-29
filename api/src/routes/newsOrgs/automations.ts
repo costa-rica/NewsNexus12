@@ -356,28 +356,4 @@ router.post('/location-scorer/start-job', authenticateToken, async (req, res) =>
   }
 });
 
-router.post('/ai-approver/start-job', authenticateToken, async (req, res) => {
-  const workerPythonBaseUrl = getRequiredWorkerPythonBaseUrl(res);
-  if (!workerPythonBaseUrl) {
-    return;
-  }
-
-  try {
-    const response = await axios.post(
-      `${workerPythonBaseUrl}/ai-approver/start-job`,
-      req.body,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    return res.status(response.status).json(response.data);
-  } catch (error: unknown) {
-    logger.error('Error starting ai approver worker job:', error);
-    return forwardWorkerPythonAxiosError(res, error);
-  }
-});
-
 export = router;

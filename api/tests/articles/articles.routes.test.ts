@@ -1,6 +1,8 @@
 import express from "express";
 import request from "supertest";
 
+let mockAuthenticationAllowed = true;
+
 jest.mock("../../src/modules/logger", () => ({
   info: jest.fn(),
   warn: jest.fn(),
@@ -8,9 +10,12 @@ jest.mock("../../src/modules/logger", () => ({
 }));
 
 jest.mock("../../src/modules/userAuthentication", () => ({
-  authenticateToken: (req: any, _res: any, next: any) => {
+  authenticateToken: (req: any, res: any, next: any) => {
+    if (!mockAuthenticationAllowed) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
     req.user = { id: 1, email: "tester@example.com" };
-    next();
+    return next();
   },
 }));
 
@@ -100,6 +105,7 @@ function buildApp() {
 describe("articles routes contract tests", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthenticationAllowed = true;
     mockQueriesSqlModule.sqlQueryArticleIdsForArticlesRoute.mockResolvedValue(
       [],
     );
@@ -694,7 +700,7 @@ describe("articles routes contract tests", () => {
   });
 
   test("GET /articles/review-selected-content/:articleId returns scraped content when canonical row is successful", async () => {
-    mockArticleModel.findByPk.mockResolvedValue({ id: 77 });
+    mockArticleModel.findByPk.mockResolvedValue({ id: 77, title: "Article 77" });
     mockGetCanonicalArticleContents02Row.mockResolvedValue({
       id: 201,
       articleId: 77,
@@ -711,6 +717,7 @@ describe("articles routes contract tests", () => {
     expect(response.body).toEqual({
       result: true,
       articleId: 77,
+      title: "Article 77",
       hasArticleContent: true,
       content: "Stored article content",
       contentSource: "article-contents-02",
@@ -718,7 +725,7 @@ describe("articles routes contract tests", () => {
   });
 
   test("GET /articles/review-selected-content/:articleId returns empty content when canonical row is not usable", async () => {
-    mockArticleModel.findByPk.mockResolvedValue({ id: 78 });
+    mockArticleModel.findByPk.mockResolvedValue({ id: 78, title: "Article 78" });
     mockGetCanonicalArticleContents02Row.mockResolvedValue({
       id: 202,
       articleId: 78,
@@ -735,10 +742,53 @@ describe("articles routes contract tests", () => {
     expect(response.body).toEqual({
       result: true,
       articleId: 78,
+      title: "Article 78",
       hasArticleContent: false,
       content: null,
       contentSource: null,
     });
+  });
+
+  test("GET /articles/review-selected-content/:articleId rejects an invalid id", async () => {
+    const app = buildApp();
+    const response = await request(app).get(
+      "/articles/review-selected-content/not-a-number",
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      result: false,
+      message: "Invalid articleId",
+    });
+    expect(mockArticleModel.findByPk).not.toHaveBeenCalled();
+  });
+
+  test("GET /articles/review-selected-content/:articleId returns 404 for a missing article", async () => {
+    mockArticleModel.findByPk.mockResolvedValue(null);
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/articles/review-selected-content/999",
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      result: false,
+      message: "Article not found",
+    });
+    expect(mockGetCanonicalArticleContents02Row).not.toHaveBeenCalled();
+  });
+
+  test("GET /articles/review-selected-content/:articleId requires authentication", async () => {
+    mockAuthenticationAllowed = false;
+
+    const app = buildApp();
+    const response = await request(app).get(
+      "/articles/review-selected-content/77",
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockArticleModel.findByPk).not.toHaveBeenCalled();
   });
 
   test("POST /articles/approve/:articleId stores publisherFinalUrl from successful scraped content", async () => {

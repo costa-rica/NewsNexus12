@@ -1,5 +1,4 @@
 export const MODEL_LOAD_ORDER: string[] = [
-  "AiApproverPromptVersion",
   "AiApproverPromptVersionV02",
   "AiApproverRunV02",
   "ArtificialIntelligence",
@@ -11,8 +10,6 @@ export const MODEL_LOAD_ORDER: string[] = [
   "WebsiteDomain",
   "EntityWhoCategorizedArticle",
   "EntityWhoFoundArticle",
-  "OrchestratorRun",
-  "OrchestratorRunStep",
   "NewsApiRequest",
   "NewsRssRequest",
   "NewsApiRequestWebsiteDomainContract",
@@ -30,7 +27,6 @@ export const MODEL_LOAD_ORDER: string[] = [
   "ArticlesApproved02",
   "ArticleStateContract",
   "ArticleStateContract02",
-  "AiApproverArticleScore",
   "AiApproverArticlePredictionV02",
   "ArticleDuplicateAnalysis",
 ];

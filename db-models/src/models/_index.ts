@@ -1,14 +1,6 @@
 import { sequelize } from "./_connection";
 
 import {
-	initAiApproverArticleScore,
-	AiApproverArticleScore,
-} from "./AiApproverArticleScore";
-import {
-	initAiApproverPromptVersion,
-	AiApproverPromptVersion,
-} from "./AiApproverPromptVersion";
-import {
 	initAiApproverPromptVersionV02,
 	AiApproverPromptVersionV02,
 } from "./AiApproverPromptVersionV02";
@@ -102,10 +94,6 @@ import { initReport, Report } from "./Report";
 import { initState, State } from "./State";
 import { initUser, User } from "./User";
 import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
-import { initOrchestratorRun, OrchestratorRun } from "./OrchestratorRun";
-import type { OrchestratorRunMode, OrchestratorRunStatus } from "./OrchestratorRun";
-import { initOrchestratorRunStep, OrchestratorRunStep } from "./OrchestratorRunStep";
-import type { OrchestratorRunStepName, OrchestratorRunStepStatus } from "./OrchestratorRunStep";
 
 import { applyAssociations } from "./_associations";
 import { MODEL_LOAD_ORDER } from "./_loadOrder";
@@ -113,8 +101,6 @@ import { ensureSchemaReady } from "../utils/ensureSchemaReady";
 import { resetAllSequences } from "../utils/resetSequences";
 
 export function initModels() {
-	initAiApproverArticleScore();
-	initAiApproverPromptVersion();
 	initAiApproverPromptVersionV02();
 	initAiApproverRunV02();
 	initAiApproverArticlePredictionV02();
@@ -145,15 +131,11 @@ export function initModels() {
 	initState();
 	initUser();
 	initWebsiteDomain();
-	initOrchestratorRun();
-	initOrchestratorRunStep();
 
 	applyAssociations();
 
 	return {
 		sequelize,
-		AiApproverArticleScore,
-		AiApproverPromptVersion,
 		AiApproverPromptVersionV02,
 		AiApproverRunV02,
 		AiApproverArticlePredictionV02,
@@ -184,8 +166,6 @@ export function initModels() {
 		State,
 		User,
 		WebsiteDomain,
-		OrchestratorRun,
-		OrchestratorRunStep,
 	};
 }
 
@@ -199,10 +179,6 @@ export type {
 	AiApproverV02ResultStatus,
 	AiApproverV02SelectionItem,
 	AiApproverV02SelectionMode,
-	OrchestratorRunMode,
-	OrchestratorRunStatus,
-	OrchestratorRunStepName,
-	OrchestratorRunStepStatus,
 };
 
 export {
@@ -210,8 +186,6 @@ export {
 	MODEL_LOAD_ORDER,
 	ensureSchemaReady,
 	resetAllSequences,
-	AiApproverArticleScore,
-	AiApproverPromptVersion,
 	AiApproverPromptVersionV02,
 	AiApproverRunV02,
 	AiApproverArticlePredictionV02,
@@ -242,8 +216,6 @@ export {
 	State,
 	User,
 	WebsiteDomain,
-	OrchestratorRun,
-	OrchestratorRunStep,
 };
 
 export async function dropLegacyArticleContentsTable(): Promise<void> {

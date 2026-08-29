@@ -86,8 +86,6 @@ export interface RequestGoogleRssJobContext {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
-  orchestratorRunId?: number;
-  resumePlan?: GoogleRssJobResumePlan;
   signal: AbortSignal;
   updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
@@ -100,16 +98,6 @@ export interface RequestGoogleRssJobInput {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
-  orchestratorRunId?: number;
-  resumePlan?: GoogleRssJobResumePlan;
-}
-
-export interface GoogleRssJobResumePlan {
-  resumeAfterRequestUrl?: string | null;
-  resumeAfterQueryRowIndex?: number | null;
-  resumeAfterQueryRowId?: number | null;
-  sourceOrchestratorRunId?: number | null;
-  continuationRunId?: number | null;
 }
 
 const GOOGLE_NEWS_RSS_ORG_NAME = 'Google News RSS';
@@ -340,7 +328,6 @@ const storeRequestAndArticles = async (params: {
   status: 'success' | 'error';
   items: RssItem[];
   newsArticleAggregatorSourceId: number;
-  orchestratorRunId?: number;
   entityWhoFoundArticleId: number;
   signal: AbortSignal;
   navigationSessionManager: GoogleNavigationSessionManager;
@@ -353,7 +340,6 @@ const storeRequestAndArticles = async (params: {
 
   const request = await NewsApiRequest.create({
     newsArticleAggregatorSourceId: params.newsArticleAggregatorSourceId,
-    orchestratorRunId: params.orchestratorRunId ?? null,
     dateEndOfRequest,
     countOfArticlesReceivedFromRequest: params.items.length,
     status: params.status,
@@ -467,39 +453,12 @@ const delay = async (ms: number, signal: AbortSignal): Promise<void> => {
   });
 };
 
-export const shouldSkipRowForResumePlan = (
-  row: GoogleRssQueryRow,
-  rowIndex: number,
-  requestUrl: string | null,
-  resumePlan: GoogleRssJobResumePlan | undefined
-): boolean => {
-  if (!resumePlan) {
-    return false;
-  }
-
-  if (typeof resumePlan.resumeAfterQueryRowIndex === 'number') {
-    return rowIndex <= resumePlan.resumeAfterQueryRowIndex;
-  }
-
-  if (typeof resumePlan.resumeAfterQueryRowId === 'number') {
-    return row.id <= resumePlan.resumeAfterQueryRowId;
-  }
-
-  if (resumePlan.resumeAfterRequestUrl && requestUrl) {
-    return requestUrl === resumePlan.resumeAfterRequestUrl;
-  }
-
-  return false;
-};
-
 const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<void> => {
   logWorkflowStart('Request Google RSS', {
     jobId: context.jobId,
     spreadsheetPath: context.spreadsheetPath,
     doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours,
-    orchestratorRunId: context.orchestratorRunId,
-    targetArticlesAddedCount: context.targetArticlesAddedCount,
-    resumePlan: context.resumePlan
+    targetArticlesAddedCount: context.targetArticlesAddedCount
   });
 
   const delayBetweenRequestsMs = (() => {
@@ -573,22 +532,6 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       const queryResult = buildGoogleRssQuery(row);
       const requestUrl = queryResult.query ? buildGoogleRssUrl(queryResult.query) : null;
 
-      if (shouldSkipRowForResumePlan(row, i, requestUrl, context.resumePlan)) {
-        queryResults[i] = {
-          ...queryResults[i],
-          status: 'skipped',
-          saved_articles: 0,
-          note: 'resume_before_marker'
-        };
-        logger.info('Skipping row before or at Google RSS resume marker', {
-          rowId: row.id,
-          rowIndex: i,
-          requestUrl,
-          resumePlan: context.resumePlan
-        });
-        continue;
-      }
-
       if (!queryResult.query) {
         queryResults[i] = {
           ...queryResults[i],
@@ -660,7 +603,6 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         status: response.status,
         items: response.items,
         newsArticleAggregatorSourceId,
-        orchestratorRunId: context.orchestratorRunId,
         entityWhoFoundArticleId,
         signal: context.signal,
         navigationSessionManager,
@@ -743,12 +685,6 @@ export const createRequestGoogleRssJobHandler = (
       doNotRepeatRequestsWithinHours: input.doNotRepeatRequestsWithinHours,
       ...(input.targetArticlesAddedCount !== undefined
         ? { targetArticlesAddedCount: input.targetArticlesAddedCount }
-        : {}),
-      ...(input.orchestratorRunId !== undefined
-        ? { orchestratorRunId: input.orchestratorRunId }
-        : {}),
-      ...(input.resumePlan !== undefined
-        ? { resumePlan: input.resumePlan }
         : {}),
       signal: queueContext.signal,
       updateResult: queueContext.updateResult

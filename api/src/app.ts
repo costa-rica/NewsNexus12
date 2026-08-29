@@ -72,7 +72,6 @@ export function mountLegacyRouters(): void {
       prefix: "/automations/ai-approver-v02",
       modulePath: "./routes/automations/ai-approver-v02",
     },
-    { prefix: "/automations/orchestrator", modulePath: "./routes/automations/orchestrator" },
     {
       prefix: "/artificial-intelligence",
       modulePath: "./routes/artificialIntelligence",
@@ -84,10 +83,6 @@ export function mountLegacyRouters(): void {
       modulePath: "./routes/analysis/approvedArticles",
     },
     { prefix: "/analysis/deduper", modulePath: "./routes/analysis/deduper" },
-    {
-      prefix: "/analysis/ai-approver",
-      modulePath: "./routes/analysis/ai-approver",
-    },
     {
       prefix: "/analysis/ai-approver-v02",
       modulePath: "./routes/analysis/ai-approver-v02",

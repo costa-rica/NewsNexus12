@@ -8,6 +8,8 @@ jest.mock("@newsnexus/db-models", () => ({
   Article: {
     bulkCreate: jest.fn(),
     rawAttributes: {
+      id: { type: { key: "INTEGER" } },
+      title: { type: { key: "STRING" } },
       publishedDate: { type: { key: "DATEONLY" } },
       createdAt: { type: { key: "DATE" } },
       continuationPlan: { type: { key: "JSONB" } },
@@ -16,44 +18,15 @@ jest.mock("@newsnexus/db-models", () => ({
   User: {
     bulkCreate: jest.fn(),
     rawAttributes: {
+      id: { type: { key: "INTEGER" } },
+      email: { type: { key: "STRING" } },
       createdAt: { type: { key: "DATE" } },
-    },
-  },
-  AiApproverPromptVersion: {
-    bulkCreate: jest.fn(),
-    rawAttributes: {
-      id: { type: { key: "INTEGER" } },
-      name: { type: { key: "STRING" } },
-    },
-  },
-  AiApproverArticleScore: {
-    bulkCreate: jest.fn(),
-    rawAttributes: {
-      id: { type: { key: "INTEGER" } },
-      articleId: { type: { key: "INTEGER" } },
-      promptVersionId: { type: { key: "INTEGER" } },
-    },
-  },
-  OrchestratorRun: {
-    bulkCreate: jest.fn(),
-    rawAttributes: {
-      id: { type: { key: "INTEGER" } },
-      status: { type: { key: "STRING" } },
-    },
-  },
-  OrchestratorRunStep: {
-    bulkCreate: jest.fn(),
-    rawAttributes: {
-      id: { type: { key: "INTEGER" } },
-      orchestratorRunId: { type: { key: "INTEGER" } },
-      stepName: { type: { key: "STRING" } },
     },
   },
   NewsApiRequest: {
     bulkCreate: jest.fn(),
     rawAttributes: {
       id: { type: { key: "INTEGER" } },
-      orchestratorRunId: { type: { key: "INTEGER" } },
       status: { type: { key: "STRING" } },
     },
   },
@@ -65,12 +38,8 @@ jest.mock("@newsnexus/db-models", () => ({
     ),
   },
   MODEL_LOAD_ORDER: [
-    "AiApproverPromptVersion",
-    "OrchestratorRun",
-    "OrchestratorRunStep",
     "NewsApiRequest",
     "Article",
-    "AiApproverArticleScore",
     "User",
   ],
   resetAllSequences: jest.fn(),
@@ -103,10 +72,6 @@ describe("Zip import module", () => {
     jest.clearAllMocks();
     (db.Article.bulkCreate as jest.Mock).mockReset();
     (db.User.bulkCreate as jest.Mock).mockReset();
-    (db.AiApproverPromptVersion.bulkCreate as jest.Mock).mockReset();
-    (db.AiApproverArticleScore.bulkCreate as jest.Mock).mockReset();
-    (db.OrchestratorRun.bulkCreate as jest.Mock).mockReset();
-    (db.OrchestratorRunStep.bulkCreate as jest.Mock).mockReset();
     (db.NewsApiRequest.bulkCreate as jest.Mock).mockReset();
     (db.sequelize.query as jest.Mock).mockReset();
     (db.sequelize.sync as jest.Mock).mockReset();
@@ -288,13 +253,9 @@ describe("Zip import module", () => {
       return index;
     };
 
-    it("loads orchestrator tables before NewsApiRequest descendants", () => {
-      expect(indexOf("OrchestratorRun")).toBeLessThan(indexOf("OrchestratorRunStep"));
-      expect(indexOf("OrchestratorRun")).toBeLessThan(indexOf("NewsApiRequest"));
-      expect(indexOf("OrchestratorRunStep")).toBeLessThan(indexOf("NewsApiRequest"));
+    it("loads retained request parents before descendants", () => {
       expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("NewsApiRequestWebsiteDomainContract"));
       expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("Article"));
-      expect(indexOf("OrchestratorRunStep")).toBeLessThan(indexOf("Article"));
     });
 
     it("loads AI Approver V02 parents before predictions", () => {
@@ -382,7 +343,7 @@ describe("Zip import module", () => {
       expect(db.resetAllSequences).toHaveBeenCalled();
     });
 
-    it("establishes the pre-removal import baseline for an old backup", async () => {
+    it("imports retained data and skips removed files from an old backup", async () => {
       const zipPath = path.join(tempDir, "pre-removal-backup.zip");
       const zip = new AdmZip();
 
@@ -410,24 +371,22 @@ describe("Zip import module", () => {
 
       const result = await importZipFileToDatabase(zipPath);
 
-      expect(result.totalRecords).toBe(5);
-      expect(result.skippedFiles).toEqual([]);
-      expect(result.importedTables).toEqual(
+      expect(result.totalRecords).toBe(1);
+      expect(result.skippedFiles).toEqual(
         expect.arrayContaining([
-          "AiApproverPromptVersion",
-          "AiApproverArticleScore",
-          "OrchestratorRun",
-          "OrchestratorRunStep",
-          "NewsApiRequest",
+          "AiApproverPromptVersion.csv",
+          "AiApproverArticleScore.csv",
+          "OrchestratorRun.csv",
+          "OrchestratorRunStep.csv",
         ]),
       );
+      expect(result.importedTables).toEqual(["NewsApiRequest"]);
       expect(db.NewsApiRequest.bulkCreate).toHaveBeenCalledWith(
         [
-          expect.objectContaining({
+          {
             id: "20",
-            orchestratorRunId: "10",
             status: "completed",
-          }),
+          },
         ],
         { ignoreDuplicates: true, transaction: {} },
       );
