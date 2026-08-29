@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T21:50:35Z
+updated_at: 2026-08-29T22:05:46Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -26,25 +26,25 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 
 ### Repository alignment
 
-- [ ] Confirm the branch is `dev_29_remove_v01_workflows` and record starting `git status` without altering unrelated changes.
-- [ ] Add a prominent notice to `docs/20260829_weekly_article_processing_cron_prd.md` that it is invalid for implementation, subordinate to the removal PRD, and requires redesign without the removed route, tables, header, and column.
-- [ ] Inventory live references to V01 models, V01 routes, `/orchestrator`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deployment assets, and V01 settings across source, tests, scripts, and active documentation.
-- [ ] Classify every match as removal work, retained V02 or internal Python coordination, historical material to archive, or current removal documentation.
-- [ ] Create a sanitized Ubuntu retirement evidence template covering systemd, Hermes, user and root crontabs, `/etc/cron*`, active child jobs, removal results, daemon reload, and remaining triggers.
+- [x] Confirm the branch is `dev_29_remove_v01_workflows` and record starting `git status` without altering unrelated changes.
+- [x] Add a prominent notice to `docs/20260829_weekly_article_processing_cron_prd.md` that it is invalid for implementation, subordinate to the removal PRD, and requires redesign without the removed route, tables, header, and column.
+- [x] Inventory live references to V01 models, V01 routes, `/orchestrator`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deployment assets, and V01 settings across source, tests, scripts, and active documentation.
+- [x] Classify every match as removal work, retained V02 or internal Python coordination, historical material to archive, or current removal documentation.
+- [x] Create a sanitized Ubuntu retirement evidence template covering systemd, Hermes, user and root crontabs, `/etc/cron*`, active child jobs, removal results, daemon reload, and remaining triggers.
 
 ### Pre-removal ZIP baseline
 
-- [ ] Extend `db-manager/tests/modules/zipImport.test.ts` with an old-backup ZIP fixture containing the four legacy model CSVs and an old-format `NewsApiRequest.csv` with `orchestratorRunId`.
-- [ ] Establish the pre-removal behavior while legacy models remain registered; do not require the four model CSVs to be skipped yet.
-- [ ] Confirm the fixture is readable and uses only test-managed temporary directories.
+- [x] Extend `db-manager/tests/modules/zipImport.test.ts` with an old-backup ZIP fixture containing the four legacy model CSVs and an old-format `NewsApiRequest.csv` with `orchestratorRunId`.
+- [x] Establish the pre-removal behavior while legacy models remain registered; do not require the four model CSVs to be skipped yet.
+- [x] Confirm the fixture is readable and uses only test-managed temporary directories.
 
 ### Phase 1 verification and commit
 
-- [ ] Run the focused ZIP-import test.
-- [ ] Run the complete db-manager test suite.
-- [ ] Run the db-manager TypeScript build.
-- [ ] Fix all Phase 1 failures before continuing.
-- [ ] Mark only completed Phase 1 tasks, review the staged diff, and commit with a reference to this todo Phase 1.
+- [x] Run the focused ZIP-import test.
+- [x] Run the complete db-manager test suite.
+- [x] Run the db-manager TypeScript build.
+- [x] Fix all Phase 1 failures before continuing.
+- [x] Mark only completed Phase 1 tasks, review the staged diff, and commit with a reference to this todo Phase 1.
 
 ## Operator Gate A: Preserve the Pre-removal Database
 
