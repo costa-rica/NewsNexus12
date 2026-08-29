@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:36:06Z
+updated_at: 2026-08-29T22:50:45Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -213,6 +213,36 @@ Phase 5 verification notes:
 - The portal production build passed with Webpack. Turbopack stalled without reporting a build failure, so its exact build processes were stopped before the verified Webpack run.
 - Remaining search matches are retained V02 names, internal Python implementation names, negative route tests, backup-compatibility fixtures, archived history, or current removal records.
 - No live executable trigger, service, timer, or schema helper remains that can reactivate or recreate the removed workflows.
+
+## Mac Workstation Database Rehearsal
+
+- [x] Confirm no local NewsNexus application process is running before replenishment.
+- [x] Reconfirm the source ZIP checksum and compressed-file integrity.
+- [x] Clean and build db-models and db-manager from the removal branch.
+- [x] Validate the source ZIP through db-manager's disposable scratch-database flow.
+- [x] Replenish local `newsnexus_dev` with `--zip_file`, allowing that operation to rebuild `public` without a separate `--drop_db` call.
+- [x] Confirm the four removed CSV files are skipped.
+- [x] Confirm the four removed tables and `NewsApiRequests.orchestratorRunId` are absent.
+- [x] Confirm retained V02, article, and article-content tables are present.
+- [x] Create and verify a new post-removal database backup.
+- [x] Restore the new post-removal backup into a disposable scratch database to prove round-trip compatibility.
+- [x] Start API, worker-node, worker-python, and portal against the replenished local database.
+- [x] Confirm retained health, queue, V02 history, API, article-content, and portal routes are mounted.
+- [x] Confirm representative removed API, worker-node, worker-python, and portal routes return `404`.
+- [x] Stop all temporary local application processes.
+
+Mac workstation rehearsal notes:
+
+- Source ZIP: `/Users/nick/Downloads/db_backup_202608292156564.zip`
+- Source SHA-256: `184edcb5c4d66e41bd6c934b4e0ed22bcc563f35aac2bd6d933ab25575cf14f0`
+- Replenish imported 1,552,287 records across 26 retained tables and restored 254,127 articles.
+- Import skipped `AiApproverArticleScore.csv`, `AiApproverPromptVersion.csv`, `OrchestratorRun.csv`, and `OrchestratorRunStep.csv`.
+- Post-removal backup: `/Users/nick/Documents/_testData/db_backup_202608292247058.zip`
+- Post-removal SHA-256: `11e6f15ab4808e074d9c2ed6411477ad89a28b29873d7feb71cb8ec4cb8dc3ea`
+- The new ZIP passed integrity testing, omits the four removed CSV files, and omits `orchestratorRunId` from `NewsApiRequest.csv`.
+- The new ZIP passed db-manager's scratch restore with 1,552,279 records across 26 retained tables.
+- Runtime checks returned `200` for retained public routes, `401` for retained protected API routes, and `404` for representative removed routes.
+- Ubuntu was not accessed or modified during this rehearsal.
 
 ## Operator Gate B: Retire Every Existing Ubuntu Schedule
 
