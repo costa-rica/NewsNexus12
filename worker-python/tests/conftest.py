@@ -12,12 +12,6 @@ os.environ.setdefault("NAME_APP", "worker-python-tests")
 os.environ.setdefault("RUN_ENVIRONMENT", "testing")
 os.environ.setdefault("PATH_TO_LOGS", "/tmp")
 os.environ.setdefault("PATH_UTILTIES", "/tmp")
-os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-# Force the OpenAI API backend so test collection never requires the Codex CLI
-# binary on PATH. Forced (not setdefault) so a host value of USE_OPEN_AI_API=false
-# cannot defeat the bootstrap. Codex-default tests must isolate themselves with
-# monkeypatch instead of weakening this assignment.
-os.environ["USE_OPEN_AI_API"] = "true"
 os.environ.setdefault(
     "NAME_AI_ENTITY_LOCATION_SCORER",
     "NewsNexusClassifierLocationScorer01",

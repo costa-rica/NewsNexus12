@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:17:39Z
+updated_at: 2026-08-29T22:21:30Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -124,24 +124,24 @@ All Phase 2 edits remain in one working-tree integration unit. Remove API and wo
 
 ### Runtime, configuration, and tests
 
-- [ ] Unmount and delete `worker-python/src/routes/ai_approver.py`.
-- [ ] Delete `worker-python/src/modules/ai_approver/`, the V01 prompt setup utility, prompt asset, contract fixture, and V01 contract, integration, and unit tests.
-- [ ] Remove V01 startup validation, warnings, imports, and router registration from `worker-python/src/main.py`.
-- [ ] Remove V01-only environment examples while preserving every `AI_APPROVER_V02_*` setting and shared credential required elsewhere.
-- [ ] Remove `OrchestratorLockMiddleware` registration from FastAPI startup.
-- [ ] Delete `worker-python/src/modules/orchestrator/active_run_guard.py` and `lock_middleware.py`.
-- [ ] Delete `worker-python/src/modules/orchestrator/__init__.py` and its package directory when empty.
-- [ ] Remove stale V01 and legacy-lock `__pycache__` files without touching retained workflow packages.
-- [ ] Confirm V02, deduper, location scorer, queue status, and cancellation code imports neither deleted package.
+- [x] Unmount and delete `worker-python/src/routes/ai_approver.py`.
+- [x] Delete `worker-python/src/modules/ai_approver/`, the V01 prompt setup utility, prompt asset, contract fixture, and V01 contract, integration, and unit tests.
+- [x] Remove V01 startup validation, warnings, imports, and router registration from `worker-python/src/main.py`.
+- [x] Remove V01-only environment examples while preserving every `AI_APPROVER_V02_*` setting and shared credential required elsewhere.
+- [x] Remove `OrchestratorLockMiddleware` registration from FastAPI startup.
+- [x] Delete `worker-python/src/modules/orchestrator/active_run_guard.py` and `lock_middleware.py`.
+- [x] Delete `worker-python/src/modules/orchestrator/__init__.py` and its package directory when empty.
+- [x] Remove stale V01 and legacy-lock `__pycache__` files without touching retained workflow packages.
+- [x] Confirm V02, deduper, location scorer, queue status, and cancellation code imports neither deleted package.
 
 ### Phase 3 verification and commit
 
-- [ ] Run worker-python V02 unit and integration suites.
-- [ ] Run retained deduper and location-scorer unit suites.
-- [ ] Run the broader worker-python suite when available.
-- [ ] Import or start FastAPI in a test environment without V01 settings and confirm retained routes register.
-- [ ] Fix all Phase 3 failures before continuing.
-- [ ] Mark only completed Phase 3 tasks, review the staged diff, and commit with a reference to this todo Phase 3.
+- [x] Run worker-python V02 unit and integration suites.
+- [x] Run retained deduper and location-scorer unit suites.
+- [x] Run the broader worker-python suite when available.
+- [x] Import or start FastAPI in a test environment without V01 settings and confirm retained routes register.
+- [x] Fix all Phase 3 failures before continuing.
+- [x] Mark only completed Phase 3 tasks, review the staged diff, and commit with a reference to this todo Phase 3.
 
 ## Phase 4: Portal V01 Removal and Viewer Preservation
 

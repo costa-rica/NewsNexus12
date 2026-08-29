@@ -31,6 +31,17 @@ def test_test_route_echoes_json(client) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize(
+    "path",
+    ["/ai-approver/start-job", "/ai-approver/review-page/start-job"],
+)
+def test_removed_ai_approver_v01_routes_return_404(client, path: str) -> None:
+    response = client.post(path, json={})
+
+    assert response.status_code == 404
+
+
+@pytest.mark.integration
 def test_create_job_and_fetch_status(client, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     from src.routes import deduper as deduper_routes
 
