@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:28:48Z
+updated_at: 2026-08-29T22:36:06Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -12,7 +12,7 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 - [ ] Work only on `dev_29_remove_v01_workflows` and preserve unrelated user changes and untracked files.
 - [ ] Use `20260829_legacy_orchestrator_and_ai_approver_v01_removal_prd_v03.md` and `20260829_legacy_v01_removal_plan_v02.md` as the implementation authority.
 - [ ] Treat this file as superseding `20260829_legacy_v01_removal_todo_v01.md` and incorporating its assessment.
-- [ ] Do not implement `docs/20260829_weekly_article_processing_cron_prd.md`; this removal takes precedence.
+- [x] Do not implement `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`; this removal takes precedence.
 - [ ] Do not add a replacement scheduler, automatic schema migration, `410` compatibility route, or V01 read-only interface.
 - [ ] Preserve AI Approver V02, the generic article-content viewer, standalone Google RSS, shared queues, and unrelated automations.
 - [ ] Preserve retained internal Python classes named `orchestrator.py` under AI Approver V02, deduper, and location scorer.
@@ -27,7 +27,7 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 ### Repository alignment
 
 - [x] Confirm the branch is `dev_29_remove_v01_workflows` and record starting `git status` without altering unrelated changes.
-- [x] Add a prominent notice to `docs/20260829_weekly_article_processing_cron_prd.md` that it is invalid for implementation, subordinate to the removal PRD, and requires redesign without the removed route, tables, header, and column.
+- [x] Add a prominent notice to `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md` that it is invalid for implementation, subordinate to the removal PRD, and requires redesign without the removed route, tables, header, and column.
 - [x] Inventory live references to V01 models, V01 routes, `/orchestrator`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deployment assets, and V01 settings across source, tests, scripts, and active documentation.
 - [x] Classify every match as removal work, retained V02 or internal Python coordination, historical material to archive, or current removal documentation.
 - [x] Create a sanitized Ubuntu retirement evidence template covering systemd, Hermes, user and root crontabs, `/etc/cron*`, active child jobs, removal results, daemon reload, and remaining triggers.
@@ -181,30 +181,38 @@ Phase 4 verification notes:
 
 ### Executable assets
 
-- [ ] Delete the weekly and test orchestrator systemd services, weekly timer, both trigger scripts, and `scripts/schema/20260623_weekly_continuation_phase2.sql`.
-- [ ] Delete `scripts/ai-approver-review-legend-counts.mjs` and its output after confirming they are V01-only.
-- [ ] Rewrite `scripts/README.md` for retained scripts, or delete it if no retained instructions remain.
-- [ ] Do not archive executable trigger, unit, or schema helpers.
+- [x] Delete the weekly and test orchestrator systemd services, weekly timer, both trigger scripts, and `scripts/schema/20260623_weekly_continuation_phase2.sql`.
+- [x] Delete `scripts/ai-approver-review-legend-counts.mjs` and its output after confirming they are V01-only.
+- [x] Rewrite `scripts/README.md` for retained scripts, or delete it if no retained instructions remain.
+- [x] Do not archive executable trigger, unit, or schema helpers.
 
 ### Documentation
 
-- [ ] Update root and package `AGENTS.md` and README files so active guidance describes only V02 and retained independent workflows.
-- [ ] Update database table references, deployment guidance, and worker-python API documentation that treats either removed feature as live.
-- [ ] Delete V01-only operational instructions and prompt assets that could reactivate V01.
-- [ ] Move historical V01 reports and implementation records to `docs/archive/YYYYMM/` using each file's creation month.
-- [ ] Move the July safe-removal report to `docs/archive/202607/` and repair active references.
-- [ ] Preserve historical contents without rewriting descriptions of old behavior.
-- [ ] Ensure active guidance states `orchestrator` no longer names a live NewsNexus product feature while allowing retained internal Python class names.
+- [x] Update root and package `AGENTS.md` and README files so active guidance describes only V02 and retained independent workflows.
+- [x] Update database table references, deployment guidance, and worker-python API documentation that treats either removed feature as live.
+- [x] Delete V01-only operational instructions and prompt assets that could reactivate V01.
+- [x] Move historical V01 reports and implementation records to `docs/archive/YYYYMM/` using each file's creation month.
+- [x] Move the July safe-removal report to `docs/archive/202607/` and repair active references.
+- [x] Preserve historical contents without rewriting descriptions of old behavior.
+- [x] Ensure active guidance states `orchestrator` no longer names a live NewsNexus product feature while allowing retained internal Python class names.
 
 ### Clean full-repository verification and commit
 
-- [ ] Search live source and active docs for the four deleted model names, `orchestratorRunId`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deleted routes and unit names, and V01 settings.
-- [ ] Classify every remaining match as retained internal code, archived history, removal documentation, or a defect to fix.
-- [ ] Confirm no executable schema helper can recreate removed schema.
-- [ ] Purge only exact generated output directories for db-models, db-manager, API, worker-node, and portal; rebuild all in dependency order.
-- [ ] Run complete db-manager, API, and worker-node suites, portal lint, and retained worker-python suites.
-- [ ] Fix all Phase 5 failures before continuing.
-- [ ] Mark only completed Phase 5 tasks, review the staged diff, and commit with a reference to this todo Phase 5.
+- [x] Search live source and active docs for the four deleted model names, `orchestratorRunId`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deleted routes and unit names, and V01 settings.
+- [x] Classify every remaining match as retained internal code, archived history, removal documentation, or a defect to fix.
+- [x] Confirm no executable schema helper can recreate removed schema.
+- [x] Purge only exact generated output directories for db-models, db-manager, API, worker-node, and portal; rebuild all in dependency order.
+- [x] Run complete db-manager, API, and worker-node suites, portal lint, and retained worker-python suites.
+- [x] Fix all Phase 5 failures before continuing.
+- [x] Mark only completed Phase 5 tasks, review the staged diff, and commit with a reference to this todo Phase 5.
+
+Phase 5 verification notes:
+
+- Clean builds passed for db-models, db-manager, API, worker-node, and portal in dependency order.
+- Complete suites passed: db-manager 212 tests, API 158 tests, worker-node 167 tests, and worker-python 148 tests. Portal lint passed with zero warnings.
+- The portal production build passed with Webpack. Turbopack stalled without reporting a build failure, so its exact build processes were stopped before the verified Webpack run.
+- Remaining search matches are retained V02 names, internal Python implementation names, negative route tests, backup-compatibility fixtures, archived history, or current removal records.
+- No live executable trigger, service, timer, or schema helper remains that can reactivate or recreate the removed workflows.
 
 ## Operator Gate B: Retire Every Existing Ubuntu Schedule
 

@@ -1,8 +1,8 @@
 ---
 created_at: 2026-05-24
-updated_at: 2026-05-24
+updated_at: 2026-08-29T22:32:17Z
 created_by: hermes (gpt-5.5)
-modified_by: hermes (gpt-5.5)
+modified_by: codex (gpt-5.6) nicksmacbookair
 ---
 
 # nn12prod deployment instructions for Hermes
@@ -185,7 +185,7 @@ Rules:
 Optional test gate only if a safe throwaway test database is configured:
 
 ```bash
-bash -lc 'set -a; source db-manager/.env; set +a; PG_DATABASE=newsnexus_test_api_prod_deploy NODE_ENV=test npm test --workspace newsnexus12api -- --runInBand tests/analysis/ai-approver.routes.test.ts'
+bash -lc 'set -a; source db-manager/.env; set +a; PG_DATABASE=newsnexus_test_api_prod_deploy NODE_ENV=test npm test --workspace newsnexus12api -- --runInBand tests/analysis/ai-approver-v02.routes.test.ts'
 
 bash -lc 'set -a; source db-manager/.env; set +a; PG_DATABASE=newsnexus_test_worker_prod_deploy NODE_ENV=test npm test --workspace newsnexus12-worker-node -- --runInBand'
 

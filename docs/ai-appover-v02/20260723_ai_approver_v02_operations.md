@@ -1,38 +1,32 @@
 ---
 created_at: 2026-07-23
-updated_at: 2026-07-23
+updated_at: 2026-08-29T22:32:17Z
 created_by: codex (gpt-5)
-modified_by: codex (gpt-5)
+modified_by: codex (gpt-5.6) nicksmacbookair
 ---
 
 # AI Approver V02 Operations
 
 ## 1. Release boundary
 
-- V01 remains the existing score and gatekeeper workflow.
-- V01 backend route, table, model, and source names remain unchanged.
-- V01 portal automation cards and prompt pages are hidden.
-- V01 review data remains available in a column hidden by default.
+- V02 is the only live AI Approver workflow.
 - V02 produces advisory `approved` or `irrelevant` predictions.
-- V02 never changes approval, relevance, reports, or orchestration.
+- V02 never changes approval, relevance, or reports.
 - V02 is manual-only in this release.
 
 ## 2. Namespaces
 
 1. Worker routes
 
-   - V01: `/ai-approver`
    - V02: `/ai-approver-v02`
 
 2. API routes
 
-   - V01: existing `/automations/ai-approver` and analysis routes
    - V02 worker proxy: `/automations/ai-approver-v02`
    - V02 data and review: `/analysis/ai-approver-v02`
 
 3. Database tables
 
-   - V01: existing `AiApproverPromptVersions` and `AiApproverArticleScores`
    - V02: `AiApproverPromptVersionsV02`
    - V02: `AiApproverRunsV02`
    - V02: `AiApproverArticlePredictionsV02`
@@ -68,7 +62,7 @@ All numeric values must be positive integers.
 - `NAME_APP`
 - `PATH_TO_LOGS`
 
-V02 always uses Codex CLI. It does not read `USE_OPEN_AI_API`, `OPENAI_API_KEY`, or V01 `AI_APPROVER_*` model settings.
+V02 always uses Codex CLI and reads only its dedicated `AI_APPROVER_V02_*` settings.
 
 ## 4. Codex prerequisites
 
@@ -127,7 +121,7 @@ The installer is repeatable and non-destructive for a compatible installation. I
 5. Deploy and restart the portal.
 6. Expose V02 controls only after the preceding checks pass.
 
-Do not place V02 in the weekly orchestrator. This release is manual-only.
+Do not place V02 in a scheduler. This release is manual-only.
 
 ## 8. Health checks
 
@@ -277,7 +271,7 @@ Every listed row must represent the one permitted retry of a first `failed` or `
 
 ### 11.5 Advisory isolation
 
-- Review all writers to `ArticleApproveds`, `ArticleIsRelevants`, report contracts, and orchestrator tables.
+- Review all writers to `ArticleApproveds`, `ArticleIsRelevants`, report contracts, and AI Approver V02 tables.
 - Confirm no V02 route or repository appears among those writers.
 - Compare the smoke-test article before and after the run.
 - Treat any downstream change caused by V02 as a release-blocking incident.

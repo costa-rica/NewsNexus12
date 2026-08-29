@@ -1,590 +1,71 @@
-# AGENTS.md
-
-This file provides guidance to engineers and AI agents working in `worker-python`.
+# Worker Python Guidance
 
 ## Purpose
 
-`worker-python` is the FastAPI-based execution service for NewsNexus Python workflows.
+Worker-python is the FastAPI execution service for AI Approver V02, deduplication, location scoring, and shared durable queue operations.
 
-It now runs absorbed workflows in-process and uses a shared JSON-backed queue for:
+## Runtime entry points
 
-1. durable job tracking
-2. latest-job lookup by workflow endpoint
-3. queue status inspection
-4. cooperative job cancellation
+1. Application bootstrap: `src/main.py`
+2. AI Approver V02: `src/routes/ai_approver_v02.py` and `src/modules/ai_approver_v02/`
+3. Deduper: `src/routes/deduper.py`, `src/services/job_manager.py`, and `src/modules/deduper/`
+4. Location scorer: `src/routes/location_scorer.py` and `src/modules/location_scorer/`
+5. Shared queue: `src/routes/queue_info.py` and `src/modules/queue/`
 
-The deduper workflow from NewsNexusDeduper02 is already absorbed internally under `src/modules/deduper`.
+The old product feature formerly named orchestrator is removed. Files named `orchestrator.py` inside retained workflow packages are internal single-workflow coordinators, not a shared scheduler or public product feature.
 
-The location scorer workflow from NewsNexusClassifierLocationScorer01 is now absorbed internally under `src/modules/location_scorer`.
+## Queue behavior
 
-The AI approver workflow is absorbed internally under `src/modules/ai_approver`.
-It scores articles against active prompt rows and writes reviewable score rows
-back to Postgres. See `docs/20260502_HOW_TO_USE_AI_APPROVER.md` for operator
-setup, prompt roles, gatekeeper rollout, weekly automation behavior, queue result
-checks, and portal `N/A` troubleshooting.
+1. Queue state is stored at `PATH_UTILTIES/worker-python/queue-jobs.json`.
+2. Status values are `queued`, `running`, `completed`, `failed`, and `canceled`.
+3. Cancellation is cooperative.
+4. Restart reconciliation marks persisted in-flight jobs failed.
+5. New workflows must reuse the shared queue rather than create a parallel job store.
 
-## Runtime architecture
+## AI Approver V02
 
-1. Application bootstrap
+1. V02 routes use the `/ai-approver-v02` prefix.
+2. V02 uses dedicated `AI_APPROVER_V02_*` settings and the Codex CLI backend.
+3. Preview creates a short-lived database draft with a frozen selection.
+4. Start commits the preview and enqueues only the database run ID.
+5. Prompt, run, and prediction persistence belongs in `src/modules/ai_approver_v02/repository.py`.
+6. Keep V02 isolated from removed V01 routes, tables, settings, and prompt assets.
 
-- `src/main.py`
-- Loads `.env`, validates startup requirements, configures logging, and mounts routers.
-
-2. HTTP routes
-
-- `src/routes/index.py`
-- `src/routes/deduper.py`
-- `src/routes/location_scorer.py`
-- `src/routes/ai_approver.py`
-- `src/routes/queue_info.py`
-
-3. Shared queue infrastructure
-
-- `src/modules/queue/config.py`
-- `src/modules/queue/store.py`
-- `src/modules/queue/engine.py`
-- `src/modules/queue/status.py`
-- `src/modules/queue/types.py`
-- `src/modules/queue/global_queue.py`
-
-4. Deduper workflow
-
-- `src/services/job_manager.py`
-- `src/modules/deduper/config.py`
-- `src/modules/deduper/repository.py`
-- `src/modules/deduper/orchestrator.py`
-- `src/modules/deduper/types.py`
-- `src/modules/deduper/errors.py`
-
-5. Deduper processors
-
-- `src/modules/deduper/processors/load.py`
-- `src/modules/deduper/processors/states.py`
-- `src/modules/deduper/processors/url_check.py`
-- `src/modules/deduper/processors/content_hash.py`
-- `src/modules/deduper/processors/embedding.py`
-
-6. Deduper utilities
-
-- `src/modules/deduper/utils/csv_input.py`
-- `src/modules/deduper/utils/text_norm.py`
-
-7. Location scorer workflow
-
-- `src/modules/location_scorer/config.py`
-- `src/modules/location_scorer/repository.py`
-- `src/modules/location_scorer/orchestrator.py`
-- `src/modules/location_scorer/types.py`
-- `src/modules/location_scorer/errors.py`
-
-8. Location scorer processors
-
-- `src/modules/location_scorer/processors/load.py`
-- `src/modules/location_scorer/processors/classify.py`
-- `src/modules/location_scorer/processors/write.py`
-
-9. AI approver workflow
-
-- `src/modules/ai_approver/config.py`
-- `src/modules/ai_approver/repository.py`
-- `src/modules/ai_approver/orchestrator.py`
-- `src/modules/ai_approver/client.py`
-- `src/modules/ai_approver/errors.py`
-
-## Queue model
-
-The queue is the backbone of worker status reporting used by the portal automations UI and by API proxy routes.
-
-1. Storage
-
-- Queue state is persisted to `PATH_UTILTIES/worker-python/queue-jobs.json`.
-- The queue store is JSON-backed, not in-memory.
-
-2. Job identifiers
-
-- `jobId` values are stored as strings.
-- IDs use zero-padded human-readable values like `0001`, `0002`, `0127`.
-
-3. Status values
-
-- `queued`
-- `running`
-- `completed`
-- `failed`
-- `canceled`
-
-4. Queue lifecycle
-
-- Jobs are enqueued into the shared queue engine.
-- Only one job runs at a time.
-- Cancellation is cooperative.
-- On worker restart, any persisted `queued` or `running` jobs are reconciled to `failed` with `worker_restarted_before_completion`.
-
-## Current runtime flow
-
-### Deduper create and execute flow
-
-1. API calls worker-python deduper routes:
-
-- `GET /deduper/jobs`
-- `GET /deduper/jobs/reportId/{report_id}`
-
-2. `src/routes/deduper.py` delegates to `src/services/job_manager.py`.
-
-3. `JobManager` enqueues a queue job with endpoint name:
-
-- `/deduper/start-job`
-
-4. The shared queue engine runs the job in a background thread.
-
-5. `DeduperOrchestrator.run_analyze_fast(...)` executes in-process stages:
-
-- `load`
-- `states`
-- `url_check`
-- `embedding`
-
-6. Job state is persisted to `queue-jobs.json` and exposed through both deduper routes and queue-info routes.
-
-### Queue status flow
-
-1. Latest workflow job lookup:
-
-- `GET /queue-info/latest-job?endpointName=/deduper/start-job`
-
-2. Job-specific status lookup:
-
-- `GET /queue-info/check-status/{job_id}`
-
-3. Queue summary:
-
-- `GET /queue-info/queue-status`
-
-4. Cancellation:
-
-- `POST /queue-info/cancel-job/{job_id}`
-
-### Location scorer create and execute flow
-
-1. API or internal callers create a queued location scorer job at:
-
-- `POST /location-scorer/start-job`
-
-2. `src/routes/location_scorer.py` enqueues a shared queue job with endpoint name:
-
-- `/location-scorer/start-job`
-
-3. The route runner creates `LocationScorerRepository` and `LocationScorerOrchestrator`.
-
-4. `LocationScorerOrchestrator.run_score(...)` executes in-process stages:
-
-- `load`
-- `classify`
-- `write`
-
-5. During execution, the runner persists progress details into the queue job `result` payload so callers can display a richer status message without changing the shared queue status enum.
-
-6. Latest job and cancel operations reuse the same queue-info routes:
-
-- `GET /queue-info/latest-job?endpointName=/location-scorer/start-job`
-- `POST /queue-info/cancel-job/{job_id}`
-
-### AI approver create and execute flow
-
-1. API, portal, or worker-node orchestrator callers create a queued AI approver
-   job at:
-
-- `POST /ai-approver/start-job`
-
-2. The route accepts:
-
-- `limit`, default `10`
-- `requireStateAssignment`, default `true`
-- `stateIds`, optional list of `ArticleStateContracts02.stateId` values
-- `articleIdMinExclusive`, optional article ID lower cursor
-- `articleIdMaxInclusive`, optional upper article ID cursor
-- `mode`, optional AI approver mode override; otherwise `AI_APPROVER_MODE` from `.env`
-- `gatekeeperRejectConfidenceThreshold`, optional override for gatekeeper reject normalization
-
-AI approver modes:
-
-- `legacy` — default; category prompts only, no gatekeeper required or run.
-- `shadow` — requires one active gatekeeper, records gatekeeper decisions, and still runs category prompts regardless of decision.
-- `gatekeeper` — requires one active gatekeeper and runs category prompts only on `decision = "pass"`.
-- `gatekeeper_with_manual_review` — currently same category execution behavior as `gatekeeper`; `manual_review` does not run categories.
-
-The weekly worker-node orchestrator does not explicitly send `mode`, so weekly runs follow worker-python `AI_APPROVER_MODE`. Use `shadow` for the first gatekeeper rollout test, then test `gatekeeper` once shadow-mode decisions look correct.
-
-3. `src/routes/ai_approver.py` enqueues a shared queue job with endpoint name:
-
-- `/ai-approver/start-job`
-
-4. The route runner creates:
-
-- `AiApproverConfig`
-- `AiApproverRepository`
-- a scoring client via `create_ai_approver_client` (Codex CLI backend by
-  default, `AiApproverOpenAIClient` when `USE_OPEN_AI_API=true` with
-  `OPENAI_API_KEY` set)
-- `AiApproverOrchestrator`
-
-5. `AiApproverOrchestrator.run_score(...)` executes the scoring loop:
-
-- loads active prompts from `AiApproverPromptVersions`
-- loads eligible articles from `Articles`
-- uses `ArticleContents02.content` when available, otherwise
-  `Articles.description`
-- builds each prompt by replacing `{articleTitle}` and `{articleContent}`
-- scores each prompt through the selected backend (Codex CLI `codex exec`
-  by default; OpenAI chat completions with
-  `response_format={"type": "json_object"}` when the API backend is active)
-- inserts one score row per article/prompt attempt into
-  `AiApproverArticleScores`
-
-6. Eligibility filters in the batch path exclude articles that:
-
-- already have any `AiApproverArticleScores` row
-- have an `ArticleIsRelevants` row with `"isRelevant" = FALSE`
-- have any `ArticleApproveds` row
-- lack a valid non-error `ArticleStateContracts02` row when
-  `requireStateAssignment` is true
-- are outside the optional article ID cursor bounds
-- are outside the optional `stateIds` filter
-
-7. Queue result payload fields include:
-
-- `exitCode`
-- `error`
-- `stderr`
-- `stdout`
-- `statusText`
-- `promptCount`
-- `articleCount`
-- `attemptCount`
-- `usagePromptTokens`
-- `usageCompletionTokens`
-- `usageTotalTokens`
-- `mode`
-- `gatekeeperPromptVersionId`
-- `gatekeeperAttemptCount`
-- `gatekeeperPassCount`
-- `gatekeeperRejectCount`
-- `gatekeeperManualReviewCount`
-- `gatekeeperInvalidResponseCount`
-- `gatekeeperFailedCount`
-- `categoryPromptCount`
-- `categoryAttemptCount`
-- `categorySkippedCount`
-- `estimatedCategoryCallsAvoided`
-
-8. Latest job and cancel operations reuse the same queue-info routes:
-
-- `GET /queue-info/latest-job?endpointName=/ai-approver/start-job`
-- `POST /queue-info/cancel-job/{job_id}`
-
-### AI approver review-page one-off flow
-
-1. The review modal/API creates a queued one-off score at:
-
-- `POST /ai-approver/review-page/start-job`
-
-2. The route accepts:
-
-- `articleId`
-- `promptVersionId`
-
-3. The route enqueues endpoint name:
-
-- `/ai-approver/review-page/start-job`
-
-4. `AiApproverOrchestrator.run_single_score(...)`:
-
-- loads the prompt by ID from `AiApproverPromptVersions`
-- does not require the prompt to be active
-- loads article content with the same `ArticleContents02` preference and
-  `Articles.description` fallback
-- writes one `AiApproverArticleScores` row
-- includes `contentSource` in the queue result
-
-### AI approver prompts and scoring agents
-
-Each active `AiApproverPromptVersions` row functions as one scoring agent. The
-worker does not route between agents by category; it runs every active prompt
-against every eligible batch article. Prompt text is stored in
-`promptInMarkdown` and must include `{articleTitle}` and `{articleContent}` if
-the article fields should be injected.
-
-Both scoring backends expect prompt output as JSON. Valid category responses
-have numeric `score` and non-empty `reason`. Invalid JSON shapes are persisted
-as `invalid_response`; backend/runtime exceptions are persisted as `failed`.
-
-Backend selection (`create_ai_approver_client`):
-
-- `USE_OPEN_AI_API=true` plus `OPENAI_API_KEY` -> OpenAI API backend.
-- `USE_OPEN_AI_API=true` without `OPENAI_API_KEY` -> Codex CLI backend, with
-  a logged soft-fallback warning.
-- `USE_OPEN_AI_API` unset or `false` -> Codex CLI backend (the default),
-  regardless of whether a key is present.
-
-The OpenAI API backend uses `AI_APPROVER_MODEL_NAME` (default `gpt-4o-mini`),
-`temperature=0.2`, and JSON object response format.
-
-The Codex CLI backend runs one `codex exec` subprocess per article/prompt with
-`--ephemeral --skip-git-repo-check -s read-only --output-last-message` and
-passes `AI_APPROVER_MODEL_NAME` as `-m`.
-
-Codex model support: manual validation on 2026-07-09 (codex-cli 0.142.5,
-ChatGPT login) showed the CLI rejects the default `gpt-4o-mini` ("not
-supported when using Codex with a ChatGPT account"), so operators using the
-Codex CLI backend must set `AI_APPROVER_MODEL_NAME` to a Codex-supported
-model. `gpt-5.4-mini` was validated working; the CLI default is `gpt-5.5`. It authenticates through the
-operator's existing Codex CLI login, requires `codex` on `PATH` at startup,
-and reports zero token usage (`usagePromptTokens`, `usageCompletionTokens`,
-and `usageTotalTokens` are always 0 for Codex-backed jobs). Codex calls are
-substantially slower than API calls (a full agent session per article), so
-Codex-backed batch jobs take longer without being hung.
-
-Migration note: existing deployments that have `OPENAI_API_KEY` but do not set
-`USE_OPEN_AI_API=true` switch to the Codex CLI backend after this change. Add
-`USE_OPEN_AI_API=true` to stay on the OpenAI API.
-
-## Environment variables
-
-Required:
-
-1. `PATH_DATABASE`
-
-- Directory containing the SQLite database.
-
-2. `NAME_DB`
-
-- SQLite database filename.
-
-3. `PATH_UTILTIES`
-
-- Base utilities path used to resolve `worker-python/queue-jobs.json`.
-
-4. `NAME_AI_ENTITY_LOCATION_SCORER`
-
-- AI entity name used by the location scorer to resolve `ArtificialIntelligences` and `EntityWhoCategorizedArticles`.
-- Worker startup fails if this value is missing.
-
-5. `PG_HOST`
-
-- Postgres host used by the AI approver.
-
-6. `PG_PORT`
-
-- Postgres port used by the AI approver.
-
-7. `PG_DATABASE`
-
-- Postgres database used by the AI approver.
-
-8. `PG_USER`
-
-- Postgres user used by the AI approver.
-
-9. AI approver backend requirement (one of the two)
-
-- Codex CLI backend (default): the `codex` binary must resolve on `PATH` at
-  startup, authenticated via the operator's Codex CLI login.
-- OpenAI API backend: set `USE_OPEN_AI_API=true` and provide
-  `OPENAI_API_KEY`.
-
-Optional:
-
-1. `PATH_TO_CSV`
-
-- Used by deduper load stage when no `report_id` is provided.
-
-2. `DEDUPER_ENABLE_EMBEDDING`
-
-- Enable or disable the embedding stage.
-- Default: `true`.
-
-3. Deduper batch tuning
-
-- `DEDUPER_BATCH_SIZE_LOAD` default `1000`
-- `DEDUPER_BATCH_SIZE_STATES` default `1000`
-- `DEDUPER_BATCH_SIZE_URL` default `1000`
-- `DEDUPER_BATCH_SIZE_CONTENT_HASH` default `1000`
-- `DEDUPER_BATCH_SIZE_EMBEDDING` default `100`
-
-4. Deduper resilience and memory tuning
-
-- `DEDUPER_CACHE_MAX_ENTRIES` default `10000`
-- `DEDUPER_CHECKPOINT_INTERVAL` default `250`
-
-5. Location scorer tuning
-
-- `LOCATION_SCORER_BATCH_SIZE` default `10`
-- `LOCATION_SCORER_CHECKPOINT_INTERVAL` default `10`
-
-6. AI approver tuning
-
-- `PG_PASSWORD` default empty
-- `USE_OPEN_AI_API` default `false` (Codex CLI backend is the default)
-- `OPENAI_API_KEY` default empty; only used by the OpenAI API backend
-- `AI_APPROVER_MODEL_NAME` default `gpt-4o-mini`; applies to both backends
-  (OpenAI API model param and `codex exec -m` flag)
-- `AI_APPROVER_CODEX_TIMEOUT_SECONDS` default `180`; per-article `codex exec`
-  subprocess timeout
-- `AI_APPROVER_BATCH_SIZE` default `10`
-
-`AI_APPROVER_BATCH_SIZE` is validated by config but current route execution
-uses the request `limit` for article selection.
-
-Deprecated in the absorbed runtime path:
-
-1. `PATH_TO_MICROSERVICE_DEDUPER`
-2. `PATH_TO_PYTHON_VENV`
-
-## Local development
-
-Start the app with:
-
-```bash
-cd worker-python
-source venv/bin/activate
-uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
-```
-
-## Operational guidance
-
-1. Health and verification
-
-- `GET /`
-- `GET /deduper/health`
-- `GET /deduper/jobs/list`
-- `GET /deduper/jobs/{job_id}`
-- `GET /queue-info/latest-job?endpointName=/deduper/start-job`
-- `GET /queue-info/queue-status`
-
-2. Common issue: worker fails at startup with `PATH_UTILTIES is required`
-
-- Ensure `.env` is present in `worker-python/`.
-- Ensure `PATH_UTILTIES` is defined.
-
-3. Common issue: worker fails at startup with `NAME_AI_ENTITY_LOCATION_SCORER is required`
-
-- Ensure the location scorer AI entity env var is set in `worker-python/.env`.
-- Ensure the referenced AI entity and related `EntityWhoCategorizedArticles` row exist in the shared database.
-
-4. Common issue: worker fails at startup with `PG_HOST`, `PG_PORT`,
-   `PG_DATABASE`, or `PG_USER` missing
-
-- Ensure `worker-python/.env` is present.
-- Ensure the AI approver Postgres variables are populated.
-- Do not print secrets in logs or documentation when troubleshooting.
-
-4b. Common issue: worker fails at startup with `codex CLI not found on PATH`
-
-- The Codex CLI backend is the default; startup requires the `codex` binary
-  unless `USE_OPEN_AI_API=true` with `OPENAI_API_KEY` selects the API backend.
-- Under service managers (launchd/pm2/systemd) the minimal `PATH` often does
-  not include nvm-installed binaries; extend the service `PATH` so `codex`
-  resolves, or switch to the OpenAI API backend.
-
-5. Common issue: `job not found`
-
-- Usually caused by polling with `reportId` instead of `jobId`.
-- Queue and deduper status routes require the job ID returned at creation time.
-
-6. Common issue: completed location scorer job but no rows
-
-- Confirm the `ArtificialIntelligences` row exists for `NAME_AI_ENTITY_LOCATION_SCORER`.
-- Confirm the related `EntityWhoCategorizedArticles` row exists.
-- Confirm there are unscored `Articles` for that entity.
-
-7. Common issue: completed AI approver job with zero articles or attempts
-
-- Check `AiApproverPromptVersions` for active prompt rows.
-- Check whether target articles already have `AiApproverArticleScores` rows.
-- Check `ArticleIsRelevants`, `ArticleApproveds`, and
-  `ArticleStateContracts02` filters.
-- Check the request `stateIds`, `articleIdMinExclusive`, and
-  `articleIdMaxInclusive` bounds.
-
-8. Common issue: AI approver rows have `invalid_response`
-
-- Inspect the corresponding `AiApproverPromptVersions.promptInMarkdown`.
-- Confirm the prompt asks for JSON only with numeric `score` and non-empty
-  `reason`.
-- The OpenAI client uses JSON object response format, but the worker still
-  validates the returned payload shape.
-
-9. Common issue: AI approver rows have `failed`
-
-- Inspect `AiApproverArticleScores.errorCode` and `errorMessage`.
-- On the OpenAI API backend, check OpenAI connectivity, model name, and API
-  key configuration.
-- On the Codex CLI backend, check that the CLI login is still valid and that
-  the Codex CLI accepts `AI_APPROVER_MODEL_NAME`; if the CLI rejects the
-  model (`codex exec failed with exit code ...` in `errorMessage`), set
-  `AI_APPROVER_MODEL_NAME` to a Codex-supported model.
-- Check whether prompt output was invalid JSON that raised during parsing.
-
-10. Common issue: completed job but no deduper rows
-
-- Validate source rows for the report in the shared SQLite database.
-- Validate approved rows exist for the target report.
-- Validate worker-python points at the intended DB file.
-
-11. Cancellation behavior
-
-- Cancellation is cooperative, not force-kill based.
-- Processors must check `should_cancel` at checkpoints between batches or units of work.
-
-## Design rules for maintainers
+## Design rules
 
 1. Keep route handlers thin.
+2. Keep SQL in repository modules.
+3. Keep processors stage-focused.
+4. Preserve live endpoint names used by queue status clients.
+5. Update README and active API documentation when route behavior changes.
+6. Do not restore a shared scheduler or cross-worker lock without a new approved design.
 
-- Routes should validate input, enqueue or dispatch work, and shape responses.
+## Development
 
-2. Keep durable queue behavior centralized.
+1. Start locally:
 
-- Queue lifecycle logic belongs in `src/modules/queue/`.
-- New workflow routes should reuse the shared queue engine instead of creating parallel job stores.
+   ```bash
+   cd worker-python
+   source venv/bin/activate
+   uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
+   ```
 
-3. Keep SQL in repository modules.
+2. Run all tests:
 
-- Processors and routes should not issue raw SQL directly.
-- AI approver SQL belongs in `src/modules/ai_approver/repository.py`.
+   ```bash
+   ./venv/bin/pytest
+   ```
 
-4. Keep processors stage-focused.
+3. Run focused retained workflow tests:
 
-- One processor per stage.
-- Limit side effects to the processor's owned responsibility.
+   ```bash
+   ./venv/bin/pytest tests/unit/ai_approver_v02 tests/integration/test_ai_approver_v02_routes.py
+   ./venv/bin/pytest tests/unit/deduper tests/unit/location_scorer
+   ```
 
-5. Preserve workflow endpoint names.
+## Safety
 
-- Endpoint names such as `/deduper/start-job` are part of the status lookup contract used by API and portal clients.
-- AI approver endpoint names `/ai-approver/start-job` and
-  `/ai-approver/review-page/start-job` are also status lookup contracts.
-
-6. Keep docs updated with code changes.
-
-- Update `worker-python/docs/worker-python-api-documentation/*` when route behavior changes.
-- Update this file when architecture or runtime flow changes materially.
-
-## Troubleshooting and rollback
-
-1. If a workflow fails
-
-- Capture the request payload.
-- Capture the `jobId`.
-- Capture `/queue-info/check-status/{jobId}`.
-- Capture `/queue-info/latest-job?endpointName=...` when relevant.
-- Capture `/deduper/health` for deduper issues.
-
-2. If queue state looks inconsistent
-
-- Inspect `PATH_UTILTIES/worker-python/queue-jobs.json`.
-- Check whether the worker restarted and reconciled in-flight jobs to failed.
-
-3. Rollback order
-
-- First prefer a code-level fix in the current worker.
-- Next use a commit-level rollback in `worker-python`.
-- Do not reintroduce a separate child-process worker path unless explicitly required.
+1. Do not print credentials or database passwords.
+2. Confirm the target database before database-backed tests.
+3. Use a disposable test database for destructive integration tests.
+4. Keep production service and schedule changes behind operator approval.

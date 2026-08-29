@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:45:20Z
-updated_at: 2026-08-29T21:45:20Z
+updated_at: 2026-08-29T22:32:17Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -13,7 +13,7 @@ This plan implements `20260829_legacy_orchestrator_and_ai_approver_v01_removal_p
 
 It supersedes `20260829_legacy_v01_removal_plan_v01.md` and incorporates `20260829_legacy_v01_removal_plan_v01_assessment_codex.md`. The V01 assessment correctly identified the read-only `ArticleContents02` viewer as retained article-review functionality despite its duplicate handler being placed in the V01 API namespace.
 
-The removal PRD takes precedence over `docs/20260829_weekly_article_processing_cron_prd.md`. The existing weekly PRD will receive a visible blocked or superseded notice and will not supply architecture to this implementation. Its product goals remain input for a separately planned replacement.
+The removal PRD takes precedence over the archived `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`. That weekly PRD is invalid for implementation and does not supply architecture to this implementation. Its product goals remain input for a separately planned replacement.
 
 The change removes two connected legacy systems:
 

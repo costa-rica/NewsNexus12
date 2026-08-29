@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T22:03:49Z
-updated_at: 2026-08-29T22:03:49Z
+updated_at: 2026-08-29T22:32:17Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -162,12 +162,12 @@ This is the pre-removal file-level classification. Shared files contain both rem
 - package README and AGENTS files returned by the scan
 - `docs/db-models/TABLE_REFERENCE.md`
 - active deployment and score-legend guidance that presents V01 or the weekly workflow as live
-- `docs/20260829_weekly_article_processing_cron_prd.md`, which now carries an invalid-for-implementation notice
+- `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`, archived after being marked invalid for implementation
 
 ### 4.2 Historical material to archive
 
 - Archive V01 reports and implementation records by their creation month.
-- Move `docs/ai-appover-v02/20260723_ai_approver_v01_safe_removal_report.md` to `docs/archive/202607/` during the documentation phase.
+- `docs/archive/202607/20260723_ai_approver_v01_safe_removal_report.md` contains the archived safe-removal report.
 - Classify the May 2026 worker-python V01 reports and plans for `docs/archive/202605/` during the final documentation pass.
 - Preserve historical wording; update only frontmatter and active references required by the move.
 

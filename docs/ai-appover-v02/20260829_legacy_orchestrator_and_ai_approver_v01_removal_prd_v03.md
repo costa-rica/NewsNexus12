@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:31:54Z
-updated_at: 2026-08-29T21:31:54Z
+updated_at: 2026-08-29T22:32:17Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -15,7 +15,7 @@ Difficulty: high. Risk: medium-high. The portal card is already hidden, but the 
 - Active implementation branch: `dev_29_remove_v01_workflows`
 - Product change: remove AI Approver V01 and the legacy Weekly Orchestrator V01
 - Supersedes: `20260829_legacy_orchestrator_and_ai_approver_v01_removal_prd_v02.md`
-- Primary inventory: `20260723_ai_approver_v01_safe_removal_report.md`
+- Primary inventory: `docs/archive/202607/20260723_ai_approver_v01_safe_removal_report.md`
 - Assessment incorporated: `20260829_legacy_orchestrator_and_ai_approver_v01_removal_prd_v02_assessment_claude.md`
 - Repository evidence reviewed: 2026-08-29
 - Legacy application-code removal authorized: yes

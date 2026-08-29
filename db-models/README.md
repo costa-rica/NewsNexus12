@@ -55,11 +55,10 @@ const { Article, User, sequelize } = db;
 
 - No .env file is needed becuase this package will use the .env vars from the project it is imported into.
 
-## AI Approver table versions
+## AI Approver V02 tables
 
-- V01 model and table names remain unchanged.
-- V02 uses `AiApproverPromptVersionsV02`, `AiApproverRunsV02`, and `AiApproverArticlePredictionsV02`.
-- V02 associations and load order are separate from V01.
+- AI Approver V02 uses `AiApproverPromptVersionsV02`, `AiApproverRunsV02`, and `AiApproverArticlePredictionsV02`.
+- V02 associations and load order are isolated from unrelated models.
 - Install V02 tables with the dedicated db-manager command.
 - Do not use general `sync({ alter: true })` or `sync({ force: true })` for V02 deployment.
 
