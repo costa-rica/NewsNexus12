@@ -158,25 +158,25 @@ Optional:
 
 1. `npm run dev`
 2. `npm run build`
-3. `npm run puppeteer:browsers:install`
+3. `npm run playwright:browsers:install`
 4. `npm start`
 5. `npm test`
 6. `npm run test:watch`
 
-## Puppeteer browser install
+## Playwright browser install
 
-The article-content scraper can fall back to Puppeteer, which requires a browser binary in the runtime environment.
+The article-content scraper uses Playwright, which requires a Chromium binary in the runtime environment.
 
 Typical setup:
 
 1. `npm install`
 2. `npm run build`
-3. `npm run puppeteer:browsers:install`
+3. `npm run playwright:browsers:install`
 
 On Ubuntu servers, install the browser as the same user that runs `worker-node`. For example:
 
 ```bash
-sudo -u limited_user npm run puppeteer:browsers:install
+sudo -u limited_user npm run playwright:browsers:install
 ```
 
 ## Documentation

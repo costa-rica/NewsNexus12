@@ -1,6 +1,6 @@
 # Table Reference
 
-Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
+Database table reference for NewsNexus12 (PostgreSQL via Sequelize ORM).
 
 **Note**: All tables include `createdAt` and `updatedAt` timestamp fields (DATE, NOT NULL).
 
@@ -30,6 +30,7 @@ Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
 - belongsTo NewsApiRequest (via `newsApiRequestId`)
 - belongsTo NewsRssRequest (via `newsRssRequestId`)
 - hasMany ArticleContents02, ArticleApproved, ArticlesApproved02, ArticleReviewed, ArticleIsRelevant, ArticleDuplicateAnalysis, ArticleStateContract, ArticleStateContract02, ArticleKeywordContract, ArticleReportContract, ArticleEntityWhoCategorizedArticleContract, ArticleEntityWhoCategorizedArticleContracts02, AiApproverArticleScore
+- hasOne AiApproverArticlePredictionV02 (via `articleId`)
 - belongsToMany State (through ArticleStateContract)
 
 ---
@@ -234,6 +235,108 @@ Database table reference for NewsNexus12 (SQLite via Sequelize ORM).
 **Relationships**:
 
 - hasMany AiApproverArticleScore (via `promptVersionId`)
+
+---
+
+### AiApproverArticlePredictionV02
+
+- **Table name**: `AiApproverArticlePredictionsV02`
+
+| Column            | Type    | Constraints          | Notes                                                        |
+| ----------------- | ------- | -------------------- | ------------------------------------------------------------ |
+| id                | INTEGER | PK, Auto Increment   |                                                              |
+| articleId         | INTEGER | FK, NOT NULL         | → Articles.id                                                |
+| promptVersionId   | INTEGER | FK, NOT NULL         | → AiApproverPromptVersionsV02.id                              |
+| runId             | INTEGER | FK, NOT NULL         | → AiApproverRunsV02.id                                       |
+| resultStatus      | STRING  | NOT NULL             | `completed`, `failed`, or `invalid_response`                  |
+| prediction        | STRING  | NULL                 | `approved` or `irrelevant`; required for completed results    |
+| reasoning         | TEXT    | NULL                 | Nonblank reasoning required for completed results             |
+| errorCode         | STRING  | NULL                 | Workflow or provider error code                               |
+| errorMessage      | TEXT    | NULL                 | Workflow or provider error detail                             |
+| attemptCount      | INTEGER | NOT NULL, DEFAULT 1  | Valid range is 1–2                                           |
+| modelName         | STRING  | NOT NULL             | Model used for the prediction                                 |
+| pipelineVersion   | STRING  | NOT NULL             | Pipeline version that produced the prediction                 |
+| contentSource     | STRING  | NOT NULL             | `article_contents_02` or `description`                        |
+| metadata          | JSONB   | NULL                 | Structured workflow and model metadata                        |
+| humanValidation   | BOOLEAN | NULL, DEFAULT null   | Human validation state: approved, rejected, or undetermined   |
+| humanComment      | TEXT    | NULL                 | Optional human review comment                                 |
+
+**Indexes**:
+
+- Non-unique indexes on `articleId`, `promptVersionId`, `runId`, `resultStatus`, and `prediction`
+
+**Relationships**:
+
+- belongsTo Article (via `articleId`)
+- belongsTo AiApproverPromptVersionV02 (via `promptVersionId`)
+- belongsTo AiApproverRunV02 (via `runId`)
+
+---
+
+### AiApproverPromptVersionV02
+
+- **Table name**: `AiApproverPromptVersionsV02`
+
+| Column           | Type    | Constraints               | Notes                                              |
+| ---------------- | ------- | ------------------------- | -------------------------------------------------- |
+| id               | INTEGER | PK, Auto Increment        |                                                    |
+| title            | STRING  | NULL                      | Optional normalized title for the prompt version   |
+| promptInMarkdown | TEXT    | NOT NULL                  | Full nonblank prompt body stored in Markdown       |
+| isActive         | BOOLEAN | NOT NULL, DEFAULT false   | Only one prompt version can be active              |
+| firstUsedAt      | DATE    | NULL                      | First time the prompt was used by a committed run  |
+
+**Indexes**:
+
+- Unique partial index on `title` when the title is not null
+- Unique partial index on `isActive` when `isActive` is true
+- Non-unique index on `isActive`
+
+**Relationships**:
+
+- hasMany AiApproverRunV02 (via `activePromptVersionId`)
+- hasMany AiApproverArticlePredictionV02 (via `promptVersionId`)
+
+---
+
+### AiApproverRunV02
+
+- **Table name**: `AiApproverRunsV02`
+
+| Column                     | Type    | Constraints               | Notes                                                              |
+| -------------------------- | ------- | ------------------------- | ------------------------------------------------------------------ |
+| id                         | INTEGER | PK, Auto Increment        |                                                                    |
+| jobId                      | STRING  | NULL                      | Queue or worker job identifier                                     |
+| activePromptVersionId      | INTEGER | FK, NOT NULL              | → AiApproverPromptVersionsV02.id                                   |
+| selectionMode              | STRING  | NOT NULL                  | `article_position_count` or `until_last_approved`                   |
+| requestedArticleCount      | INTEGER | NULL                      | Requested count for position-based selection; minimum 1            |
+| allowPastApprovedBoundary  | BOOLEAN | NOT NULL, DEFAULT false   | Whether selection may continue beyond the approved boundary        |
+| allowDescriptionFallback   | BOOLEAN | NOT NULL, DEFAULT false   | Whether article descriptions may replace unavailable full content  |
+| highestArticleIdAtStart    | INTEGER | NOT NULL                  | Highest article ID captured when the run was planned; minimum 1     |
+| approvedBoundaryArticleId  | INTEGER | NULL                      | Last approved article boundary captured at planning; minimum 1     |
+| plannedEligibleCount       | INTEGER | NOT NULL, DEFAULT 0       | Number of eligible articles in the selection snapshot              |
+| attemptedCount             | INTEGER | NOT NULL, DEFAULT 0       | Number of articles attempted                                       |
+| completedCount             | INTEGER | NOT NULL, DEFAULT 0       | Number of completed predictions                                    |
+| failedCount                | INTEGER | NOT NULL, DEFAULT 0       | Number of failed predictions                                       |
+| invalidResponseCount       | INTEGER | NOT NULL, DEFAULT 0       | Number of invalid model responses                                  |
+| skippedCount               | INTEGER | NOT NULL, DEFAULT 0       | Number of skipped articles                                         |
+| status                     | STRING  | NOT NULL, DEFAULT `draft` | Draft, execution, terminal, or circuit-breaker state                |
+| endingReason               | TEXT    | NULL                      | Explanation for the run's terminal state                           |
+| modelName                  | STRING  | NOT NULL                  | Model selected for the run                                         |
+| selectionSnapshot          | JSONB   | NOT NULL, DEFAULT `[]`    | Planned article IDs and their content sources                      |
+| previewToken               | STRING  | NULL                      | Unique token used to commit a previewed run                        |
+| previewExpiresAt           | DATE    | NULL                      | Expiration time for the preview token                              |
+| startedAt                  | DATE    | NULL                      | Time execution started                                             |
+| endedAt                    | DATE    | NULL                      | Time execution ended                                               |
+
+**Indexes**:
+
+- Unique index on `previewToken`
+- Non-unique indexes on `jobId`, `status`, `createdAt`, and (`status`, `previewExpiresAt`)
+
+**Relationships**:
+
+- belongsTo AiApproverPromptVersionV02 (via `activePromptVersionId`)
+- hasMany AiApproverArticlePredictionV02 (via `runId`)
 
 ---
 
