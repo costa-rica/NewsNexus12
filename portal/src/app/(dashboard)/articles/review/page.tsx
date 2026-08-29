@@ -24,44 +24,8 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { ModalInformationOk } from "@/components/ui/modal/ModalInformationOk";
 import ModalStateAssignerDetails from "@/components/ui/modal/ModalStateAssignerDetails";
-import ModalAiApproverDetails from "@/components/ui/modal/ModalAiApproverDetails";
 import ModalAiApproverV02Details from "@/components/ui/modal/ModalAiApproverV02Details";
 import ModalReviewArticleContent from "@/components/ui/modal/ModalReviewArticleContent";
-
-type AiApproverTopScoreMap = Record<
-	string,
-	{
-		id: number;
-		articleId: number;
-		promptVersionId: number;
-		score: number | null;
-		resultStatus: string;
-		promptName: string | null;
-		promptRole?: string | null;
-	}
->;
-
-type AiApproverGatekeeperMap = Record<
-	string,
-	{
-		id: number;
-		articleId: number;
-		promptVersionId: number;
-		resultStatus: string;
-		decision: string | null;
-		confidence: number | null;
-		reasonCode: string | null;
-		reason?: string | null;
-		errorCode?: string | null;
-		errorMessage?: string | null;
-		promptName?: string | null;
-	}
->;
-
-type AiApproverTopScoresResponse = {
-	topScores: AiApproverTopScoreMap;
-	gatekeeperResults: AiApproverGatekeeperMap;
-};
 
 type AiApproverV02PredictionMap = Record<string, AiApproverPredictionV02>;
 
@@ -80,7 +44,6 @@ export default function ReviewArticles() {
 	const [articlesArray, setArticlesArray] = useState<Article[]>([]);
 	const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 	const [stateAssignerArticleId, setStateAssignerArticleId] = useState<number | null>(null);
-	const [aiApproverArticleId, setAiApproverArticleId] = useState<number | null>(null);
 	const [aiApproverV02ArticleId, setAiApproverV02ArticleId] =
 		useState<number | null>(null);
 	const [reviewArticleContentArticleId, setReviewArticleContentArticleId] =
@@ -319,85 +282,6 @@ export default function ReviewArticles() {
 		}
 	};
 
-	const mergeAiApproverTopScores = useCallback(
-		(
-			articles: Article[],
-			topScores: AiApproverTopScoreMap = {},
-			gatekeeperResults: AiApproverGatekeeperMap = {}
-		) =>
-			articles.map((article) => {
-				const scoreRow = topScores[String(article.id)];
-				const gatekeeperRow = gatekeeperResults[String(article.id)];
-				return {
-					...article,
-					aiApproverTopScore: scoreRow?.score ?? null,
-					aiApproverTopScoreId: scoreRow?.id ?? null,
-					aiApproverTopPromptVersionId: scoreRow?.promptVersionId ?? null,
-					aiApproverTopPromptName: scoreRow?.promptName ?? null,
-					aiApproverTopResultStatus: scoreRow?.resultStatus ?? null,
-					aiApproverGatekeeperDecision: gatekeeperRow?.decision ?? null,
-					aiApproverGatekeeperConfidence: gatekeeperRow?.confidence ?? null,
-					aiApproverGatekeeperReasonCode: gatekeeperRow?.reasonCode ?? null,
-					aiApproverGatekeeperResultStatus: gatekeeperRow?.resultStatus ?? null,
-					aiApproverGatekeeperScoreId: gatekeeperRow?.id ?? null,
-				};
-			}),
-		[]
-	);
-
-	const fetchAiApproverTopScores = useCallback(
-		async (articleIds: number[]): Promise<AiApproverTopScoresResponse> => {
-			if (!token || articleIds.length === 0) {
-				return { topScores: {}, gatekeeperResults: {} };
-			}
-
-			const response = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/analysis/ai-approver/top-scores`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${token}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({ articleIds }),
-				}
-			);
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`Server Error: ${errorText}`);
-			}
-
-			const result = await response.json();
-			return {
-				topScores: (result.topScores || {}) as AiApproverTopScoreMap,
-				gatekeeperResults: (result.gatekeeperResults || {}) as AiApproverGatekeeperMap,
-			};
-		},
-		[token]
-	);
-
-	const fetchAiApproverTopScoresInChunks = useCallback(
-		async (articleIds: number[]): Promise<AiApproverTopScoresResponse> => {
-			const combinedTopScores: AiApproverTopScoreMap = {};
-			const combinedGatekeeperResults: AiApproverGatekeeperMap = {};
-
-			for (let i = 0; i < articleIds.length; i += 500) {
-				const chunk = articleIds.slice(i, i + 500);
-				const { topScores, gatekeeperResults } =
-					await fetchAiApproverTopScores(chunk);
-				Object.assign(combinedTopScores, topScores);
-				Object.assign(combinedGatekeeperResults, gatekeeperResults);
-			}
-
-			return {
-				topScores: combinedTopScores,
-				gatekeeperResults: combinedGatekeeperResults,
-			};
-		},
-		[fetchAiApproverTopScores]
-	);
-
 	const fetchAiApproverV02PredictionsInChunks = useCallback(
 		async (articleIds: number[]): Promise<AiApproverV02PredictionMap> => {
 			const combined: AiApproverV02PredictionMap = {};
@@ -507,18 +391,11 @@ export default function ReviewArticles() {
 
 			if (result.articlesArray && Array.isArray(result.articlesArray)) {
 				const articleIds = result.articlesArray.map((article: Article) => article.id);
-				const [{ topScores, gatekeeperResults }, v02Predictions] =
-					await Promise.all([
-						fetchAiApproverTopScoresInChunks(articleIds),
-						fetchAiApproverV02PredictionsInChunks(articleIds),
-					]);
+				const v02Predictions =
+					await fetchAiApproverV02PredictionsInChunks(articleIds);
 				setArticlesArray(
 					mergeAiApproverV02Predictions(
-						mergeAiApproverTopScores(
-							result.articlesArray,
-							topScores,
-							gatekeeperResults
-						),
+						result.articlesArray,
 						v02Predictions
 					)
 				);
@@ -539,24 +416,6 @@ export default function ReviewArticles() {
 			}));
 		}
 	};
-
-	const handleAiApproverArticleUpdate = useCallback(
-		async (articleId: number) => {
-			try {
-				const topScores = await fetchAiApproverTopScores([articleId]);
-				setArticlesArray((prevArray) =>
-					mergeAiApproverTopScores(
-						prevArray,
-						topScores.topScores,
-						topScores.gatekeeperResults
-					)
-				);
-			} catch (error) {
-				console.error("Error refreshing AI approver top score:", error);
-			}
-		},
-		[fetchAiApproverTopScores, mergeAiApproverTopScores]
-	);
 
 	const handleAiApproverV02ArticleUpdate = useCallback(
 		async (articleId: number) => {
@@ -1207,7 +1066,6 @@ export default function ReviewArticles() {
 				onToggleReviewed={handleClickIsReviewed}
 				onToggleRelevant={handleClickIsRelevant}
 				onStateAssignmentClick={setStateAssignerArticleId}
-				onAiApproverClick={setAiApproverArticleId}
 				onAiApproverV02Click={setAiApproverV02ArticleId}
 				onArticleContentClick={setReviewArticleContentArticleId}
 			/>
@@ -1233,14 +1091,6 @@ export default function ReviewArticles() {
 					onClose={() => setStateAssignerArticleId(null)}
 					onArticleUpdate={handleStateAssignerArticleUpdate}
 					showFullDetails={false}
-				/>
-			)}
-
-			{aiApproverArticleId && (
-				<ModalAiApproverDetails
-					articleId={aiApproverArticleId}
-					onClose={() => setAiApproverArticleId(null)}
-					onScoresUpdated={handleAiApproverArticleUpdate}
 				/>
 			)}
 

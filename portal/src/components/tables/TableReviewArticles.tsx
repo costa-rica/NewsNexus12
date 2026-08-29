@@ -38,70 +38,6 @@ const multiSelectStringFilterFn: FilterFn<Article> = (row, columnId, filterValue
 	return selectedValues.includes(normalizedRowValue);
 };
 
-function getAiApproverSortValue(article: Article): number | undefined {
-	if (article.aiApproverTopScoreId && article.aiApproverTopScore !== null) {
-		return Number(article.aiApproverTopScore);
-	}
-	if (article.aiApproverTopScoreId) {
-		return 0;
-	}
-	if (article.aiApproverGatekeeperScoreId) {
-		return -0.01;
-	}
-	return undefined;
-}
-
-function getGatekeeperBadge(article: Article): {
-	label: string;
-	className: string;
-	title: string;
-} {
-	const status = article.aiApproverGatekeeperResultStatus;
-	const decision = article.aiApproverGatekeeperDecision;
-	const confidence =
-		typeof article.aiApproverGatekeeperConfidence === "number"
-			? ` (${Math.round(article.aiApproverGatekeeperConfidence * 100)}%)`
-			: "";
-
-	if (status === "failed" || status === "invalid_response" || decision === "error") {
-		return {
-			label: "Err",
-			className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-			title: `Open AI Approver details (${status || "gatekeeper error"})`,
-		};
-	}
-	if (decision === "reject") {
-		return {
-			label: "Reject",
-			className:
-				"bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
-			title: `Gatekeeper rejected${confidence}`,
-		};
-	}
-	if (decision === "manual_review") {
-		return {
-			label: "Review",
-			className:
-				"bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200",
-			title: `Gatekeeper routed to manual review${confidence}`,
-		};
-	}
-	if (decision === "pass") {
-		return {
-			label: "GK",
-			className:
-				"bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200",
-			title: `Gatekeeper passed${confidence}`,
-		};
-	}
-
-	return {
-		label: "GK",
-		className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-		title: `Gatekeeper analysis exists (${status || "unknown"})`,
-	};
-}
-
 interface ColumnFilterOption {
 	value: string;
 	label: string;
@@ -124,7 +60,6 @@ interface TableReviewArticlesProps {
 	onToggleRelevant?: (articleId: number) => void;
 	onDeleteArticle?: (article: Article) => void;
 	onStateAssignmentClick?: (articleId: number) => void;
-	onAiApproverClick?: (articleId: number) => void;
 	onAiApproverV02Click?: (articleId: number) => void;
 	onArticleContentClick?: (articleId: number) => void;
 }
@@ -141,7 +76,6 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	onToggleRelevant,
 	onDeleteArticle,
 	onStateAssignmentClick,
-	onAiApproverClick,
 	onAiApproverV02Click,
 	onArticleContentClick,
 }) => {
@@ -157,7 +91,6 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
 		locationClassifierScore: false,
-		aiApproverTopScore: false,
 	});
 	const stateFilterRef = useRef<HTMLDivElement | null>(null);
 	const aiApproverV02FilterRef = useRef<HTMLDivElement | null>(null);
@@ -725,74 +658,6 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 						}
 					),
 					columnHelper.accessor(
-						getAiApproverSortValue,
-						{
-							id: "aiApproverTopScore",
-							header: "AI Approver V01",
-							enableSorting: true,
-							sortUndefined: "last",
-							sortingFn: "basic",
-							cell: ({ row, getValue }) => {
-								const value = getValue();
-								const hasCategoryAnalysis = Boolean(row.original.aiApproverTopScoreId);
-								const hasGatekeeperAnalysis = Boolean(
-									row.original.aiApproverGatekeeperScoreId
-								);
-								const hasAnalysis = hasCategoryAnalysis || hasGatekeeperAnalysis;
-								if (!hasAnalysis) {
-									return <div className="text-center text-xs text-gray-400">N/A</div>;
-								}
-								const hasValidScore =
-									value !== undefined &&
-									value !== null &&
-									row.original.aiApproverTopScore !== null;
-								const normalized = hasValidScore
-									? Math.max(0, Math.min(1, Number(value)))
-									: 0;
-								const green = Math.floor(normalized * 200);
-								const color = hasValidScore
-									? `rgb(${128 - green / 3}, ${green}, ${128 - green / 3})`
-									: "rgb(147, 51, 234)";
-								const label = hasValidScore
-									? `${Math.round(normalized * 100)}%`
-									: "0";
-								if (!hasCategoryAnalysis && hasGatekeeperAnalysis) {
-									const badge = getGatekeeperBadge(row.original);
-									return (
-										<div className="flex justify-center">
-											<button
-												type="button"
-												onClick={() => onAiApproverClick?.(row.original.id)}
-												className={`flex h-10 min-w-10 items-center justify-center rounded-full px-2 text-[10px] font-semibold transition-transform hover:scale-105 ${badge.className}`}
-												title={badge.title}
-											>
-												{badge.label}
-											</button>
-										</div>
-									);
-								}
-
-								return (
-									<div className="flex justify-center">
-										<button
-											type="button"
-											onClick={() => onAiApproverClick?.(row.original.id)}
-											className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition-transform hover:scale-105"
-											style={{ backgroundColor: color }}
-											title={
-												hasValidScore
-													? "Open AI Approver details"
-													: `Open AI Approver details (${row.original.aiApproverTopResultStatus || "no valid response"})`
-											}
-										>
-											{label}
-										</button>
-									</div>
-								);
-							},
-						}
-					),
-					columnHelper.accessor(
 						(row) => {
 							const stateName = row.stateAssignment?.stateName?.trim();
 							if (stateName) {
@@ -940,7 +805,6 @@ const TableReviewArticles: React.FC<TableReviewArticlesProps> = ({
 			onToggleRelevant,
 			onDeleteArticle,
 			onStateAssignmentClick,
-			onAiApproverClick,
 			onAiApproverV02Click,
 			onArticleContentClick,
 			showReviewedColumn,

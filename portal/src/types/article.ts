@@ -27,16 +27,6 @@ export interface Article {
 	nameOfOrg?: string;
 	semanticRatingMax?: number | string;
 	locationClassifierScore?: number | string;
-	aiApproverTopScore?: number | null;
-	aiApproverTopScoreId?: number | null;
-	aiApproverTopPromptVersionId?: number | null;
-	aiApproverTopPromptName?: string | null;
-	aiApproverTopResultStatus?: string | null;
-	aiApproverGatekeeperDecision?: string | null;
-	aiApproverGatekeeperConfidence?: number | null;
-	aiApproverGatekeeperReasonCode?: string | null;
-	aiApproverGatekeeperResultStatus?: string | null;
-	aiApproverGatekeeperScoreId?: number | null;
 	aiApproverV02PredictionId?: number | null;
 	aiApproverV02Prediction?: "approved" | "irrelevant" | null;
 	aiApproverV02ResultStatus?: string | null;
@@ -61,62 +51,6 @@ export interface ReviewArticleContentResponse {
 	hasArticleContent: boolean;
 	content: string | null;
 	contentSource: string | null;
-}
-
-export interface ReviewPageAiApproverStartJobResponse {
-	result: boolean;
-	jobId: string;
-	status: string;
-	endpointName: string;
-	promptVersionId: number;
-	articleId: number;
-}
-
-export interface AiApproverPromptVersion {
-	id: number;
-	name: string;
-	description: string | null;
-	promptInMarkdown: string;
-	isActive: boolean;
-	endedAt: string | null;
-	promptRole: "category_score" | "legacy_category_score" | "gatekeeper" | string;
-	promptKey: string | null;
-	pipelineVersion: string | null;
-	responseSchemaVersion: string | null;
-	modelName: string | null;
-}
-
-export interface AiApproverScoreRow {
-	id: number;
-	articleId: number;
-	promptVersionId: number;
-	resultStatus: "completed" | "failed" | "invalid_response" | string;
-	score: number | null;
-	reason: string | null;
-	errorCode: string | null;
-	errorMessage: string | null;
-	isHumanApproved: boolean | null;
-	reasonHumanRejected: string | null;
-	promptRole: "category_score" | "legacy_category_score" | "gatekeeper" | string;
-	pipelineVersion: string | null;
-	decision: "pass" | "reject" | "manual_review" | "error" | string | null;
-	confidence: number | null;
-	reasonCode: string | null;
-	metadata: Record<string, unknown> | null;
-	createdAt: string;
-	updatedAt: string;
-	promptVersion: AiApproverPromptVersion | null;
-}
-
-export interface AiApproverArticleDetailsResponse {
-	result: boolean;
-	articleId: number;
-	topEligibleScoreId: number | null;
-	latestGatekeeperResultId: number | null;
-	gatekeeperResults: AiApproverScoreRow[];
-	categoryScores: AiApproverScoreRow[];
-	legacyCategoryScores: AiApproverScoreRow[];
-	scores: AiApproverScoreRow[];
 }
 
 export interface AiApproverPromptVersionV02 {

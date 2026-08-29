@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:21:30Z
+updated_at: 2026-08-29T22:28:48Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -147,28 +147,35 @@ All Phase 2 edits remain in one working-tree integration unit. Remove API and wo
 
 ### V01 surfaces
 
-- [ ] Delete `OrchestratorSection.tsx`, `AiApproverSection.tsx`, `ModalAiApproverDetails.tsx`, the V01 prompt implementation, and both V01 prompt page files.
-- [ ] Remove V01 score and gatekeeper requests, merge logic, state, callbacks, modal launch, table column, sorting, and rendering from article review.
-- [ ] Remove only V01 prompt, score, gatekeeper, and one-off response types from `portal/src/types/article.ts`.
-- [ ] Confirm the automations page retains every independent card, including AI Approver V02.
+- [x] Delete `OrchestratorSection.tsx`, `AiApproverSection.tsx`, `ModalAiApproverDetails.tsx`, the V01 prompt implementation, and both V01 prompt page files.
+- [x] Remove V01 score and gatekeeper requests, merge logic, state, callbacks, modal launch, table column, sorting, and rendering from article review.
+- [x] Remove only V01 prompt, score, gatekeeper, and one-off response types from `portal/src/types/article.ts`.
+- [x] Confirm the automations page retains every independent card, including AI Approver V02.
 
 ### Retained article content and V02
 
-- [ ] Preserve `ModalReviewArticleContent.tsx`, `ReviewArticleContentResponse`, `reviewArticleContentArticleId`, `onArticleContentClick`, and the content button.
-- [ ] Change the modal URL to `/articles/review-selected-content/:articleId`.
-- [ ] Add or update focused coverage proving the button remains for `hasArticleContent` rows and the modal uses the retained endpoint.
-- [ ] Preserve the V02 column, filter, details modal, validation, comments, and prediction refresh.
-- [ ] Confirm removed V01 prompt URLs use normal Next.js not-found behavior without a V02 redirect.
+- [x] Preserve `ModalReviewArticleContent.tsx`, `ReviewArticleContentResponse`, `reviewArticleContentArticleId`, `onArticleContentClick`, and the content button.
+- [x] Change the modal URL to `/articles/review-selected-content/:articleId`.
+- [x] Add or update focused coverage proving the button remains for `hasArticleContent` rows and the modal uses the retained endpoint.
+- [x] Preserve the V02 column, filter, details modal, validation, comments, and prediction refresh.
+- [x] Confirm removed V01 prompt URLs use normal Next.js not-found behavior without a V02 redirect.
 
 ### Clean output, verification, and commit
 
-- [ ] Remove only the exact ignored `portal/.next` directory after confirming its path.
-- [ ] Run portal lint with zero warnings.
-- [ ] Run focused portal tests if a test runner exists for touched components.
-- [ ] Run the clean portal production build and inspect route output for deleted V01 pages.
-- [ ] Manually verify the automations page, V02 review controls, and read-only content modal.
-- [ ] Fix all Phase 4 failures before continuing.
-- [ ] Mark only completed Phase 4 tasks, review the staged diff, and commit with a reference to this todo Phase 4.
+- [x] Remove only the exact ignored `portal/.next` directory after confirming its path.
+- [x] Run portal lint with zero warnings.
+- [x] Run focused portal tests if a test runner exists for touched components.
+- [x] Run the clean portal production build and inspect route output for deleted V01 pages.
+- [x] Manually verify the automations page, V02 review controls, and read-only content modal.
+- [x] Fix all Phase 4 failures before continuing.
+- [x] Mark only completed Phase 4 tasks, review the staged diff, and commit with a reference to this todo Phase 4.
+
+Phase 4 verification notes:
+
+- Portal has no configured component test runner.
+- Focused source assertions confirmed the content button remains conditional on `hasArticleContent`, its callback remains wired, and the modal uses the retained endpoint.
+- Lint passed with zero warnings. The clean Webpack production build passed after allowing its configured Google Font download.
+- Build route output contains V02 prompts and no V01 prompt route.
 
 ## Phase 5: Scripts, Documentation, and Full Repository Verification
 

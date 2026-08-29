@@ -31,7 +31,7 @@ const ModalReviewArticleContent: React.FC<ModalReviewArticleContentProps> = ({
 			try {
 				setLoading(true);
 				const response = await fetch(
-					`${process.env.NEXT_PUBLIC_API_BASE_URL}/analysis/ai-approver/review-article-content/${articleId}`,
+					`${process.env.NEXT_PUBLIC_API_BASE_URL}/articles/review-selected-content/${articleId}`,
 					{
 						headers: {
 							Authorization: `Bearer ${token}`,
