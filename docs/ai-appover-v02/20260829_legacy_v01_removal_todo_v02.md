@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:50:45Z
+updated_at: 2026-08-29T22:59:04Z
 created_by: codex (gpt-5.6) nicksmacbookair
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -224,6 +224,9 @@ Phase 5 verification notes:
 - [x] Confirm the four removed CSV files are skipped.
 - [x] Confirm the four removed tables and `NewsApiRequests.orchestratorRunId` are absent.
 - [x] Confirm retained V02, article, and article-content tables are present.
+- [x] Investigate the initial round-trip count mismatch and identify blank nullable V02 tokens as the cause of skipped retained rows.
+- [x] Normalize blank nullable strings to SQL `NULL` during ZIP import and add regression coverage.
+- [x] Run the focused and complete db-manager suites and repeat the source-backup scratch validation.
 - [x] Create and verify a new post-removal database backup.
 - [x] Restore the new post-removal backup into a disposable scratch database to prove round-trip compatibility.
 - [x] Start API, worker-node, worker-python, and portal against the replenished local database.
@@ -235,12 +238,16 @@ Mac workstation rehearsal notes:
 
 - Source ZIP: `/Users/nick/Downloads/db_backup_202608292156564.zip`
 - Source SHA-256: `184edcb5c4d66e41bd6c934b4e0ed22bcc563f35aac2bd6d933ab25575cf14f0`
-- Replenish imported 1,552,287 records across 26 retained tables and restored 254,127 articles.
+- The initial rehearsal exposed a restore defect: eight V02 runs with blank nullable `previewToken` values conflicted on the unique index, causing 13,741 dependent predictions to be skipped as orphans.
+- The importer now normalizes blank nullable string fields to SQL `NULL`. ZIP-import coverage passed 32 tests, the complete db-manager suite passed 214 tests, and the build passed.
+- Corrected replenish imported 1,566,028 records across 26 retained tables and restored 254,127 articles.
 - Import skipped `AiApproverArticleScore.csv`, `AiApproverPromptVersion.csv`, `OrchestratorRun.csv`, and `OrchestratorRunStep.csv`.
-- Post-removal backup: `/Users/nick/Documents/_testData/db_backup_202608292247058.zip`
-- Post-removal SHA-256: `11e6f15ab4808e074d9c2ed6411477ad89a28b29873d7feb71cb8ec4cb8dc3ea`
+- Verified post-removal backup: `/Users/nick/Documents/_testData/db_backup_202608292255192.zip`
+- Verified post-removal SHA-256: `e9d1a0213366fd0b34ee12cd7db60cc6ac6852e6fad4ed8fba09233cbe64f26d`
+- The incomplete first artifact was preserved as `/Users/nick/Documents/_testData/db_backup_202608292247058.invalid_do_not_use.zip` and must not be deployed.
 - The new ZIP passed integrity testing, omits the four removed CSV files, and omits `orchestratorRunId` from `NewsApiRequest.csv`.
-- The new ZIP passed db-manager's scratch restore with 1,552,279 records across 26 retained tables.
+- The new ZIP contains all 18 V02 runs and 13,750 V02 predictions from the source and passed scratch restore with 1,566,028 records across 26 retained tables.
+- Every retained CSV has the same row count as the source ZIP; only the four intentionally removed CSV files differ.
 - Runtime checks returned `200` for retained public routes, `401` for retained protected API routes, and `404` for representative removed routes.
 - Ubuntu was not accessed or modified during this rehearsal.
 

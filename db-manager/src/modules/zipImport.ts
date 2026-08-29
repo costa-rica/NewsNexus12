@@ -117,6 +117,31 @@ function getFloatFields(model: { rawAttributes?: Record<string, unknown> }): str
     .map(([field]) => field);
 }
 
+function getNullableStringFields(model: {
+  rawAttributes?: Record<string, unknown>;
+}): string[] {
+  if (!model.rawAttributes) {
+    return [];
+  }
+
+  return Object.entries(model.rawAttributes)
+    .filter(([, attribute]) => {
+      const typedAttribute = attribute as {
+        allowNull?: boolean;
+        type?: { key?: string; constructor?: { name?: string } };
+      };
+      const key =
+        typedAttribute.type?.key ?? typedAttribute.type?.constructor?.name;
+      return (
+        typedAttribute.allowNull === true &&
+        (key === DataTypes.STRING.key ||
+          key === DataTypes.TEXT.key ||
+          key === DataTypes.CHAR.key)
+      );
+    })
+    .map(([field]) => field);
+}
+
 function getJsonFields(model: { rawAttributes?: Record<string, unknown> }): string[] {
   if (!model.rawAttributes) {
     return [];
@@ -259,6 +284,28 @@ export function sanitizeFloatFields(
   return sanitizedCount;
 }
 
+export function sanitizeNullableStringFields(
+  records: Record<string, string | null>[],
+  nullableStringFields: string[],
+): number {
+  if (nullableStringFields.length === 0 || records.length === 0) {
+    return 0;
+  }
+
+  let sanitizedCount = 0;
+
+  for (const record of records) {
+    for (const field of nullableStringFields) {
+      if (field in record && record[field] === "") {
+        record[field] = null;
+        sanitizedCount += 1;
+      }
+    }
+  }
+
+  return sanitizedCount;
+}
+
 export function sanitizeBooleanFields(
   records: Record<string, string | null>[],
   booleanFields: string[],
@@ -374,6 +421,7 @@ async function importCsvFileInBatches(
   sanitizedBooleans: number;
   sanitizedIntegers: number;
   sanitizedFloats: number;
+  sanitizedNullableStrings: number;
   sanitizedJson: number;
   skippedFkCount: number;
 }> {
@@ -381,12 +429,14 @@ async function importCsvFileInBatches(
   const booleanFields = getBooleanFields(model);
   const integerFields = getIntegerFields(model);
   const floatFields = getFloatFields(model);
+  const nullableStringFields = getNullableStringFields(model);
   const jsonFields = getJsonFields(model);
   let importedCount = 0;
   let sanitizedDates = 0;
   let sanitizedBooleans = 0;
   let sanitizedIntegers = 0;
   let sanitizedFloats = 0;
+  let sanitizedNullableStrings = 0;
   let sanitizedJson = 0;
   let skippedFkCount = 0;
   let batch: Record<string, string | null>[] = [];
@@ -401,6 +451,10 @@ async function importCsvFileInBatches(
     sanitizedBooleans += sanitizeBooleanFields(batch, booleanFields);
     sanitizedIntegers += sanitizeIntegerFields(batch, integerFields);
     sanitizedFloats += sanitizeFloatFields(batch, floatFields);
+    sanitizedNullableStrings += sanitizeNullableStringFields(
+      batch,
+      nullableStringFields,
+    );
     sanitizedJson += sanitizeJsonFields(batch, jsonFields);
 
     try {
@@ -480,7 +534,16 @@ async function importCsvFileInBatches(
     stream.on("error", handleError);
   });
 
-  return { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, sanitizedJson, skippedFkCount };
+  return {
+    importedCount,
+    sanitizedDates,
+    sanitizedBooleans,
+    sanitizedIntegers,
+    sanitizedFloats,
+    sanitizedNullableStrings,
+    sanitizedJson,
+    skippedFkCount,
+  };
 }
 
 export async function rebuildSchema(): Promise<void> {
@@ -560,11 +623,16 @@ export async function importZipFileToDatabase(
         continue;
       }
 
-      const { importedCount, sanitizedDates, sanitizedBooleans, sanitizedIntegers, sanitizedFloats, sanitizedJson, skippedFkCount } = await importCsvFileInBatches(
-        csvFile,
-        tableName,
-        model,
-      );
+      const {
+        importedCount,
+        sanitizedDates,
+        sanitizedBooleans,
+        sanitizedIntegers,
+        sanitizedFloats,
+        sanitizedNullableStrings,
+        sanitizedJson,
+        skippedFkCount,
+      } = await importCsvFileInBatches(csvFile, tableName, model);
 
       if (importedCount === 0 && skippedFkCount === 0) {
         continue;
@@ -588,6 +656,11 @@ export async function importZipFileToDatabase(
       if (sanitizedFloats > 0) {
         logger.warn(
           `Sanitized ${sanitizedFloats} empty-string float values to null for ${tableName}`,
+        );
+      }
+      if (sanitizedNullableStrings > 0) {
+        logger.warn(
+          `Sanitized ${sanitizedNullableStrings} empty nullable string values to null for ${tableName}`,
         );
       }
       if (sanitizedJson > 0) {

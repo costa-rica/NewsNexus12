@@ -30,6 +30,15 @@ jest.mock("@newsnexus/db-models", () => ({
       status: { type: { key: "STRING" } },
     },
   },
+  AiApproverRunV02: {
+    bulkCreate: jest.fn(),
+    rawAttributes: {
+      id: { type: { key: "INTEGER" }, allowNull: false },
+      jobId: { type: { key: "STRING" }, allowNull: true },
+      previewToken: { type: { key: "STRING" }, allowNull: true },
+      status: { type: { key: "STRING" }, allowNull: false },
+    },
+  },
   sequelize: {
     query: jest.fn(),
     sync: jest.fn(),
@@ -39,6 +48,7 @@ jest.mock("@newsnexus/db-models", () => ({
   },
   MODEL_LOAD_ORDER: [
     "NewsApiRequest",
+    "AiApproverRunV02",
     "Article",
     "User",
   ],
@@ -64,6 +74,7 @@ import {
   normalizeDateValue,
   sanitizeDateFields,
   sanitizeJsonFields,
+  sanitizeNullableStringFields,
 } from "../../src/modules/zipImport";
 import { MODEL_LOAD_ORDER as ACTUAL_MODEL_LOAD_ORDER } from "../../../db-models/src/models/_loadOrder";
 
@@ -73,9 +84,30 @@ describe("Zip import module", () => {
     (db.Article.bulkCreate as jest.Mock).mockReset();
     (db.User.bulkCreate as jest.Mock).mockReset();
     (db.NewsApiRequest.bulkCreate as jest.Mock).mockReset();
+    (db.AiApproverRunV02.bulkCreate as jest.Mock).mockReset();
     (db.sequelize.query as jest.Mock).mockReset();
     (db.sequelize.sync as jest.Mock).mockReset();
     (db.resetAllSequences as jest.Mock).mockReset();
+  });
+
+  describe("sanitizeNullableStringFields()", () => {
+    it("converts blank nullable strings to null without changing other strings", () => {
+      const records = [
+        { jobId: "", previewToken: "", status: "completed" },
+        { jobId: "0093", previewToken: "token", status: "completed" },
+      ];
+
+      const result = sanitizeNullableStringFields(records, [
+        "jobId",
+        "previewToken",
+      ]);
+
+      expect(result).toBe(2);
+      expect(records).toEqual([
+        { jobId: null, previewToken: null, status: "completed" },
+        { jobId: "0093", previewToken: "token", status: "completed" },
+      ]);
+    });
   });
 
   describe("normalizeDateValue()", () => {
@@ -387,6 +419,36 @@ describe("Zip import module", () => {
             id: "20",
             status: "completed",
           },
+        ],
+        { ignoreDuplicates: true, transaction: {} },
+      );
+    });
+
+    it("imports multiple V02 runs whose nullable unique tokens are blank", async () => {
+      const zipPath = path.join(tempDir, "v02-runs-with-blank-tokens.zip");
+      const zip = new AdmZip();
+
+      zip.addFile(
+        "AiApproverRunV02.csv",
+        Buffer.from(
+          [
+            "id,jobId,previewToken,status",
+            "1,0093,,completed",
+            "2,0094,,completed",
+          ].join("\n"),
+        ),
+      );
+      zip.writeZip(zipPath);
+
+      (db.AiApproverRunV02.bulkCreate as jest.Mock).mockResolvedValue(null);
+
+      const result = await importZipFileToDatabase(zipPath);
+
+      expect(result.totalRecords).toBe(2);
+      expect(db.AiApproverRunV02.bulkCreate).toHaveBeenCalledWith(
+        [
+          { id: "1", jobId: "0093", previewToken: null, status: "completed" },
+          { id: "2", jobId: "0094", previewToken: null, status: "completed" },
         ],
         { ignoreDuplicates: true, transaction: {} },
       );
