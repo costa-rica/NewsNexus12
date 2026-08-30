@@ -1,8 +1,8 @@
 ---
 created_at: 2026-08-30T01:17:22Z
-updated_at: 2026-08-30T01:17:22Z
+updated_at: 2026-08-30T01:26:05Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
-modified_by: codex (gpt-5.6-sol) nicksmacbookair
+modified_by: hermes (gpt-5.6-sol) nws-nn12dev
 ---
 
 # Weekly Article Processing Cron PRD V02
@@ -595,6 +595,7 @@ What are the absolute NewsNexus12 repository path and service-account name on th
 
 #### Operator Response
 
+Dev and production use `/home/limited_user/applications/NewsNexus12`. The application and weekly-flow service account is `limited_user`, with group `limited_user`.
 
 ### 2. Project resources path
 
@@ -602,6 +603,7 @@ What absolute Ubuntu path should represent `project_resources/NewsNexus12/weekly
 
 #### Operator Response
 
+Use `/home/limited_user/project_resources/NewsNexus12/weekly-flow/` on both dev and production. Create the `weekly-flow` directory as `limited_user:limited_user`; the parent `/home/limited_user/project_resources/NewsNexus12` already uses that ownership.
 
 ### 3. Ubuntu vault sync
 
@@ -609,4 +611,12 @@ What is the Ubuntu Obsidian vault root, and which command or service should sync
 
 #### Operator Response
 
-(codex) The macOS NickVault path is not portable. Configure and verify the Ubuntu path and sync mechanism before enabling production alerts.
+Use `/home/nick/NickVault` as the vault root on both Ubuntu servers. The sync command is:
+
+```bash
+/home/nick/.npm-global/bin/ob sync --path "/home/nick/NickVault"
+```
+
+Run vault sync and alert-file writes as `nick`, not `limited_user`. The vault, CLI, and Obsidian authentication are Nick-owned, and `limited_user` cannot traverse `/home/nick` or use Nick's protected sync credentials.
+
+Add a narrowly scoped root-installed oneshot helper service that runs as `User=nick`. It must sync before writing, atomically publish the fixed `ALERT-newsnexus12-weekly-cron.md` file from a fixed weekly-flow staging path, and sync again afterward. Permit the `limited_user` coordinator to start only this helper service; do not copy Nick's Obsidian token to `limited_user` or grant it general vault access.
