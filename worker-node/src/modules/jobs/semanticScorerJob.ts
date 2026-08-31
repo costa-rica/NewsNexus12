@@ -27,7 +27,7 @@ export interface SemanticScorerJobContext {
 }
 
 export interface SemanticScorerJobDependencies {
-  runLegacyWorkflow?: (context: SemanticScorerJobContext) => Promise<void>;
+  runLegacyWorkflow?: (context: SemanticScorerJobContext) => Promise<SemanticScorerJobResult>;
 }
 
 export interface ScorableArticle {
@@ -39,6 +39,32 @@ export interface ScorableArticle {
 export interface ScoreResult {
   keyword: string | null;
   keywordRating: number | null;
+}
+
+export type SemanticScorerEndingReason = 'completed' | 'canceled' | 'error';
+export type SemanticScorerSkipReason = 'no_usable_text' | 'no_score_result';
+export type SemanticScorerFailureReason = 'timeout' | 'scoring_error' | 'persistence_error';
+
+export interface SemanticScorerArticleOutcome<Reason extends string> {
+  articleId: number;
+  reason: Reason;
+}
+
+export interface SemanticScorerJobResult {
+  schemaVersion: 1;
+  endingReason: SemanticScorerEndingReason;
+  terminalMessage: string;
+  selectedArticleIds: number[];
+  scoredArticleIds: number[];
+  skippedArticles: SemanticScorerArticleOutcome<SemanticScorerSkipReason>[];
+  failedArticles: SemanticScorerArticleOutcome<SemanticScorerFailureReason>[];
+  unattemptedArticleIds: number[];
+  selectedCount: number;
+  attemptedCount: number;
+  successfulCount: number;
+  skippedCount: number;
+  failedCount: number;
+  unattemptedCount: number;
 }
 
 interface ProcessArticlesOptions {
@@ -56,6 +82,36 @@ interface ProcessArticlesOptions {
     warn: (message: string) => void;
     error: (message: string) => void;
   };
+}
+
+const buildSemanticScorerResult = (input: {
+  endingReason: SemanticScorerEndingReason;
+  terminalMessage: string;
+  selectedArticleIds: number[];
+  scoredArticleIds: number[];
+  skippedArticles: SemanticScorerArticleOutcome<SemanticScorerSkipReason>[];
+  failedArticles: SemanticScorerArticleOutcome<SemanticScorerFailureReason>[];
+  unattemptedArticleIds: number[];
+}): SemanticScorerJobResult => ({
+  schemaVersion: 1,
+  ...input,
+  selectedCount: input.selectedArticleIds.length,
+  attemptedCount:
+    input.scoredArticleIds.length + input.skippedArticles.length + input.failedArticles.length,
+  successfulCount: input.scoredArticleIds.length,
+  skippedCount: input.skippedArticles.length,
+  failedCount: input.failedArticles.length,
+  unattemptedCount: input.unattemptedArticleIds.length
+});
+
+class SemanticScorerProcessingError extends Error {
+  public readonly result: SemanticScorerJobResult;
+
+  constructor(message: string, result: SemanticScorerJobResult) {
+    super(message);
+    this.name = 'SemanticScorerProcessingError';
+    this.result = result;
+  }
 }
 
 const SEMANTIC_SCORER_KEYWORDS_FILENAME = 'NewsNexusSemanticScorerKeywords.xlsx';
@@ -384,44 +440,102 @@ export const processArticlesWithTimeout = async ({
   writeRunningStatus: writeRunningStatusFile,
   writeCompletedStatus: writeCompletedStatusFile,
   log
-}: ProcessArticlesOptions): Promise<void> => {
+}: ProcessArticlesOptions): Promise<SemanticScorerJobResult> => {
+  const selectedArticleIds = articles.map(({ id }) => id);
+  const scoredArticleIds: number[] = [];
+  const skippedArticles: SemanticScorerArticleOutcome<SemanticScorerSkipReason>[] = [];
+  const failedArticles: SemanticScorerArticleOutcome<SemanticScorerFailureReason>[] = [];
+
+  const createResult = (
+    endingReason: SemanticScorerEndingReason,
+    terminalMessage: string,
+    unattemptedArticleIds: number[]
+  ) => buildSemanticScorerResult({
+    endingReason,
+    terminalMessage,
+    selectedArticleIds,
+    scoredArticleIds,
+    skippedArticles,
+    failedArticles,
+    unattemptedArticleIds
+  });
+
   for (let index = 0; index < articles.length; index += 1) {
     if (signal.aborted) {
-      return;
+      return createResult(
+        'canceled',
+        'Semantic scorer was canceled before all selected articles were attempted.',
+        articles.slice(index).map(({ id }) => id)
+      );
     }
 
     const article = articles[index];
 
-    try {
-      const scoreResult = await withTimeout(
-        scoreArticle(article, keywords, signal),
-        iterationTimeoutMs
-      );
+    if (!pickArticleText(article)) {
+      skippedArticles.push({ articleId: article.id, reason: 'no_usable_text' });
+    } else {
+      let scoreResult: ScoreResult | null = null;
+      let scoringFailed = false;
 
-      if (scoreResult === null) {
+      try {
+        scoreResult = await withTimeout(
+          scoreArticle(article, keywords, signal),
+          iterationTimeoutMs
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown semantic scoring error';
+        log.error(`Semantic scorer scoring failed for article ${article.id}: ${message}`);
+        failedArticles.push({ articleId: article.id, reason: 'scoring_error' });
+        scoringFailed = true;
+      }
+
+      if (scoringFailed) {
+        // The failure outcome was recorded above.
+      } else if (scoreResult === null) {
         log.warn(
           `Semantic scorer timeout for article ${article.id} after ${iterationTimeoutMs}ms. Skipping iteration.`
         );
+        failedArticles.push({ articleId: article.id, reason: 'timeout' });
       } else if (scoreResult.keyword && scoreResult.keywordRating !== null) {
-        await persistScore(article.id, scoreResult.keyword, scoreResult.keywordRating);
+        try {
+          await persistScore(article.id, scoreResult.keyword, scoreResult.keywordRating);
+          scoredArticleIds.push(article.id);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown semantic persistence error';
+          log.error(`Semantic scorer persistence failed for article ${article.id}: ${message}`);
+          failedArticles.push({ articleId: article.id, reason: 'persistence_error' });
+        }
+      } else {
+        skippedArticles.push({ articleId: article.id, reason: 'no_score_result' });
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown semantic scoring error';
-      log.error(`Semantic scorer iteration failed for article ${article.id}: ${message}`);
     }
 
     const loopCount = index + 1;
     if (loopCount % progressEvery === 0) {
       log.info(`Processed ${loopCount} articles...`);
-      await writeRunningStatusFile(loopCount);
+      try {
+        await writeRunningStatusFile(loopCount);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to write semantic scorer progress';
+        throw new SemanticScorerProcessingError(
+          message,
+          createResult('error', message, articles.slice(index + 1).map(({ id }) => id))
+        );
+      }
     }
   }
 
-  await writeCompletedStatusFile(articles.length);
+  try {
+    await writeCompletedStatusFile(articles.length);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to write semantic scorer completion';
+    throw new SemanticScorerProcessingError(message, createResult('error', message, []));
+  }
   log.info('✅ All articles processed and saved.');
+  return createResult('completed', 'Semantic scorer completed all selected articles.', []);
 };
 
-const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<void> => {
+const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<SemanticScorerJobResult> => {
   await verifySemanticScorerDirectoryExists(context.semanticScorerDir);
   const keywordsWorkbookPath = await verifyKeywordsWorkbookExists(context.semanticScorerDir);
 
@@ -437,7 +551,7 @@ const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<voi
   logger.info(`Loaded keywords: ${keywords.length}`);
   const embedder = await getEmbedder();
 
-  await processArticlesWithTimeout({
+  return processArticlesWithTimeout({
     articles,
     keywords,
     iterationTimeoutMs: DEFAULT_ITERATION_TIMEOUT_MS,
@@ -469,11 +583,28 @@ export const createSemanticScorerJobHandler = (
     await verifySemanticScorerDirectoryExists(semanticScorerDir);
     await verifyKeywordsWorkbookExists(semanticScorerDir);
 
-    await workflowRunner({
-      jobId: queueContext.jobId,
-      semanticScorerDir,
-      signal: queueContext.signal,
-      targeting
-    });
+    try {
+      const result = await workflowRunner({
+        jobId: queueContext.jobId,
+        semanticScorerDir,
+        signal: queueContext.signal,
+        targeting
+      });
+      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+    } catch (error) {
+      const result = error instanceof SemanticScorerProcessingError
+        ? error.result
+        : buildSemanticScorerResult({
+            endingReason: 'error',
+            terminalMessage: error instanceof Error ? error.message : 'Semantic scorer failed.',
+            selectedArticleIds: [],
+            scoredArticleIds: [],
+            skippedArticles: [],
+            failedArticles: [],
+            unattemptedArticleIds: []
+          });
+      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+      throw error;
+    }
   };
 };

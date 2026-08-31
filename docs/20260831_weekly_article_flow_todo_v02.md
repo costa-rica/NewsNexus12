@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:21:14Z
+updated_at: 2026-08-31T23:24:11Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -173,42 +173,42 @@ Implementation rules:
 
 ### Processing outcomes
 
-- [ ] Define `SemanticScorerJobResult` with `schemaVersion`, `endingReason`, terminal message, arrays, and derived counts.
-- [ ] Return selected, scored, skipped, failed, and unattempted article outcomes from the processing loop.
-- [ ] Use deterministic `no_usable_text` skips when no scoring input exists.
-- [ ] Classify per-article timeout, scoring error, and persistence error separately.
-- [ ] Ensure each selected article appears in exactly one terminal outcome.
-- [ ] Mark remaining selected IDs unattempted after cancellation or a stage-level stop.
-- [ ] Preserve existing progress files for compatibility without using them as the result authority.
+- [x] Define `SemanticScorerJobResult` with `schemaVersion`, `endingReason`, terminal message, arrays, and derived counts.
+- [x] Return selected, scored, skipped, failed, and unattempted article outcomes from the processing loop.
+- [x] Use deterministic `no_usable_text` skips when no scoring input exists.
+- [x] Classify per-article timeout, scoring error, and persistence error separately.
+- [x] Ensure each selected article appears in exactly one terminal outcome.
+- [x] Mark remaining selected IDs unattempted after cancellation or a stage-level stop.
+- [x] Preserve existing progress files for compatibility without using them as the result authority.
 
 ### Queue integration
 
-- [ ] Refactor the semantic workflow runner to return its structured result.
-- [ ] Call queue `updateResult` before normal return.
-- [ ] Persist partial results before propagating a stage-level exception when possible.
-- [ ] Keep the normal scorer eligibility filter unchanged.
-- [ ] Keep existing optional ID-range behavior for existing callers.
-- [ ] Confirm the weekly flow can call the route without cohort IDs or ID bounds.
+- [x] Refactor the semantic workflow runner to return its structured result.
+- [x] Call queue `updateResult` before normal return.
+- [x] Persist partial results before propagating a stage-level exception when possible.
+- [x] Keep the normal scorer eligibility filter unchanged.
+- [x] Keep existing optional ID-range behavior for existing callers.
+- [x] Confirm the weekly flow can call the route without cohort IDs or ID bounds.
 
 ### Tests
 
-- [ ] Test score success and persistence.
-- [ ] Test no-usable-text skip behavior.
-- [ ] Test scoring timeout, scoring error, and persistence error.
-- [ ] Test isolated failures continuing through the selected set.
-- [ ] Test cancellation and unattempted IDs.
-- [ ] Test array/count reconciliation and queue result persistence.
-- [ ] Test that normal eligibility and existing range callers remain compatible.
+- [x] Test score success and persistence.
+- [x] Test no-usable-text skip behavior.
+- [x] Test scoring timeout, scoring error, and persistence error.
+- [x] Test isolated failures continuing through the selected set.
+- [x] Test cancellation and unattempted IDs.
+- [x] Test array/count reconciliation and queue result persistence.
+- [x] Test that normal eligibility and existing range callers remain compatible.
 
 ### Phase verification and commit
 
-- [ ] Run focused semantic-scorer tests.
-- [ ] Run `npm -C worker-node test`.
-- [ ] Run `npm -C worker-node run build`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 4 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 4 files and inspect `git diff --cached`.
-- [ ] Commit Phase 4 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 4.
+- [x] Run focused semantic-scorer tests.
+- [x] Run `npm -C worker-node test`.
+- [x] Run `npm -C worker-node run build`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 4 tasks and update this document's modification metadata.
+- [x] Stage only Phase 4 files and inspect `git diff --cached`.
+- [x] Commit Phase 4 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 4.
 
 ## Phase 5: State Assigner Result and Breaker
 

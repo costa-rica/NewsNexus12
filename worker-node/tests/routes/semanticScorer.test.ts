@@ -6,12 +6,16 @@ import request from 'supertest';
 import { errorHandler } from '../../src/modules/middleware/errorHandlers';
 import { QueueJobStore } from '../../src/modules/queue/jobStore';
 import { GlobalQueueEngine, QueueExecutionContext } from '../../src/modules/queue/queueEngine';
+import { SemanticScorerTargeting } from '../../src/modules/jobs/semanticScorerJob';
 import { createSemanticScorerRouter } from '../../src/routes/semanticScorer';
 
 const buildApp = (
   queueEngine: GlobalQueueEngine,
   env: NodeJS.ProcessEnv,
-  buildJobHandler?: (semanticScorerDir: string) => (context: QueueExecutionContext) => Promise<void>
+  buildJobHandler?: (
+    semanticScorerDir: string,
+    targeting?: SemanticScorerTargeting
+  ) => (context: QueueExecutionContext) => Promise<void>
 ): express.Express => {
   const app = express();
   app.use(express.json());
@@ -88,6 +92,45 @@ describe('semanticScorer routes', () => {
           message: 'PATH_TO_SEMANTIC_SCORER_DIR env var is required'
         }
       ]
+    });
+  });
+
+  it('keeps optional ID-range targeting compatible', async () => {
+    await fs.writeFile(path.join(tempDirPath, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      { PATH_TO_SEMANTIC_SCORER_DIR: tempDirPath },
+      buildJobHandler
+    );
+
+    const response = await request(app).post('/semantic-scorer/start-job').send({
+      articleIdMinExclusive: 100,
+      articleIdMaxInclusive: 200
+    });
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith(tempDirPath, {
+      articleIdMinExclusive: 100,
+      articleIdMaxInclusive: 200
+    });
+  });
+
+  it('allows the weekly flow to omit ID bounds', async () => {
+    await fs.writeFile(path.join(tempDirPath, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      { PATH_TO_SEMANTIC_SCORER_DIR: tempDirPath },
+      buildJobHandler
+    );
+
+    const response = await request(app).post('/semantic-scorer/start-job').send({});
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith(tempDirPath, {
+      articleIdMinExclusive: undefined,
+      articleIdMaxInclusive: undefined
     });
   });
 });
