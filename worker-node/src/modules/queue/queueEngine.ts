@@ -22,6 +22,7 @@ export interface EnqueueJobInput {
   endpointName: string;
   run: QueueJobHandler;
   jobId?: string;
+  parameters?: Record<string, unknown>;
 }
 
 export interface EnqueueJobResult {
@@ -99,7 +100,8 @@ export class GlobalQueueEngine {
       jobId,
       endpointName: input.endpointName,
       status: 'queued',
-      createdAt: nowIso
+      createdAt: nowIso,
+      ...(input.parameters !== undefined ? { parameters: input.parameters } : {})
     };
 
     await this.store.appendJob(jobRecord);

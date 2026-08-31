@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:15:21Z
+updated_at: 2026-08-31T23:21:14Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -126,48 +126,48 @@ Implementation rules:
 
 ### Optional run input
 
-- [ ] Extend `POST /request-google-rss/start-job` with optional `weeklyArticleFlowRunId`.
-- [ ] Reject booleans, strings with trailing content, zero, negatives, non-integers, and unknown run IDs.
-- [ ] Require the referenced weekly run to be `pending` or `running`.
-- [ ] Keep existing request bodies valid when the field is absent.
-- [ ] Propagate the validated run ID through route input, queue handler input, and RSS job context.
-- [ ] Include the run ID in queue parameters where safe for recovery inspection.
+- [x] Extend `POST /request-google-rss/start-job` with optional `weeklyArticleFlowRunId`.
+- [x] Reject booleans, strings with trailing content, zero, negatives, non-integers, and unknown run IDs.
+- [x] Require the referenced weekly run to be `pending` or `running`.
+- [x] Keep existing request bodies valid when the field is absent.
+- [x] Propagate the validated run ID through route input, queue handler input, and RSS job context.
+- [x] Include the run ID in queue parameters where safe for recovery inspection.
 
 ### Request association
 
-- [ ] Set `NewsApiRequest.weeklyArticleFlowRunId` on every request row created by that RSS job.
-- [ ] Leave the field `null` for manual RSS and unrelated ingestion paths.
-- [ ] Preserve repeat-window, URL deduplication, article-content seeding, follow-up scraping, cancellation, and query-result behavior.
-- [ ] Do not add a header or reuse `orchestratorRunId`.
+- [x] Set `NewsApiRequest.weeklyArticleFlowRunId` on every request row created by that RSS job.
+- [x] Leave the field `null` for manual RSS and unrelated ingestion paths.
+- [x] Preserve repeat-window, URL deduplication, article-content seeding, follow-up scraping, cancellation, and query-result behavior.
+- [x] Do not add a header or reuse `orchestratorRunId`.
 
 ### RSS result contract
 
-- [ ] Add `schemaVersion`, safe terminal message, and compatible common result fields to `GoogleRssJobResult`.
-- [ ] Preserve `articlesAddedCount`, query results, and all existing ending reasons.
-- [ ] Derive result counts from arrays where the contract includes arrays.
-- [ ] Persist the result through the existing `updateResult` path on accepted terminal completion.
-- [ ] Preserve partial diagnostic results on cancellation and failure when available.
+- [x] Add `schemaVersion`, safe terminal message, and compatible common result fields to `GoogleRssJobResult`.
+- [x] Preserve `articlesAddedCount`, query results, and all existing ending reasons.
+- [x] Derive result counts from arrays where the contract includes arrays.
+- [x] Persist the result through the existing `updateResult` path on accepted terminal completion.
+- [x] Preserve partial diagnostic results on cancellation and failure when available.
 
 ### Compatibility tests
 
-- [ ] Test missing, valid, malformed, inactive, terminal, and nonexistent weekly run IDs.
-- [ ] Test weekly request association across multiple RSS query rows.
-- [ ] Test manual RSS without a run ID.
-- [ ] Test unrelated article-ingestion paths still create valid request rows.
-- [ ] Test all six RSS ending reasons and existing target-count behavior.
-- [ ] Test that removed legacy headers and field names remain absent.
+- [x] Test missing, valid, malformed, inactive, terminal, and nonexistent weekly run IDs.
+- [x] Test weekly request association across multiple RSS query rows.
+- [x] Test manual RSS without a run ID.
+- [x] Test unrelated article-ingestion paths still create valid request rows.
+- [x] Test all six RSS ending reasons and existing target-count behavior.
+- [x] Test that removed legacy headers and field names remain absent.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Refresh the worker-node local db-model dependency if the package manager requires it.
-- [ ] Run focused request-google-rss route and job tests.
-- [ ] Run `npm -C worker-node test`.
-- [ ] Run `npm -C worker-node run build`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 3 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 3 files and inspect `git diff --cached`.
-- [ ] Commit Phase 3 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 3.
+- [x] Run `npm -C db-models run build`.
+- [x] Refresh the worker-node local db-model dependency if the package manager requires it.
+- [x] Run focused request-google-rss route and job tests.
+- [x] Run `npm -C worker-node test`.
+- [x] Run `npm -C worker-node run build`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 3 tasks and update this document's modification metadata.
+- [x] Stage only Phase 3 files and inspect `git diff --cached`.
+- [x] Commit Phase 3 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 3.
 
 ## Phase 4: Semantic Scorer Result Contract
 

@@ -6,6 +6,7 @@ import {
   Article,
   NewsApiRequest,
   NewsArticleAggregatorSource,
+  WeeklyArticleFlowRun,
   initModels
 } from '@newsnexus/db-models';
 import {
@@ -200,6 +201,29 @@ describe('requestGoogleRss job handler', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
+  it('passes weeklyArticleFlowRunId to the workflow dependency', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'request-google-rss-job-'));
+    const spreadsheetPath = path.join(tempDir, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'mock spreadsheet data', 'utf8');
+    const runLegacyWorkflow = jest.fn().mockResolvedValue(undefined);
+    const handler = createRequestGoogleRssJobHandler(
+      {
+        spreadsheetPath,
+        doNotRepeatRequestsWithinHours: 0,
+        weeklyArticleFlowRunId: 42
+      },
+      { runLegacyWorkflow }
+    );
+
+    await handler(makeQueueContext());
+
+    expect(runLegacyWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+      weeklyArticleFlowRunId: 42
+    }));
+
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
   it('maps RSS item content from content:encoded', () => {
     const items = mapRssItems([
       {
@@ -367,6 +391,24 @@ describe('requestGoogleRss terminal path results', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('writes endingReason=aborted when the RSS request aborts', async () => {
+    const abortError = new Error('request aborted');
+    abortError.name = 'AbortError';
+    fetchSpy.mockRejectedValue(abortError);
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    expect(updateResult).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<GoogleRssJobResult>>({
+        endingReason: 'aborted',
+        terminalMessage: 'Google RSS request was aborted.'
+      })
+    );
+  });
+
   it('includes articlesAddedCount in every result', async () => {
     fetchSpy.mockResolvedValue({
       ok: false,
@@ -380,7 +422,14 @@ describe('requestGoogleRss terminal path results', () => {
     await handler(makeQueueContext({ updateResult }));
 
     expect(updateResult).toHaveBeenCalledWith(
-      expect.objectContaining({ articlesAddedCount: expect.any(Number) })
+      expect.objectContaining({
+        schemaVersion: 1,
+        terminalMessage: expect.any(String),
+        articlesAddedCount: expect.any(Number),
+        successfulQueryCount: expect.any(Number),
+        skippedQueryCount: expect.any(Number),
+        failedQueryCount: expect.any(Number)
+      })
     );
   });
 
@@ -522,6 +571,50 @@ describe('requestGoogleRss terminal path results', () => {
     });
     await expectArticlesExist(urls);
     await expect(NewsApiRequest.count({ where: { url: String(fetchSpy.mock.calls[0][0]) } })).resolves.toBe(1);
+  });
+
+  it('associates every query request with the weekly run and leaves manual requests unassociated', async () => {
+    const weeklyRun = await WeeklyArticleFlowRun.create({
+      mode: 'dev_canary',
+      status: 'completed',
+      host: 'worker-node-test',
+      sourceRevision: 'test-revision'
+    });
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [31, 'weekly association one', '', '', '', '30d'],
+      [32, 'weekly association two', '', '', '', '30d']
+    ]);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => makeEmptyRssXml()
+    } as Response);
+
+    const weeklyHandler = createRequestGoogleRssJobHandler({
+      spreadsheetPath,
+      doNotRepeatRequestsWithinHours: 0,
+      weeklyArticleFlowRunId: weeklyRun.id
+    });
+    await weeklyHandler(makeQueueContext());
+
+    const weeklyRequests = await NewsApiRequest.findAll({
+      where: { weeklyArticleFlowRunId: weeklyRun.id }
+    });
+    expect(weeklyRequests).toHaveLength(2);
+
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [33, 'manual association control', '', '', '', '30d']
+    ]);
+    const manualHandler = createRequestGoogleRssJobHandler({
+      spreadsheetPath,
+      doNotRepeatRequestsWithinHours: 0
+    });
+    await manualHandler(makeQueueContext());
+
+    const manualUrl = String(fetchSpy.mock.calls[2][0]);
+    await expect(NewsApiRequest.findOne({ where: { url: manualUrl } })).resolves.toMatchObject({
+      weeklyArticleFlowRunId: null
+    });
   });
 
   it('records successful requests with zero saves when all articles already exist', async () => {

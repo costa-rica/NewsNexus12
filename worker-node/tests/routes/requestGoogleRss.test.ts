@@ -15,7 +15,8 @@ import { createRequestGoogleRssRouter } from '../../src/routes/requestGoogleRss'
 const buildApp = (
   queueEngine: GlobalQueueEngine,
   env: NodeJS.ProcessEnv,
-  buildJobHandler?: (input: RequestGoogleRssJobInput) => (context: QueueExecutionContext) => Promise<void>
+  buildJobHandler?: (input: RequestGoogleRssJobInput) => (context: QueueExecutionContext) => Promise<void>,
+  findWeeklyRunByPk?: (id: number) => Promise<{ status: string } | null>
 ): express.Express => {
   const app = express();
   app.use(express.json());
@@ -24,7 +25,8 @@ const buildApp = (
     createRequestGoogleRssRouter({
       queueEngine,
       env,
-      buildJobHandler: buildJobHandler ?? (() => async () => undefined)
+      buildJobHandler: buildJobHandler ?? (() => async () => undefined),
+      findWeeklyRunByPk
     })
   );
   app.use(errorHandler);
@@ -81,6 +83,9 @@ describe('requestGoogleRss routes', () => {
     await queueEngine.onIdle();
     const queuedJob = await queueStore.getJobById('job-1');
     expect(queuedJob?.status).toBe('completed');
+    expect(queuedJob?.parameters).toEqual({
+      doNotRepeatRequestsWithinHours: DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS
+    });
   });
 
   it('passes custom doNotRepeatRequestsWithinHours to the job handler', async () => {
@@ -154,6 +159,62 @@ describe('requestGoogleRss routes', () => {
       doNotRepeatRequestsWithinHours: DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
       targetArticlesAddedCount: 10
     });
+  });
+
+  it('validates and passes an active weeklyArticleFlowRunId', async () => {
+    const spreadsheetPath = path.join(tempDirPath, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const findWeeklyRunByPk = jest.fn().mockResolvedValue({ status: 'running' });
+    const app = buildApp(
+      queueEngine,
+      { PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath },
+      buildJobHandler,
+      findWeeklyRunByPk
+    );
+
+    const response = await request(app).post('/request-google-rss/start-job').send({
+      weeklyArticleFlowRunId: 42
+    });
+
+    expect(response.status).toBe(202);
+    expect(findWeeklyRunByPk).toHaveBeenCalledWith(42);
+    expect(buildJobHandler).toHaveBeenCalledWith(expect.objectContaining({
+      weeklyArticleFlowRunId: 42
+    }));
+    await queueEngine.onIdle();
+    await expect(queueStore.getJobById('job-1')).resolves.toMatchObject({
+      parameters: expect.objectContaining({ weeklyArticleFlowRunId: 42 })
+    });
+  });
+
+  it.each([true, 0, -1, 1.5, '12x'])('rejects malformed weekly run id %p', async (value) => {
+    const spreadsheetPath = path.join(tempDirPath, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
+    const app = buildApp(queueEngine, {
+      PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath
+    });
+
+    const response = await request(app).post('/request-google-rss/start-job').send({
+      weeklyArticleFlowRunId: value
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it.each([null, { status: 'completed' }])('rejects missing or terminal weekly run %p', async (run) => {
+    const spreadsheetPath = path.join(tempDirPath, 'queries.xlsx');
+    await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
+    const app = buildApp(
+      queueEngine,
+      { PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath },
+      undefined,
+      jest.fn().mockResolvedValue(run)
+    );
+
+    const response = await request(app).post('/request-google-rss/start-job').send({
+      weeklyArticleFlowRunId: 42
+    });
+    expect(response.status).toBe(400);
   });
 
   it('returns validation error when spreadsheet env var is missing', async () => {

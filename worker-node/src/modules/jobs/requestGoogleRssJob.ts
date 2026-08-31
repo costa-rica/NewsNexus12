@@ -50,6 +50,7 @@ interface RssFetchResult {
   items: RssItem[];
   error?: string;
   statusCode?: number;
+  aborted?: boolean;
 }
 
 export type GoogleRssEndingReason =
@@ -75,9 +76,14 @@ export interface GoogleRssQueryResult {
 }
 
 export interface GoogleRssJobResult {
+  schemaVersion: 1;
   endingReason: GoogleRssEndingReason;
   endingMessage: string;
+  terminalMessage: string;
   articlesAddedCount: number;
+  successfulQueryCount: number;
+  skippedQueryCount: number;
+  failedQueryCount: number;
   queryResults: GoogleRssQueryResult[];
 }
 
@@ -86,6 +92,7 @@ export interface RequestGoogleRssJobContext {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
+  weeklyArticleFlowRunId?: number;
   signal: AbortSignal;
   updateResult?: (result: Record<string, unknown>) => Promise<void>;
 }
@@ -98,6 +105,7 @@ export interface RequestGoogleRssJobInput {
   spreadsheetPath: string;
   doNotRepeatRequestsWithinHours: number;
   targetArticlesAddedCount?: number;
+  weeklyArticleFlowRunId?: number;
 }
 
 const GOOGLE_NEWS_RSS_ORG_NAME = 'Google News RSS';
@@ -221,26 +229,18 @@ export const createRssSeedResult = (
 };
 
 const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetchResult> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const abortFromSignal = () => controller.abort();
+  signal.addEventListener('abort', abortFromSignal, { once: true });
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    signal.addEventListener(
-      'abort',
-      () => {
-        controller.abort();
-      },
-      { once: true }
-    );
-
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'NewsNexusRequesterGoogleRss04/1.0'
       }
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorMessage = `RSS request failed with status ${response.status}`;
@@ -268,8 +268,12 @@ const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetch
     return {
       status: 'error',
       items: [],
-      error: message
+      error: message,
+      aborted: error instanceof Error && error.name === 'AbortError'
     };
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener('abort', abortFromSignal);
   }
 };
 
@@ -332,6 +336,7 @@ const storeRequestAndArticles = async (params: {
   signal: AbortSignal;
   navigationSessionManager: GoogleNavigationSessionManager;
   timeRange: string;
+  weeklyArticleFlowRunId?: number;
 }): Promise<number> => {
   const cutoffDays = parseTimeRangeDays(params.timeRange) ?? getDefaultLimitDays();
   const cutoffMs = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
@@ -347,7 +352,8 @@ const storeRequestAndArticles = async (params: {
     andString: params.andString,
     orString: params.orString,
     notString: null,
-    isFromAutomation: true
+    isFromAutomation: true,
+    weeklyArticleFlowRunId: params.weeklyArticleFlowRunId ?? null
   });
 
   let savedCount = 0;
@@ -458,7 +464,8 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     jobId: context.jobId,
     spreadsheetPath: context.spreadsheetPath,
     doNotRepeatRequestsWithinHours: context.doNotRepeatRequestsWithinHours,
-    targetArticlesAddedCount: context.targetArticlesAddedCount
+    targetArticlesAddedCount: context.targetArticlesAddedCount,
+    weeklyArticleFlowRunId: context.weeklyArticleFlowRunId
   });
 
   const delayBetweenRequestsMs = (() => {
@@ -596,6 +603,18 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         break;
       }
 
+      if (response.aborted) {
+        queryResults[i] = {
+          ...queryResults[i],
+          status: 'failed',
+          saved_articles: 0,
+          note: 'aborted'
+        };
+        endingReason = 'aborted';
+        endingMessage = 'Google RSS request was aborted.';
+        break;
+      }
+
       const savedThisRequest = await storeRequestAndArticles({
         requestUrl,
         andString: queryResult.andString,
@@ -606,7 +625,8 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         entityWhoFoundArticleId,
         signal: context.signal,
         navigationSessionManager,
-        timeRange: queryResult.timeRange
+        timeRange: queryResult.timeRange,
+        weeklyArticleFlowRunId: context.weeklyArticleFlowRunId
       });
       articlesAddedCount += savedThisRequest;
 
@@ -645,8 +665,13 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       }
     }
   } catch (error) {
-    endingReason = 'error';
-    endingMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+    const isAbortError = error instanceof Error && error.name === 'AbortError';
+    endingReason = isAbortError ? 'aborted' : 'error';
+    endingMessage = isAbortError
+      ? 'Google RSS request was aborted.'
+      : error instanceof Error
+        ? error.message
+        : 'Unknown error occurred.';
     logger.error(`requestGoogleRss job failed: ${endingMessage}`);
     if (currentRowIndex >= 0 && currentRowIndex < queryResults.length) {
       queryResults[currentRowIndex] = {
@@ -660,9 +685,14 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     await navigationSessionManager.close();
 
     const result: GoogleRssJobResult = {
+      schemaVersion: 1,
       endingReason,
       endingMessage,
+      terminalMessage: endingMessage,
       articlesAddedCount,
+      successfulQueryCount: queryResults.filter(({ status }) => status === 'success').length,
+      skippedQueryCount: queryResults.filter(({ status }) => status === 'skipped').length,
+      failedQueryCount: queryResults.filter(({ status }) => status === 'failed').length,
       queryResults
     };
     logger.info('requestGoogleRss job ending', result);
@@ -685,6 +715,9 @@ export const createRequestGoogleRssJobHandler = (
       doNotRepeatRequestsWithinHours: input.doNotRepeatRequestsWithinHours,
       ...(input.targetArticlesAddedCount !== undefined
         ? { targetArticlesAddedCount: input.targetArticlesAddedCount }
+        : {}),
+      ...(input.weeklyArticleFlowRunId !== undefined
+        ? { weeklyArticleFlowRunId: input.weeklyArticleFlowRunId }
         : {}),
       signal: queueContext.signal,
       updateResult: queueContext.updateResult
