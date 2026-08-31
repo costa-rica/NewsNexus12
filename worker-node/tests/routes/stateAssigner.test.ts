@@ -259,4 +259,31 @@ describe('stateAssigner routes', () => {
       pathToStateAssignerFiles: tempDirPath
     });
   });
+
+  it('preserves exact cohort IDs and requested capacity in the job and queue record', async () => {
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      { PATH_TO_STATE_ASSIGNER_FILES: tempDirPath },
+      { buildJobHandler }
+    );
+
+    const response = await request(app).post('/state-assigner/start-job').send({
+      articleIds: [101, 202, 202],
+      targetArticleStateReviewCount: 250
+    });
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith(expect.objectContaining({
+      articleIds: [101, 202],
+      targetArticleStateReviewCount: 250
+    }));
+    await queueEngine.onIdle();
+    await expect(queueStore.getJobById('job-1')).resolves.toMatchObject({
+      parameters: expect.objectContaining({
+        articleIds: [101, 202],
+        targetArticleStateReviewCount: 250
+      })
+    });
+  });
 });

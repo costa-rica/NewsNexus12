@@ -50,6 +50,35 @@ export interface StateAssignerJobContext extends StateAssignerJobInput {
   registerCancelableProcess: (handle: CancelableProcessHandle) => void;
 }
 
+export type StateAssignerEndingReason = 'completed' | 'canceled' | 'circuit_breaker' | 'error';
+export type StateAssignerSkipReason = 'no_usable_content' | 'operator_canceled';
+export type StateAssignerFailureReason = 'timeout' | 'analysis_error' | 'persistence_error';
+
+export interface StateAssignerArticleOutcome<Reason extends string> {
+  articleId: number;
+  reason: Reason;
+}
+
+export interface StateAssignerJobResult {
+  schemaVersion: 1;
+  endingReason: StateAssignerEndingReason;
+  terminalMessage: string;
+  selectedArticleIds: number[];
+  attemptedArticleIds: number[];
+  successfulArticleIds: number[];
+  skippedArticles: StateAssignerArticleOutcome<StateAssignerSkipReason>[];
+  failedArticles: StateAssignerArticleOutcome<StateAssignerFailureReason>[];
+  unattemptedArticleIds: number[];
+  selectedCount: number;
+  attemptedCount: number;
+  successfulCount: number;
+  skippedCount: number;
+  failedCount: number;
+  unattemptedCount: number;
+  maximumConsecutiveFailures: number;
+  circuitBreakerTripped: boolean;
+}
+
 type AnalyzeStateAssignerArticle = (
   aiConfig: StateAssignerAiConfig,
   stateAssignerDirectories: StateAssignerDirectories,
@@ -82,14 +111,52 @@ interface ProcessStateAssignmentsOptions {
   };
 }
 
+const buildStateAssignerResult = (input: {
+  endingReason: StateAssignerEndingReason;
+  terminalMessage: string;
+  selectedArticleIds: number[];
+  attemptedArticleIds: number[];
+  successfulArticleIds: number[];
+  skippedArticles: StateAssignerArticleOutcome<StateAssignerSkipReason>[];
+  failedArticles: StateAssignerArticleOutcome<StateAssignerFailureReason>[];
+  unattemptedArticleIds: number[];
+  maximumConsecutiveFailures: number;
+  circuitBreakerTripped: boolean;
+}): StateAssignerJobResult => ({
+  schemaVersion: 1,
+  ...input,
+  selectedCount: input.selectedArticleIds.length,
+  attemptedCount: input.attemptedArticleIds.length,
+  successfulCount: input.successfulArticleIds.length,
+  skippedCount: input.skippedArticles.length,
+  failedCount: input.failedArticles.length,
+  unattemptedCount: input.unattemptedArticleIds.length
+});
+
+const emptyStateAssignerResult = (
+  endingReason: StateAssignerEndingReason,
+  terminalMessage: string
+): StateAssignerJobResult => buildStateAssignerResult({
+  endingReason,
+  terminalMessage,
+  selectedArticleIds: [],
+  attemptedArticleIds: [],
+  successfulArticleIds: [],
+  skippedArticles: [],
+  failedArticles: [],
+  unattemptedArticleIds: [],
+  maximumConsecutiveFailures: 0,
+  circuitBreakerTripped: false
+});
+
 export interface StateAssignerJobDependencies {
-  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<void>;
+  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<StateAssignerJobResult>;
   selectArticles?: typeof selectTargetArticles;
   enrichContent02?: typeof enrichArticleContent02;
   getCanonicalContent02Row?: typeof getCanonicalArticleContent02Row;
   analyzeWithOpenAi?: AnalyzeStateAssignerArticle;
   analyzeWithCodexCli?: AnalyzeStateAssignerArticle;
-  processAssignments?: (options: ProcessStateAssignmentsOptions) => Promise<void>;
+  processAssignments?: (options: ProcessStateAssignmentsOptions) => Promise<StateAssignerJobResult>;
   ensureDb?: typeof ensureDbReady;
   ensureDirectories?: typeof ensureStateAssignerDirectories;
   syncPrompts?: (promptsDir: string) => Promise<void>;
@@ -278,14 +345,60 @@ export const processStateAssignmentsWithTimeout = async ({
   analyzeArticle,
   persistAssignment,
   log
-}: ProcessStateAssignmentsOptions): Promise<void> => {
+}: ProcessStateAssignmentsOptions): Promise<StateAssignerJobResult> => {
+  const selectedArticleIds = articles.map(({ id }) => id);
+  const attemptedArticleIds: number[] = [];
+  const successfulArticleIds: number[] = [];
+  const skippedArticles: StateAssignerArticleOutcome<StateAssignerSkipReason>[] = [];
+  const failedArticles: StateAssignerArticleOutcome<StateAssignerFailureReason>[] = [];
+  let consecutiveFailures = 0;
+  let maximumConsecutiveFailures = 0;
+
+  const createResult = (
+    endingReason: StateAssignerEndingReason,
+    terminalMessage: string,
+    unattemptedArticleIds: number[],
+    circuitBreakerTripped = false
+  ) => buildStateAssignerResult({
+    endingReason,
+    terminalMessage,
+    selectedArticleIds,
+    attemptedArticleIds,
+    successfulArticleIds,
+    skippedArticles,
+    failedArticles,
+    unattemptedArticleIds,
+    maximumConsecutiveFailures,
+    circuitBreakerTripped
+  });
+
+  const recordFailure = (articleId: number, reason: StateAssignerFailureReason): boolean => {
+    failedArticles.push({ articleId, reason });
+    consecutiveFailures += 1;
+    maximumConsecutiveFailures = Math.max(maximumConsecutiveFailures, consecutiveFailures);
+    return consecutiveFailures >= 5;
+  };
+
   for (let index = 0; index < articles.length; index += 1) {
     if (signal.aborted) {
-      return;
+      return createResult(
+        'canceled',
+        'State assigner was canceled before all selected articles were attempted.',
+        articles.slice(index).map(({ id }) => id)
+      );
     }
 
     const article = articles[index];
     log.info(`Processing article ${article.id} (${index + 1}/${articles.length})`);
+
+    if (article.title.trim() === '' && article.content.trim() === '') {
+      skippedArticles.push({ articleId: article.id, reason: 'no_usable_content' });
+      continue;
+    }
+
+    attemptedArticleIds.push(article.id);
+
+    let response: ChatGptResponse;
 
     try {
       const result = await runWithIterationTimeout(
@@ -302,31 +415,88 @@ export const processStateAssignmentsWithTimeout = async ({
         signal
       );
 
+      if (signal.aborted) {
+        skippedArticles.push({ articleId: article.id, reason: 'operator_canceled' });
+        return createResult(
+          'canceled',
+          'State assigner was canceled during article analysis.',
+          articles.slice(index + 1).map(({ id }) => id)
+        );
+      }
+
       if (result.timedOut) {
         log.warn(
           `State assigner timeout for article ${article.id} after ${iterationTimeoutMs}ms. Skipping iteration.`
         );
+        if (recordFailure(article.id, 'timeout')) {
+          return createResult(
+            'circuit_breaker',
+            'State assigner stopped after five consecutive article failures.',
+            articles.slice(index + 1).map(({ id }) => id),
+            true
+          );
+        }
         continue;
       }
-
-      await persistAssignment(article.id, result.value!, prompt.id, entityWhoCategorizesId);
-      log.info(`Successfully processed article ${article.id}`);
+      response = result.value!;
     } catch (error) {
       if (signal.aborted || isAbortError(error)) {
-        return;
+        skippedArticles.push({ articleId: article.id, reason: 'operator_canceled' });
+        return createResult(
+          'canceled',
+          'State assigner was canceled during article analysis.',
+          articles.slice(index + 1).map(({ id }) => id)
+        );
       }
 
       const message = error instanceof Error ? error.message : 'Unknown state assigner error';
-      log.error(`Failed to process article ${article.id}: ${message}`);
+      log.error(`State assigner analysis failed for article ${article.id}: ${message}`);
       log.warn(`Skipping article ${article.id} and continuing with next article`);
+      if (recordFailure(article.id, 'analysis_error')) {
+        return createResult(
+          'circuit_breaker',
+          'State assigner stopped after five consecutive article failures.',
+          articles.slice(index + 1).map(({ id }) => id),
+          true
+        );
+      }
+      continue;
+    }
+
+    try {
+      await persistAssignment(article.id, response, prompt.id, entityWhoCategorizesId);
+      successfulArticleIds.push(article.id);
+      consecutiveFailures = 0;
+      log.info(`Successfully processed article ${article.id}`);
+    } catch (error) {
+      if (signal.aborted || isAbortError(error)) {
+        skippedArticles.push({ articleId: article.id, reason: 'operator_canceled' });
+        return createResult(
+          'canceled',
+          'State assigner was canceled while persisting an article assignment.',
+          articles.slice(index + 1).map(({ id }) => id)
+        );
+      }
+      const message = error instanceof Error ? error.message : 'Unknown state assignment persistence error';
+      log.error(`State assigner persistence failed for article ${article.id}: ${message}`);
+      if (recordFailure(article.id, 'persistence_error')) {
+        return createResult(
+          'circuit_breaker',
+          'State assigner stopped after five consecutive article failures.',
+          articles.slice(index + 1).map(({ id }) => id),
+          true
+        );
+      }
     }
   }
+
+  return createResult('completed', 'State assigner completed all selected articles.', []);
 };
 
 const runLegacyWorkflow = async (
   context: StateAssignerJobContext,
   dependencies: StateAssignerJobDependencies = {}
-): Promise<void> => {
+): Promise<StateAssignerJobResult> => {
   logWorkflowStart('State Assigner', {
     jobId: context.jobId,
     targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
@@ -365,7 +535,7 @@ const runLegacyWorkflow = async (
 
   if (candidateArticles.length === 0) {
     logger.info('No articles to process');
-    return;
+    return emptyStateAssignerResult('completed', 'State assigner found no eligible articles.');
   }
 
   logger.info('State assigner selected candidate articles for pre-scrape enrichment', {
@@ -381,7 +551,18 @@ const runLegacyWorkflow = async (
     logger.info('State assigner pre-scrape enrichment summary', scrapeSummary);
   } catch (error) {
     if (context.signal.aborted || isAbortError(error)) {
-      return;
+      return buildStateAssignerResult({
+        endingReason: 'canceled',
+        terminalMessage: 'State assigner was canceled during pre-scrape enrichment.',
+        selectedArticleIds: candidateArticles.map(({ id }) => id),
+        attemptedArticleIds: [],
+        successfulArticleIds: [],
+        skippedArticles: [],
+        failedArticles: [],
+        unattemptedArticleIds: candidateArticles.map(({ id }) => id),
+        maximumConsecutiveFailures: 0,
+        circuitBreakerTripped: false
+      });
     }
 
     logger.warn('State assigner pre-scrape enrichment failed. Continuing with assignment.', {
@@ -407,7 +588,7 @@ const runLegacyWorkflow = async (
   });
   logger.info(`Starting to process ${articles.length} articles`);
 
-  await processAssignments({
+  return processAssignments({
     articles,
     prompt,
     entityWhoCategorizesId,
@@ -431,18 +612,28 @@ export const createStateAssignerJobHandler = (
     ((context: StateAssignerJobContext) => runLegacyWorkflow(context, dependencies));
 
   return async (queueContext: QueueExecutionContext): Promise<void> => {
-    await workflowRunner({
-      jobId: queueContext.jobId,
-      signal: queueContext.signal,
-      registerCancelableProcess: queueContext.registerCancelableProcess,
-      targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
-      targetArticleStateReviewCount: input.targetArticleStateReviewCount,
-      aiConfig: input.aiConfig,
-      pathToStateAssignerFiles: input.pathToStateAssignerFiles,
-      articleIds: input.articleIds,
-      includeArticlesThatMightHaveBeenStateAssigned: input.includeArticlesThatMightHaveBeenStateAssigned,
-      articleIdMinExclusive: input.articleIdMinExclusive,
-      articleIdMaxInclusive: input.articleIdMaxInclusive
-    });
+    try {
+      const result = await workflowRunner({
+        jobId: queueContext.jobId,
+        signal: queueContext.signal,
+        registerCancelableProcess: queueContext.registerCancelableProcess,
+        targetArticleThresholdDaysOld: input.targetArticleThresholdDaysOld,
+        targetArticleStateReviewCount: input.targetArticleStateReviewCount,
+        aiConfig: input.aiConfig,
+        pathToStateAssignerFiles: input.pathToStateAssignerFiles,
+        articleIds: input.articleIds,
+        includeArticlesThatMightHaveBeenStateAssigned: input.includeArticlesThatMightHaveBeenStateAssigned,
+        articleIdMinExclusive: input.articleIdMinExclusive,
+        articleIdMaxInclusive: input.articleIdMaxInclusive
+      });
+      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+    } catch (error) {
+      const result = emptyStateAssignerResult(
+        'error',
+        error instanceof Error ? error.message : 'State assigner failed.'
+      );
+      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+      throw error;
+    }
   };
 };

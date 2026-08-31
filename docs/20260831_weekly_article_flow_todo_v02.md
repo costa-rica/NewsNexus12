@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:24:11Z
+updated_at: 2026-08-31T23:28:09Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -214,45 +214,45 @@ Implementation rules:
 
 ### Structured processor result
 
-- [ ] Define `StateAssignerJobResult` with common fields and state-specific breaker fields.
-- [ ] Change `processStateAssignmentsWithTimeout` to return attempted, successful, skipped, failed, and unattempted outcomes.
-- [ ] Distinguish analysis errors, persistence errors, and iteration timeouts.
-- [ ] Ensure each selected article has exactly one terminal outcome.
-- [ ] Preserve exact-ID targeting and existing bounded pre-scrape enrichment.
+- [x] Define `StateAssignerJobResult` with common fields and state-specific breaker fields.
+- [x] Change `processStateAssignmentsWithTimeout` to return attempted, successful, skipped, failed, and unattempted outcomes.
+- [x] Distinguish analysis errors, persistence errors, and iteration timeouts.
+- [x] Ensure each selected article has exactly one terminal outcome.
+- [x] Preserve exact-ID targeting and existing bounded pre-scrape enrichment.
 
 ### Consecutive-failure breaker
 
-- [ ] Maintain the counter inside worker-node's per-article loop.
-- [ ] Increment it for analysis errors, persistence errors, and iteration timeouts.
-- [ ] Reset it only after a successfully persisted assignment.
-- [ ] Do not count operator cancellation as an article failure.
-- [ ] Stop processing immediately on the fifth consecutive failure.
-- [ ] Mark every remaining selected article unattempted.
-- [ ] Record `maximumConsecutiveFailures` and `circuitBreakerTripped`.
-- [ ] Permit one to four isolated terminal failures without falsely tripping the breaker.
+- [x] Maintain the counter inside worker-node's per-article loop.
+- [x] Increment it for analysis errors, persistence errors, and iteration timeouts.
+- [x] Reset it only after a successfully persisted assignment.
+- [x] Do not count operator cancellation as an article failure.
+- [x] Stop processing immediately on the fifth consecutive failure.
+- [x] Mark every remaining selected article unattempted.
+- [x] Record `maximumConsecutiveFailures` and `circuitBreakerTripped`.
+- [x] Permit one to four isolated terminal failures without falsely tripping the breaker.
 
 ### Queue integration and tests
 
-- [ ] Return and persist the result through queue `updateResult`.
-- [ ] Preserve partial results on cancellation or stage failure where possible.
-- [ ] Test all-success processing.
-- [ ] Test timeout, analysis error, and persistence error classification.
-- [ ] Test that a success resets the counter.
-- [ ] Test five consecutive mixed failure types trip the breaker.
-- [ ] Test remaining IDs become unattempted at the breaker.
-- [ ] Test cancellation does not increment the breaker.
-- [ ] Test exact cohort IDs and capacity are preserved through the route and job.
-- [ ] Test result array/count reconciliation and queue persistence.
+- [x] Return and persist the result through queue `updateResult`.
+- [x] Preserve partial results on cancellation or stage failure where possible.
+- [x] Test all-success processing.
+- [x] Test timeout, analysis error, and persistence error classification.
+- [x] Test that a success resets the counter.
+- [x] Test five consecutive mixed failure types trip the breaker.
+- [x] Test remaining IDs become unattempted at the breaker.
+- [x] Test cancellation does not increment the breaker.
+- [x] Test exact cohort IDs and capacity are preserved through the route and job.
+- [x] Test result array/count reconciliation and queue persistence.
 
 ### Phase verification and commit
 
-- [ ] Run focused state-assigner route, targeting, and job tests.
-- [ ] Run `npm -C worker-node test`.
-- [ ] Run `npm -C worker-node run build`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 5 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 5 files and inspect `git diff --cached`.
-- [ ] Commit Phase 5 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 5.
+- [x] Run focused state-assigner route, targeting, and job tests.
+- [x] Run `npm -C worker-node test`.
+- [x] Run `npm -C worker-node run build`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 5 tasks and update this document's modification metadata.
+- [x] Stage only Phase 5 files and inspect `git diff --cached`.
+- [x] Commit Phase 5 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 5.
 
 ## Phase 6: Coordinator Foundation
 

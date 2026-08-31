@@ -97,9 +97,18 @@ export const validateArticleAutomationTargetingInput = (
   );
 
   if (Array.isArray(candidate?.articleIds) && articleIds !== null) {
+    const exactIdReviewCount = candidate?.targetArticleStateReviewCount === undefined
+      ? null
+      : parsePositiveIntegerField(
+          candidate.targetArticleStateReviewCount,
+          'targetArticleStateReviewCount'
+        );
     return {
       ...ARTICLE_AUTOMATION_DEFAULTS,
       articleIds,
+      ...(exactIdReviewCount !== null
+        ? { targetArticleStateReviewCount: exactIdReviewCount }
+        : {}),
       ...(typeof articleIdMinExclusive === 'number' ? { articleIdMinExclusive } : {}),
       ...(typeof articleIdMaxInclusive === 'number' ? { articleIdMaxInclusive } : {})
     };
