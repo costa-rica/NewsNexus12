@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:28:09Z
+updated_at: 2026-08-31T23:35:57Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -258,53 +258,53 @@ Implementation rules:
 
 ### Package and typed configuration
 
-- [ ] Create the private `ops/weekly-article-flow` TypeScript package, lockfile, TypeScript config, Jest config, and build scripts.
-- [ ] Add the planned `src/config`, `src/database`, `src/http`, `src/contracts`, `src/stages`, `src/coordinator`, `src/reporting`, and `src/alerts` module boundaries.
-- [ ] Depend on local `@newsnexus/db-models` and avoid a second database model definition.
-- [ ] Add `.env.example` with no secrets.
-- [ ] Parse modes, absolute paths, allowlisted worker URLs, database identities, stage timeouts, run timeout, polling, backoff, disk threshold, and canary target.
-- [ ] Reject unknown modes, relative paths, malformed URLs, unsafe timeout ranges, and overlapping dev/production identities.
-- [ ] Limit CLI options to mode, resume run ID, expected dev database confirmation, canary target, and live-AI permission.
-- [ ] Reject production target-count configuration and arbitrary command, SQL, path, credential, or URL overrides.
+- [x] Create the private `ops/weekly-article-flow` TypeScript package, lockfile, TypeScript config, Jest config, and build scripts.
+- [x] Add the planned `src/config`, `src/database`, `src/http`, `src/contracts`, `src/stages`, `src/coordinator`, `src/reporting`, and `src/alerts` module boundaries.
+- [x] Depend on local `@newsnexus/db-models` and avoid a second database model definition.
+- [x] Add `.env.example` with no secrets.
+- [x] Parse modes, absolute paths, allowlisted worker URLs, database identities, stage timeouts, run timeout, polling, backoff, disk threshold, and canary target.
+- [x] Reject unknown modes, relative paths, malformed URLs, unsafe timeout ranges, and overlapping dev/production identities.
+- [x] Limit CLI options to mode, resume run ID, expected dev database confirmation, canary target, and live-AI permission.
+- [x] Reject production target-count configuration and arbitrary command, SQL, path, credential, or URL overrides.
 
 ### Database repository
 
-- [ ] Implement atomic new-run creation backed by the partial unique index.
-- [ ] Map active-run uniqueness conflicts to `active_run_exists`.
-- [ ] Implement allowed run and stage transitions.
-- [ ] Persist `running` stage evidence before external work and terminal evidence after postcondition validation.
-- [ ] Implement exact cohort queries through weekly run, news API requests, and articles.
-- [ ] Implement V02 selection and prediction queries needed for reconciliation.
-- [ ] Implement resume loading without creating a replacement run.
-- [ ] Validate resume host, database, mode, revision, stage state, and conflicts.
+- [x] Implement atomic new-run creation backed by the partial unique index.
+- [x] Map active-run uniqueness conflicts to `active_run_exists`.
+- [x] Implement allowed run and stage transitions.
+- [x] Persist `running` stage evidence before external work and terminal evidence after postcondition validation.
+- [x] Implement exact cohort queries through weekly run, news API requests, and articles.
+- [x] Implement V02 selection and prediction queries needed for reconciliation.
+- [x] Implement resume loading without creating a replacement run.
+- [x] Validate resume host, database, mode, revision, stage state, and conflicts.
 
 ### HTTP and result contracts
 
-- [ ] Implement allowlisted worker-node and worker-python clients.
-- [ ] Implement queue start, status, idle check, and cancellation calls using the workers' existing route spelling.
-- [ ] Add bounded request timeouts, exponential polling backoff, and safe error bodies.
-- [ ] Implement independent RSS, semantic, and state result validators.
-- [ ] Reject unknown schema versions, inconsistent counts, duplicate mutually exclusive IDs, and missing terminal outcomes as `failed_worker_result_contract`.
-- [ ] Ensure clients never log request secrets, preview tokens, article content, or environment values.
+- [x] Implement allowlisted worker-node and worker-python clients.
+- [x] Implement queue start, status, idle check, and cancellation calls using the workers' existing route spelling.
+- [x] Add bounded request timeouts, exponential polling backoff, and safe error bodies.
+- [x] Implement independent RSS, semantic, and state result validators.
+- [x] Reject unknown schema versions, inconsistent counts, duplicate mutually exclusive IDs, and missing terminal outcomes as `failed_worker_result_contract`.
+- [x] Ensure clients never log request secrets, preview tokens, article content, or environment values.
 
 ### Shell entry points
 
-- [ ] Add `bin/run-weekly-flow` with fixed nonblocking `flock` behavior.
-- [ ] Add `bin/run-dev-canary` and `bin/run-dev-destructive-recovery` wrappers.
-- [ ] Use absolute resolved paths and safe argument passing.
-- [ ] Ensure development wrappers cannot install or enable a schedule.
+- [x] Add `bin/run-weekly-flow` with fixed nonblocking `flock` behavior.
+- [x] Add `bin/run-dev-canary` and `bin/run-dev-destructive-recovery` wrappers.
+- [x] Use absolute resolved paths and safe argument passing.
+- [x] Ensure development wrappers cannot install or enable a schedule.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Install coordinator dependencies and inspect lockfile changes.
-- [ ] Run coordinator config, repository, HTTP-client, contract, and shell-wrapper tests.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 6 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 6 files and inspect `git diff --cached`.
-- [ ] Commit Phase 6 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 6.
+- [x] Run `npm -C db-models run build`.
+- [x] Install coordinator dependencies and inspect lockfile changes.
+- [x] Run coordinator config, repository, HTTP-client, contract, and shell-wrapper tests.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 6 tasks and update this document's modification metadata.
+- [x] Stage only Phase 6 files and inspect `git diff --cached`.
+- [x] Commit Phase 6 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 6.
 
 ## Phase 7: Maintenance and Worker Stages
 

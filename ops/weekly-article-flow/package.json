@@ -1,0 +1,23 @@
+{
+  "name": "@newsnexus/weekly-article-flow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Source-controlled weekly article processing coordinator",
+  "main": "dist/cli.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@newsnexus/db-models": "file:../../db-models",
+    "dotenv": "^17.2.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.13.10",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.4",
+    "typescript": "^5.8.2"
+  }
+}

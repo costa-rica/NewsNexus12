@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly PACKAGE_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly LOCK_FILE="/var/lock/newsnexus12-weekly-article-flow.lock"
+
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "weekly article flow is already running" >&2
+  exit 75
+fi
+
+exec node "${PACKAGE_DIR}/dist/cli.js" "$@"
