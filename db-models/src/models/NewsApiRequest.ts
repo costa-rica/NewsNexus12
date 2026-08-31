@@ -1,7 +1,7 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from './_connection';
 
-interface NewsApiRequestAttributes {
+export interface NewsApiRequestAttributes {
   id: number;
   newsArticleAggregatorSourceId: number;
   countOfArticlesReceivedFromRequest: number | null;
@@ -15,9 +15,10 @@ interface NewsApiRequestAttributes {
   orString: string | null;
   notString: string | null;
   isFromAutomation: boolean;
+  weeklyArticleFlowRunId: number | null;
 }
 
-interface NewsApiRequestCreationAttributes extends Optional<NewsApiRequestAttributes, 'id' | 'countOfArticlesReceivedFromRequest' | 'countOfArticlesSavedToDbFromRequest' | 'countOfArticlesAvailableFromRequest' | 'dateStartOfRequest' | 'dateEndOfRequest' | 'status' | 'url' | 'andString' | 'orString' | 'notString' | 'isFromAutomation'> {}
+interface NewsApiRequestCreationAttributes extends Optional<NewsApiRequestAttributes, 'id' | 'countOfArticlesReceivedFromRequest' | 'countOfArticlesSavedToDbFromRequest' | 'countOfArticlesAvailableFromRequest' | 'dateStartOfRequest' | 'dateEndOfRequest' | 'status' | 'url' | 'andString' | 'orString' | 'notString' | 'isFromAutomation' | 'weeklyArticleFlowRunId'> {}
 
 export class NewsApiRequest extends Model<NewsApiRequestAttributes, NewsApiRequestCreationAttributes> implements NewsApiRequestAttributes {
   public id!: number;
@@ -33,6 +34,7 @@ export class NewsApiRequest extends Model<NewsApiRequestAttributes, NewsApiReque
   public orString!: string | null;
   public notString!: string | null;
   public isFromAutomation!: boolean;
+  public weeklyArticleFlowRunId!: number | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -84,12 +86,23 @@ export function initNewsApiRequest() {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    weeklyArticleFlowRunId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     sequelize,
     modelName: 'NewsApiRequest',
     tableName: 'NewsApiRequests',
     timestamps: true,
+    indexes: [
+      {
+        name: 'idx_news_api_requests_weekly_article_flow_run_id',
+        fields: ['weeklyArticleFlowRunId'],
+      },
+    ],
   }
   );
   return NewsApiRequest;

@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T22:46:56Z
+updated_at: 2026-08-31T23:11:53Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -34,48 +34,48 @@ Implementation rules:
 
 ### Model contract
 
-- [ ] Add `db-models/src/models/WeeklyArticleFlowRun.ts`.
-- [ ] Define typed modes: `dev_canary`, `dev_destructive_recovery`, `manual_production`, and `scheduled_production`.
-- [ ] Define every V03 weekly-run status.
-- [ ] Add all required run fields, JSONB `stageResults`, nullable fields, validation, and timestamps.
-- [ ] Add nullable `weeklyArticleFlowRunId` to `NewsApiRequest` attributes, creation attributes, class fields, and Sequelize definition.
-- [ ] Keep the request-field default `null` so existing creation calls remain valid.
-- [ ] Register the new model in `_index.ts` initialization, return object, exports, and type exports.
-- [ ] Add weekly-run-to-request associations in `_associations.ts` with restrictive deletion behavior.
-- [ ] Place `WeeklyArticleFlowRun` before `NewsApiRequest` in `_loadOrder.ts`.
+- [x] Add `db-models/src/models/WeeklyArticleFlowRun.ts`.
+- [x] Define typed modes: `dev_canary`, `dev_destructive_recovery`, `manual_production`, and `scheduled_production`.
+- [x] Define every V03 weekly-run status.
+- [x] Add all required run fields, JSONB `stageResults`, nullable fields, validation, and timestamps.
+- [x] Add nullable `weeklyArticleFlowRunId` to `NewsApiRequest` attributes, creation attributes, class fields, and Sequelize definition.
+- [x] Keep the request-field default `null` so existing creation calls remain valid.
+- [x] Register the new model in `_index.ts` initialization, return object, exports, and type exports.
+- [x] Add weekly-run-to-request associations in `_associations.ts` with restrictive deletion behavior.
+- [x] Place `WeeklyArticleFlowRun` before `NewsApiRequest` in `_loadOrder.ts`.
 
 ### Additive installation
 
-- [ ] Add an idempotent weekly-flow schema installer in db-manager using the existing V02 installer pattern.
-- [ ] Create the run table only when absent.
-- [ ] Add the request column only when absent without rewriting historical rows.
-- [ ] Install status, scheduled-time, creation-time, and request foreign-key indexes.
-- [ ] Install a PostgreSQL partial unique index allowing only one `pending` or `running` weekly run.
-- [ ] Add the restrictive foreign key from `NewsApiRequests.weeklyArticleFlowRunId` to `WeeklyArticleFlowRuns.id`.
-- [ ] Verify compatible existing columns, indexes, and constraints and refuse incompatible definitions.
-- [ ] Add a standalone installer entry point and db-manager package script.
-- [ ] Add mocked installer tests for fresh installation, idempotency, incompatibility, foreign keys, indexes, and the active-run uniqueness rule.
-- [ ] Add a disposable-Postgres integration harness that creates an isolated database, runs the real weekly-flow installer, and always tears the database down.
-- [ ] Add a dedicated db-manager integration-test script for the installed weekly-flow schema.
-- [ ] Prove the partial unique index rejects a second `pending` or `running` weekly run.
-- [ ] Prove terminal weekly runs do not block creation of a new active run.
-- [ ] Prove `NewsApiRequests` rows with a null `weeklyArticleFlowRunId` remain valid.
-- [ ] Prove deleting a referenced weekly run is rejected by `ON DELETE RESTRICT`.
-- [ ] Prove the exact cohort join returns only articles associated through requests carrying the selected weekly run ID.
-- [ ] Add load-order and ZIP-import compatibility coverage for the new table and nullable field.
+- [x] Add an idempotent weekly-flow schema installer in db-manager using the existing V02 installer pattern.
+- [x] Create the run table only when absent.
+- [x] Add the request column only when absent without rewriting historical rows.
+- [x] Install status, scheduled-time, creation-time, and request foreign-key indexes.
+- [x] Install a PostgreSQL partial unique index allowing only one `pending` or `running` weekly run.
+- [x] Add the restrictive foreign key from `NewsApiRequests.weeklyArticleFlowRunId` to `WeeklyArticleFlowRuns.id`.
+- [x] Verify compatible existing columns, indexes, and constraints and refuse incompatible definitions.
+- [x] Add a standalone installer entry point and db-manager package script.
+- [x] Add mocked installer tests for fresh installation, idempotency, incompatibility, foreign keys, indexes, and the active-run uniqueness rule.
+- [x] Add a disposable-Postgres integration harness that creates an isolated database, runs the real weekly-flow installer, and always tears the database down.
+- [x] Add a dedicated db-manager integration-test script for the installed weekly-flow schema.
+- [x] Prove the partial unique index rejects a second `pending` or `running` weekly run.
+- [x] Prove terminal weekly runs do not block creation of a new active run.
+- [x] Prove `NewsApiRequests` rows with a null `weeklyArticleFlowRunId` remain valid.
+- [x] Prove deleting a referenced weekly run is rejected by `ON DELETE RESTRICT`.
+- [x] Prove the exact cohort join returns only articles associated through requests carrying the selected weekly run ID.
+- [x] Add load-order and ZIP-import compatibility coverage for the new table and nullable field.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Run the focused mocked db-manager installer and ZIP-import tests.
-- [ ] Run the disposable-Postgres weekly-flow schema integration suite against an explicitly confirmed test database.
-- [ ] Verify the integration harness removed its disposable database after both passing and intentionally failing cases.
-- [ ] Run `npm -C db-manager test`.
-- [ ] Run `npm -C db-manager run build`.
-- [ ] Fix failures, rerun the affected checks, and confirm no legacy V01 or orchestrator schema was reintroduced.
-- [ ] Check off completed Phase 1 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 1 files and inspect `git diff --cached`.
-- [ ] Commit Phase 1 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 1.
+- [x] Run `npm -C db-models run build`.
+- [x] Run the focused mocked db-manager installer and ZIP-import tests.
+- [x] Run the disposable-Postgres weekly-flow schema integration suite against an explicitly confirmed test database.
+- [x] Verify the integration harness removed its disposable database after both passing and intentionally failing cases.
+- [x] Run `npm -C db-manager test`.
+- [x] Run `npm -C db-manager run build`.
+- [x] Fix failures, rerun the affected checks, and confirm no legacy V01 or orchestrator schema was reintroduced.
+- [x] Check off completed Phase 1 tasks and update this document's modification metadata.
+- [x] Stage only Phase 1 files and inspect `git diff --cached`.
+- [x] Commit Phase 1 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 1.
 
 ## Phase 2: Db-Manager Maintenance Safety
 

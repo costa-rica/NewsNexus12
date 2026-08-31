@@ -28,8 +28,19 @@ import { Report } from "./Report";
 import { State } from "./State";
 import { User } from "./User";
 import { WebsiteDomain } from "./WebsiteDomain";
+import { WeeklyArticleFlowRun } from "./WeeklyArticleFlowRun";
 
 export function applyAssociations(): void {
+	// --- Weekly article flow associations ---
+	WeeklyArticleFlowRun.hasMany(NewsApiRequest, {
+		foreignKey: "weeklyArticleFlowRunId",
+		onDelete: "RESTRICT",
+	});
+	NewsApiRequest.belongsTo(WeeklyArticleFlowRun, {
+		foreignKey: "weeklyArticleFlowRunId",
+		onDelete: "RESTRICT",
+	});
+
 	// --- AI Approver V02 associations ---
 	AiApproverPromptVersionV02.hasMany(AiApproverRunV02, {
 		foreignKey: "activePromptVersionId",

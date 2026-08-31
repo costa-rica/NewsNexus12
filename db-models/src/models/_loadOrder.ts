@@ -10,6 +10,7 @@ export const MODEL_LOAD_ORDER: string[] = [
   "WebsiteDomain",
   "EntityWhoCategorizedArticle",
   "EntityWhoFoundArticle",
+  "WeeklyArticleFlowRun",
   "NewsApiRequest",
   "NewsRssRequest",
   "NewsApiRequestWebsiteDomainContract",

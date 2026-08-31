@@ -70,6 +70,16 @@ It does not use `force` or `alter`. It rejects partial or incompatible existing 
 
 See `../docs/ai-appover-v02/20260723_ai_approver_v02_schema_operations.md` for backup prerequisites, production usage, verification queries, and rollback.
 
+## Weekly Article Flow Schema Installer
+
+The dedicated installer creates or validates the additive weekly-run table and nullable `NewsApiRequests.weeklyArticleFlowRunId` relationship:
+
+```bash
+npm run schema:weekly-article-flow
+```
+
+It rejects incompatible existing definitions and does not use `force` or `alter`. Run the disposable PostgreSQL integration suite with `npm run test:schema-weekly-article-flow`.
+
 ## CLI Flags
 
 | Flag | Argument | Description |

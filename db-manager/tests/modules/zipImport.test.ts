@@ -28,6 +28,15 @@ jest.mock("@newsnexus/db-models", () => ({
     rawAttributes: {
       id: { type: { key: "INTEGER" } },
       status: { type: { key: "STRING" } },
+      weeklyArticleFlowRunId: { type: { key: "INTEGER" }, allowNull: true },
+    },
+  },
+  WeeklyArticleFlowRun: {
+    bulkCreate: jest.fn(),
+    rawAttributes: {
+      id: { type: { key: "INTEGER" } },
+      mode: { type: { key: "STRING" }, allowNull: false },
+      status: { type: { key: "STRING" }, allowNull: false },
     },
   },
   AiApproverRunV02: {
@@ -47,6 +56,7 @@ jest.mock("@newsnexus/db-models", () => ({
     ),
   },
   MODEL_LOAD_ORDER: [
+    "WeeklyArticleFlowRun",
     "NewsApiRequest",
     "AiApproverRunV02",
     "Article",
@@ -84,6 +94,7 @@ describe("Zip import module", () => {
     (db.Article.bulkCreate as jest.Mock).mockReset();
     (db.User.bulkCreate as jest.Mock).mockReset();
     (db.NewsApiRequest.bulkCreate as jest.Mock).mockReset();
+    (db.WeeklyArticleFlowRun.bulkCreate as jest.Mock).mockReset();
     (db.AiApproverRunV02.bulkCreate as jest.Mock).mockReset();
     (db.sequelize.query as jest.Mock).mockReset();
     (db.sequelize.sync as jest.Mock).mockReset();
@@ -286,6 +297,7 @@ describe("Zip import module", () => {
     };
 
     it("loads retained request parents before descendants", () => {
+      expect(indexOf("WeeklyArticleFlowRun")).toBeLessThan(indexOf("NewsApiRequest"));
       expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("NewsApiRequestWebsiteDomainContract"));
       expect(indexOf("NewsApiRequest")).toBeLessThan(indexOf("Article"));
     });
@@ -451,6 +463,44 @@ describe("Zip import module", () => {
           { id: "2", jobId: "0094", previewToken: null, status: "completed" },
         ],
         { ignoreDuplicates: true, transaction: {} },
+      );
+    });
+
+    it("imports weekly flow runs before linked news API requests", async () => {
+      const zipPath = path.join(tempDir, "weekly-flow-cohort.zip");
+      const zip = new AdmZip();
+
+      zip.addFile(
+        "WeeklyArticleFlowRun.csv",
+        Buffer.from("id,mode,status\n7,dev_canary,completed"),
+      );
+      zip.addFile(
+        "NewsApiRequest.csv",
+        Buffer.from("id,weeklyArticleFlowRunId,status\n8,7,completed"),
+      );
+      zip.writeZip(zipPath);
+
+      (db.WeeklyArticleFlowRun.bulkCreate as jest.Mock).mockResolvedValue(null);
+      (db.NewsApiRequest.bulkCreate as jest.Mock).mockResolvedValue(null);
+
+      const result = await importZipFileToDatabase(zipPath);
+
+      expect(result.importedTables).toEqual([
+        "WeeklyArticleFlowRun",
+        "NewsApiRequest",
+      ]);
+      expect(db.WeeklyArticleFlowRun.bulkCreate).toHaveBeenCalledWith(
+        [{ id: "7", mode: "dev_canary", status: "completed" }],
+        { ignoreDuplicates: true, transaction: {} },
+      );
+      expect(db.NewsApiRequest.bulkCreate).toHaveBeenCalledWith(
+        [{ id: "8", weeklyArticleFlowRunId: "7", status: "completed" }],
+        { ignoreDuplicates: true, transaction: {} },
+      );
+      expect(
+        (db.WeeklyArticleFlowRun.bulkCreate as jest.Mock).mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (db.NewsApiRequest.bulkCreate as jest.Mock).mock.invocationCallOrder[0],
       );
     });
 

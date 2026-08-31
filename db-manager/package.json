@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "ts-node src/index.ts",
     "schema:ai-approver-v02": "ts-node src/standalone/installAiApproverV02Schema.ts",
+    "schema:weekly-article-flow": "ts-node src/standalone/installWeeklyArticleFlowSchema.ts",
+    "test:schema-weekly-article-flow": "PG_DATABASE=newsnexus_test_weekly_article_flow jest tests/integration/weeklyArticleFlowSchema.integration.test.ts --runInBand",
     "test": "jest",
     "clean": "rm -rf dist"
   },
