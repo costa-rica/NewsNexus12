@@ -42,6 +42,7 @@ The tool is invoked via `npm start --` with flags. With no flags it displays a d
 ```bash
 npm start                                        # Status only
 npm start -- --create_backup                     # Create ZIP backup of all tables
+npm start -- --clear_duplicate_analyses           # Clear duplicate-analysis rows in bounded batches
 npm start -- --zip_file /path/to/backup.zip      # Import ZIP (drops and rebuilds schema first)
 npm start -- --drop_db                           # Wipe all data and rebuild empty schema
 npm start -- --dry_run --zip_file /path/to.zip   # Validate ZIP against scratch DB (live data untouched)
@@ -56,7 +57,7 @@ npm start -- --delete_articles_retired_sources 100       # Delete 100 eligible r
 npm start -- --delete_articles_retired_sources           # Delete all eligible retired-source articles
 ```
 
-Flags can be combined (except `--dry_run` and `--drop_db`, which exit after completing). Execution order: backup, import, trim, delete, no-state delete, retired-sources delete, then status.
+Flags can be combined (except `--dry_run` and `--drop_db`, which exit after completing). Execution order: duplicate-analysis cleanup, backup, import, trim, delete, no-state delete, retired-sources delete, then status.
 
 ## AI Approver V02 Schema Installer
 
@@ -84,7 +85,8 @@ It rejects incompatible existing definitions and does not use `force` or `alter`
 
 | Flag | Argument | Description |
 |------|----------|-------------|
-| `--create_backup` | None | Create a ZIP backup of all database tables |
+| `--create_backup` | None | Create a ZIP backup with CSV exports and a versioned hash manifest |
+| `--clear_duplicate_analyses` | None | Delete all duplicate-analysis rows in bounded batches without changing the table or sequence |
 | `--zip_file` | Path | Full replenish: drop schema, import ZIP, reset sequences |
 | `--drop_db` | None | Wipe all data and rebuild empty schema |
 | `--dry_run` | None (requires `--zip_file`, `--delete_articles_no_state`, or `--delete_articles_retired_sources`) | Validate a ZIP against a scratch DB, preview no-state deletion, or preview retired-source deletion |

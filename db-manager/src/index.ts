@@ -71,6 +71,7 @@ export async function runDbManager(
 ): Promise<number> {
   try {
     const options = parseCliArgs(args);
+    const machineResults: Record<string, unknown>[] = [];
 
     if (options.dryRun) {
       const dryRunTargetCount = [
@@ -108,6 +109,8 @@ export async function runDbManager(
       deleteOldestEligibleArticles,
     } = await import("./modules/deleteArticles");
     const { createDatabaseBackupZipFile } = await import("./modules/backup");
+    const { BACKUP_MANIFEST_VERSION } = await import("./modules/backup");
+    const { clearDuplicateAnalyses } = await import("./modules/clearDuplicateAnalyses");
     const { deleteNoStateArticles } = await import("./modules/deleteArticlesNoState");
     const { deleteRetiredSourcesArticles } = await import("./modules/deleteArticlesRetiredSources");
     const { importZipFileToDatabase, rebuildSchema } = await import("./modules/zipImport");
@@ -148,10 +151,21 @@ export async function runDbManager(
       return 0;
     }
 
+    if (options.clearDuplicateAnalyses) {
+      logger.info("Clearing ArticleDuplicateAnalyses rows");
+      machineResults.push(await clearDuplicateAnalyses());
+    }
+
     if (options.createBackup) {
       logger.info("Creating database backup zip file");
       const backupPath = await createDatabaseBackupZipFile();
       logger.info(`Backup created at: ${backupPath}`);
+      machineResults.push({
+        command: "create_backup",
+        success: true,
+        archivePath: backupPath,
+        manifestVersion: BACKUP_MANIFEST_VERSION,
+      });
     }
 
     if (options.zipFilePath) {
@@ -197,6 +211,13 @@ export async function runDbManager(
       logger.info(
         `Deleted ${result.deletedCount} articles older than ${result.cutoffDate}`,
       );
+      machineResults.push({
+        command: "delete_articles",
+        success: true,
+        foundCount: result.foundCount,
+        deletedCount: result.deletedCount,
+        cutoffDate: result.cutoffDate,
+      });
     }
 
     if (options.deleteArticlesNoState) {
@@ -227,6 +248,10 @@ export async function runDbManager(
 
     const status = await getDatabaseStatus();
     logStatus(status);
+
+    for (const result of machineResults) {
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    }
 
     await sequelize.close();
     return 0;

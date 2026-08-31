@@ -7,6 +7,7 @@ export type CliOptions = {
   deleteArticlesRetiredSourcesLimit?: number;
   zipFilePath?: string;
   createBackup?: boolean;
+  clearDuplicateAnalyses?: boolean;
   dryRun?: boolean;
   dropDb?: boolean;
 };

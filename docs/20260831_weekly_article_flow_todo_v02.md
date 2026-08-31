@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:11:53Z
+updated_at: 2026-08-31T23:15:21Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -81,46 +81,46 @@ Implementation rules:
 
 ### Duplicate-analysis cleanup
 
-- [ ] Add `--clear_duplicate_analyses` to the known CLI flags, parsed options, help documentation, and execution order before backup.
-- [ ] Implement a cleanup module that counts `ArticleDuplicateAnalysis` rows before deletion.
-- [ ] Select and delete primary keys in bounded batches.
-- [ ] Verify zero rows remain and return before, deleted, remaining, and batch counts.
-- [ ] Preserve the table, constraints, indexes, and identity sequence.
-- [ ] Ensure the implementation never issues `DROP TABLE`, `TRUNCATE`, or `VACUUM FULL`.
-- [ ] Emit one stable machine-readable JSON summary after successful CLI completion.
-- [ ] Add tests for empty data, multiple batches, partial batch failure, final verification failure, and JSON summary output.
+- [x] Add `--clear_duplicate_analyses` to the known CLI flags, parsed options, help documentation, and execution order before backup.
+- [x] Implement a cleanup module that counts `ArticleDuplicateAnalysis` rows before deletion.
+- [x] Select and delete primary keys in bounded batches.
+- [x] Verify zero rows remain and return before, deleted, remaining, and batch counts.
+- [x] Preserve the table, constraints, indexes, and identity sequence.
+- [x] Ensure the implementation never issues `DROP TABLE`, `TRUNCATE`, or `VACUUM FULL`.
+- [x] Emit one stable machine-readable JSON summary after successful CLI completion.
+- [x] Add tests for empty data, multiple batches, partial batch failure, final verification failure, and JSON summary output.
 
 ### Verifiable backup manifest
 
-- [ ] Define a versioned backup manifest schema.
-- [ ] Enumerate every registered db-model, including models with zero rows.
-- [ ] Write one CSV for each positive-row model.
-- [ ] Store model name, CSV filename, row count, byte size, and SHA-256 in each positive-row entry.
-- [ ] Store explicit zero-row entries without data CSV files.
-- [ ] Include `manifest.json` in the ZIP.
-- [ ] Preserve the existing error when the entire database has no data.
-- [ ] Return the archive path and manifest version in the final machine-readable command summary.
-- [ ] Update backup and ZIP-import code where necessary to recognize the manifest without treating it as an unknown model CSV.
-- [ ] Add tests for empty tables, nonempty tables, expected membership, byte sizes, hashes, and cleanup of temporary files.
+- [x] Define a versioned backup manifest schema.
+- [x] Enumerate every registered db-model, including models with zero rows.
+- [x] Write one CSV for each positive-row model.
+- [x] Store model name, CSV filename, row count, byte size, and SHA-256 in each positive-row entry.
+- [x] Store explicit zero-row entries without data CSV files.
+- [x] Include `manifest.json` in the ZIP.
+- [x] Preserve the existing error when the entire database has no data.
+- [x] Return the archive path and manifest version in the final machine-readable command summary.
+- [x] Update backup and ZIP-import code where necessary to recognize the manifest without treating it as an unknown model CSV.
+- [x] Add tests for empty tables, nonempty tables, expected membership, byte sizes, hashes, and cleanup of temporary files.
 
 ### Old-article deletion result
 
-- [ ] Preserve default `--delete_articles` behavior at 180 days.
-- [ ] Emit found count, deleted count, cutoff date, success, and command type in the stable final JSON summary.
-- [ ] Keep normal Winston logging compatible and exclude credentials or article content from summaries.
-- [ ] Add tests for success, failure, exit code, and result formatting.
-- [ ] Update db-manager README and package guidance for the new cleanup flag, manifest, and machine-readable terminal result.
+- [x] Preserve default `--delete_articles` behavior at 180 days.
+- [x] Emit found count, deleted count, cutoff date, success, and command type in the stable final JSON summary.
+- [x] Keep normal Winston logging compatible and exclude credentials or article content from summaries.
+- [x] Add tests for success, failure, exit code, and result formatting.
+- [x] Update db-manager README and package guidance for the new cleanup flag, manifest, and machine-readable terminal result.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Run focused db-manager CLI, cleanup, backup, and ZIP-import tests.
-- [ ] Run `npm -C db-manager test`.
-- [ ] Run `npm -C db-manager run build`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 2 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 2 files and inspect `git diff --cached`.
-- [ ] Commit Phase 2 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 2.
+- [x] Run `npm -C db-models run build`.
+- [x] Run focused db-manager CLI, cleanup, backup, and ZIP-import tests.
+- [x] Run `npm -C db-manager test`.
+- [x] Run `npm -C db-manager run build`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 2 tasks and update this document's modification metadata.
+- [x] Stage only Phase 2 files and inspect `git diff --cached`.
+- [x] Commit Phase 2 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 2.
 
 ## Phase 3: Google RSS Cohort Ownership
 

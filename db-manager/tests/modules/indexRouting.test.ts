@@ -30,7 +30,12 @@ jest.mock("../../src/modules/deleteArticles", () => ({
 }));
 
 jest.mock("../../src/modules/backup", () => ({
+  BACKUP_MANIFEST_VERSION: 1,
   createDatabaseBackupZipFile: jest.fn(),
+}));
+
+jest.mock("../../src/modules/clearDuplicateAnalyses", () => ({
+  clearDuplicateAnalyses: jest.fn(),
 }));
 
 jest.mock("../../src/modules/deleteArticlesNoState", () => ({
@@ -56,6 +61,9 @@ import { deleteNoStateArticles } from "../../src/modules/deleteArticlesNoState";
 import { deleteRetiredSourcesArticles } from "../../src/modules/deleteArticlesRetiredSources";
 import { runDryRunValidator } from "../../src/modules/dryRunValidator";
 import { getDatabaseStatus } from "../../src/modules/status";
+import { clearDuplicateAnalyses } from "../../src/modules/clearDuplicateAnalyses";
+import { deleteOldUnapprovedArticles } from "../../src/modules/deleteArticles";
+import { createDatabaseBackupZipFile } from "../../src/modules/backup";
 
 const statusSummary = {
   totalArticles: 10,
@@ -68,6 +76,7 @@ const statusSummary = {
 
 describe("db-manager index routing", () => {
   let stderrWriteSpy: jest.SpyInstance;
+  let stdoutWriteSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -83,13 +92,67 @@ describe("db-manager index routing", () => {
     });
     (runDryRunValidator as jest.Mock).mockResolvedValue({ success: true });
     (getDatabaseStatus as jest.Mock).mockResolvedValue(statusSummary);
+    (clearDuplicateAnalyses as jest.Mock).mockResolvedValue({
+      command: "clear_duplicate_analyses",
+      success: true,
+      beforeCount: 3,
+      deletedCount: 3,
+      remainingCount: 0,
+      batchCount: 1,
+    });
+    (deleteOldUnapprovedArticles as jest.Mock).mockResolvedValue({
+      foundCount: 2,
+      deletedCount: 2,
+      cutoffDate: "2026-03-04",
+    });
+    (createDatabaseBackupZipFile as jest.Mock).mockResolvedValue(
+      "/tmp/db_backup.zip",
+    );
     stderrWriteSpy = jest
       .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    stdoutWriteSpy = jest
+      .spyOn(process.stdout, "write")
       .mockImplementation(() => true);
   });
 
   afterEach(() => {
     stderrWriteSpy.mockRestore();
+    stdoutWriteSpy.mockRestore();
+  });
+
+  it("runs duplicate cleanup before backup and emits stable summaries", async () => {
+    const exitCode = await runDbManager([
+      "--clear_duplicate_analyses",
+      "--create_backup",
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(clearDuplicateAnalyses).toHaveBeenCalledTimes(1);
+    expect(createDatabaseBackupZipFile).toHaveBeenCalledTimes(1);
+    expect(
+      (clearDuplicateAnalyses as jest.Mock).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      (createDatabaseBackupZipFile as jest.Mock).mock.invocationCallOrder[0],
+    );
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"command":"clear_duplicate_analyses"'),
+    );
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"manifestVersion":1'),
+    );
+  });
+
+  it("keeps the default 180-day deletion and emits its result", async () => {
+    const exitCode = await runDbManager(["--delete_articles"]);
+
+    expect(exitCode).toBe(0);
+    expect(deleteOldUnapprovedArticles).toHaveBeenCalledWith(180);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '"command":"delete_articles","success":true,"foundCount":2,"deletedCount":2',
+      ),
+    );
   });
 
   it("routes --delete_articles_no_state execute path to the no-state module", async () => {

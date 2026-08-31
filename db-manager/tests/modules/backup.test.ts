@@ -150,6 +150,33 @@ describe("Backup module", () => {
       expect(entryNames).toContain("Article.csv");
       expect(entryNames).toContain("ArticleApproved.csv");
       expect(entryNames).not.toContain("User.csv");
+      expect(entryNames).toContain("manifest.json");
+    });
+
+    it("writes a versioned manifest with hashes and explicit empty models", async () => {
+      (db.Article.findAll as jest.Mock).mockResolvedValue([{ id: 1, title: "A" }]);
+      (db.ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (db.User.findAll as jest.Mock).mockResolvedValue([]);
+
+      const zipPath = await createDatabaseBackupZipFile();
+      const zip = new AdmZip(zipPath);
+      const manifest = JSON.parse(zip.readAsText("manifest.json"));
+      const article = manifest.models.find((entry: any) => entry.modelName === "Article");
+      const user = manifest.models.find((entry: any) => entry.modelName === "User");
+
+      expect(manifest.version).toBe(1);
+      expect(article).toEqual(expect.objectContaining({
+        csvFilename: "Article.csv",
+        rowCount: 1,
+        byteSize: expect.any(Number),
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }));
+      expect(user).toEqual(expect.objectContaining({
+        csvFilename: null,
+        rowCount: 0,
+        byteSize: null,
+        sha256: null,
+      }));
     });
 
     it("includes AI Approver V02 models discovered through package exports", async () => {

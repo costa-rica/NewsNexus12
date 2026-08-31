@@ -8,6 +8,7 @@ const KNOWN_FLAGS = [
   "--delete_articles_retired_sources",
   "--zip_file",
   "--create_backup",
+  "--clear_duplicate_analyses",
   "--dry_run",
   "--drop_db",
 ];
@@ -211,6 +212,17 @@ export function parseCliArgs(args: string[]): CliOptions {
       }
 
       options.createBackup = true;
+      continue;
+    }
+
+    if (flagToken === "--clear_duplicate_analyses") {
+      if (
+        inlineValue !== undefined ||
+        (args[i + 1] && !args[i + 1].startsWith("--"))
+      ) {
+        throw new Error("--clear_duplicate_analyses does not take a value");
+      }
+      options.clearDuplicateAnalyses = true;
       continue;
     }
 

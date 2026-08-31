@@ -14,6 +14,7 @@ function toDateOnly(date: Date): string {
 }
 
 export type DeleteArticlesResult = {
+  foundCount: number;
   deletedCount: number;
   cutoffDate: string;
 };
@@ -75,7 +76,7 @@ export async function deleteOldUnapprovedArticles(
   );
 
   if (totalToDelete === 0) {
-    return { deletedCount: 0, cutoffDate: cutoffDateOnly };
+    return { foundCount: 0, deletedCount: 0, cutoffDate: cutoffDateOnly };
   }
 
   let deletedCount = 0;
@@ -136,7 +137,7 @@ export async function deleteOldUnapprovedArticles(
     );
   }
 
-  return { deletedCount, cutoffDate: cutoffDateOnly };
+  return { foundCount: totalToDelete, deletedCount, cutoffDate: cutoffDateOnly };
 }
 
 export async function deleteOldestEligibleArticles(

@@ -7,6 +7,18 @@ describe("CLI argument parser", () => {
       expect(result).toEqual({});
     });
 
+    it("parses --clear_duplicate_analyses without a value", () => {
+      expect(parseCliArgs(["--clear_duplicate_analyses"])).toEqual({
+        clearDuplicateAnalyses: true,
+      });
+    });
+
+    it("rejects a value for --clear_duplicate_analyses", () => {
+      expect(() =>
+        parseCliArgs(["--clear_duplicate_analyses", "ArticleDuplicateAnalyses"]),
+      ).toThrow("--clear_duplicate_analyses does not take a value");
+    });
+
     it("parses --delete_articles with no value and defaults to DEFAULT_DELETE_DAYS", () => {
       const result = parseCliArgs(["--delete_articles"]);
       expect(result.deleteArticlesDays).toBe(DEFAULT_DELETE_DAYS);
