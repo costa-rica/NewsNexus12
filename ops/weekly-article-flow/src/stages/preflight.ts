@@ -122,18 +122,20 @@ export const runPreflight = async (
   }
 
   await dependencies.workerClient.requestJson('node', '/health');
-  if (!await dependencies.workerClient.isQueueIdle('node')) {
-    throw new Error('worker-node queue is not idle');
-  }
-  if (!await dependencies.workerClient.isQueueIdle('python')) {
-    throw new Error('worker-python queue is not idle');
-  }
-  const latestV02 = await dependencies.workerClient.requestJson<{ status?: string } | null>(
-    'python',
-    '/ai-approver-v02/runs/latest'
-  );
-  if (latestV02 && ['queued', 'running'].includes(String(latestV02.status))) {
-    throw new Error('an AI Approver V02 execution is already active');
+  if (!options.resumeRunId) {
+    if (!await dependencies.workerClient.isQueueIdle('node')) {
+      throw new Error('worker-node queue is not idle');
+    }
+    if (!await dependencies.workerClient.isQueueIdle('python')) {
+      throw new Error('worker-python queue is not idle');
+    }
+    const latestV02 = await dependencies.workerClient.requestJson<{ status?: string } | null>(
+      'python',
+      '/ai-approver-v02/runs/latest'
+    );
+    if (latestV02 && ['queued', 'running'].includes(String(latestV02.status))) {
+      throw new Error('an AI Approver V02 execution is already active');
+    }
   }
 
   const authenticateDb = dependencies.authenticateDb ?? (async () => {

@@ -126,6 +126,28 @@ describe('weekly flow repository', () => {
       selectedArticleIds: [10, 11],
       predictions: [{ articleId: 10, resultStatus: 'completed', prediction: 'approved' }]
     }));
+    expect(dbMock.AiApproverRunV02.findByPk).toHaveBeenCalledWith(7, expect.objectContaining({
+      attributes: expect.not.arrayContaining(['previewToken'])
+    }));
+  });
+
+  it('loads token-safe V02 recovery state with an explicit attribute allowlist', async () => {
+    dbMock.AiApproverRunV02.findByPk.mockResolvedValue({
+      id: 8,
+      jobId: 'job-8',
+      status: 'queued',
+      previewExpiresAt: null,
+      plannedEligibleCount: 1,
+      selectionSnapshot: [{ articleId: 10 }]
+    });
+    const repository = new WeeklyFlowRepository();
+    await expect(repository.loadV02SafeRunState(8)).resolves.toEqual(expect.objectContaining({
+      id: 8,
+      jobId: 'job-8'
+    }));
+    expect(dbMock.AiApproverRunV02.findByPk).toHaveBeenCalledWith(8, {
+      attributes: ['id', 'jobId', 'status', 'previewExpiresAt', 'plannedEligibleCount', 'selectionSnapshot']
+    });
   });
 
   it('resumes only the same active execution context without creating a run', async () => {

@@ -15,6 +15,7 @@ export interface CommandRequest {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 export class CommandTimeoutError extends Error {
@@ -45,6 +46,26 @@ export const runCommand = async (request: CommandRequest): Promise<CommandResult
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    const terminate = () => {
+      if (!child.pid) return;
+      try {
+        process.kill(-child.pid, 'SIGTERM');
+      } catch {
+        child.kill('SIGTERM');
+      }
+    };
+    const onAbort = () => {
+      terminate();
+      setTimeout(() => {
+        if (!child.pid) return;
+        try {
+          process.kill(-child.pid, 'SIGKILL');
+        } catch {
+          child.kill('SIGKILL');
+        }
+      }, 5000).unref();
+    };
+    request.signal?.addEventListener('abort', onAbort, { once: true });
     child.stdout.on('data', (chunk: Buffer) => { stdout = appendBounded(stdout, chunk); });
     child.stderr.on('data', (chunk: Buffer) => { stderr = appendBounded(stderr, chunk); });
 
@@ -68,10 +89,16 @@ export const runCommand = async (request: CommandRequest): Promise<CommandResult
 
     child.once('error', (error) => {
       clearTimeout(timer);
+      request.signal?.removeEventListener('abort', onAbort);
       reject(error);
     });
     child.once('close', (code) => {
       clearTimeout(timer);
+      request.signal?.removeEventListener('abort', onAbort);
+      if (request.signal?.aborted) {
+        reject(request.signal.reason instanceof Error ? request.signal.reason : new Error('command canceled'));
+        return;
+      }
       if (timedOut) {
         reject(new CommandTimeoutError(request.command, request.timeoutMs));
         return;

@@ -21,7 +21,7 @@ const config = (): WeeklyFlowConfig => ({
   backupDirectory: '/resources/backups',
   journalDirectory: '/resources/journal',
   alertStagingPath: '/resources/alert.md',
-  alertHelperService: 'alert.service',
+  alertHelperService: 'newsnexus12-publish-weekly-alert.service',
   rssSpreadsheetPath: '/resources/queries.xlsx',
   semanticDirectory: '/resources/semantic',
   stateFilesPath: '/resources/state',
@@ -34,8 +34,10 @@ const config = (): WeeklyFlowConfig => ({
     semanticSeconds: 14400,
     stateSeconds: 64800,
     aiApproverV02Seconds: 43200,
+    reportingSeconds: 600,
     runSeconds: 259200
   },
+  v02PreviewTtlSeconds: 960,
   polling: { initialMs: 1000, maxMs: 30000 },
   minimumFreeDiskBytes: 1000,
   devRssTarget: 10
@@ -134,5 +136,16 @@ describe('weekly flow preflight', () => {
       mode: 'dev_canary',
       allowLiveAi: true
     }, dependencies(client))).rejects.toThrow('already active');
+  });
+
+  it('defers busy-queue ownership checks to authoritative resume reconciliation', async () => {
+    const client = workerClient(false);
+    await expect(runPreflight(config(), {
+      mode: 'dev_canary',
+      resumeRunId: 42,
+      allowLiveAi: true
+    }, dependencies(client))).resolves.toEqual(expect.objectContaining({ host: 'dev-host' }));
+    expect(client.isQueueIdle).not.toHaveBeenCalled();
+    expect(client.requestJson).toHaveBeenCalledTimes(1);
   });
 });

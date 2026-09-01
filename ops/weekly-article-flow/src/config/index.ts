@@ -35,8 +35,10 @@ export interface WeeklyFlowConfig {
     semanticSeconds: number;
     stateSeconds: number;
     aiApproverV02Seconds: number;
+    reportingSeconds: number;
     runSeconds: number;
   };
+  v02PreviewTtlSeconds: number;
   polling: { initialMs: number; maxMs: number };
   minimumFreeDiskBytes: number;
   devRssTarget: number;
@@ -119,6 +121,8 @@ export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig 
   const initialMs = integer(env, 'WEEKLY_FLOW_POLL_INITIAL_MS', 250, 60_000);
   const maxMs = integer(env, 'WEEKLY_FLOW_POLL_MAX_MS', initialMs, 300_000);
   const runSeconds = integer(env, 'WEEKLY_FLOW_RUN_TIMEOUT_SECONDS', 3600, 259_200);
+  const workerPreviewTtlSeconds = integer(env, 'AI_APPROVER_V02_PREVIEW_TTL_MINUTES', 1, 59) * 60;
+  const v02PreviewTtlSeconds = workerPreviewTtlSeconds + 60;
 
   const timeouts = {
     preflightSeconds: integer(env, 'WEEKLY_FLOW_PREFLIGHT_TIMEOUT_SECONDS', 60, 900),
@@ -129,15 +133,34 @@ export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig 
     semanticSeconds: integer(env, 'WEEKLY_FLOW_SEMANTIC_TIMEOUT_SECONDS', 60, 14_400),
     stateSeconds: integer(env, 'WEEKLY_FLOW_STATE_TIMEOUT_SECONDS', 60, 64_800),
     aiApproverV02Seconds: integer(env, 'WEEKLY_FLOW_AI_APPROVER_V02_TIMEOUT_SECONDS', 60, 43_200),
+    reportingSeconds: integer(env, 'WEEKLY_FLOW_REPORTING_TIMEOUT_SECONDS', 60, 600),
     runSeconds
   };
   if (Object.values(timeouts).some((value) => value > runSeconds)) {
     throw new Error('stage timeouts must not exceed WEEKLY_FLOW_RUN_TIMEOUT_SECONDS');
   }
 
+  const resourcesPath = absolutePath(env, 'WEEKLY_FLOW_RESOURCES_PATH');
+  const journalDirectory = absolutePath(env, 'WEEKLY_FLOW_JOURNAL_DIRECTORY');
+  const alertStagingPath = absolutePath(env, 'WEEKLY_FLOW_ALERT_STAGING_PATH');
+  if (journalDirectory !== path.join(resourcesPath, 'weekly-flow')) {
+    throw new Error('WEEKLY_FLOW_JOURNAL_DIRECTORY must be the weekly-flow directory under resources');
+  }
+  if (
+    path.dirname(alertStagingPath) !== journalDirectory ||
+    path.basename(alertStagingPath) !== 'ALERT-newsnexus12-weekly-cron.md'
+  ) {
+    throw new Error('WEEKLY_FLOW_ALERT_STAGING_PATH must use the fixed alert name in the journal directory');
+  }
+
+  const alertHelperService = required(env, 'WEEKLY_FLOW_ALERT_HELPER_SERVICE');
+  if (alertHelperService !== 'newsnexus12-publish-weekly-alert.service') {
+    throw new Error('WEEKLY_FLOW_ALERT_HELPER_SERVICE must name the fixed weekly alert publisher service');
+  }
+
   return {
     repositoryPath: absolutePath(env, 'WEEKLY_FLOW_REPOSITORY_PATH'),
-    resourcesPath: absolutePath(env, 'WEEKLY_FLOW_RESOURCES_PATH'),
+    resourcesPath,
     devHosts,
     productionHosts,
     devDatabases,
@@ -146,13 +169,14 @@ export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig 
     workerPythonUrl: baseUrl(env, 'WEEKLY_FLOW_WORKER_PYTHON_URL'),
     lockPath: absolutePath(env, 'WEEKLY_FLOW_LOCK_PATH'),
     backupDirectory: absolutePath(env, 'WEEKLY_FLOW_BACKUP_DIRECTORY'),
-    journalDirectory: absolutePath(env, 'WEEKLY_FLOW_JOURNAL_DIRECTORY'),
-    alertStagingPath: absolutePath(env, 'WEEKLY_FLOW_ALERT_STAGING_PATH'),
-    alertHelperService: required(env, 'WEEKLY_FLOW_ALERT_HELPER_SERVICE'),
+    journalDirectory,
+    alertStagingPath,
+    alertHelperService,
     rssSpreadsheetPath: absolutePath(env, 'WEEKLY_FLOW_RSS_SPREADSHEET_PATH'),
     semanticDirectory: absolutePath(env, 'WEEKLY_FLOW_SEMANTIC_DIRECTORY'),
     stateFilesPath: absolutePath(env, 'WEEKLY_FLOW_STATE_FILES_PATH'),
     timeouts,
+    v02PreviewTtlSeconds,
     polling: { initialMs, maxMs },
     minimumFreeDiskBytes: integer(env, 'WEEKLY_FLOW_MIN_FREE_DISK_BYTES', 1, Number.MAX_SAFE_INTEGER),
     devRssTarget: integer(env, 'WEEKLY_FLOW_DEV_RSS_TARGET', 1, 10_000)

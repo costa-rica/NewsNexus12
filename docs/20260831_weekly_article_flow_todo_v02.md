@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:46:11Z
+updated_at: 2026-09-01T02:11:37Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -375,54 +375,54 @@ Implementation rules:
 
 ### V02 preview and execution
 
-- [ ] Submit the preview directly to the allowlisted worker-python URL.
-- [ ] Set `selectionMode` to `article_position_count`.
-- [ ] Set `requestedArticleCount` to the Google RSS `articlesAddedCount` without increasing it.
-- [ ] Enable description fallback and approved-boundary crossing.
-- [ ] Persist draft ID, expiry, planned eligible count, frozen selected IDs, cohort IDs, overlap IDs, overlap count, and overlap percentage.
-- [ ] Treat overlap as visibility-only at every percentage.
-- [ ] Keep the preview token in memory only until acceptance.
-- [ ] Redact the preview token from logs, errors, Postgres stage results, and JSONL.
-- [ ] Accept the preview and persist V02 run and queue job IDs.
-- [ ] Poll both the V02 run and worker-python queue record to terminal state.
-- [ ] Reconcile attempted, completed, failed, invalid-response, skipped, and unattempted IDs and counts from the frozen selection and predictions.
-- [ ] Apply the 12-hour V02 stage timeout.
-- [ ] Map unacceptable terminal results to `failure_ai_approver_v02`.
-- [ ] Preserve explicit cancellation and run-wide timeout statuses.
-- [ ] Reattach any accepted V02 run during recovery and never automatically duplicate it.
-- [ ] Treat a pre-acceptance draft whose in-memory token was lost as unaccepted work; wait for or verify expiry before creating another preview for the same weekly run.
+- [x] Submit the preview directly to the allowlisted worker-python URL.
+- [x] Set `selectionMode` to `article_position_count`.
+- [x] Set `requestedArticleCount` to the Google RSS `articlesAddedCount` without increasing it.
+- [x] Enable description fallback and approved-boundary crossing.
+- [x] Persist draft ID, expiry, planned eligible count, frozen selected IDs, cohort IDs, overlap IDs, overlap count, and overlap percentage.
+- [x] Treat overlap as visibility-only at every percentage.
+- [x] Keep the preview token in memory only until acceptance.
+- [x] Redact the preview token from logs, errors, Postgres stage results, and JSONL.
+- [x] Accept the preview and persist V02 run and queue job IDs.
+- [x] Poll both the V02 run and worker-python queue record to terminal state.
+- [x] Reconcile attempted, completed, failed, invalid-response, skipped, and unattempted IDs and counts from the frozen selection and predictions.
+- [x] Apply the 12-hour V02 stage timeout.
+- [x] Map unacceptable terminal results to `failure_ai_approver_v02`.
+- [x] Preserve explicit cancellation and run-wide timeout statuses.
+- [x] Reattach any accepted V02 run during recovery and never automatically duplicate it.
+- [x] Treat a pre-acceptance draft whose in-memory token was lost as unaccepted work; wait for or verify expiry before creating another preview for the same weekly run.
 
 ### JSONL journal
 
-- [ ] Write versioned UTC JSONL events to `/home/limited_user/project_resources/NewsNexus12/weekly-flow/`.
-- [ ] Use `weekly-flow-YYYYMMDD.jsonl` and append one flushed complete line per event.
-- [ ] Include run, stage, job, count, reason, path, mode, host, and revision fields from the PRD.
-- [ ] Exclude secrets, preview tokens, credentials, environment values, and article content.
-- [ ] Keep JSONL non-authoritative for recovery and retries.
-- [ ] Record reporting failure without rewriting an otherwise successful run status.
+- [x] Write versioned UTC JSONL events to `/home/limited_user/project_resources/NewsNexus12/weekly-flow/`.
+- [x] Use `weekly-flow-YYYYMMDD.jsonl` and append one flushed complete line per event.
+- [x] Include run, stage, job, count, reason, path, mode, host, and revision fields from the PRD.
+- [x] Exclude secrets, preview tokens, credentials, environment values, and article content.
+- [x] Keep JSONL non-authoritative for recovery and retries.
+- [x] Record reporting failure without rewriting an otherwise successful run status.
 
 ### Alert staging and invocation
 
-- [ ] Render the fixed-name `ALERT-newsnexus12-weekly-cron.md` with the required failure and recovery details.
-- [ ] Atomically stage it under the weekly-flow resources path.
-- [ ] Invoke only the fixed alert-publisher oneshot service.
-- [ ] Record helper start, completion, and failure without granting vault access to `limited_user`.
-- [ ] Keep the alert present until operator resolution or archival.
+- [x] Render the fixed-name `ALERT-newsnexus12-weekly-cron.md` with the required failure and recovery details.
+- [x] Atomically stage it under the weekly-flow resources path.
+- [x] Invoke only the fixed alert-publisher oneshot service.
+- [x] Record helper start, completion, and failure without granting vault access to `limited_user`.
+- [x] Keep the alert present until operator resolution or archival.
 
 ### Phase verification and commit
 
-- [ ] Add tests for exact Mode A body construction and no count compensation.
-- [ ] Add tests for zero, partial, and full cohort overlap all proceeding.
-- [ ] Add tests for token redaction, expiry recovery, dual-terminal reconciliation, every V02 terminal state, cancellation, and timeout.
-- [ ] Add tests for JSONL append, flushing, schemas, redaction, and write failures.
-- [ ] Add tests for alert content, atomic staging, helper success, helper failure, and sync failure reporting.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Run `worker-python/venv/bin/pytest worker-python/tests/unit/ai_approver_v02 worker-python/tests/integration/test_ai_approver_v02_routes.py`.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 8 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 8 files and inspect `git diff --cached`.
-- [ ] Commit Phase 8 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 8.
+- [x] Add tests for exact Mode A body construction and no count compensation.
+- [x] Add tests for zero, partial, and full cohort overlap all proceeding.
+- [x] Add tests for token redaction, expiry recovery, dual-terminal reconciliation, every V02 terminal state, cancellation, and timeout.
+- [x] Add tests for JSONL append, flushing, schemas, redaction, and write failures.
+- [x] Add tests for alert content, atomic staging, helper success, helper failure, and sync failure reporting.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Run `worker-python/venv/bin/pytest worker-python/tests/unit/ai_approver_v02 worker-python/tests/integration/test_ai_approver_v02_routes.py`.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 8 tasks and update this document's modification metadata.
+- [x] Stage only Phase 8 files and inspect `git diff --cached`.
+- [x] Commit Phase 8 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 8.
 
 ## Phase 9: Operational Assets and Documentation
 

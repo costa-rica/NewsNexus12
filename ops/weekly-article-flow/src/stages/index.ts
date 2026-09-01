@@ -18,3 +18,4 @@ export * from './commandRunner';
 export * from './maintenance';
 export * from './preflight';
 export * from './workers';
+export * from './aiApproverV02';

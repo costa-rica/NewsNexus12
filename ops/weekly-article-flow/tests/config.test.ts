@@ -11,9 +11,9 @@ const validEnv = (): NodeJS.ProcessEnv => ({
   WEEKLY_FLOW_WORKER_PYTHON_URL: 'http://127.0.0.1:5000',
   WEEKLY_FLOW_LOCK_PATH: '/var/lock/newsnexus12.lock',
   WEEKLY_FLOW_BACKUP_DIRECTORY: '/srv/resources/backups',
-  WEEKLY_FLOW_JOURNAL_DIRECTORY: '/srv/resources/journal',
-  WEEKLY_FLOW_ALERT_STAGING_PATH: '/srv/resources/alert.md',
-  WEEKLY_FLOW_ALERT_HELPER_SERVICE: 'newsnexus12-alert.service',
+  WEEKLY_FLOW_JOURNAL_DIRECTORY: '/srv/resources/weekly-flow',
+  WEEKLY_FLOW_ALERT_STAGING_PATH: '/srv/resources/weekly-flow/ALERT-newsnexus12-weekly-cron.md',
+  WEEKLY_FLOW_ALERT_HELPER_SERVICE: 'newsnexus12-publish-weekly-alert.service',
   WEEKLY_FLOW_RSS_SPREADSHEET_PATH: '/srv/resources/queries.xlsx',
   WEEKLY_FLOW_SEMANTIC_DIRECTORY: '/srv/resources/semantic',
   WEEKLY_FLOW_STATE_FILES_PATH: '/srv/resources/state',
@@ -25,7 +25,9 @@ const validEnv = (): NodeJS.ProcessEnv => ({
   WEEKLY_FLOW_SEMANTIC_TIMEOUT_SECONDS: '14400',
   WEEKLY_FLOW_STATE_TIMEOUT_SECONDS: '64800',
   WEEKLY_FLOW_AI_APPROVER_V02_TIMEOUT_SECONDS: '43200',
+  WEEKLY_FLOW_REPORTING_TIMEOUT_SECONDS: '600',
   WEEKLY_FLOW_RUN_TIMEOUT_SECONDS: '259200',
+  AI_APPROVER_V02_PREVIEW_TTL_MINUTES: '15',
   WEEKLY_FLOW_POLL_INITIAL_MS: '1000',
   WEEKLY_FLOW_POLL_MAX_MS: '30000',
   WEEKLY_FLOW_MIN_FREE_DISK_BYTES: '1000000',
@@ -45,6 +47,8 @@ describe('weekly flow configuration', () => {
     ['credentialed URL', { WEEKLY_FLOW_WORKER_NODE_URL: 'http://user:secret@127.0.0.1:3002' }],
     ['URL with path', { WEEKLY_FLOW_WORKER_NODE_URL: 'http://127.0.0.1:3002/api' }],
     ['unsafe timeout', { WEEKLY_FLOW_SEMANTIC_TIMEOUT_SECONDS: '20000' }],
+    ['invalid worker preview TTL', { AI_APPROVER_V02_PREVIEW_TTL_MINUTES: '0' }],
+    ['unsafe alert name', { WEEKLY_FLOW_ALERT_STAGING_PATH: '/srv/resources/weekly-flow/other.md' }],
     ['overlapping database', { WEEKLY_FLOW_PRODUCTION_DATABASES: 'newsnexus_dev' }]
   ])('rejects %s configuration', (_label, overrides) => {
     expect(() => parseWeeklyFlowConfig({ ...validEnv(), ...overrides })).toThrow();

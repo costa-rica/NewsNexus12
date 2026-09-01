@@ -84,13 +84,33 @@ export interface ResumeRunExpectation {
 }
 
 export interface V02Reconciliation {
-  run: AiApproverRunV02;
+  run: Pick<AiApproverRunV02,
+    | 'id'
+    | 'jobId'
+    | 'status'
+    | 'endingReason'
+    | 'attemptedCount'
+    | 'completedCount'
+    | 'failedCount'
+    | 'invalidResponseCount'
+    | 'skippedCount'
+    | 'selectionSnapshot'
+  >;
   selectedArticleIds: number[];
   predictions: Array<{
     articleId: number;
     resultStatus: string;
     prediction: string | null;
   }>;
+}
+
+export interface V02SafeRunState {
+  id: number;
+  jobId: string | null;
+  status: AiApproverRunV02['status'];
+  previewExpiresAt: Date | null;
+  plannedEligibleCount: number;
+  selectionSnapshot: AiApproverRunV02['selectionSnapshot'];
 }
 
 export class WeeklyFlowRepository {
@@ -202,7 +222,12 @@ export class WeeklyFlowRepository {
   }
 
   async loadV02Reconciliation(runId: number): Promise<V02Reconciliation | null> {
-    const run = await AiApproverRunV02.findByPk(runId);
+    const run = await AiApproverRunV02.findByPk(runId, {
+      attributes: [
+        'id', 'jobId', 'status', 'endingReason', 'attemptedCount', 'completedCount',
+        'failedCount', 'invalidResponseCount', 'skippedCount', 'selectionSnapshot'
+      ]
+    });
     if (!run) {
       return null;
     }
@@ -218,6 +243,21 @@ export class WeeklyFlowRepository {
         resultStatus: prediction.resultStatus,
         prediction: prediction.prediction
       }))
+    };
+  }
+
+  async loadV02SafeRunState(runId: number): Promise<V02SafeRunState | null> {
+    const run = await AiApproverRunV02.findByPk(runId, {
+      attributes: ['id', 'jobId', 'status', 'previewExpiresAt', 'plannedEligibleCount', 'selectionSnapshot']
+    });
+    if (!run) return null;
+    return {
+      id: run.id,
+      jobId: run.jobId,
+      status: run.status,
+      previewExpiresAt: run.previewExpiresAt,
+      plannedEligibleCount: run.plannedEligibleCount,
+      selectionSnapshot: run.selectionSnapshot
     };
   }
 
