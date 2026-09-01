@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@newsnexus/db-models": "file:../../db-models",
+    "adm-zip": "^0.6.0",
     "dotenv": "^17.2.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.13.10",
     "jest": "^30.2.0",

@@ -8,8 +8,8 @@ const jsonResponse = (body: unknown, status = 200): Response => new Response(JSO
 describe('worker HTTP client', () => {
   it('uses each worker queue route spelling and preserves the allowlisted origin', async () => {
     const fetchFn = jest.fn()
-      .mockResolvedValueOnce(jsonResponse({ totalJobs: 0, queued: 0, running: 0, completed: 0, failed: 0, canceled: 0 }))
-      .mockResolvedValueOnce(jsonResponse({ totalJobs: 0, queued: 0, running: 0, completed: 0, failed: 0, canceled: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ summary: {}, runningJob: null, queuedJobs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ summary: {}, runningJob: null, queuedJobs: [] }))
       .mockResolvedValueOnce(jsonResponse({ outcome: 'canceled' }))
       .mockResolvedValueOnce(jsonResponse({ outcome: 'canceled' }));
     const client = new WorkerHttpClient({

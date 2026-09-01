@@ -23,6 +23,9 @@ export interface WeeklyFlowConfig {
   journalDirectory: string;
   alertStagingPath: string;
   alertHelperService: string;
+  rssSpreadsheetPath: string;
+  semanticDirectory: string;
+  stateFilesPath: string;
   timeouts: {
     preflightSeconds: number;
     duplicateCleanupSeconds: number;
@@ -146,6 +149,9 @@ export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig 
     journalDirectory: absolutePath(env, 'WEEKLY_FLOW_JOURNAL_DIRECTORY'),
     alertStagingPath: absolutePath(env, 'WEEKLY_FLOW_ALERT_STAGING_PATH'),
     alertHelperService: required(env, 'WEEKLY_FLOW_ALERT_HELPER_SERVICE'),
+    rssSpreadsheetPath: absolutePath(env, 'WEEKLY_FLOW_RSS_SPREADSHEET_PATH'),
+    semanticDirectory: absolutePath(env, 'WEEKLY_FLOW_SEMANTIC_DIRECTORY'),
+    stateFilesPath: absolutePath(env, 'WEEKLY_FLOW_STATE_FILES_PATH'),
     timeouts,
     polling: { initialMs, maxMs },
     minimumFreeDiskBytes: integer(env, 'WEEKLY_FLOW_MIN_FREE_DISK_BYTES', 1, Number.MAX_SAFE_INTEGER),

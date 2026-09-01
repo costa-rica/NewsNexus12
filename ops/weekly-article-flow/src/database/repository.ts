@@ -171,6 +171,23 @@ export class WeeklyFlowRepository {
     await run.update({ stageResults });
   }
 
+  async updateRunningStageEvidence(
+    run: WeeklyArticleFlowRun,
+    stage: WeeklyStageName,
+    evidence: Record<string, unknown>
+  ): Promise<void> {
+    if (run.currentStage !== stage) {
+      throw new InvalidRunTransitionError(run.currentStage, stage);
+    }
+    const previous = run.stageResults[stage] ?? {};
+    if (previous.status !== 'running') {
+      throw new Error(`stage is not running: ${stage}`);
+    }
+    const stageResults = { ...run.stageResults };
+    stageResults[stage] = { ...previous, ...evidence, status: 'running' };
+    await run.update({ stageResults });
+  }
+
   async getCohortArticleIds(runId: number): Promise<number[]> {
     const rows = await sequelize.query<{ id: number }>(
       `SELECT DISTINCT article."id" AS "id"

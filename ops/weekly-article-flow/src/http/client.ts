@@ -10,12 +10,16 @@ export interface QueueJobRecord {
 }
 
 export interface QueueStatusView {
-  totalJobs: number;
-  queued: number;
-  running: number;
-  completed: number;
-  failed: number;
-  canceled: number;
+  summary: {
+    totalJobs: number;
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+  };
+  runningJob: QueueJobRecord | null;
+  queuedJobs: QueueJobRecord[];
 }
 
 export interface WorkerHttpClientOptions {
@@ -139,6 +143,11 @@ export class WorkerHttpClient {
   async getQueueStatus(worker: WorkerKind): Promise<QueueStatusView> {
     const path = worker === 'node' ? '/queue-info/queue_status' : '/queue-info/queue-status';
     return this.requestJson(worker, path);
+  }
+
+  async isQueueIdle(worker: WorkerKind): Promise<boolean> {
+    const status = await this.getQueueStatus(worker);
+    return status.runningJob === null && status.queuedJobs.length === 0;
   }
 
   async cancelQueueJob(worker: WorkerKind, jobId: string): Promise<Record<string, unknown>> {

@@ -3,6 +3,7 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
+  setupFiles: ['<rootDir>/tests/setupEnv.js'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   clearMocks: true
 };

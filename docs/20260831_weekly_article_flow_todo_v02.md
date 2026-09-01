@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-08-31T23:35:57Z
+updated_at: 2026-08-31T23:46:11Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -310,66 +310,66 @@ Implementation rules:
 
 ### Preflight and locks
 
-- [ ] Validate host and database against mode-specific allowlists before creating a run.
-- [ ] Verify the `limited_user` runtime identity where required.
-- [ ] Verify repository revision, worker health, idle queues, and absence of an active V02 execution.
-- [ ] Verify spreadsheet, semantic workbook, state files, active V02 prompt, Playwright, Codex CLI, disk space, and writable output paths.
-- [ ] Apply the 15-minute preflight timeout.
-- [ ] Record mode, host, source revision, schedule time, and start time.
+- [x] Validate host and database against mode-specific allowlists before creating a run.
+- [x] Verify the `limited_user` runtime identity where required.
+- [x] Verify repository revision, worker health, idle queues, and absence of an active V02 execution.
+- [x] Verify spreadsheet, semantic workbook, state files, active V02 prompt, Playwright, Codex CLI, disk space, and writable output paths.
+- [x] Apply the 15-minute preflight timeout.
+- [x] Record mode, host, source revision, schedule time, and start time.
 
 ### Maintenance stages
 
-- [ ] Run duplicate cleanup with its 60-minute timeout only in enabled modes.
-- [ ] Parse the db-manager JSON summary and independently verify zero duplicate-analysis rows.
-- [ ] Run backup with its two-hour timeout only in enabled modes.
-- [ ] Verify ZIP integrity, manifest version, complete model membership, CSV membership, sizes, hashes, zero duplicate-analysis rows, and at least one nonempty model.
-- [ ] Persist archive path, archive size, archive SHA-256, duration, manifest version, and exit code.
-- [ ] Block deletion when any backup check fails.
-- [ ] Run the unchanged default `npm start -- --delete_articles` command with its 30-minute timeout.
-- [ ] Parse and persist its found count, deleted count, cutoff, duration, and exit code.
-- [ ] Mark maintenance stages skipped in `dev_canary`.
-- [ ] Require exact development database confirmation before enabling them in `dev_destructive_recovery`.
+- [x] Run duplicate cleanup with its 60-minute timeout only in enabled modes.
+- [x] Parse the db-manager JSON summary and independently verify zero duplicate-analysis rows.
+- [x] Run backup with its two-hour timeout only in enabled modes.
+- [x] Verify ZIP integrity, manifest version, complete model membership, CSV membership, sizes, hashes, zero duplicate-analysis rows, and at least one nonempty model.
+- [x] Persist archive path, archive size, archive SHA-256, duration, manifest version, and exit code.
+- [x] Block deletion when any backup check fails.
+- [x] Run the unchanged default `npm start -- --delete_articles` command with its 30-minute timeout.
+- [x] Parse and persist its found count, deleted count, cutoff, duration, and exit code.
+- [x] Mark maintenance stages skipped in `dev_canary`.
+- [x] Require exact development database confirmation before enabling them in `dev_destructive_recovery`.
 
 ### RSS, semantic, and state stages
 
-- [ ] Submit RSS with `weeklyArticleFlowRunId` and a small target only in permitted development modes.
-- [ ] Poll the queue job to terminal status rather than treating HTTP `202` as completion.
-- [ ] Implement the V03 per-mode RSS ending-reason matrix.
-- [ ] Map rate limiting, cancellation, abort, error, and invalid production target behavior to the named statuses.
-- [ ] Query the exact cohort and require its distinct count to equal `articlesAddedCount`.
-- [ ] Complete as `completed_no_new_articles` when both counts are zero.
-- [ ] Start semantic scoring without cohort IDs or ID bounds.
-- [ ] Apply the four-hour semantic stage timeout.
-- [ ] Accept isolated semantic failures while recording every outcome.
-- [ ] Submit state assignment with exact cohort IDs and capacity at least equal to the RSS-added count.
-- [ ] Apply the 18-hour state stage timeout.
-- [ ] Map a tripped worker breaker to `failure_state_assigner_circuit_breaker`.
-- [ ] Accept and record one to four isolated state failures.
+- [x] Submit RSS with `weeklyArticleFlowRunId` and a small target only in permitted development modes.
+- [x] Poll the queue job to terminal status rather than treating HTTP `202` as completion.
+- [x] Implement the V03 per-mode RSS ending-reason matrix.
+- [x] Map rate limiting, cancellation, abort, error, and invalid production target behavior to the named statuses.
+- [x] Query the exact cohort and require its distinct count to equal `articlesAddedCount`.
+- [x] Complete as `completed_no_new_articles` when both counts are zero.
+- [x] Start semantic scoring without cohort IDs or ID bounds.
+- [x] Apply the four-hour semantic stage timeout.
+- [x] Accept isolated semantic failures while recording every outcome.
+- [x] Submit state assignment with exact cohort IDs and capacity at least equal to the RSS-added count.
+- [x] Apply the 18-hour state stage timeout.
+- [x] Map a tripped worker breaker to `failure_state_assigner_circuit_breaker`.
+- [x] Accept and record one to four isolated state failures.
 
 ### Recovery and timeout behavior
 
-- [ ] Skip completed stages from authoritative persisted evidence.
-- [ ] Reattach a running or terminal worker job through its stored ID.
-- [ ] Reconcile duplicate cleanup through its zero-row postcondition.
-- [ ] Reconcile backup only from one uniquely identified valid archive created after stage start.
-- [ ] Require explicit reconciliation when old-article deletion lacks a trustworthy result or postcondition.
-- [ ] Stop instead of blindly resubmitting ambiguous work.
-- [ ] Cap every stage deadline by the remaining 72-hour run budget.
-- [ ] On timeout, cancel the child job or terminate the owned process group, record the outcome, and set `timed_out`.
+- [x] Skip completed stages from authoritative persisted evidence.
+- [x] Reattach a running or terminal worker job through its stored ID.
+- [x] Reconcile duplicate cleanup through its zero-row postcondition.
+- [x] Reconcile backup only from one uniquely identified valid archive created after stage start.
+- [x] Require explicit reconciliation when old-article deletion lacks a trustworthy result or postcondition.
+- [x] Stop instead of blindly resubmitting ambiguous work.
+- [x] Cap every stage deadline by the remaining 72-hour run budget.
+- [x] On timeout, cancel the child job or terminate the owned process group, record the outcome, and set `timed_out`.
 
 ### Phase verification and commit
 
-- [ ] Add tests for stage order, mode skips, preflight failures, and both locks.
-- [ ] Add tests for db-manager command parsing, backup verification failures, and deletion blocking.
-- [ ] Add tests for all RSS modes, cohort reconciliation, semantic handling, state breaker mapping, cancellation, and no-new-articles completion.
-- [ ] Add tests for resume attachment, destructive non-repetition, ambiguous evidence, and 72-hour timeout handling.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Run `npm -C worker-node test` and `npm -C worker-node run build` as integration regressions.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 7 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 7 files and inspect `git diff --cached`.
-- [ ] Commit Phase 7 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 7.
+- [x] Add tests for stage order, mode skips, preflight failures, and both locks.
+- [x] Add tests for db-manager command parsing, backup verification failures, and deletion blocking.
+- [x] Add tests for all RSS modes, cohort reconciliation, semantic handling, state breaker mapping, cancellation, and no-new-articles completion.
+- [x] Add tests for resume attachment, destructive non-repetition, ambiguous evidence, and 72-hour timeout handling.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Run `npm -C worker-node test` and `npm -C worker-node run build` as integration regressions.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 7 tasks and update this document's modification metadata.
+- [x] Stage only Phase 7 files and inspect `git diff --cached`.
+- [x] Commit Phase 7 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 7.
 
 ## Phase 8: AI Approver V02 and Reporting
 

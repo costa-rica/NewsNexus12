@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { parseWeeklyFlowCli, parseWeeklyFlowConfig } from './config';
 import { WeeklyArticleFlowCoordinator } from './coordinator';
+import { WeeklyFlowRepository } from './database';
+import { WorkerHttpClient } from './http';
 
 export const runCli = async (
   argv: string[] = process.argv.slice(2),
@@ -8,7 +10,16 @@ export const runCli = async (
 ): Promise<void> => {
   const options = parseWeeklyFlowCli(argv);
   const config = parseWeeklyFlowConfig(env);
-  const coordinator = new WeeklyArticleFlowCoordinator({ config });
+  const workerClient = new WorkerHttpClient({
+    workerNodeUrl: config.workerNodeUrl,
+    workerPythonUrl: config.workerPythonUrl
+  });
+  const coordinator = new WeeklyArticleFlowCoordinator({
+    config,
+    repository: new WeeklyFlowRepository(),
+    workerClient,
+    env
+  });
   await coordinator.run(options);
 };
 
