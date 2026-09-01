@@ -1,6 +1,6 @@
 ---
 created_at: 2026-07-23
-updated_at: 2026-08-29T22:32:17Z
+updated_at: 2026-09-01T02:21:37Z
 created_by: codex (gpt-5)
 modified_by: codex (gpt-5.6) nicksmacbookair
 ---
@@ -12,7 +12,7 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 - V02 is the only live AI Approver workflow.
 - V02 produces advisory `approved` or `irrelevant` predictions.
 - V02 never changes approval, relevance, or reports.
-- V02 is manual-only in this release.
+- V02 is available through the operator UI and the approved weekly article flow.
 
 ## 2. Namespaces
 
@@ -121,7 +121,7 @@ The installer is repeatable and non-destructive for a compatible installation. I
 5. Deploy and restart the portal.
 6. Expose V02 controls only after the preceding checks pass.
 
-Do not place V02 in a scheduler. This release is manual-only.
+Do not schedule V02 directly. The only approved scheduled caller is the completion-driven coordinator under `ops/weekly-article-flow`.
 
 ## 8. Health checks
 
@@ -141,7 +141,7 @@ Expected results:
 - worker logs contain `event=startup_complete`
 - worker logs contain no `event=ai_approver_v02_startup_database_failed`
 
-A V01 configuration warning may appear. It must not prevent `event=startup_complete`.
+Worker startup must not read or validate removed V01 configuration.
 
 ### 8.2 API
 
@@ -167,9 +167,9 @@ Expected results:
 
 - Sign in as an operator.
 - Confirm only the V02 approver card is rendered on automations.
-- Confirm the V01 prompt URL renders the standard not-found page.
+- Confirm removed V01 routes render the standard not-found page.
 - Confirm the V02 review column is visible.
-- Confirm the V01 review column can be enabled from Columns.
+- Confirm no V01 review column is available from Columns.
 
 ## 9. Production smoke test
 
@@ -189,8 +189,8 @@ This procedure requires separate approval for a live Codex call.
 12. Save validation without a comment.
 13. Save a comment without changing validation.
 14. Clear each field independently.
-15. Confirm no approval, relevance, report, or orchestration row changed.
-16. Confirm a V01 startup warning, if present, did not stop worker startup.
+15. Confirm no approval, relevance, or report row changed.
+16. Confirm worker startup has no V01 configuration dependency.
 
 ## 10. Normal rollback
 
@@ -198,7 +198,7 @@ This procedure requires separate approval for a live Codex call.
 2. Roll back the API V02 routes.
 3. Roll back worker-python V02 runtime access.
 4. Leave all V02 tables and data intact.
-5. Confirm V01 backend routes still respond.
+5. Confirm removed V01 routes remain unavailable.
 6. Record the rollback version and reason.
 
 Normal rollback must not drop V02 tables. Destructive removal is a separate operator-approved procedure.
@@ -276,15 +276,12 @@ Every listed row must represent the one permitted retry of a first `failed` or `
 - Compare the smoke-test article before and after the run.
 - Treat any downstream change caused by V02 as a release-blocking incident.
 
-### 11.6 V01 startup isolation
+### 11.6 Removed V01 isolation
 
-Count worker log records containing:
-
-- `event=ai_approver_v01_startup_validation_failed`
-- `event=startup_complete`
-- `event=startup_fatal`
-
-The success target is zero startup failures caused only by V01 configuration. Direct V01 requests may still fail and should record a clear configuration error.
+- Confirm worker startup reads no V01 configuration.
+- Confirm removed V01 worker and API routes return not found.
+- Confirm no V01 table, prompt, or UI contract is required by a V02 run.
+- Treat any restored V01 runtime dependency as a release-blocking regression.
 
 ## 12. Draft and expired previews
 

@@ -1,0 +1,21 @@
+[Unit]
+Description=NewsNexus12 weekly article flow
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=limited_user
+Group=limited_user
+WorkingDirectory=/home/limited_user/applications/NewsNexus12
+EnvironmentFile=/etc/newsnexus12/weekly-article-flow.env
+ExecStart=/home/limited_user/applications/NewsNexus12/ops/weekly-article-flow/bin/run-weekly-flow --mode scheduled_production --allow-live-ai
+TimeoutStartSec=73h
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=newsnexus12-weekly-article-flow
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

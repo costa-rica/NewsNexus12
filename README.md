@@ -35,6 +35,8 @@ npm run build
 
 The root build runs the packages in dependency order, including `db-models` before the apps that depend on it.
 
+The weekly article flow is a separate operational package under `ops/weekly-article-flow`. Build and test it explicitly with its package commands.
+
 ### 4. Start locally in separate terminals:
 
 ```bash
@@ -80,6 +82,15 @@ sudo systemctl stop newsnexus12-portal.service
 - V02 API routes use `/automations/ai-approver-v02` and `/analysis/ai-approver-v02`.
 - V02 data uses only tables whose names end in `V02`.
 
+## Weekly Article Flow
+
+- The completion-driven weekly flow lives under `ops/weekly-article-flow`.
+- It coordinates db-manager maintenance, Google RSS, semantic scoring, state assignment, and AI Approver V02.
+- Development execution is manual and does not install a schedule.
+- Production uses the source-controlled systemd service and timer only after a supervised manual run and operator approval.
+- See `ops/weekly-article-flow/README.md` for schema installation, modes, recovery, deployment, monitoring, and rollback.
+- Internal Python modules named `orchestrator.py` are local V02 implementation modules, not the removed cross-service legacy orchestrator feature.
+
 ## Directory Structure
 
 ```
@@ -106,6 +117,7 @@ sudo systemctl stop newsnexus12-portal.service
 │   ├── components/
 │   ├── pages/
 │   └── package.json
+├── ops/weekly-article-flow/        - Weekly completion-driven coordinator and production assets
 ├── worker-python/                  - Python API queueing service
 │   ├── src/
 │   └── requirements.txt

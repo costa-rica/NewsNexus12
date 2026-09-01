@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-09-01T02:11:37Z
+updated_at: 2026-09-01T02:18:47Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -428,47 +428,47 @@ Implementation rules:
 
 ### Systemd and scoped helper
 
-- [ ] Add the production weekly service with `User=limited_user`, `Group=limited_user`, absolute paths, journald output, and `TimeoutStartSec=73h`.
-- [ ] Add the Friday 5:00 AM `America/Los_Angeles` timer with persistence and the fixed service target.
-- [ ] Add a root-owned alert-publisher oneshot service.
-- [ ] Add a fixed root-owned helper that runs sync and publication as `nick`.
-- [ ] Use `/home/nick/.npm-global/bin/ob sync --path "/home/nick/NickVault"` before and after publication.
-- [ ] Validate the fixed staging file and atomically publish to `/home/nick/NickVault/ALERT-newsnexus12-weekly-cron.md`.
-- [ ] Add a narrow sudoers template allowing `limited_user` to start only the fixed alert service with no arguments.
-- [ ] Ensure no helper accepts arbitrary commands, SQL, paths, URLs, or environment overrides.
+- [x] Add the production weekly service with `User=limited_user`, `Group=limited_user`, absolute paths, journald output, and `TimeoutStartSec=73h`.
+- [x] Add the Friday 5:00 AM `America/Los_Angeles` timer with persistence and the fixed service target.
+- [x] Add a root-owned alert-publisher oneshot service.
+- [x] Add a fixed root-owned helper that runs sync and publication as `nick`.
+- [x] Use `/home/nick/.npm-global/bin/ob sync --path "/home/nick/NickVault"` before and after publication.
+- [x] Validate the fixed staging file and atomically publish to `/home/nick/NickVault/ALERT-newsnexus12-weekly-cron.md`.
+- [x] Add a narrow sudoers template allowing `limited_user` to start only the fixed alert service with no arguments.
+- [x] Ensure no helper accepts arbitrary commands, SQL, paths, URLs, or environment overrides.
 
 ### Installation boundaries
 
-- [ ] Add an installer that builds or verifies the coordinator and copies source-controlled assets.
-- [ ] Support a development helper-only installation path for the alert helper, oneshot service, and scoped sudoers rule without installing the weekly service or timer.
-- [ ] Make timer activation a separate explicit installer action.
-- [ ] Default production installation to timer disabled.
-- [ ] Refuse schedule installation from development wrappers or development mode.
-- [ ] Add an uninstaller that disables and removes only this subsystem's installed units and helper assets.
-- [ ] Preserve JSONL, alerts, database records, and unrelated schedules during uninstall.
-- [ ] Add `systemd-analyze verify` instructions for Ubuntu validation.
+- [x] Add an installer that builds or verifies the coordinator and copies source-controlled assets.
+- [x] Support a development helper-only installation path for the alert helper, oneshot service, and scoped sudoers rule without installing the weekly service or timer.
+- [x] Make timer activation a separate explicit installer action.
+- [x] Default production installation to timer disabled.
+- [x] Refuse schedule installation from development wrappers or development mode.
+- [x] Add an uninstaller that disables and removes only this subsystem's installed units and helper assets.
+- [x] Preserve JSONL, alerts, database records, and unrelated schedules during uninstall.
+- [x] Add `systemd-analyze verify` instructions for Ubuntu validation.
 
 ### Documentation
 
-- [ ] Add `ops/weekly-article-flow/README.md` covering modes, commands, paths, configuration, recovery, failure reasons, and operator gates.
-- [ ] Document the additive schema installation command.
-- [ ] Document dev canary and destructive-recovery commands without a schedule.
-- [ ] Document manual production, timer installation, supervised-run gate, activation, monitoring, and rollback.
-- [ ] Update root and relevant package guidance to identify the new weekly article flow and AI Approver V02.
-- [ ] State clearly that internal Python files named `orchestrator.py` are not the removed cross-service product feature.
-- [ ] Search active code and documentation for accidental use of removed V01 and legacy orchestrator contracts.
+- [x] Add `ops/weekly-article-flow/README.md` covering modes, commands, paths, configuration, recovery, failure reasons, and operator gates.
+- [x] Document the additive schema installation command.
+- [x] Document dev canary and destructive-recovery commands without a schedule.
+- [x] Document manual production, timer installation, supervised-run gate, activation, monitoring, and rollback.
+- [x] Update root and relevant package guidance to identify the new weekly article flow and AI Approver V02.
+- [x] State clearly that internal Python files named `orchestrator.py` are not the removed cross-service product feature.
+- [x] Search active code and documentation for accidental use of removed V01 and legacy orchestrator contracts.
 
 ### Phase verification and commit
 
-- [ ] Run shell syntax checks for wrappers, installer, uninstaller, and alert helper.
-- [ ] Run coordinator tests and build.
-- [ ] Review systemd units for absolute paths, user/group, timeout, timezone, persistence, environment loading, and disabled-by-default behavior.
-- [ ] Verify installers cannot enable schedules in development mode.
-- [ ] Verify uninstall scope cannot delete data or unrelated units.
-- [ ] Fix failures and rerun all affected checks.
-- [ ] Check off completed Phase 9 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 9 files and inspect `git diff --cached`.
-- [ ] Commit Phase 9 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 9.
+- [x] Run shell syntax checks for wrappers, installer, uninstaller, and alert helper.
+- [x] Run coordinator tests and build.
+- [x] Review systemd units for absolute paths, user/group, timeout, timezone, persistence, environment loading, and disabled-by-default behavior.
+- [x] Verify installers cannot enable schedules in development mode.
+- [x] Verify uninstall scope cannot delete data or unrelated units.
+- [x] Fix failures and rerun all affected checks.
+- [x] Check off completed Phase 9 tasks and update this document's modification metadata.
+- [x] Stage only Phase 9 files and inspect `git diff --cached`.
+- [x] Commit Phase 9 with a message referencing `20260831_weekly_article_flow_todo_v02.md` Phase 9.
 
 ## Phase 10: macOS Integrated Verification
 

@@ -57,3 +57,5 @@ The FastAPI worker runs AI Approver V02, deduplication, location scoring, and sh
    - `POST /queue-info/cancel-job/{job_id}`
 
 AI Approver V01 and the former cross-worker weekly workflow are not live features.
+
+Files named `orchestrator.py` inside `src/modules/ai_approver_v02/` coordinate V02 internals only. They are not the removed cross-service legacy orchestrator product feature. The current weekly flow is owned by `../ops/weekly-article-flow`.

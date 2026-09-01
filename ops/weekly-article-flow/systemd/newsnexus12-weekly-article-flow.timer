@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the NewsNexus12 weekly article flow Friday mornings
+
+[Timer]
+OnCalendar=Fri *-*-* 05:00:00 America/Los_Angeles
+Persistent=true
+Unit=newsnexus12-weekly-article-flow.service
+
+[Install]
+WantedBy=timers.target

@@ -11,6 +11,8 @@ In NewsNexus10 these were separate Node microservices. In NewsNexus12 they are g
 3. state-assigner workflow
 4. queue inspection and cancellation endpoints
 
+The source-controlled coordinator under `../ops/weekly-article-flow` invokes the first three workflows sequentially. Worker-node does not own the production schedule or a cross-service orchestrator.
+
 ## Workflow names and what they do
 
 ### request-google-rss workflow
@@ -22,6 +24,7 @@ Summary:
 - reads query rows from spreadsheet path in `PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED`
 - builds Google News RSS requests
 - stores request metadata and new articles through `@newsnexus/db-models`
+- accepts an optional active weekly-flow run ID while preserving manual requests that omit it
 
 ### semantic-scorer workflow
 
@@ -32,6 +35,7 @@ Summary:
 - loads keywords from `NewsNexusSemanticScorerKeywords.xlsx` in `PATH_TO_SEMANTIC_SCORER_DIR`
 - scores unprocessed articles using embedding similarity (`Xenova/paraphrase-MiniLM-L6-v2`)
 - writes keyword scores through `@newsnexus/db-models`
+- reports structured selected, scored, skipped, failed, and unattempted outcomes to the weekly coordinator
 
 ### state-assigner workflow
 
@@ -42,6 +46,7 @@ Summary:
 - selects candidate articles without state assignments
 - sends article content to Codex CLI by default, or to the OpenAI API when opted in
 - writes `ArticleStateContract02` records through `@newsnexus/db-models`
+- supports exact weekly-cohort IDs and stops after five consecutive failures or timeouts
 
 State assigner file layout (`PATH_TO_STATE_ASSIGNER_FILES`):
 

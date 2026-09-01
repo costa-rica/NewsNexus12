@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish the fixed NewsNexus12 weekly-flow alert
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/libexec/newsnexus12-publish-weekly-alert
+TimeoutStartSec=10m
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=newsnexus12-publish-weekly-alert
+PrivateTmp=true

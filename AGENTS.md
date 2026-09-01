@@ -28,6 +28,7 @@ NewsNexus12 is a monorepo for a news aggregation and analysis platform. It has n
 | **worker-python** | `/worker-python` | Flask 3                                                             | Queues Python microservices (deduper, location scorer) |
 | **worker-node**   | `/worker-node`   | Express 5 + TypeScript                                              | Queue-backed Node workflows and article scraping       |
 | **db-manager**    | `/db-manager`    | TypeScript CLI + Winston + Sequelize 6                              | Database maintenance (article cleanup, backup, import) |
+| **weekly flow**   | `/ops/weekly-article-flow` | TypeScript + shell + systemd templates                     | Completion-driven weekly production workflow           |
 
 **Dependency graph:** `portal → (HTTP) → api → db-models → Postgres ← worker-python` and `portal → (HTTP) → api → worker-node → db-models`
 
@@ -66,6 +67,10 @@ cd portal && npm run lint
 # Worker-node build/tests
 cd worker-node && npm run build
 cd worker-node && npm test
+
+# Weekly flow (not part of the root npm workspace)
+cd ops/weekly-article-flow && npm run build
+cd ops/weekly-article-flow && npm test
 ```
 
 No test frameworks are configured for db-models, portal, or worker-python. db-manager uses Jest (201 tests).
@@ -73,6 +78,10 @@ No test frameworks are configured for db-models, portal, or worker-python. db-ma
 ## Architecture Details
 
 AI Approver V02 is the only live AI Approver workflow. Its runtime is under `worker-python/src/modules/ai_approver_v02/`, and its operator-facing routes use `/ai-approver-v02`.
+
+The completion-driven weekly workflow is owned by `ops/weekly-article-flow`. Development runs are manual. Production scheduling uses its source-controlled systemd units only after the supervised-run and operator-approval gates.
+
+Internal retained Python files named `orchestrator.py` coordinate one workflow locally. They are not the removed cross-service product feature and must not be exposed as a product, route, scheduler, or shared runtime contract.
 
 ### db-models
 

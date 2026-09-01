@@ -1,0 +1,1 @@
+limited_user ALL=(root) NOPASSWD: /usr/bin/systemctl start newsnexus12-publish-weekly-alert.service

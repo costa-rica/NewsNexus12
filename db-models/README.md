@@ -62,6 +62,13 @@ const { Article, User, sequelize } = db;
 - Install V02 tables with the dedicated db-manager command.
 - Do not use general `sync({ alter: true })` or `sync({ force: true })` for V02 deployment.
 
+## Weekly article flow tables
+
+- `WeeklyArticleFlowRuns` is the authoritative run and recovery record.
+- `NewsApiRequests.weeklyArticleFlowRunId` associates Google RSS requests with one weekly cohort.
+- Install this additive schema with `npm -C db-manager run schema:weekly-article-flow` from the repository root.
+- Do not use general Sequelize sync to deploy the weekly-flow schema.
+
 ## References
 
 - [Database Overview](./docs/DATABASE_OVERVIEW.md): Describes the database package architecture, schema and relationships.

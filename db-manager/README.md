@@ -81,6 +81,8 @@ npm run schema:weekly-article-flow
 
 It rejects incompatible existing definitions and does not use `force` or `alter`. Run the disposable PostgreSQL integration suite with `npm run test:schema-weekly-article-flow`.
 
+This schema supports the coordinator under `../ops/weekly-article-flow`. Install it as a separate deployment step before any development canary or production run.
+
 ## CLI Flags
 
 | Flag | Argument | Description |

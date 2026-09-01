@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly STAGED_ALERT="/home/limited_user/project_resources/NewsNexus12/weekly-flow/ALERT-newsnexus12-weekly-cron.md"
+readonly VAULT_ROOT="/home/nick/NickVault"
+readonly DESTINATION="${VAULT_ROOT}/ALERT-newsnexus12-weekly-cron.md"
+readonly TEMPORARY="${VAULT_ROOT}/.ALERT-newsnexus12-weekly-cron.md.tmp"
+readonly OB="/home/nick/.npm-global/bin/ob"
+readonly RUNUSER="/usr/sbin/runuser"
+
+if [[ "$#" -ne 0 ]]; then
+  echo "weekly alert publisher accepts no arguments" >&2
+  exit 64
+fi
+
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "weekly alert publisher must run as root" >&2
+  exit 77
+fi
+
+if [[ ! -x "${OB}" ]]; then
+  echo "fixed Obsidian sync executable is unavailable" >&2
+  exit 69
+fi
+
+if [[ ! -d "${VAULT_ROOT}" || -L "${VAULT_ROOT}" ]]; then
+  echo "fixed NickVault root is not a regular directory" >&2
+  exit 66
+fi
+
+if [[ ! -f "${STAGED_ALERT}" || -L "${STAGED_ALERT}" ]]; then
+  echo "fixed staged alert is not a regular file" >&2
+  exit 66
+fi
+
+"${RUNUSER}" --user nick -- "${OB}" sync --path "${VAULT_ROOT}"
+
+if [[ -e "${TEMPORARY}" || -L "${TEMPORARY}" ]]; then
+  echo "fixed temporary alert path already exists" >&2
+  exit 73
+fi
+
+cleanup() {
+  if [[ -e "${TEMPORARY}" || -L "${TEMPORARY}" ]]; then
+    /bin/rm -- "${TEMPORARY}"
+  fi
+}
+trap cleanup EXIT
+
+umask 077
+"${RUNUSER}" --user limited_user -- /bin/cat -- "${STAGED_ALERT}" \
+  | "${RUNUSER}" --user nick -- /usr/bin/tee "${TEMPORARY}" >/dev/null
+"${RUNUSER}" --user nick -- /bin/chmod 0600 "${TEMPORARY}"
+
+if [[ ! -f "${TEMPORARY}" || -L "${TEMPORARY}" ]]; then
+  echo "temporary alert is not a regular file" >&2
+  exit 73
+fi
+
+"${RUNUSER}" --user nick -- /bin/mv -- "${TEMPORARY}" "${DESTINATION}"
+trap - EXIT
+
+"${RUNUSER}" --user nick -- "${OB}" sync --path "${VAULT_ROOT}"
