@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-01T02:15:39Z
-updated_at: 2026-09-01T02:21:37Z
+updated_at: 2026-09-01T02:30:59Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -36,8 +36,11 @@ Every mode requires `--allow-live-ai`. Development modes require an allowlisted 
 npm -C db-models run build
 npm -C ops/weekly-article-flow run build
 npm -C ops/weekly-article-flow test
+npm -C ops/weekly-article-flow run test:integration
 ops/weekly-article-flow/install.sh --check
 ```
+
+The integration command recreates and drops only `newsnexus_test_weekly_coordinator`. It runs the real coordinator and repository with fake workers.
 
 The check command runs shell syntax checks. Each Ubuntu installer path runs `systemd-analyze verify` after copying its units. Operators can repeat production verification with:
 

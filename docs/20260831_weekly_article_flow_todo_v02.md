@@ -1,6 +1,6 @@
 ---
 created_at: 2026-08-31T22:46:56Z
-updated_at: 2026-09-01T02:18:47Z
+updated_at: 2026-09-01T02:31:13Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -474,42 +474,42 @@ Implementation rules:
 
 ### Full repository checks
 
-- [ ] Build db-models first.
-- [ ] Run the full db-manager test suite and build.
-- [ ] Run the full worker-node test suite and build.
-- [ ] Run the coordinator test suite and build.
-- [ ] Run focused retained worker-python AI Approver V02 unit and integration suites.
-- [ ] Run broader API, portal, or worker-python regression checks if implementation changes touched those packages.
-- [ ] Fix all introduced failures and rerun the full affected suite.
+- [x] Build db-models first.
+- [x] Run the full db-manager test suite and build.
+- [x] Run the full worker-node test suite and build.
+- [x] Run the coordinator test suite and build.
+- [x] Run focused retained worker-python AI Approver V02 unit and integration suites.
+- [x] Run broader API, portal, or worker-python regression checks if implementation changes touched those packages.
+- [x] Fix all introduced failures and rerun the full affected suite.
 
 ### Static and contract review
 
-- [ ] Confirm manual RSS requests still work without a weekly run ID.
-- [ ] Confirm unrelated ingestion remains unchanged.
-- [ ] Confirm semantic scorer normal eligibility remains authoritative.
-- [ ] Confirm state assignment alone owns the five-consecutive-failure breaker.
-- [ ] Confirm V02 receives RSS count and never uses overlap as a gate.
-- [ ] Confirm all stage timeouts match V03, including semantic at four hours and run/service at 72/73 hours.
-- [ ] Confirm production RSS cannot use a target count.
-- [ ] Confirm the timer remains disabled by default.
-- [ ] Confirm no secret, token, article content, credential, or production database value is committed.
-- [ ] Confirm no V01 or removed legacy orchestrator runtime was restored.
+- [x] Confirm manual RSS requests still work without a weekly run ID.
+- [x] Confirm unrelated ingestion remains unchanged.
+- [x] Confirm semantic scorer normal eligibility remains authoritative.
+- [x] Confirm state assignment alone owns the five-consecutive-failure breaker.
+- [x] Confirm V02 receives RSS count and never uses overlap as a gate.
+- [x] Confirm all stage timeouts match V03, including semantic at four hours and run/service at 72/73 hours.
+- [x] Confirm production RSS cannot use a target count.
+- [x] Confirm the timer remains disabled by default.
+- [x] Confirm no secret, token, article content, credential, or production database value is committed.
+- [x] Confirm no V01 or removed legacy orchestrator runtime was restored.
 
 ### Local safety exercises
 
-- [ ] Exercise coordinator dry dependencies with fake workers and a disposable local database.
-- [ ] Verify malformed worker results become `failed_worker_result_contract`.
-- [ ] Verify backup validation blocks deletion.
-- [ ] Verify resume cannot duplicate completed stages or an accepted V02 run.
-- [ ] Verify JSONL remains non-authoritative when its file is missing or corrupt.
+- [x] Exercise coordinator dry dependencies with fake workers and a disposable local database.
+- [x] Verify malformed worker results become `failed_worker_result_contract`.
+- [x] Verify backup validation blocks deletion.
+- [x] Verify resume cannot duplicate completed stages or an accepted V02 run.
+- [x] Verify JSONL remains non-authoritative when its file is missing or corrupt.
 
 ### Phase verification and commit
 
-- [ ] Record exact commands, results, and any accepted environment limitations in this todo or a linked active verification record.
-- [ ] Check off completed Phase 10 tasks and update this document's modification metadata.
-- [ ] Stage only verification fixes and documentation produced by Phase 10, then inspect `git diff --cached`.
-- [ ] Commit Phase 10 if it produced tracked changes, referencing `20260831_weekly_article_flow_todo_v02.md` Phase 10.
-- [ ] If Phase 10 produced no tracked changes, record that no commit was required.
+- [x] Record exact commands, results, and any accepted environment limitations in this todo or a linked active verification record.
+- [x] Check off completed Phase 10 tasks and update this document's modification metadata.
+- [x] Stage only verification fixes and documentation produced by Phase 10, then inspect `git diff --cached`.
+- [x] Commit Phase 10 if it produced tracked changes, referencing `20260831_weekly_article_flow_todo_v02.md` Phase 10.
+- [x] If Phase 10 produced no tracked changes, record that no commit was required. Not applicable because verification added tracked tests and evidence.
 
 ## Phase 11: Ubuntu Dev Canary
 
