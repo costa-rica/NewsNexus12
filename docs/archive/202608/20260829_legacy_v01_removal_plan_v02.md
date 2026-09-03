@@ -1,8 +1,8 @@
 ---
 created_at: 2026-08-29T21:45:20Z
-updated_at: 2026-08-29T22:32:17Z
+updated_at: 2026-08-30T00:51:09Z
 created_by: codex (gpt-5.6) nicksmacbookair
-modified_by: codex (gpt-5.6) nicksmacbookair
+modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
 
 # Legacy Orchestrator and AI Approver V01 Removal Plan V02
@@ -13,7 +13,7 @@ This plan implements `20260829_legacy_orchestrator_and_ai_approver_v01_removal_p
 
 It supersedes `20260829_legacy_v01_removal_plan_v01.md` and incorporates `20260829_legacy_v01_removal_plan_v01_assessment_codex.md`. The V01 assessment correctly identified the read-only `ArticleContents02` viewer as retained article-review functionality despite its duplicate handler being placed in the V01 API namespace.
 
-The removal PRD takes precedence over the archived `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`. That weekly PRD is invalid for implementation and does not supply architecture to this implementation. Its product goals remain input for a separately planned replacement.
+The removal PRD takes precedence over the technical design in `docs/20260829_weekly_article_processing_cron_prd_v01.md`. That weekly PRD remains the active source of product requirements for a separately planned replacement, but V01 does not supply architecture to this removal implementation.
 
 The change removes two connected legacy systems:
 
@@ -186,7 +186,7 @@ Update active guidance so it describes V02 and retained independent jobs only:
 
 Delete the V01 gatekeeper prompt asset and active instructions that could seed or operate V01. Move historical V01 reports and implementation records to `docs/archive/YYYYMM/` using each document's creation month. Move the July safe-removal report to `docs/archive/202607/` and update links from the current PRD and plan-and-vet records as needed.
 
-Add a prominent invalid-for-implementation notice to `docs/20260829_weekly_article_processing_cron_prd.md`. The notice will state that the removal PRD is authoritative and that a new version must define new workflow naming, persisted state, cohort ownership, installation, verification, and rollback without the deleted route, tables, header, or column.
+Add a prominent technical-design warning to `docs/20260829_weekly_article_processing_cron_prd_v01.md`. The notice will state that its product requirements remain active, the removal PRD is authoritative for legacy deletion, and V02 must define new workflow naming, persisted state, cohort ownership, installation, verification, and rollback without the deleted route, tables, header, or column.
 
 Historical documents that merely describe prior behavior may keep the old terminology after archiving. Active documentation may use `orchestrator` only for retained internal Python classes or when explaining that the removed product feature no longer exists.
 

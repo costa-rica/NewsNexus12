@@ -1,8 +1,8 @@
 ---
 created_at: 2026-08-29T21:50:35Z
-updated_at: 2026-08-29T22:59:04Z
+updated_at: 2026-08-30T00:51:09Z
 created_by: codex (gpt-5.6) nicksmacbookair
-modified_by: codex (gpt-5.6) nicksmacbookair
+modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
 
 # Legacy Orchestrator and AI Approver V01 Removal Todo V02
@@ -12,7 +12,7 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 - [ ] Work only on `dev_29_remove_v01_workflows` and preserve unrelated user changes and untracked files.
 - [ ] Use `20260829_legacy_orchestrator_and_ai_approver_v01_removal_prd_v03.md` and `20260829_legacy_v01_removal_plan_v02.md` as the implementation authority.
 - [ ] Treat this file as superseding `20260829_legacy_v01_removal_todo_v01.md` and incorporating its assessment.
-- [x] Do not implement `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`; this removal takes precedence.
+- [x] Do not implement the technical design in `docs/20260829_weekly_article_processing_cron_prd_v01.md`; this removal takes precedence while its replacement-flow product requirements remain active.
 - [ ] Do not add a replacement scheduler, automatic schema migration, `410` compatibility route, or V01 read-only interface.
 - [ ] Preserve AI Approver V02, the generic article-content viewer, standalone Google RSS, shared queues, and unrelated automations.
 - [ ] Preserve retained internal Python classes named `orchestrator.py` under AI Approver V02, deduper, and location scorer.
@@ -27,7 +27,7 @@ modified_by: codex (gpt-5.6) nicksmacbookair
 ### Repository alignment
 
 - [x] Confirm the branch is `dev_29_remove_v01_workflows` and record starting `git status` without altering unrelated changes.
-- [x] Add a prominent notice to `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md` that it is invalid for implementation, subordinate to the removal PRD, and requires redesign without the removed route, tables, header, and column.
+- [x] Add a prominent notice to `docs/20260829_weekly_article_processing_cron_prd_v01.md` that its technical design is invalid for implementation, its product requirements remain active, and it requires redesign without the removed route, tables, header, and column.
 - [x] Inventory live references to V01 models, V01 routes, `/orchestrator`, `X-Orchestrator-Run-Id`, `googleRssResumePlan`, deployment assets, and V01 settings across source, tests, scripts, and active documentation.
 - [x] Classify every match as removal work, retained V02 or internal Python coordination, historical material to archive, or current removal documentation.
 - [x] Create a sanitized Ubuntu retirement evidence template covering systemd, Hermes, user and root crontabs, `/etc/cron*`, active child jobs, removal results, daemon reload, and remaining triggers.

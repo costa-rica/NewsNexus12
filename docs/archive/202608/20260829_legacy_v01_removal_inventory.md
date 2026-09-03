@@ -1,8 +1,8 @@
 ---
 created_at: 2026-08-29T22:03:49Z
-updated_at: 2026-08-29T22:32:17Z
+updated_at: 2026-08-30T00:51:09Z
 created_by: codex (gpt-5.6) nicksmacbookair
-modified_by: codex (gpt-5.6) nicksmacbookair
+modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
 
 # Legacy V01 Removal Inventory
@@ -162,7 +162,7 @@ This is the pre-removal file-level classification. Shared files contain both rem
 - package README and AGENTS files returned by the scan
 - `docs/db-models/TABLE_REFERENCE.md`
 - active deployment and score-legend guidance that presents V01 or the weekly workflow as live
-- `docs/archive/202608/20260829_weekly_article_processing_cron_prd.md`, archived after being marked invalid for implementation
+- `docs/20260829_weekly_article_processing_cron_prd_v01.md`, restored as the active replacement-flow product requirements; its V01 technical design remains invalid for implementation
 
 ### 4.2 Historical material to archive
 

@@ -1,8 +1,8 @@
 ---
 created_at: 2026-08-29T21:31:54Z
-updated_at: 2026-08-29T22:32:17Z
+updated_at: 2026-08-30T00:51:09Z
 created_by: codex (gpt-5.6) nicksmacbookair
-modified_by: codex (gpt-5.6) nicksmacbookair
+modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
 
 # Legacy Orchestrator and AI Approver V01 Removal PRD V03
@@ -27,7 +27,7 @@ Difficulty: high. Risk: medium-high. The portal card is already hidden, but the 
 
 ### 1.1 Precedence over the weekly cron PRD
 
-This removal PRD takes precedence over `docs/20260829_weekly_article_processing_cron_prd.md`.
+This removal PRD takes precedence over the technical design in `docs/20260829_weekly_article_processing_cron_prd_v01.md`. The weekly PRD remains the active source of product requirements for a replacement flow using AI Approver V02.
 
 The weekly cron PRD must not be implemented in its current form because it depends on assets this PRD removes:
 
