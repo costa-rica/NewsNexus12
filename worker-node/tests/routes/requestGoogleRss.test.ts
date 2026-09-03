@@ -16,7 +16,8 @@ const buildApp = (
   queueEngine: GlobalQueueEngine,
   env: NodeJS.ProcessEnv,
   buildJobHandler?: (input: RequestGoogleRssJobInput) => (context: QueueExecutionContext) => Promise<void>,
-  findWeeklyRunByPk?: (id: number) => Promise<{ status: string } | null>
+  findWeeklyRunByPk?: (id: number) => Promise<{ status: string } | null>,
+  ensureDatabaseReady?: () => Promise<void>
 ): express.Express => {
   const app = express();
   app.use(express.json());
@@ -26,7 +27,8 @@ const buildApp = (
       queueEngine,
       env,
       buildJobHandler: buildJobHandler ?? (() => async () => undefined),
-      findWeeklyRunByPk
+      findWeeklyRunByPk,
+      ensureDatabaseReady
     })
   );
   app.use(errorHandler);
@@ -166,11 +168,13 @@ describe('requestGoogleRss routes', () => {
     await fs.writeFile(spreadsheetPath, 'dummy', 'utf8');
     const buildJobHandler = jest.fn(() => async () => undefined);
     const findWeeklyRunByPk = jest.fn().mockResolvedValue({ status: 'running' });
+    const ensureDatabaseReady = jest.fn().mockResolvedValue(undefined);
     const app = buildApp(
       queueEngine,
       { PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: spreadsheetPath },
       buildJobHandler,
-      findWeeklyRunByPk
+      findWeeklyRunByPk,
+      ensureDatabaseReady
     );
 
     const response = await request(app).post('/request-google-rss/start-job').send({
@@ -178,6 +182,7 @@ describe('requestGoogleRss routes', () => {
     });
 
     expect(response.status).toBe(202);
+    expect(ensureDatabaseReady).toHaveBeenCalledTimes(1);
     expect(findWeeklyRunByPk).toHaveBeenCalledWith(42);
     expect(buildJobHandler).toHaveBeenCalledWith(expect.objectContaining({
       weeklyArticleFlowRunId: 42

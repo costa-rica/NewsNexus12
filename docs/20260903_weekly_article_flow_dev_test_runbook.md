@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-03T19:40:05Z
-updated_at: 2026-09-03T19:43:58Z
+updated_at: 2026-09-03T22:06:34Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -122,6 +122,15 @@ The test passes when:
 ```
 
 If resume is refused, preserve the exact error and database evidence for review. Do not manually mark stages complete or rerun a destructive stage whose completion is already recorded.
+
+## Troubleshooting
+
+- **Production `.env` handoff:** the operator will copy the development `.env` to production. The file has been confirmed to contain no populated secrets, so the AI agent may review it; `PG_PASSWORD=` may remain blank. Before execution, verify production database identity, allowlists, worker URLs, resource paths, and backup destination. Redact any credentials added later.
+- **RSS fails before queuing with a Sequelize constructor error:** deploy the committed database-initialization fix, rebuild worker-node, then stop/start the existing worker service.
+- **Semantic scorer receives Hugging Face HTTP 429 or lacks `model.onnx`:** preload the configured model into Transformers.js's service-readable cache, verify permissions, and execute a test embedding before retrying.
+- **A failed run cannot resume:** terminal runs are immutable. Never edit their status. Correct the cause and follow persisted recovery evidence; use only a verified pre-destructive backup when restoration is required.
+- **Tests target the operational database:** stop immediately. Never run Jest with development or production database configuration; require an isolated test database. Restore only from a verified backup.
+- **Service handling:** the flow orchestrates existing applications and queues. Do not create replacement services; use approved stop/start operations only when deployment or database recovery requires them.
 
 ## Test handoff
 

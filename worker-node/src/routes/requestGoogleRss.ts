@@ -10,6 +10,7 @@ import {
 import { globalQueueEngine } from '../modules/queue/globalQueue';
 import { GlobalQueueEngine } from '../modules/queue/queueEngine';
 import logger from '../modules/logger';
+import ensureDbReady from '../modules/db/ensureDbReady';
 import { WeeklyArticleFlowRun } from '@newsnexus/db-models';
 
 interface RequestGoogleRssRouteDependencies {
@@ -17,6 +18,7 @@ interface RequestGoogleRssRouteDependencies {
   env: NodeJS.ProcessEnv;
   buildJobHandler: (input: RequestGoogleRssJobInput) => QueueJobHandler;
   findWeeklyRunByPk?: (id: number) => Promise<{ status: string } | null>;
+  ensureDatabaseReady?: () => Promise<void>;
 }
 
 const resolveSpreadsheetPathFromEnv = (env: NodeJS.ProcessEnv): string => {
@@ -122,6 +124,7 @@ export const createRequestGoogleRssRouter = (
   const router = Router();
   const { queueEngine, env, buildJobHandler } = dependencies;
   const findWeeklyRunByPk = dependencies.findWeeklyRunByPk ?? ((id: number) => WeeklyArticleFlowRun.findByPk(id));
+  const ensureDatabaseReady = dependencies.ensureDatabaseReady ?? ensureDbReady;
 
   router.post('/start-job', async (req, res, next) => {
     try {
@@ -131,6 +134,7 @@ export const createRequestGoogleRssRouter = (
       const targetArticlesAddedCount = resolveTargetArticlesAddedCount(req.body);
       const weeklyArticleFlowRunId = resolveWeeklyArticleFlowRunId(req.body);
       if (weeklyArticleFlowRunId !== undefined) {
+        await ensureDatabaseReady();
         const run = await findWeeklyRunByPk(weeklyArticleFlowRunId);
         if (!run || !['pending', 'running'].includes(run.status)) {
           throw AppError.validation([{ field: 'weeklyArticleFlowRunId', message: 'weeklyArticleFlowRunId must reference an active weekly run' }]);
