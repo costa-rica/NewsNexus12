@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-03T23:02:51Z
-updated_at: 2026-09-03T23:02:51Z
+updated_at: 2026-09-03T23:16:25Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -73,43 +73,20 @@ sudo ops/weekly-article-flow/install.sh --mode production --install-assets
 
 This builds only the weekly coordinator, installs/verifies its systemd assets, and explicitly disables the timer. Confirm the timer remains disabled.
 
-Before running the flow, verify that `Xenova/paraphrase-MiniLM-L6-v2/onnx/model.onnx` is cached and readable by `limited_user`. If missing, preload it through the installed Transformers.js package and successfully execute one test embedding. Stop if the download is rate-limited or the model remains unreadable.
+Before enabling the timer, verify that `Xenova/paraphrase-MiniLM-L6-v2/onnx/model.onnx` is cached and readable by `limited_user`. If missing, preload it through the installed Transformers.js package and successfully execute one test embedding. Stop if the download is rate-limited or the model remains unreadable.
 
-## 5. Run one supervised production flow
+## 5. Activate the Friday production timer
+
+Do not run the flow manually. Confirm that the next calendar occurrence is a future Friday at **5:00 AM America/Los_Angeles**:
 
 ```bash
-sudo /bin/bash -c '
-  set -a
-  source /etc/newsnexus12/weekly-article-flow.env
-  set +a
-  exec /usr/sbin/runuser --user limited_user -- \
-    /home/limited_user/applications/NewsNexus12/ops/weekly-article-flow/bin/run-weekly-flow \
-    --mode manual_production \
-    --allow-live-ai
-'
+date
+systemd-analyze calendar 'Fri *-*-* 05:00:00 America/Los_Angeles'
 ```
 
-Remain attached until the coordinator exits. Do not start another run concurrently.
+The timer uses `Persistent=true`. If the expected Friday 5:00 AM occurrence has already passed, stop and obtain operator direction rather than risking an immediate catch-up run.
 
-## 6. Verify the supervised run
-
-Before enabling scheduling, confirm all of the following:
-
-- The authoritative `WeeklyArticleFlowRuns` row is terminal with `status=completed`.
-- Every stage has persisted completion evidence and reconciled counts.
-- The backup exists at the persisted path and its integrity/hash verification passed.
-- RSS cohort counts reconcile with the run record.
-- Semantic, state assignment, and AI Approver V02 jobs completed successfully.
-- Node and Python worker queues returned to idle.
-- JSONL reporting exists and agrees with PostgreSQL.
-- No unresolved staged alert exists.
-- All four existing application services remain healthy.
-
-If any check fails, keep the timer disabled and report the exact run ID, stage, job ID, failure reason, and evidence. Never edit run records, create a replacement run, or rerun a destructive stage to bypass recovery rules.
-
-## 7. Enable and verify the production timer
-
-Only after the supervised run passes:
+Enable and start the timer:
 
 ```bash
 cd /home/limited_user/applications/NewsNexus12
@@ -120,7 +97,25 @@ systemctl is-active newsnexus12-weekly-article-flow.timer
 systemctl list-timers --all newsnexus12-weekly-article-flow.timer
 ```
 
-Expected schedule: Friday at **5:00 AM America/Los_Angeles**, with persistence enabled. Confirm the displayed next trigger before declaring production activation complete.
+The timer must report both `enabled` and `active`, and its displayed next trigger must be the expected future Friday at 5:00 AM Pacific. Confirm `newsnexus12-weekly-article-flow.service` remains inactive before that trigger. Do not manually start it.
+
+## 6. Verify the first scheduled run
+
+Wait for the Friday 5:00 AM timer trigger and monitor the real `scheduled_production` run. It will execute the full production workload, including every eligible RSS workbook query.
+
+After it finishes, confirm:
+
+- The authoritative `WeeklyArticleFlowRuns` row is terminal with `status=completed`.
+- Every stage has persisted completion evidence and reconciled counts.
+- The backup exists at the persisted path and its integrity/hash verification passed.
+- RSS additions and cohort counts reconcile with the run record.
+- Semantic, state assignment, and AI Approver V02 jobs completed successfully.
+- Node and Python worker queues returned to idle.
+- JSONL reporting agrees with PostgreSQL and no unresolved staged alert exists.
+- All four application services remain healthy.
+- The timer remains enabled and active with the following Friday 5:00 AM occurrence scheduled.
+
+If activation or the scheduled run fails, disable the timer and report the exact run ID, stage, job ID, failure reason, and evidence. Never edit run records, create a replacement run, or rerun a destructive stage to bypass recovery rules.
 
 ## Rollback
 
@@ -134,4 +129,4 @@ Do not remove the environment file, PostgreSQL evidence, backups, JSONL, or aler
 
 ## Completion report
 
-Report the environment-file metadata (not values), service health, schema result, supervised run ID/status and stage counts, backup/hash evidence, worker job IDs, JSONL path, timer enabled/active state, and next scheduled execution.
+Report the environment-file metadata (not values), service health, schema result, timer enabled/active state, initial and following scheduled execution times, scheduled run ID/status and stage counts, backup/hash evidence, worker job IDs, and JSONL path.
