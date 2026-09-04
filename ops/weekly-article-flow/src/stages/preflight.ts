@@ -99,8 +99,23 @@ export const runPreflight = async (
   await access(config.journalDirectory, fs.constants.W_OK);
   await access(config.backupDirectory, fs.constants.W_OK);
 
-  const playwrightBinary = path.join(config.repositoryPath, 'worker-node', 'node_modules', '.bin', 'playwright');
-  await access(playwrightBinary, fs.constants.X_OK);
+  const playwrightCandidates = [
+    path.join(config.repositoryPath, 'worker-node', 'node_modules', '.bin', 'playwright'),
+    path.join(config.repositoryPath, 'node_modules', '.bin', 'playwright')
+  ];
+  let playwrightBinary: string | null = null;
+  for (const candidate of playwrightCandidates) {
+    try {
+      await access(candidate, fs.constants.X_OK);
+      playwrightBinary = candidate;
+      break;
+    } catch {
+      // npm may install workspace binaries locally or hoist them to the repository root.
+    }
+  }
+  if (!playwrightBinary) {
+    throw new Error(`Playwright CLI was not found in the worker or repository node_modules: ${playwrightCandidates.join(', ')}`);
+  }
   if (!await findExecutable('codex', env.PATH ?? '', access)) {
     throw new Error('codex CLI was not found on PATH');
   }

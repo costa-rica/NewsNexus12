@@ -84,6 +84,26 @@ describe('weekly flow preflight', () => {
     expect(client.isQueueIdle).toHaveBeenNthCalledWith(2, 'python');
   });
 
+  it('accepts a Playwright executable hoisted to the repository root', async () => {
+    const setup = dependencies();
+    const access = jest.fn(async (target: string) => {
+      if (target === '/repo/worker-node/node_modules/.bin/playwright') {
+        const error = new Error(`ENOENT: no such file or directory, access '${target}'`) as NodeJS.ErrnoException;
+        error.code = 'ENOENT';
+        throw error;
+      }
+    });
+
+    await expect(runPreflight(config(), {
+      mode: 'dev_canary',
+      allowLiveAi: true
+    }, {
+      ...setup,
+      access: access as never
+    })).resolves.toEqual(expect.objectContaining({ host: 'dev-host' }));
+    expect(access).toHaveBeenCalledWith('/repo/node_modules/.bin/playwright', expect.any(Number));
+  });
+
   it('allows operator-directed destructive development without database confirmation', async () => {
     await expect(runPreflight(config(), {
       mode: 'dev_destructive_recovery',
