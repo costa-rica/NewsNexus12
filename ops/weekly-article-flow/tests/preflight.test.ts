@@ -1,3 +1,6 @@
+const runCommand = jest.fn();
+jest.mock('../src/stages/commandRunner', () => ({ runCommand }));
+
 jest.mock('@newsnexus/db-models', () => ({
   initModels: jest.fn(),
   sequelize: { authenticate: jest.fn() },
@@ -102,6 +105,28 @@ describe('weekly flow preflight', () => {
       access: access as never
     })).resolves.toEqual(expect.objectContaining({ host: 'dev-host' }));
     expect(access).toHaveBeenCalledWith('/repo/node_modules/.bin/playwright', expect.any(Number));
+  });
+
+  it('marks the repository as safe when resolving its revision', async () => {
+    const { resolveRevision: _resolveRevision, ...setup } = dependencies();
+    runCommand.mockResolvedValue({
+      command: 'git',
+      args: [],
+      exitCode: 0,
+      stdout: `${'b'.repeat(40)}\n`,
+      stderr: '',
+      durationMs: 1
+    });
+
+    await expect(runPreflight(config(), {
+      mode: 'dev_canary',
+      allowLiveAi: true
+    }, setup)).resolves.toEqual(expect.objectContaining({ sourceRevision: 'b'.repeat(40) }));
+    expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'git',
+      args: ['-c', 'safe.directory=/repo', 'rev-parse', 'HEAD'],
+      cwd: '/repo'
+    }));
   });
 
   it('allows operator-directed destructive development without database confirmation', async () => {

@@ -160,7 +160,7 @@ export const runPreflight = async (
   const resolveRevision = dependencies.resolveRevision ?? (async () => {
     const result = await runCommand({
       command: 'git',
-      args: ['rev-parse', 'HEAD'],
+      args: ['-c', `safe.directory=${config.repositoryPath}`, 'rev-parse', 'HEAD'],
       cwd: config.repositoryPath,
       timeoutMs: 10_000
     });
