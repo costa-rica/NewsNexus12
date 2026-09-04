@@ -4,7 +4,7 @@ import path from 'node:path';
 describe('weekly flow shell wrappers', () => {
   const binDir = path.resolve(__dirname, '../bin');
 
-  it.each(['run-weekly-flow', 'run-dev-canary', 'run-dev-destructive-recovery'])(
+  it.each(['run-weekly-flow', 'run-dev-canary', 'run-dev-destructive-recovery', 'run-config-check'])(
     'ships executable %s with safe argument passing',
     (name) => {
       const filePath = path.join(binDir, name);
@@ -19,5 +19,11 @@ describe('weekly flow shell wrappers', () => {
     const contents = fs.readFileSync(path.join(binDir, 'run-weekly-flow'), 'utf8');
     expect(contents).toContain('LOCK_FILE="/var/lock/newsnexus12-weekly-article-flow.lock"');
     expect(contents).toContain('flock -n 9');
+  });
+
+  it('keeps configuration checking independent from the weekly-flow lock', () => {
+    const contents = fs.readFileSync(path.join(binDir, 'run-config-check'), 'utf8');
+    expect(contents).toContain('dist/configCheck.js');
+    expect(contents).not.toMatch(/run-weekly-flow|flock|LOCK_FILE/);
   });
 });

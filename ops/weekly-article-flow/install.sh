@@ -24,7 +24,8 @@ check_sources() {
     "${SCRIPT_DIR}/systemd/newsnexus12-weekly-article-flow.timer" \
     "${SCRIPT_DIR}/systemd/newsnexus12-publish-weekly-alert.service" \
     "${SCRIPT_DIR}/libexec/newsnexus12-publish-weekly-alert" \
-    "${SCRIPT_DIR}/sudoers/newsnexus12-publish-weekly-alert"; do
+    "${SCRIPT_DIR}/sudoers/newsnexus12-publish-weekly-alert" \
+    "${SCRIPT_DIR}/bin/run-config-check"; do
     if [[ ! -f "${required_file}" || -L "${required_file}" ]]; then
       echo "required source asset is missing or unsafe: ${required_file}" >&2
       exit 66
@@ -34,6 +35,7 @@ check_sources() {
   /bin/bash -n "${SCRIPT_DIR}/bin/run-weekly-flow"
   /bin/bash -n "${SCRIPT_DIR}/bin/run-dev-canary"
   /bin/bash -n "${SCRIPT_DIR}/bin/run-dev-destructive-recovery"
+  /bin/bash -n "${SCRIPT_DIR}/bin/run-config-check"
   /bin/bash -n "${SCRIPT_DIR}/libexec/newsnexus12-publish-weekly-alert"
   /bin/bash -n "${SCRIPT_DIR}/install.sh"
   /bin/bash -n "${SCRIPT_DIR}/uninstall.sh"

@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-04T17:05:31Z
-updated_at: 2026-09-04T20:09:07Z
+updated_at: 2026-09-04T20:12:31Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -101,63 +101,63 @@ Implementation rules:
 
 ### TypeScript entry point
 
-- [ ] Add a separate `src/configCheck.ts` entry point that compiles to `dist/configCheck.js`.
-- [ ] Accept `--mode` with one of the four existing `WeeklyArticleFlowMode` values without creating a fifth mode.
-- [ ] Parse the normal weekly-flow configuration and load the shared PostgreSQL connection configuration.
-- [ ] Detect the hostname and Linux username without consulting a host allowlist.
-- [ ] Call the Phase 1 shared production identity function.
-- [ ] Authenticate with PostgreSQL using a read-only connection query.
-- [ ] Print a secret-free success summary containing only mode, hostname, database name, and database user.
-- [ ] Exit nonzero with a clear, secret-free error when parsing, identity, or authentication fails.
-- [ ] Close Sequelize after successful authentication.
-- [ ] Close Sequelize after an authentication or later validation failure.
-- [ ] Add dependency seams so unit tests do not contact a live database.
+- [x] Add a separate `src/configCheck.ts` entry point that compiles to `dist/configCheck.js`.
+- [x] Accept `--mode` with one of the four existing `WeeklyArticleFlowMode` values without creating a fifth mode.
+- [x] Parse the normal weekly-flow configuration and load the shared PostgreSQL connection configuration.
+- [x] Detect the hostname and Linux username without consulting a host allowlist.
+- [x] Call the Phase 1 shared production identity function.
+- [x] Authenticate with PostgreSQL using a read-only connection query.
+- [x] Print a secret-free success summary containing only mode, hostname, database name, and database user.
+- [x] Exit nonzero with a clear, secret-free error when parsing, identity, or authentication fails.
+- [x] Close Sequelize after successful authentication.
+- [x] Close Sequelize after an authentication or later validation failure.
+- [x] Add dependency seams so unit tests do not contact a live database.
 
 ### Command boundaries
 
-- [ ] Keep the configuration check separate from the coordinator and `run-weekly-flow`.
-- [ ] Do not acquire the weekly-flow `flock`.
-- [ ] Do not initialize workflow models or call `sequelize.sync()`.
-- [ ] Do not construct a weekly-flow repository or create or update a run row.
-- [ ] Do not construct a worker client or contact worker-node or worker-python.
-- [ ] Do not inspect resource files or directories.
-- [ ] Do not require worker queues to be idle.
-- [ ] Do not require `--allow-live-ai`.
-- [ ] Do not execute stages, change schema or data, or control services and timers.
+- [x] Keep the configuration check separate from the coordinator and `run-weekly-flow`.
+- [x] Do not acquire the weekly-flow `flock`.
+- [x] Do not initialize workflow models or call `sequelize.sync()`.
+- [x] Do not construct a weekly-flow repository or create or update a run row.
+- [x] Do not construct a worker client or contact worker-node or worker-python.
+- [x] Do not inspect resource files or directories.
+- [x] Do not require worker queues to be idle.
+- [x] Do not require `--allow-live-ai`.
+- [x] Do not execute stages, change schema or data, or control services and timers.
 
 ### Shell and installer assets
 
-- [ ] Add executable `bin/run-config-check` with `set -euo pipefail`.
-- [ ] Resolve the package directory from the wrapper location.
-- [ ] Execute `dist/configCheck.js` directly and forward `"$@"` safely.
-- [ ] Add the wrapper to `install.sh` source-presence and Bash syntax checks.
-- [ ] Keep the production service and timer behavior unchanged.
+- [x] Add executable `bin/run-config-check` with `set -euo pipefail`.
+- [x] Resolve the package directory from the wrapper location.
+- [x] Execute `dist/configCheck.js` directly and forward `"$@"` safely.
+- [x] Add the wrapper to `install.sh` source-presence and Bash syntax checks.
+- [x] Keep the production service and timer behavior unchanged.
 
 ### Tests
 
-- [ ] Test all four existing modes through the configuration-check entry point.
-- [ ] Test valid configuration and authentication return success.
-- [ ] Test configuration and authentication failures return nonzero without exposing secrets.
-- [ ] Test production uses `limited_user` and `newsnexus_app` through the shared identity function.
-- [ ] Test normal preflight and configuration check reject the same invalid identities with the same exact messages.
-- [ ] Test Sequelize closes on success and failure.
-- [ ] Assert that configuration checking does not initialize models, synchronize schema, create run state, contact workers, inspect resources, or require live-AI permission.
-- [ ] Add `run-config-check` to the shell-wrapper executable, safe-forwarding, and no-scheduler test matrix.
-- [ ] Assert the wrapper does not invoke `run-weekly-flow` or reference its lock.
-- [ ] Test that `install.sh --check` syntax-checks the new wrapper.
+- [x] Test all four existing modes through the configuration-check entry point.
+- [x] Test valid configuration and authentication return success.
+- [x] Test configuration and authentication failures return nonzero without exposing secrets.
+- [x] Test production uses `limited_user` and `newsnexus_app` through the shared identity function.
+- [x] Test normal preflight and configuration check reject the same invalid identities with the same exact messages.
+- [x] Test Sequelize closes on success and failure.
+- [x] Assert that configuration checking does not initialize models, synchronize schema, create run state, contact workers, inspect resources, or require live-AI permission.
+- [x] Add `run-config-check` to the shell-wrapper executable, safe-forwarding, and no-scheduler test matrix.
+- [x] Assert the wrapper does not invoke `run-weekly-flow` or reference its lock.
+- [x] Test that `install.sh --check` syntax-checks the new wrapper.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Run focused shared-identity, configuration-check, wrapper, and operational-asset tests.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Run `ops/weekly-article-flow/install.sh --check`.
-- [ ] Fix failures and rerun every affected check.
-- [ ] Inspect `dist/configCheck.js` only as a generated build artifact and confirm the source entry point does not import coordinator, repository, worker, or stage modules.
-- [ ] Check off completed Phase 2 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 2 files and inspect `git diff --cached`.
-- [ ] Commit Phase 2 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 2.
+- [x] Run `npm -C db-models run build`.
+- [x] Run focused shared-identity, configuration-check, wrapper, and operational-asset tests.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Run `ops/weekly-article-flow/install.sh --check`.
+- [x] Fix failures and rerun every affected check.
+- [x] Inspect `dist/configCheck.js` only as a generated build artifact and confirm the source entry point does not import coordinator, repository, worker, or stage modules.
+- [x] Check off completed Phase 2 tasks and update this document's modification metadata.
+- [x] Stage only Phase 2 files and inspect `git diff --cached`.
+- [x] Commit Phase 2 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 2.
 
 ## Phase 3: Environment and Operator Documentation
 

@@ -55,6 +55,12 @@ describe('weekly flow operational assets', () => {
     expect(installer).toContain('systemctl enable --now newsnexus12-weekly-article-flow.timer');
   });
 
+  it('checks the read-only configuration wrapper as a source asset', () => {
+    const installer = read('install.sh');
+    expect(installer).toContain('"${SCRIPT_DIR}/bin/run-config-check"; do');
+    expect(installer).toContain('/bin/bash -n "${SCRIPT_DIR}/bin/run-config-check"');
+  });
+
   it('limits uninstall to fixed assets and preserves operational data', () => {
     const uninstaller = read('uninstall.sh');
     expect(uninstaller).toContain('uninstall.sh --confirm');
