@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-03T19:40:05Z
-updated_at: 2026-09-03T22:06:34Z
+updated_at: 2026-09-04T20:13:04Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -14,6 +14,7 @@ Use this runbook to trigger and assess one complete weekly article flow on the U
 Background documents:
 
 - [Weekly Article Processing Cron PRD V03](./20260829_weekly_article_processing_cron_prd_v03.md) defines the approved behavior, safety requirements, execution modes, and acceptance criteria.
+- [Weekly Article Processing Cron PRD V06](./20260904_weekly_article_processing_cron_prd_v06.md) amends environment selection, database confirmation, production identity, and configuration validation.
 - [Weekly Article Flow Todo V02](./20260831_weekly_article_flow_todo_v02.md) records the implementation phases and Ubuntu development testing work.
 
 ## Preconditions
@@ -23,7 +24,7 @@ Background documents:
 - Keep the API, worker-node, and worker-python services running.
 - Confirm the replenished development database contains the `WeeklyArticleFlowRuns` table.
 - Configure `ops/weekly-article-flow/.env` from `.env.example` without committing it.
-- Confirm its `PG_DATABASE`, development host allowlist, development database allowlist, resource paths, worker URLs, and backup path are correct.
+- Confirm its `PG_DATABASE`, resource paths, worker URLs, and backup path are correct.
 - Do not install or enable the production timer during this test.
 
 ## 1. Confirm the target
@@ -31,20 +32,19 @@ Background documents:
 ```bash
 cd /home/limited_user/applications/NewsNexus12/ops/weekly-article-flow
 hostname
-grep -E '^(PG_DATABASE|WEEKLY_FLOW_DEV_HOSTS|WEEKLY_FLOW_DEV_DATABASES)=' .env
+grep -E '^PG_DATABASE=' .env
 curl --fail http://127.0.0.1:3002/queue-info/queue_status
 curl --fail http://127.0.0.1:5000/queue-info/queue-status
 ```
 
-The hostname and database must exactly match their development allowlists. Both queues must be idle. Do not print or share database passwords or API keys.
+Confirm the hostname and `PG_DATABASE` identify the intended development environment. Both queues must be idle. Do not print or share database passwords or API keys.
 
 ## 2. Trigger the full flow
 
-Replace `<exact_dev_database>` with the `PG_DATABASE` value confirmed above. Keep the command in the foreground.
+Keep the command in the foreground.
 
 ```bash
 ./bin/run-dev-destructive-recovery \
-  --confirm-dev-database <exact_dev_database> \
   --canary-target 25 \
   --allow-live-ai
 ```
@@ -116,7 +116,6 @@ The test passes when:
 ```bash
 ./bin/run-dev-destructive-recovery \
   --resume-run-id <run_id> \
-  --confirm-dev-database <exact_dev_database> \
   --canary-target 25 \
   --allow-live-ai
 ```
@@ -125,7 +124,7 @@ If resume is refused, preserve the exact error and database evidence for review.
 
 ## Troubleshooting
 
-- **Production `.env` handoff:** the operator will copy the development `.env` to production. The file has been confirmed to contain no populated secrets, so the AI agent may review it; `PG_PASSWORD=` may remain blank. Before execution, verify production database identity, allowlists, worker URLs, resource paths, and backup destination. Redact any credentials added later.
+- **Production `.env` handoff:** the operator will copy the development `.env` to production. The file has been confirmed to contain no populated secrets, so the AI agent may review it; `PG_PASSWORD=` may remain blank. Before execution, set the weekly-flow production role to `PG_USER=newsnexus_app` and verify the database identity, worker URLs, resource paths, and backup destination. Redact any credentials added later.
 - **RSS fails before queuing with a Sequelize constructor error:** deploy the committed database-initialization fix, rebuild worker-node, then stop/start the existing worker service.
 - **Semantic scorer receives Hugging Face HTTP 429 or lacks `model.onnx`:** preload the configured model into Transformers.js's service-readable cache, verify permissions, and execute a test embedding before retrying.
 - **A failed run cannot resume:** terminal runs are immutable. Never edit their status. Correct the cause and follow persisted recovery evidence; use only a verified pre-destructive backup when restoration is required.

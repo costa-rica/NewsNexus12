@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-03T23:02:51Z
-updated_at: 2026-09-03T23:22:51Z
+updated_at: 2026-09-04T20:13:04Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -11,7 +11,9 @@ modified_by: codex (gpt-5.6-sol) nicksmacbookair
 
 Use this runbook only after NewsNexus12 has been pulled, installed, and built; the production database has been recreated and replenished; and the existing API, portal, Node worker, and Python worker services are running.
 
-Do not pull code, rebuild those applications, replace the database, create replacement services, or use any development or manual-production mode. The production flow must start only as `scheduled_production` through the Friday systemd timer.
+This runbook follows `docs/20260904_weekly_article_processing_cron_prd_v06.md`. Keep the production timer disabled through configuration validation and one supervised `manual_production` run. Enable scheduling only after that run succeeds and the operator approves activation.
+
+Do not replace the database, create replacement services, change database roles or grants, or edit another package's environment file.
 
 ## 1. Validate the production environment
 
@@ -23,7 +25,14 @@ sudo test ! -L /etc/newsnexus12/weekly-article-flow.env
 sudo stat -c '%U:%G %a %n' /etc/newsnexus12/weekly-article-flow.env
 ```
 
-The operator copied this file from development and confirmed it has no populated secrets; `PG_PASSWORD=` may remain blank. The agent may review it, but must not print its contents. Verify that production host/database allowlists, PostgreSQL identity, worker URLs and ports, repository/resource paths, spreadsheet, semantic/state files, backup directory, journal directory, and disk threshold are correct for production.
+The operator copied this file from development and confirmed it has no populated secrets; `PG_PASSWORD=` may remain blank. The agent may review it, but must not print its contents.
+
+Securely update only the weekly-flow environment before validation:
+
+1. Set `PG_USER=newsnexus_app` for manual and scheduled weekly runs.
+2. Keep the intended production `PG_DATABASE` as the only database-name setting.
+3. Remove the four obsolete weekly-flow allowlist variables listed in V06 section 5.
+4. Verify worker URLs and ports, repository and resource paths, spreadsheet, semantic and state files, backup and journal directories, and disk threshold.
 
 Stop and report any placeholder, development-only value, missing path, inaccessible resource, or database mismatch. Do not guess or bypass preflight checks.
 
@@ -57,12 +66,13 @@ sudo /bin/bash -c '
   source /etc/newsnexus12/weekly-article-flow.env
   set +a
   exec /usr/sbin/runuser --user limited_user -- \
+    /usr/bin/env PG_USER=newsnexus_boot \
     /usr/bin/npm -C /home/limited_user/applications/NewsNexus12/db-manager \
     run schema:weekly-article-flow
 '
 ```
 
-This command must not use Sequelize `force` or `alter`.
+This one-command override is the only use of `newsnexus_boot`. It must not change `/etc/newsnexus12/weekly-article-flow.env`. The schema command must not use Sequelize `force` or `alter`.
 
 ## 4. Install production scheduler assets, leaving the timer disabled
 
@@ -75,9 +85,59 @@ This builds only the weekly coordinator, installs/verifies its systemd assets, a
 
 Before enabling the timer, verify that `Xenova/paraphrase-MiniLM-L6-v2/onnx/model.onnx` is cached and readable by `limited_user`. If missing, preload it through the installed Transformers.js package and successfully execute one test embedding. Stop if the download is rate-limited or the model remains unreadable.
 
-## 5. Activate the Friday production timer
+## 5. Validate configuration and connectivity
 
-Do not run the flow manually. Confirm that the next calendar occurrence is a future Friday at **5:00 AM America/Los_Angeles**:
+Load the protected environment and run the read-only configuration check as `limited_user`:
+
+```bash
+sudo /bin/bash -c '
+  set -a
+  source /etc/newsnexus12/weekly-article-flow.env
+  set +a
+  exec /usr/sbin/runuser --user limited_user -- \
+    /home/limited_user/applications/NewsNexus12/ops/weekly-article-flow/bin/run-config-check \
+    --mode manual_production
+'
+```
+
+The check must report Linux host `nws-nn12prod`, the intended `PG_DATABASE`, and database role `newsnexus_app`. It does not acquire the flow lock, contact workers, create a run, or change database state.
+
+Stop and correct any configuration, identity, or PostgreSQL connection failure. Do not bypass this check.
+
+## 6. Run supervised production
+
+Confirm both worker queues are idle and no weekly run is active. Then keep this command in the foreground:
+
+```bash
+sudo /bin/bash -c '
+  set -a
+  source /etc/newsnexus12/weekly-article-flow.env
+  set +a
+  exec /usr/sbin/runuser --user limited_user -- \
+    /home/limited_user/applications/NewsNexus12/ops/weekly-article-flow/bin/run-weekly-flow \
+    --mode manual_production \
+    --allow-live-ai
+'
+```
+
+The September 4 configuration-parser failure created no coordinator run. Do not supply `--resume-run-id` for that attempt.
+
+## 7. Review and approve
+
+Before enabling the timer, review:
+
+1. The `WeeklyArticleFlowRuns` row and stage evidence.
+2. Backup path and verification result.
+3. Worker job IDs and terminal results.
+4. JSONL path and contents.
+5. Weekly-flow and alert-helper journald output.
+6. Any staged or published alert.
+
+The supervised run must end as `completed` or `completed_no_new_articles`. Obtain explicit operator approval before continuing.
+
+## 8. Activate the Friday production timer
+
+Confirm that the next calendar occurrence is a future Friday at 5:00 AM `America/Los_Angeles`:
 
 ```bash
 date
@@ -97,7 +157,7 @@ systemctl is-active newsnexus12-weekly-article-flow.timer
 systemctl list-timers --all newsnexus12-weekly-article-flow.timer
 ```
 
-The timer must report both `enabled` and `active`, and its displayed next trigger must be the expected future Friday at 5:00 AM Pacific. Confirm `newsnexus12-weekly-article-flow.service` remains inactive before that trigger. Do not manually start it. Implementation is complete after these static checks; do not wait for, trigger, or monitor the scheduled flow.
+The timer must report both `enabled` and `active`, and its displayed next trigger must be the expected future Friday at 5:00 AM Pacific. Confirm `newsnexus12-weekly-article-flow.service` remains inactive before that trigger.
 
 ## Rollback
 
@@ -111,4 +171,4 @@ Do not remove the environment file, PostgreSQL evidence, backups, JSONL, or aler
 
 ## Completion report
 
-Report the environment-file metadata (not values), service health, schema result, timer enabled/active state, and next scheduled execution time. Stop after this implementation report; runtime verification will be requested separately by the operator.
+Report the environment-file metadata, deployed revision, configuration-check result, supervised run ID and final status, evidence locations, timer enabled/active state, and next scheduled execution time. Do not report credentials.

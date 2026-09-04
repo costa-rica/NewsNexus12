@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-01T02:15:39Z
-updated_at: 2026-09-01T02:30:59Z
+updated_at: 2026-09-04T20:13:04Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -20,7 +20,6 @@ AI Approver V02 is the only approver used here. Internal Python modules named `o
 2. `dev_destructive_recovery`
    - manual only
    - destructive maintenance enabled
-   - requires the exact development database confirmation
 3. `manual_production`
    - manual full production sequence
    - required before timer activation
@@ -28,7 +27,7 @@ AI Approver V02 is the only approver used here. Internal Python modules named `o
    - full production sequence
    - invoked only by the production systemd timer
 
-Every mode requires `--allow-live-ai`. Development modes require an allowlisted development host and database. Production modes require the `limited_user` runtime and database user.
+Every flow execution requires `--allow-live-ai`. Production modes require Linux account `limited_user` and PostgreSQL role `newsnexus_app`.
 
 ## Build and test
 
@@ -63,7 +62,7 @@ The command installs or validates the additive weekly-flow schema. It does not u
 
 ## Configuration
 
-Copy `.env.example` to a non-versioned environment file and add the required `PG_` connection variables. Never commit credentials or production database values.
+Copy `.env.example` to a non-versioned environment file and add the required `PG_` connection variables. `PG_DATABASE` is the flow's only database-name setting. Never commit credentials or production database values.
 
 Production systemd reads `/etc/newsnexus12/weekly-article-flow.env`. The operator creates and protects that file before installation. The installer never creates, rewrites, or removes it.
 
@@ -76,30 +75,38 @@ Important fixed paths are:
 - NickVault destination: `/home/nick/NickVault/ALERT-newsnexus12-weekly-cron.md`
 - host lock: `/var/lock/newsnexus12-weekly-article-flow.lock`
 
-Review every allowlist, path, timeout, worker URL, and free-disk threshold in `.env.example`. Semantic scoring is limited to four hours. The coordinator is limited to 72 hours, while systemd allows 73 hours.
+Review every path, timeout, worker URL, and free-disk threshold in `.env.example`. Semantic scoring is limited to four hours. The coordinator is limited to 72 hours, while systemd allows 73 hours.
+
+Validate configuration and PostgreSQL connectivity without locking or starting a flow:
+
+```bash
+cd ops/weekly-article-flow
+./bin/run-config-check --mode dev_destructive_recovery
+```
+
+The check does not contact workers, inspect resource paths, require live-AI permission, create a run, or change database state. Production must load the protected environment through the invocation in the production activation runbook.
 
 ## Manual development commands
 
 Development creates no schedule.
 
 ```bash
-ops/weekly-article-flow/bin/run-dev-canary \
+cd ops/weekly-article-flow
+./bin/run-dev-canary \
   --canary-target 25 \
   --allow-live-ai
 ```
 
 ```bash
-ops/weekly-article-flow/bin/run-dev-destructive-recovery \
-  --confirm-dev-database newsnexus_dev \
+./bin/run-dev-destructive-recovery \
   --allow-live-ai
 ```
 
 Resume the same authoritative run when recovery evidence says it is safe:
 
 ```bash
-ops/weekly-article-flow/bin/run-dev-destructive-recovery \
+./bin/run-dev-destructive-recovery \
   --resume-run-id 123 \
-  --confirm-dev-database newsnexus_dev \
   --allow-live-ai
 ```
 
@@ -115,32 +122,26 @@ Development mode rejects weekly service and timer installation.
 
 Production rollout has separate gates:
 
-1. Install the additive schema.
-2. Create `/etc/newsnexus12/weekly-article-flow.env` as a root-managed file.
-3. Install and verify the assets. This explicitly leaves the timer disabled.
+1. Create `/etc/newsnexus12/weekly-article-flow.env` as a root-managed file with `PG_USER=newsnexus_app`.
+2. Install the additive schema with the runbook's one-command `PG_USER=newsnexus_boot` override.
+3. Install and verify the assets while leaving the timer disabled.
 
    ```bash
    sudo ops/weekly-article-flow/install.sh --mode production --install-assets
    ```
 
-4. Run the full flow once under supervision.
+4. Run the protected `run-config-check --mode manual_production` command.
+5. Run the full flow once under supervision using the protected environment-loading command in the production runbook.
 
-   ```bash
-   sudo -u limited_user \
-     /home/limited_user/applications/NewsNexus12/ops/weekly-article-flow/bin/run-weekly-flow \
-     --mode manual_production \
-     --allow-live-ai
-   ```
-
-5. Inspect PostgreSQL, worker jobs, JSONL, journald, and any fixed alert.
-6. Obtain operator approval to activate scheduling.
-7. Enable the Friday 5:00 AM `America/Los_Angeles` timer.
+6. Inspect PostgreSQL, worker jobs, JSONL, journald, and any fixed alert.
+7. Obtain operator approval to activate scheduling.
+8. Enable the Friday 5:00 AM `America/Los_Angeles` timer.
 
    ```bash
    sudo ops/weekly-article-flow/install.sh --mode production --enable-timer
    ```
 
-8. Confirm the next execution with `systemctl list-timers newsnexus12-weekly-article-flow.timer`.
+9. Confirm the next execution with `systemctl list-timers newsnexus12-weekly-article-flow.timer`.
 
 ## Monitoring and failure reasons
 

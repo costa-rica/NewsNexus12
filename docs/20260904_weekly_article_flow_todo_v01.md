@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-04T17:05:31Z
-updated_at: 2026-09-04T20:12:31Z
+updated_at: 2026-09-04T20:15:01Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -163,54 +163,54 @@ Implementation rules:
 
 ### Environment example and package README
 
-- [ ] Remove all four obsolete allowlist variables from `ops/weekly-article-flow/.env.example`.
-- [ ] Add a credential-free comment stating that production weekly-flow execution expects `PG_USER=newsnexus_app`.
-- [ ] Do not add `WEEKLY_FLOW_DATABASE_NAME`, `WEEKLY_FLOW_DATABASES_NAME`, or another duplicate database variable.
-- [ ] Update the package README mode descriptions to remove allowlist and database-confirmation requirements.
-- [ ] Remove `--confirm-dev-database` from new-run and resume examples.
-- [ ] Document `run-config-check` as read-only and independent from locks, workers, stages, and live-AI permission.
-- [ ] Document that schema installation alone uses `newsnexus_boot`, while manual and scheduled production runs use `newsnexus_app`.
+- [x] Remove all four obsolete allowlist variables from `ops/weekly-article-flow/.env.example`.
+- [x] Add a credential-free comment stating that production weekly-flow execution expects `PG_USER=newsnexus_app`.
+- [x] Do not add `WEEKLY_FLOW_DATABASE_NAME`, `WEEKLY_FLOW_DATABASES_NAME`, or another duplicate database variable.
+- [x] Update the package README mode descriptions to remove allowlist and database-confirmation requirements.
+- [x] Remove `--confirm-dev-database` from new-run and resume examples.
+- [x] Document `run-config-check` as read-only and independent from locks, workers, stages, and live-AI permission.
+- [x] Document that schema installation alone uses `newsnexus_boot`, while manual and scheduled production runs use `newsnexus_app`.
 
 ### Development runbook
 
-- [ ] Update `docs/20260903_weekly_article_flow_dev_test_runbook.md` to cite V06 as the current amendment.
-- [ ] Remove host and database allowlist checks and explanations.
-- [ ] Remove `--confirm-dev-database` from trigger and resume commands.
-- [ ] Keep explicit manual execution, target review, idle queues, destructive-stage warnings, evidence review, and isolated-test-database warnings.
-- [ ] Use `PG_DATABASE` as the only documented database name.
+- [x] Update `docs/20260903_weekly_article_flow_dev_test_runbook.md` to cite V06 as the current amendment.
+- [x] Remove host and database allowlist checks and explanations.
+- [x] Remove `--confirm-dev-database` from trigger and resume commands.
+- [x] Keep explicit manual execution, target review, idle queues, destructive-stage warnings, evidence review, and isolated-test-database warnings.
+- [x] Use `PG_DATABASE` as the only documented database name.
 
 ### Production activation runbook
 
-- [ ] Update `docs/20260903_weekly_article_flow_production_activation_runbook.md` to cite V06 and keep the timer disabled during all pre-activation work.
-- [ ] Require weekly-flow runtime configuration to use `PG_USER=newsnexus_app` without displaying the protected environment.
-- [ ] Remove the four obsolete allowlist entries while the timer is disabled.
-- [ ] Replace the schema command with the protected environment-loading invocation that overrides only `PG_USER=newsnexus_boot` for that command.
-- [ ] Add the protected `run-config-check --mode manual_production` invocation from V06.
-- [ ] Confirm the configuration check runs as Linux user `limited_user` and reports database role `newsnexus_app`.
-- [ ] Restore the required supervised `manual_production --allow-live-ai` run before activation.
-- [ ] Require idle worker queues and no active weekly run before the supervised run.
-- [ ] Require review of PostgreSQL, backup, worker, JSONL, journald, and alert evidence.
-- [ ] Require explicit operator approval before enabling the timer.
-- [ ] Preserve the future Friday 5:00 AM Pacific trigger check and `Persistent=true` catch-up warning.
-- [ ] State that the September 4 parser failure created no resumable run and must not use `--resume-run-id`.
-- [ ] Do not authorize role or grant changes, another package's environment changes, or replacement services.
+- [x] Update `docs/20260903_weekly_article_flow_production_activation_runbook.md` to cite V06 and keep the timer disabled during all pre-activation work.
+- [x] Require weekly-flow runtime configuration to use `PG_USER=newsnexus_app` without displaying the protected environment.
+- [x] Remove the four obsolete allowlist entries while the timer is disabled.
+- [x] Replace the schema command with the protected environment-loading invocation that overrides only `PG_USER=newsnexus_boot` for that command.
+- [x] Add the protected `run-config-check --mode manual_production` invocation from V06.
+- [x] Confirm the configuration check runs as Linux user `limited_user` and reports database role `newsnexus_app`.
+- [x] Restore the required supervised `manual_production --allow-live-ai` run before activation.
+- [x] Require idle worker queues and no active weekly run before the supervised run.
+- [x] Require review of PostgreSQL, backup, worker, JSONL, journald, and alert evidence.
+- [x] Require explicit operator approval before enabling the timer.
+- [x] Preserve the future Friday 5:00 AM Pacific trigger check and `Persistent=true` catch-up warning.
+- [x] State that the September 4 parser failure created no resumable run and must not use `--resume-run-id`.
+- [x] Do not authorize role or grant changes, another package's environment changes, or replacement services.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run test:integration` only with the isolated weekly-flow test database configured.
-- [ ] Confirm the integration harness tears down its disposable database.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Run `ops/weekly-article-flow/install.sh --check`.
-- [ ] Search active weekly-flow source, tests, `.env.example`, README, and both runbooks for all four removed variables, `expectedDevDatabase`, and `--confirm-dev-database`.
-- [ ] Confirm remaining matches exist only in the explicit unknown-option regression test or historical PRDs, plans, todos, assessments, and incident reports.
-- [ ] Search the implementation for `sequelize.sync`, new database-name variables, new modes, and unexpected scheduler controls.
-- [ ] Inspect the complete diff for secrets, production values, unrelated changes, and accidental generated-file drift.
-- [ ] Fix failures and rerun every affected check.
-- [ ] Check off completed Phase 3 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 3 files and inspect `git diff --cached`.
-- [ ] Commit Phase 3 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 3.
+- [x] Run `npm -C db-models run build`.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run test:integration` only with the isolated weekly-flow test database configured.
+- [x] Confirm the integration harness tears down its disposable database.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Run `ops/weekly-article-flow/install.sh --check`.
+- [x] Search active weekly-flow source, tests, `.env.example`, README, and both runbooks for all four removed variables, `expectedDevDatabase`, and `--confirm-dev-database`.
+- [x] Confirm remaining matches exist only in the explicit unknown-option regression test or historical PRDs, plans, todos, assessments, and incident reports.
+- [x] Search the implementation for `sequelize.sync`, new database-name variables, new modes, and unexpected scheduler controls.
+- [x] Inspect the complete diff for secrets, production values, unrelated changes, and accidental generated-file drift.
+- [x] Fix failures and rerun every affected check.
+- [x] Check off completed Phase 3 tasks and update this document's modification metadata.
+- [x] Stage only Phase 3 files and inspect `git diff --cached`.
+- [x] Commit Phase 3 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 3.
 
 ## Phase 4: Operator-gated Production Rollout
 
