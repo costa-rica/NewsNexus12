@@ -7,10 +7,6 @@ import { WorkerHttpClient, WorkerHttpError } from '../src/http';
 const config = (): WeeklyFlowConfig => ({
   repositoryPath: '/repo',
   resourcesPath: '/resources',
-  devHosts: ['dev-host'],
-  productionHosts: ['prod-host'],
-  devDatabases: ['newsnexus_dev'],
-  productionDatabases: ['newsnexus'],
   workerNodeUrl: new URL('http://127.0.0.1:3002'),
   workerPythonUrl: new URL('http://127.0.0.1:5000'),
   lockPath: '/var/lock/weekly.lock',
@@ -309,7 +305,6 @@ describe('weekly article flow coordinator stages', () => {
 
     await expect(setup.coordinator.run({
       mode: 'dev_destructive_recovery',
-      expectedDevDatabase: 'newsnexus_dev',
       allowLiveAi: false
     })).rejects.toThrow('backup hash mismatch');
     expect(oldArticleDeletion).not.toHaveBeenCalled();
@@ -378,7 +373,6 @@ describe('weekly article flow coordinator stages', () => {
     await expect(setup.coordinator.run({
       mode: 'dev_destructive_recovery',
       resumeRunId: 42,
-      expectedDevDatabase: 'newsnexus_dev',
       allowLiveAi: false
     })).rejects.toThrow('explicit reconciliation');
     expect(setup.oldArticleDeletion).not.toHaveBeenCalled();

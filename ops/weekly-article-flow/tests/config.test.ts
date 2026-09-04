@@ -3,10 +3,6 @@ import { parseWeeklyFlowCli, parseWeeklyFlowConfig } from '../src/config';
 const validEnv = (): NodeJS.ProcessEnv => ({
   WEEKLY_FLOW_REPOSITORY_PATH: '/srv/newsnexus12',
   WEEKLY_FLOW_RESOURCES_PATH: '/srv/resources',
-  WEEKLY_FLOW_DEV_HOSTS: 'dev-one,dev-two',
-  WEEKLY_FLOW_PRODUCTION_HOSTS: 'prod-one',
-  WEEKLY_FLOW_DEV_DATABASES: 'newsnexus_dev',
-  WEEKLY_FLOW_PRODUCTION_DATABASES: 'newsnexus',
   WEEKLY_FLOW_WORKER_NODE_URL: 'http://127.0.0.1:3002',
   WEEKLY_FLOW_WORKER_PYTHON_URL: 'http://127.0.0.1:5000',
   WEEKLY_FLOW_LOCK_PATH: '/var/lock/newsnexus12.lock',
@@ -48,8 +44,7 @@ describe('weekly flow configuration', () => {
     ['URL with path', { WEEKLY_FLOW_WORKER_NODE_URL: 'http://127.0.0.1:3002/api' }],
     ['unsafe timeout', { WEEKLY_FLOW_SEMANTIC_TIMEOUT_SECONDS: '20000' }],
     ['invalid worker preview TTL', { AI_APPROVER_V02_PREVIEW_TTL_MINUTES: '0' }],
-    ['unsafe alert name', { WEEKLY_FLOW_ALERT_STAGING_PATH: '/srv/resources/weekly-flow/other.md' }],
-    ['overlapping database', { WEEKLY_FLOW_PRODUCTION_DATABASES: 'newsnexus_dev' }]
+    ['unsafe alert name', { WEEKLY_FLOW_ALERT_STAGING_PATH: '/srv/resources/weekly-flow/other.md' }]
   ])('rejects %s configuration', (_label, overrides) => {
     expect(() => parseWeeklyFlowConfig({ ...validEnv(), ...overrides })).toThrow();
   });
@@ -58,13 +53,11 @@ describe('weekly flow configuration', () => {
     expect(parseWeeklyFlowCli([
       '--mode', 'dev_destructive_recovery',
       '--resume-run-id', '42',
-      '--confirm-dev-database', 'newsnexus_dev',
       '--canary-target', '10',
       '--allow-live-ai'
     ])).toEqual({
       mode: 'dev_destructive_recovery',
       resumeRunId: 42,
-      expectedDevDatabase: 'newsnexus_dev',
       canaryTarget: 10,
       allowLiveAi: true
     });
@@ -76,5 +69,8 @@ describe('weekly flow configuration', () => {
       '--mode', 'manual_production', '--canary-target', '10'
     ])).toThrow('not permitted');
     expect(() => parseWeeklyFlowCli(['--mode', 'unknown'])).toThrow('--mode');
+    expect(() => parseWeeklyFlowCli([
+      '--mode', 'dev_destructive_recovery', '--confirm-dev-database', 'newsnexus_dev'
+    ])).toThrow('Unknown option: --confirm-dev-database');
   });
 });

@@ -4,7 +4,6 @@ import { WeeklyArticleFlowMode } from '@newsnexus/db-models';
 export interface WeeklyFlowCliOptions {
   mode: WeeklyArticleFlowMode;
   resumeRunId?: number;
-  expectedDevDatabase?: string;
   canaryTarget?: number;
   allowLiveAi: boolean;
 }
@@ -12,10 +11,6 @@ export interface WeeklyFlowCliOptions {
 export interface WeeklyFlowConfig {
   repositoryPath: string;
   resourcesPath: string;
-  devHosts: string[];
-  productionHosts: string[];
-  devDatabases: string[];
-  productionDatabases: string[];
   workerNodeUrl: URL;
   workerPythonUrl: URL;
   lockPath: string;
@@ -67,14 +62,6 @@ const absolutePath = (env: NodeJS.ProcessEnv, name: string): string => {
   return path.normalize(value);
 };
 
-const list = (env: NodeJS.ProcessEnv, name: string): string[] => {
-  const values = required(env, name).split(',').map((value) => value.trim()).filter(Boolean);
-  if (values.length === 0) {
-    throw new Error(`${name} must contain at least one value`);
-  }
-  return [...new Set(values)];
-};
-
 const integer = (
   env: NodeJS.ProcessEnv,
   name: string,
@@ -103,21 +90,7 @@ const baseUrl = (env: NodeJS.ProcessEnv, name: string): URL => {
   return url;
 };
 
-const rejectOverlap = (left: string[], right: string[], label: string): void => {
-  const overlap = left.filter((value) => right.includes(value));
-  if (overlap.length > 0) {
-    throw new Error(`development and production ${label} must not overlap: ${overlap.join(', ')}`);
-  }
-};
-
 export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig => {
-  const devHosts = list(env, 'WEEKLY_FLOW_DEV_HOSTS');
-  const productionHosts = list(env, 'WEEKLY_FLOW_PRODUCTION_HOSTS');
-  const devDatabases = list(env, 'WEEKLY_FLOW_DEV_DATABASES');
-  const productionDatabases = list(env, 'WEEKLY_FLOW_PRODUCTION_DATABASES');
-  rejectOverlap(devHosts, productionHosts, 'hosts');
-  rejectOverlap(devDatabases, productionDatabases, 'databases');
-
   const initialMs = integer(env, 'WEEKLY_FLOW_POLL_INITIAL_MS', 250, 60_000);
   const maxMs = integer(env, 'WEEKLY_FLOW_POLL_MAX_MS', initialMs, 300_000);
   const runSeconds = integer(env, 'WEEKLY_FLOW_RUN_TIMEOUT_SECONDS', 3600, 259_200);
@@ -161,10 +134,6 @@ export const parseWeeklyFlowConfig = (env: NodeJS.ProcessEnv): WeeklyFlowConfig 
   return {
     repositoryPath: absolutePath(env, 'WEEKLY_FLOW_REPOSITORY_PATH'),
     resourcesPath,
-    devHosts,
-    productionHosts,
-    devDatabases,
-    productionDatabases,
     workerNodeUrl: baseUrl(env, 'WEEKLY_FLOW_WORKER_NODE_URL'),
     workerPythonUrl: baseUrl(env, 'WEEKLY_FLOW_WORKER_PYTHON_URL'),
     lockPath: absolutePath(env, 'WEEKLY_FLOW_LOCK_PATH'),
@@ -192,7 +161,7 @@ const positiveCliInteger = (name: string, raw: string | undefined): number => {
 
 export const parseWeeklyFlowCli = (argv: string[]): WeeklyFlowCliOptions => {
   const values: Record<string, string | true> = {};
-  const valueFlags = new Set(['--mode', '--resume-run-id', '--confirm-dev-database', '--canary-target']);
+  const valueFlags = new Set(['--mode', '--resume-run-id', '--canary-target']);
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === '--allow-live-ai') {
@@ -223,9 +192,6 @@ export const parseWeeklyFlowCli = (argv: string[]): WeeklyFlowCliOptions => {
     mode: mode as WeeklyArticleFlowMode,
     ...(typeof values['--resume-run-id'] === 'string'
       ? { resumeRunId: positiveCliInteger('--resume-run-id', values['--resume-run-id']) }
-      : {}),
-    ...(typeof values['--confirm-dev-database'] === 'string'
-      ? { expectedDevDatabase: values['--confirm-dev-database'] }
       : {}),
     ...(typeof values['--canary-target'] === 'string'
       ? { canaryTarget: positiveCliInteger('--canary-target', values['--canary-target']) }

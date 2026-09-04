@@ -11,10 +11,6 @@ import { runPreflight } from '../src/stages';
 const config = (): WeeklyFlowConfig => ({
   repositoryPath: '/repo',
   resourcesPath: '/resources',
-  devHosts: ['dev-host'],
-  productionHosts: ['prod-host'],
-  devDatabases: ['newsnexus_dev'],
-  productionDatabases: ['newsnexus'],
   workerNodeUrl: new URL('http://127.0.0.1:3002'),
   workerPythonUrl: new URL('http://127.0.0.1:5000'),
   lockPath: '/var/lock/weekly.lock',
@@ -52,6 +48,11 @@ const workerClient = (idle = true) => ({
 
 const dependencies = (client = workerClient()) => ({
   workerClient: client,
+  env: {
+    PG_DATABASE: 'newsnexus_dev',
+    PG_USER: 'nick',
+    PATH: '/usr/local/bin:/usr/bin'
+  },
   hostname: () => 'dev-host',
   username: () => 'nick',
   stat: jest.fn(async (target: string) => ({
@@ -66,21 +67,6 @@ const dependencies = (client = workerClient()) => ({
 });
 
 describe('weekly flow preflight', () => {
-  const priorDatabase = process.env.PG_DATABASE;
-  const priorUser = process.env.PG_USER;
-
-  beforeEach(() => {
-    process.env.PG_DATABASE = 'newsnexus_dev';
-    process.env.PG_USER = 'nick';
-  });
-
-  afterAll(() => {
-    if (priorDatabase === undefined) delete process.env.PG_DATABASE;
-    else process.env.PG_DATABASE = priorDatabase;
-    if (priorUser === undefined) delete process.env.PG_USER;
-    else process.env.PG_USER = priorUser;
-  });
-
   it('validates the development identity, workers, resources, disk, prompt, and revision', async () => {
     const client = workerClient();
     const result = await runPreflight(config(), {
@@ -98,12 +84,14 @@ describe('weekly flow preflight', () => {
     expect(client.isQueueIdle).toHaveBeenNthCalledWith(2, 'python');
   });
 
-  it('requires exact confirmation before destructive development', async () => {
+  it('allows operator-directed destructive development without database confirmation', async () => {
     await expect(runPreflight(config(), {
       mode: 'dev_destructive_recovery',
-      expectedDevDatabase: 'wrong_database',
       allowLiveAi: true
-    }, dependencies())).rejects.toThrow('exact database confirmation');
+    }, dependencies())).resolves.toEqual(expect.objectContaining({
+      host: 'dev-host',
+      databaseName: 'newsnexus_dev'
+    }));
   });
 
   it('requires explicit live-AI permission before starting work', async () => {
@@ -113,12 +101,37 @@ describe('weekly flow preflight', () => {
     }, dependencies())).rejects.toThrow('live-AI permission');
   });
 
-  it('rejects production identity crossover and busy workers', async () => {
+  it('rejects production Linux and database identities independently', async () => {
     await expect(runPreflight(config(), {
       mode: 'manual_production',
       allowLiveAi: true
-    }, dependencies())).rejects.toThrow('host is not allowlisted');
+    }, dependencies())).rejects.toThrow('must run as the limited_user account');
 
+    await expect(runPreflight(config(), {
+      mode: 'manual_production',
+      allowLiveAi: true
+    }, {
+      ...dependencies(),
+      username: () => 'limited_user'
+    })).rejects.toThrow('must connect as the newsnexus_app database role');
+  });
+
+  it('accepts the production identities before applying retained worker checks', async () => {
+    await expect(runPreflight(config(), {
+      mode: 'manual_production',
+      allowLiveAi: true
+    }, {
+      ...dependencies(workerClient(false)),
+      env: {
+        PG_DATABASE: 'newsnexus_prod',
+        PG_USER: 'newsnexus_app',
+        PATH: '/usr/local/bin:/usr/bin'
+      },
+      username: () => 'limited_user'
+    })).rejects.toThrow('queue is not idle');
+  });
+
+  it('rejects busy development workers', async () => {
     await expect(runPreflight(config(), {
       mode: 'dev_canary',
       allowLiveAi: true

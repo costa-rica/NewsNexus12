@@ -483,7 +483,7 @@ export class WeeklyArticleFlowCoordinator {
     const preflight = this.dependencies.preflight ?? ((cliOptions) => runPreflight(
       config,
       cliOptions,
-      { workerClient: this.dependencies.workerClient }
+      { workerClient: this.dependencies.workerClient, env: this.env }
     ));
     const preflightEvidence = await this.withTimeout(
       preflight(options),

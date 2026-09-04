@@ -8,6 +8,7 @@ import {
 } from '@newsnexus/db-models';
 import { WeeklyFlowCliOptions, WeeklyFlowConfig } from '../config';
 import { WorkerHttpClient } from '../http';
+import { assertProductionIdentity } from '../productionIdentity';
 import { runCommand } from './commandRunner';
 
 export interface PreflightEvidence {
@@ -23,6 +24,7 @@ export interface PreflightEvidence {
 }
 
 export interface PreflightDependencies {
+  env?: NodeJS.ProcessEnv;
   hostname?: () => string;
   username?: () => string;
   access?: typeof fs.access;
@@ -48,8 +50,12 @@ const assertDirectory = async (directoryPath: string, stat: typeof fs.stat): Pro
   }
 };
 
-const findExecutable = async (name: string, access: typeof fs.access): Promise<string | null> => {
-  const pathEntries = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
+const findExecutable = async (
+  name: string,
+  executablePath: string,
+  access: typeof fs.access
+): Promise<string | null> => {
+  const pathEntries = executablePath.split(path.delimiter).filter(Boolean);
   for (const entry of pathEntries) {
     const candidate = path.join(entry, name);
     try {
@@ -67,32 +73,16 @@ export const runPreflight = async (
   options: WeeklyFlowCliOptions,
   dependencies: PreflightDependencies
 ): Promise<PreflightEvidence> => {
+  const env = dependencies.env ?? process.env;
   const hostname = dependencies.hostname ?? os.hostname;
   const username = dependencies.username ?? (() => os.userInfo().username);
   const access = dependencies.access ?? fs.access;
   const stat = dependencies.stat ?? fs.stat;
   const statfs = dependencies.statfs ?? fs.statfs;
   const host = hostname();
-  const databaseName = process.env.PG_DATABASE?.trim() ?? '';
-  const databaseUser = process.env.PG_USER?.trim() ?? '';
-  const development = options.mode === 'dev_canary' || options.mode === 'dev_destructive_recovery';
-  const allowedHosts = development ? config.devHosts : config.productionHosts;
-  const allowedDatabases = development ? config.devDatabases : config.productionDatabases;
-  if (!allowedHosts.includes(host)) {
-    throw new Error(`host is not allowlisted for ${options.mode}`);
-  }
-  if (!allowedDatabases.includes(databaseName)) {
-    throw new Error(`database is not allowlisted for ${options.mode}`);
-  }
-  if (!development && (databaseUser !== 'limited_user' || username() !== 'limited_user')) {
-    throw new Error('production weekly flow must use the limited_user runtime and database identities');
-  }
-  if (
-    options.mode === 'dev_destructive_recovery' &&
-    options.expectedDevDatabase !== databaseName
-  ) {
-    throw new Error('destructive development mode requires exact database confirmation');
-  }
+  const databaseName = env.PG_DATABASE?.trim() ?? '';
+  const databaseUser = env.PG_USER?.trim() ?? '';
+  assertProductionIdentity(options.mode, username(), databaseUser);
   if (!options.allowLiveAi) {
     throw new Error('explicit live-AI permission is required for the weekly flow');
   }
@@ -111,7 +101,7 @@ export const runPreflight = async (
 
   const playwrightBinary = path.join(config.repositoryPath, 'worker-node', 'node_modules', '.bin', 'playwright');
   await access(playwrightBinary, fs.constants.X_OK);
-  if (!await findExecutable('codex', access)) {
+  if (!await findExecutable('codex', env.PATH ?? '', access)) {
     throw new Error('codex CLI was not found on PATH');
   }
 

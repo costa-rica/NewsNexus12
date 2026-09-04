@@ -14,10 +14,6 @@ import { WorkerHttpClient } from '../../src/http';
 const config: WeeklyFlowConfig = {
   repositoryPath: '/repo',
   resourcesPath: '/resources',
-  devHosts: ['dev-host'],
-  productionHosts: ['prod-host'],
-  devDatabases: ['newsnexus_test_weekly_coordinator'],
-  productionDatabases: ['production-placeholder'],
   workerNodeUrl: new URL('http://127.0.0.1:3002'),
   workerPythonUrl: new URL('http://127.0.0.1:5000'),
   lockPath: '/var/lock/weekly.lock',

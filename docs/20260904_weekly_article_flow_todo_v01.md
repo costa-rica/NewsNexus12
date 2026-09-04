@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-04T17:05:31Z
-updated_at: 2026-09-04T17:06:47Z
+updated_at: 2026-09-04T20:09:07Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
 modified_by: codex (gpt-5.6-sol) nicksmacbookair
 ---
@@ -38,64 +38,64 @@ Implementation rules:
 
 ### Configuration types and parsing
 
-- [ ] Remove `devHosts`, `productionHosts`, `devDatabases`, and `productionDatabases` from `WeeklyFlowConfig`.
-- [ ] Stop parsing `WEEKLY_FLOW_DEV_HOSTS`, `WEEKLY_FLOW_PRODUCTION_HOSTS`, `WEEKLY_FLOW_DEV_DATABASES`, and `WEEKLY_FLOW_PRODUCTION_DATABASES`.
-- [ ] Remove the now-unused list and overlap helpers.
-- [ ] Do not add weekly-flow validation that duplicates the shared `PG_DATABASE` requirement.
-- [ ] Remove `expectedDevDatabase` from `WeeklyFlowCliOptions`.
-- [ ] Remove `--confirm-dev-database` from accepted CLI value flags and result construction.
-- [ ] Confirm the existing unknown-option error rejects `--confirm-dev-database`.
-- [ ] Preserve all four execution modes and the existing resume, canary-target, production-target, and live-AI option behavior.
+- [x] Remove `devHosts`, `productionHosts`, `devDatabases`, and `productionDatabases` from `WeeklyFlowConfig`.
+- [x] Stop parsing `WEEKLY_FLOW_DEV_HOSTS`, `WEEKLY_FLOW_PRODUCTION_HOSTS`, `WEEKLY_FLOW_DEV_DATABASES`, and `WEEKLY_FLOW_PRODUCTION_DATABASES`.
+- [x] Remove the now-unused list and overlap helpers.
+- [x] Do not add weekly-flow validation that duplicates the shared `PG_DATABASE` requirement.
+- [x] Remove `expectedDevDatabase` from `WeeklyFlowCliOptions`.
+- [x] Remove `--confirm-dev-database` from accepted CLI value flags and result construction.
+- [x] Confirm the existing unknown-option error rejects `--confirm-dev-database`.
+- [x] Preserve all four execution modes and the existing resume, canary-target, production-target, and live-AI option behavior.
 
 ### Shared production identity
 
-- [ ] Add one shared production identity function in a focused weekly-flow module.
-- [ ] Pass the execution mode, detected Linux username, and configured PostgreSQL user into the function.
-- [ ] Require Linux user `limited_user` only for production modes.
-- [ ] Require PostgreSQL role `newsnexus_app` only for production modes.
-- [ ] Use `production weekly flow must run as the limited_user account` for a Linux-user failure.
-- [ ] Use `production weekly flow must connect as the newsnexus_app database role` for a database-role failure.
-- [ ] Keep development modes free of production identity enforcement.
-- [ ] Export and reuse the function rather than duplicating constants, conditions, or messages.
+- [x] Add one shared production identity function in a focused weekly-flow module.
+- [x] Pass the execution mode, detected Linux username, and configured PostgreSQL user into the function.
+- [x] Require Linux user `limited_user` only for production modes.
+- [x] Require PostgreSQL role `newsnexus_app` only for production modes.
+- [x] Use `production weekly flow must run as the limited_user account` for a Linux-user failure.
+- [x] Use `production weekly flow must connect as the newsnexus_app database role` for a database-role failure.
+- [x] Keep development modes free of production identity enforcement.
+- [x] Export and reuse the function rather than duplicating constants, conditions, or messages.
 
 ### Normal preflight
 
-- [ ] Remove hostname allowlist selection and comparison from `runPreflight()`.
-- [ ] Remove database allowlist selection and comparison from `runPreflight()`.
-- [ ] Remove the destructive-development database confirmation check.
-- [ ] Route production Linux and PostgreSQL identity validation through the shared function.
-- [ ] Make preflight read hostname, `PG_DATABASE`, and `PG_USER` from the coordinator's effective runtime environment and injected identity dependencies consistently.
-- [ ] Preserve hostname, database name, database user, and source revision in preflight evidence.
-- [ ] Preserve explicit live-AI, resource, executable, disk, worker, database-authentication, active-prompt, and revision checks.
-- [ ] Preserve run creation and resume matching on mode, hostname, `PG_DATABASE`, and source revision.
+- [x] Remove hostname allowlist selection and comparison from `runPreflight()`.
+- [x] Remove database allowlist selection and comparison from `runPreflight()`.
+- [x] Remove the destructive-development database confirmation check.
+- [x] Route production Linux and PostgreSQL identity validation through the shared function.
+- [x] Make preflight read hostname, `PG_DATABASE`, and `PG_USER` from the coordinator's effective runtime environment and injected identity dependencies consistently.
+- [x] Preserve hostname, database name, database user, and source revision in preflight evidence.
+- [x] Preserve explicit live-AI, resource, executable, disk, worker, database-authentication, active-prompt, and revision checks.
+- [x] Preserve run creation and resume matching on mode, hostname, `PG_DATABASE`, and source revision.
 
 ### Tests
 
-- [ ] Remove obsolete allowlist fields from configuration, coordinator, preflight, and integration fixtures.
-- [ ] Remove `expectedDevDatabase` from CLI and coordinator test options.
-- [ ] Test successful configuration parsing when all four obsolete variables are absent.
-- [ ] Remove the obsolete overlap-rejection test and confirm matching database names no longer affect parsing.
-- [ ] Test that missing or invalid remaining configuration still fails clearly.
-- [ ] Test that `--confirm-dev-database` now produces the unknown-option error.
-- [ ] Preserve tests for four-mode parsing, resume IDs, canary targets, and production target rejection.
-- [ ] Test the two production identity failures independently with their exact messages.
-- [ ] Test that valid `limited_user` and `newsnexus_app` production identities proceed to retained checks.
-- [ ] Test that development destructive recovery no longer requires database confirmation.
-- [ ] Preserve coverage for live-AI permission, worker state, database authentication, prompt state, resources, disk, and revision evidence.
-- [ ] Preserve repository recovery tests for hostname, database, mode, and revision mismatches.
+- [x] Remove obsolete allowlist fields from configuration, coordinator, preflight, and integration fixtures.
+- [x] Remove `expectedDevDatabase` from CLI and coordinator test options.
+- [x] Test successful configuration parsing when all four obsolete variables are absent.
+- [x] Remove the obsolete overlap-rejection test and confirm matching database names no longer affect parsing.
+- [x] Test that missing or invalid remaining configuration still fails clearly.
+- [x] Test that `--confirm-dev-database` now produces the unknown-option error.
+- [x] Preserve tests for four-mode parsing, resume IDs, canary targets, and production target rejection.
+- [x] Test the two production identity failures independently with their exact messages.
+- [x] Test that valid `limited_user` and `newsnexus_app` production identities proceed to retained checks.
+- [x] Test that development destructive recovery no longer requires database confirmation.
+- [x] Preserve coverage for live-AI permission, worker state, database authentication, prompt state, resources, disk, and revision evidence.
+- [x] Preserve repository recovery tests for hostname, database, mode, and revision mismatches.
 
 ### Phase verification and commit
 
-- [ ] Run `npm -C db-models run build`.
-- [ ] Run the focused weekly-flow configuration, preflight, coordinator, and repository tests.
-- [ ] Run `npm -C ops/weekly-article-flow test`.
-- [ ] Run `npm -C ops/weekly-article-flow run build`.
-- [ ] Fix failures and rerun every affected check.
-- [ ] Search TypeScript source and tests for obsolete fields and variables; allow `--confirm-dev-database` only in the regression test proving it is rejected.
-- [ ] Confirm the search retains hostname and database evidence and resume-context checks.
-- [ ] Check off completed Phase 1 tasks and update this document's modification metadata.
-- [ ] Stage only Phase 1 files and inspect `git diff --cached`.
-- [ ] Commit Phase 1 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 1.
+- [x] Run `npm -C db-models run build`.
+- [x] Run the focused weekly-flow configuration, preflight, coordinator, and repository tests.
+- [x] Run `npm -C ops/weekly-article-flow test`.
+- [x] Run `npm -C ops/weekly-article-flow run build`.
+- [x] Fix failures and rerun every affected check.
+- [x] Search TypeScript source and tests for obsolete fields and variables; allow `--confirm-dev-database` only in the regression test proving it is rejected.
+- [x] Confirm the search retains hostname and database evidence and resume-context checks.
+- [x] Check off completed Phase 1 tasks and update this document's modification metadata.
+- [x] Stage only Phase 1 files and inspect `git diff --cached`.
+- [x] Commit Phase 1 with a message referencing `20260904_weekly_article_flow_todo_v01.md` Phase 1.
 
 ## Phase 2: Read-only Configuration Check
 
