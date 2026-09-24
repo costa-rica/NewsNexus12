@@ -14,7 +14,7 @@ Run from root of project.
 npm install
 ```
 
-The root npm workspace includes `db-models`, `db-manager`, `api`, `worker-node`, and `portal`.
+The root npm workspace includes `db-models`, `db-manager`, `api`, `worker-node`, `portal`, and `ops/weekly-article-flow`.
 `worker-python` is not included in the npm workspace flow.
 
 ### 2. Set up worker-python:
@@ -35,7 +35,10 @@ npm run build
 
 The root build runs the packages in dependency order, including `db-models` before the apps that depend on it.
 
-The weekly article flow is a separate operational package under `ops/weekly-article-flow`. Build and test it explicitly with its package commands.
+The root `build` and `build:backend` commands also compile `ops/weekly-article-flow` after its database dependencies. Building does not execute the weekly workflow or activate its timer.
+
+- Run its unit tests with `npm test --workspace @newsnexus/weekly-article-flow`.
+- The existing package-directory build and test commands continue to work.
 
 ### 4. Start locally in separate terminals:
 

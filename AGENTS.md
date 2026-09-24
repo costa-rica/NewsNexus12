@@ -68,7 +68,7 @@ cd portal && npm run lint
 cd worker-node && npm run build
 cd worker-node && npm test
 
-# Weekly flow (not part of the root npm workspace)
+# Weekly flow (also built by root build and build:backend)
 cd ops/weekly-article-flow && npm run build
 cd ops/weekly-article-flow && npm test
 ```

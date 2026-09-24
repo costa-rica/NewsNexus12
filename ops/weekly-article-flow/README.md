@@ -1,8 +1,8 @@
 ---
 created_at: 2026-09-01T02:15:39Z
-updated_at: 2026-09-04T20:13:04Z
+updated_at: 2026-09-24T23:41:14Z
 created_by: codex (gpt-5.6-sol) nicksmacbookair
-modified_by: codex (gpt-5.6-sol) nicksmacbookair
+modified_by: codex (gpt-6) macbook-air
 ---
 
 # Weekly Article Flow
@@ -30,6 +30,11 @@ AI Approver V02 is the only approver used here. Internal Python modules named `o
 Every flow execution requires `--allow-live-ai`. Production modes require Linux account `limited_user` and PostgreSQL role `newsnexus_app`.
 
 ## Build and test
+
+- Run `npm install` or `npm ci` from the repository root to install this workspace with the other Node apps.
+- Root `npm run build` and `npm run build:backend` include this package after its database dependencies. These commands compile code only.
+- Run unit tests from the root with `npm test --workspace @newsnexus/weekly-article-flow`.
+- The package-directory commands below remain supported. Integration tests require their dedicated test database.
 
 ```bash
 npm -C db-models run build
