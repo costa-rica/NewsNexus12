@@ -296,6 +296,33 @@ describe('weekly article flow coordinator stages', () => {
     ]));
   });
 
+  it('persists and logs HTTP diagnostics with the run ID when semantic polling fails', async () => {
+    const run = makeRun();
+    const error = new WorkerHttpError('fetch failed');
+    error.diagnostics = {
+      worker: 'node', endpoint: '/queue-info/check-status/0257', durationMs: 1428,
+      error: { cause: { code: 'ECONNRESET' } }
+    };
+    const semanticStage = jest.fn(async () => { throw error; });
+    const setup = buildCoordinator(run, { semanticStage });
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(setup.coordinator.run({ mode: 'dev_canary', allowLiveAi: false })).rejects.toBe(error);
+      expect(semanticStage).toHaveBeenCalledWith(expect.objectContaining({ runId: 42 }));
+      expect(run.status).toBe('failed');
+      expect(run.failureReason).toBe('fetch failed');
+      expect(run.stageResults.semantic_scorer).toMatchObject({
+        status: 'failed', reason: 'fetch failed', diagnostics: error.diagnostics
+      });
+      expect(log).toHaveBeenCalledWith(JSON.stringify({
+        event: 'weekly_flow_failed', runId: 42, stage: 'semantic_scorer', error: error.diagnostics
+      }));
+      expect(setup.stateStage).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('blocks deletion and marks the run failed when backup verification fails', async () => {
     const run = makeRun({ mode: 'dev_destructive_recovery' });
     const duplicateCleanup = jest.fn(async () => ({ remainingCount: 0 }));

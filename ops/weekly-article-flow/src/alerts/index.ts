@@ -1,3 +1,4 @@
+import { diagnosticText } from '../diagnostics';
 import { lstat, open, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { runCommand } from '../stages/commandRunner';
@@ -91,6 +92,8 @@ export const publishWeeklyFlowAlert = async (
     env,
     signal
   });
-  if (result.exitCode !== 0) throw new Error(`weekly alert publisher failed with exit code ${result.exitCode}`);
+  if (result.exitCode !== 0) {
+    throw new Error(`weekly alert publisher failed with exit code ${result.exitCode}; durationMs=${result.durationMs}; stderr=${diagnosticText(result.stderr ?? '') || '(empty)'}`);
+  }
   return { exitCode: result.exitCode, durationMs: result.durationMs };
 };

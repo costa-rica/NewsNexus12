@@ -1,3 +1,4 @@
+import { errorDiagnostics } from '../diagnostics';
 import { WeeklyArticleFlowMode } from '@newsnexus/db-models';
 import {
   validateRssResult,
@@ -7,7 +8,7 @@ import {
   ValidatedSemanticResult,
   ValidatedStateResult
 } from '../contracts';
-import { QueueJobRecord, WorkerHttpClient, WorkerKind } from '../http';
+import { QueueJobRecord, WorkerHttpClient, WorkerHttpError, WorkerKind } from '../http';
 
 export interface WorkerStageEvidence<T> {
   jobId: string;
@@ -20,15 +21,27 @@ const waitForJob = async (
   worker: WorkerKind,
   jobId: string,
   deadline: Date,
-  polling: { initialMs: number; maxMs: number }
+  polling: { initialMs: number; maxMs: number },
+  context: { runId?: number; stage: string }
 ): Promise<QueueJobRecord> => {
   try {
     return await client.pollQueueJob(worker, jobId, { deadline, ...polling });
   } catch (error) {
+    const details = { ...context, worker, jobId, deadline: deadline.toISOString() };
+    console.error(JSON.stringify({
+      event: 'weekly_flow_poll_failed', ...details,
+      error: error instanceof WorkerHttpError ? error.diagnostics ?? errorDiagnostics(error) : errorDiagnostics(error)
+    }));
     try {
       await client.cancelQueueJob(worker, jobId);
-    } catch {
-      // Preserve the original timeout or polling error.
+      console.error(JSON.stringify({ event: 'weekly_flow_cancel_request_succeeded', ...details }));
+    } catch (cancelError) {
+      console.error(JSON.stringify({
+        event: 'weekly_flow_cancel_request_failed', ...details,
+        error: cancelError instanceof WorkerHttpError
+          ? cancelError.diagnostics ?? errorDiagnostics(cancelError) : errorDiagnostics(cancelError)
+      }));
+      // A successful request does not confirm terminal cancellation; preserve the polling error.
     }
     throw error;
   }
@@ -94,7 +107,7 @@ export const runRssWorkerStage = async (input: {
     )).jobId;
     await input.onJobStarted?.(jobId);
   }
-  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling);
+  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling, { runId: input.runId, stage: 'google_rss' });
   return {
     jobId,
     queueStatus: job.status,
@@ -103,6 +116,7 @@ export const runRssWorkerStage = async (input: {
 };
 
 export const runSemanticWorkerStage = async (input: {
+  runId?: number;
   client: WorkerHttpClient;
   previousJobId?: string;
   onJobStarted?: (jobId: string) => Promise<void>;
@@ -114,7 +128,7 @@ export const runSemanticWorkerStage = async (input: {
     jobId = (await input.client.startJob('node', '/semantic-scorer/start-job', {})).jobId;
     await input.onJobStarted?.(jobId);
   }
-  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling);
+  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling, { runId: input.runId, stage: 'semantic_scorer' });
   return {
     jobId,
     queueStatus: job.status,
@@ -123,6 +137,7 @@ export const runSemanticWorkerStage = async (input: {
 };
 
 export const runStateWorkerStage = async (input: {
+  runId?: number;
   client: WorkerHttpClient;
   articleIds: number[];
   requestedCapacity: number;
@@ -146,7 +161,7 @@ export const runStateWorkerStage = async (input: {
     )).jobId;
     await input.onJobStarted?.(jobId);
   }
-  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling);
+  const job = await waitForJob(input.client, 'node', jobId, input.deadline, input.polling, { runId: input.runId, stage: 'state_assigner' });
   return {
     jobId,
     queueStatus: job.status,

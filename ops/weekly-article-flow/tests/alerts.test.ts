@@ -62,10 +62,16 @@ describe('weekly flow alerts', () => {
   });
 
   it('reports helper failure', async () => {
-    runCommand.mockResolvedValue({ exitCode: 1, durationMs: 12 });
+    runCommand.mockResolvedValue({
+      exitCode: 1, durationMs: 12,
+      stderr: 'sudo: a password is required\nTOKEN="private value" Authorization: Bearer hidden'
+    });
     await expect(publishWeeklyFlowAlert(
       'newsnexus12-publish-weekly-alert.service',
       1000
-    )).rejects.toThrow('exit code 1');
+    )).rejects.toThrow('exit code 1; durationMs=12; stderr=sudo: a password is required');
+    const error = await publishWeeklyFlowAlert('newsnexus12-publish-weekly-alert.service', 1000).catch((value) => value);
+    expect(error.message).not.toContain('private value');
+    expect(error.message).not.toContain('hidden');
   });
 });

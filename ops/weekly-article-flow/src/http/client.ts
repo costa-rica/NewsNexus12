@@ -1,3 +1,5 @@
+import { diagnosticText, errorDiagnostics } from '../diagnostics';
+
 export type WorkerKind = 'node' | 'python';
 
 export interface QueueJobRecord {
@@ -31,6 +33,7 @@ export interface WorkerHttpClientOptions {
 
 export class WorkerHttpError extends Error {
   public readonly status: number | null;
+  public diagnostics?: Record<string, unknown>;
 
   constructor(message: string, status: number | null = null) {
     super(message);
@@ -78,6 +81,7 @@ export class WorkerHttpClient {
     if (url.origin !== base.origin) {
       throw new WorkerHttpError('worker request escaped the allowlisted origin');
     }
+    const startedAt = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs);
     try {
@@ -103,13 +107,23 @@ export class WorkerHttpClient {
         throw new WorkerHttpError('worker returned invalid JSON', response.status);
       }
     } catch (error) {
-      if (error instanceof WorkerHttpError) {
-        throw error;
-      }
-      if (controller.signal.aborted) {
-        throw new WorkerHttpError('worker request timed out');
-      }
-      throw new WorkerHttpError(error instanceof Error ? error.message : 'worker request failed');
+      const failure = error instanceof WorkerHttpError
+        ? error
+        : new WorkerHttpError(controller.signal.aborted
+          ? 'worker request timed out'
+          : error instanceof Error ? diagnosticText(error.message) : 'worker request failed');
+      failure.diagnostics = {
+        worker,
+        method: init.method ?? 'GET',
+        origin: url.origin,
+        endpoint: url.pathname,
+        durationMs: Date.now() - startedAt,
+        requestTimeoutMs: this.requestTimeoutMs,
+        timedOut: controller.signal.aborted,
+        status: failure.status,
+        error: errorDiagnostics(error)
+      };
+      throw failure;
     } finally {
       clearTimeout(timer);
     }

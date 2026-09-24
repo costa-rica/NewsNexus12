@@ -1,3 +1,4 @@
+import { errorDiagnostics } from '../diagnostics';
 import { WeeklyArticleFlowRun, WeeklyArticleFlowStatus } from '@newsnexus/db-models';
 import { WeeklyFlowCliOptions, WeeklyFlowConfig } from '../config';
 import { WorkerResultContractError } from '../contracts';
@@ -433,7 +434,7 @@ export class WeeklyArticleFlowCoordinator {
         const message = error instanceof Error ? error.message : 'alert helper failed';
         failures.push(`alert: ${message}`);
         helperEvents.push('failed');
-        console.error(`weekly flow alert failure: ${message}`);
+        console.error(JSON.stringify({ event: 'weekly_flow_alert_failed', runId: run.id, stage: originatingStage, error: message }));
         if (jsonlPath) {
           await this.appendJournal(run, this.journalEvent(run, 'reporting', 'alert_helper_failed', message, {
             alertPath: this.dependencies.config.alertStagingPath
@@ -630,6 +631,7 @@ export class WeeklyArticleFlowCoordinator {
         const operation = this.dependencies.semanticStage ?? runSemanticWorkerStage;
         const evidence = await operation({
           client: this.dependencies.workerClient,
+          runId: run.id,
           previousJobId,
           deadline: this.stageDeadline(run, config.timeouts.semanticSeconds),
           polling: config.polling,
@@ -647,6 +649,7 @@ export class WeeklyArticleFlowCoordinator {
         const operation = this.dependencies.stateStage ?? runStateWorkerStage;
         const evidence = await operation({
           client: this.dependencies.workerClient,
+          runId: run.id,
           articleIds: cohortArticleIds,
           requestedCapacity: Math.max(rssArticlesAddedCount, cohortArticleIds.length),
           previousJobId,
@@ -907,6 +910,8 @@ export class WeeklyArticleFlowCoordinator {
         }
         return this.run({ ...options, resumeRunId: run.id });
       }
+      const diagnostics = error instanceof WorkerHttpError ? error.diagnostics ?? errorDiagnostics(error) : errorDiagnostics(error);
+      console.error(JSON.stringify({ event: 'weekly_flow_failed', runId: run.id, stage: run.currentStage, error: diagnostics }));
       if (run.status === 'pending' || run.status === 'running') {
         const status: WeeklyArticleFlowStatus = error instanceof WorkerResultContractError
           ? 'failed_worker_result_contract'
@@ -922,7 +927,7 @@ export class WeeklyArticleFlowCoordinator {
             run,
             run.currentStage as WeeklyStageName,
             'failed',
-            { reason }
+            { reason, diagnostics }
           ).catch(() => undefined);
         }
         await this.dependencies.repository.transitionRun(run, status, reason);

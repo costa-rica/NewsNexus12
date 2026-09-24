@@ -140,6 +140,36 @@ describe('worker stages', () => {
     })).rejects.toThrow('sufficient capacity');
   });
 
+  it.each([false, true])('logs polling and cancellation failures while preserving the original error (cancel fails: %s)', async (cancelFails) => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const client = clientMock(semanticResult);
+      const primary = new Error('fetch failed');
+      (client.pollQueueJob as jest.Mock).mockRejectedValue(primary);
+      if (cancelFails) (client.cancelQueueJob as jest.Mock).mockRejectedValue(new Error('cancel connection refused'));
+      else (client.cancelQueueJob as jest.Mock).mockResolvedValue({ outcome: 'cancel_requested' });
+      await expect(runSemanticWorkerStage({
+        client, runId: 3, previousJobId: '0257',
+        deadline: new Date(Date.now() + 1000), polling: { initialMs: 1, maxMs: 2 }
+      })).rejects.toBe(primary);
+      const events = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+      expect(events[0]).toMatchObject({
+        event: 'weekly_flow_poll_failed', runId: 3, stage: 'semantic_scorer', jobId: '0257',
+        error: { message: 'fetch failed' }
+      });
+      expect(events[1]).toMatchObject({
+        event: cancelFails ? 'weekly_flow_cancel_request_failed' : 'weekly_flow_cancel_request_succeeded',
+        runId: 3, jobId: '0257'
+      });
+      if (cancelFails) expect(events[1].error.message).toBe('cancel connection refused');
+      expect(client.pollQueueJob).toHaveBeenCalledTimes(1);
+      expect(client.cancelQueueJob).toHaveBeenCalledTimes(1);
+      expect(client.startJob).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('cancels a child job after polling failure', async () => {
     const client = clientMock(rssResult());
     (client.pollQueueJob as jest.Mock).mockRejectedValue(new Error('timed out'));
