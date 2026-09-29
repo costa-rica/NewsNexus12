@@ -4,7 +4,10 @@ process.env.PG_DATABASE = "newsnexus_test_worker_node";
 process.env.PG_USER = "newsnexus_boot";
 
 import { startServer } from "../../src/server";
-import { loadAppConfig } from "../../src/modules/startup/config";
+import {
+  loadAppConfig,
+  StartupConfigError,
+} from "../../src/modules/startup/config";
 
 const requiredEnv = {
   PATH_AND_FILENAME_FOR_QUERY_SPREADSHEET_AUTOMATED: "/tmp/input.xlsx",
@@ -23,6 +26,61 @@ const requiredEnv = {
 };
 
 describe("startup config validation", () => {
+  it.each([
+    ["absent", undefined],
+    ["blank", "   "],
+  ])(
+    "defaults WORKER_HTTP_DIAGNOSTICS_ENABLED to false when %s",
+    (_description, value) => {
+      const config = loadAppConfig({
+        ...requiredEnv,
+        ...(value === undefined
+          ? {}
+          : { WORKER_HTTP_DIAGNOSTICS_ENABLED: value }),
+      });
+
+      expect(config.workerHttpDiagnosticsEnabled).toBe(false);
+    },
+  );
+
+  it.each(["1", "true", "yes", "on", " TRUE ", " YeS "])(
+    "parses WORKER_HTTP_DIAGNOSTICS_ENABLED=%p as true",
+    (value) => {
+      const config = loadAppConfig({
+        ...requiredEnv,
+        WORKER_HTTP_DIAGNOSTICS_ENABLED: value,
+      });
+
+      expect(config.workerHttpDiagnosticsEnabled).toBe(true);
+    },
+  );
+
+  it.each(["0", "false", "no", "off", " FALSE ", " oFf "])(
+    "parses WORKER_HTTP_DIAGNOSTICS_ENABLED=%p as false",
+    (value) => {
+      const config = loadAppConfig({
+        ...requiredEnv,
+        WORKER_HTTP_DIAGNOSTICS_ENABLED: value,
+      });
+
+      expect(config.workerHttpDiagnosticsEnabled).toBe(false);
+    },
+  );
+
+  it.each(["enabled", "2", "truthy"])(
+    "rejects invalid WORKER_HTTP_DIAGNOSTICS_ENABLED=%p",
+    (value) => {
+      const loadInvalidConfig = () =>
+        loadAppConfig({
+          ...requiredEnv,
+          WORKER_HTTP_DIAGNOSTICS_ENABLED: value,
+        });
+
+      expect(loadInvalidConfig).toThrow(StartupConfigError);
+      expect(loadInvalidConfig).toThrow("WORKER_HTTP_DIAGNOSTICS_ENABLED");
+    },
+  );
+
   it("loads without KEY_OPEN_AI because state assigner can use codex by default", () => {
     const config = loadAppConfig(requiredEnv);
 

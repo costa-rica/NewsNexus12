@@ -35,6 +35,7 @@ export interface AppConfig {
   port: number;
   deleteArticlesBatchSize: number;
   limitArticleAgeInDays: number;
+  workerHttpDiagnosticsEnabled: boolean;
 }
 
 export class StartupConfigError extends Error {
@@ -65,6 +66,26 @@ const parsePositiveInteger = (
   }
 
   return parsed;
+};
+
+const parseOptionalBoolean = (
+  value: string | undefined,
+  varName: string,
+): boolean => {
+  const normalizedValue = value?.trim().toLowerCase();
+  if (normalizedValue === undefined || normalizedValue === "") {
+    return false;
+  }
+  if (["1", "true", "yes", "on"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalizedValue)) {
+    return false;
+  }
+
+  throw new StartupConfigError(
+    `Environment variable ${varName} must be one of 1, true, yes, on, 0, false, no, or off`,
+  );
 };
 
 const normalizeNodeEnv = (value: string): RuntimeNodeEnv => {
@@ -168,6 +189,10 @@ export const loadAppConfig = (
     port,
     deleteArticlesBatchSize,
     limitArticleAgeInDays,
+    workerHttpDiagnosticsEnabled: parseOptionalBoolean(
+      env.WORKER_HTTP_DIAGNOSTICS_ENABLED,
+      "WORKER_HTTP_DIAGNOSTICS_ENABLED",
+    ),
   };
 };
 
