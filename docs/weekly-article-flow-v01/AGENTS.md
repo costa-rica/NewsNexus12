@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-30T21:20:58Z
-updated_at: 2026-09-30T21:30:45Z
+updated_at: 2026-09-30T22:22:11Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -39,10 +39,10 @@ Keep all four existing reports. Each contributes distinct evidence.
 
 ## Required server-agent documents
 
-1. The agent on `nws-nn12dev` must create `lessons_learned_from_v01_flow_nws-nn12dev.md` in this folder.
-2. The agent on `nws-nn12prod` must create `lessons_learned_from_v01_flow_nws-nn12prod.md` in this folder.
+1. The agent on `nws-nn12dev` created `20260930_lessons_learned_from_v01_flow_nws-nn12dev.md` in this folder.
+2. The agent on `nws-nn12prod` created `20260930_lessons_learned_from_v01_flow_nws-nn12prod.md` in this folder.
 
-These files are expected deliverables, not existing evidence. Each agent owns its host's account and must distinguish local observations from evidence reported by the other host.
+These files are retained evidence. Each agent owns its host's account and must distinguish local observations from evidence reported by the other host.
 
 - Each lessons-learned document must contain a `## Host Inventory` section following the requirements below. Keep the inventory in that host's lessons document rather than creating a separate file.
 
@@ -116,7 +116,7 @@ A Git revert changes repository content; it does not automatically undo installe
 
 ## Document metadata
 
-- Use the exact machine-specific filenames above; they intentionally omit the default date prefix.
+- Use the exact date-prefixed, machine-specific filenames above.
 - Start each generated document with YAML frontmatter containing exactly `created_at`, `updated_at`, `created_by`, and `modified_by`.
 - Use UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` format.
 - Use lowercase attribution in the format `agent (model) machine`, with the actual writing agent, model, and host. Do not include email addresses or angle brackets.
@@ -124,5 +124,5 @@ A Git revert changes repository content; it does not automatically undo installe
 
 ## Completed lessons index
 
-- Development: pending `lessons_learned_from_v01_flow_nws-nn12dev.md`.
-- Production: pending `lessons_learned_from_v01_flow_nws-nn12prod.md`.
+- Development: [Lessons learned from nws-nn12dev](20260930_lessons_learned_from_v01_flow_nws-nn12dev.md).
+- Production: [Lessons learned from nws-nn12prod](20260930_lessons_learned_from_v01_flow_nws-nn12prod.md).
