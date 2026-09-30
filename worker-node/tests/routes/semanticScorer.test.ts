@@ -14,8 +14,10 @@ const buildApp = (
   env: NodeJS.ProcessEnv,
   buildJobHandler?: (
     semanticScorerDir: string,
-    targeting?: SemanticScorerTargeting
-  ) => (context: QueueExecutionContext) => Promise<void>
+    targeting?: SemanticScorerTargeting,
+    dependencies?: { diagnosticsEnabled?: boolean }
+  ) => (context: QueueExecutionContext) => Promise<void>,
+  diagnosticsEnabled = false
 ): express.Express => {
   const app = express();
   app.use(express.json());
@@ -24,7 +26,8 @@ const buildApp = (
     createSemanticScorerRouter({
       queueEngine,
       env,
-      buildJobHandler: buildJobHandler ?? (() => async () => undefined)
+      buildJobHandler: buildJobHandler ?? (() => async () => undefined),
+      diagnosticsEnabled
     })
   );
   app.use(errorHandler);
@@ -110,10 +113,14 @@ describe('semanticScorer routes', () => {
     });
 
     expect(response.status).toBe(202);
-    expect(buildJobHandler).toHaveBeenCalledWith(tempDirPath, {
-      articleIdMinExclusive: 100,
-      articleIdMaxInclusive: 200
-    });
+    expect(buildJobHandler).toHaveBeenCalledWith(
+      tempDirPath,
+      {
+        articleIdMinExclusive: 100,
+        articleIdMaxInclusive: 200
+      },
+      { diagnosticsEnabled: false }
+    );
   });
 
   it('allows the weekly flow to omit ID bounds', async () => {
@@ -128,9 +135,33 @@ describe('semanticScorer routes', () => {
     const response = await request(app).post('/semantic-scorer/start-job').send({});
 
     expect(response.status).toBe(202);
-    expect(buildJobHandler).toHaveBeenCalledWith(tempDirPath, {
-      articleIdMinExclusive: undefined,
-      articleIdMaxInclusive: undefined
-    });
+    expect(buildJobHandler).toHaveBeenCalledWith(
+      tempDirPath,
+      {
+        articleIdMinExclusive: undefined,
+        articleIdMaxInclusive: undefined
+      },
+      { diagnosticsEnabled: false }
+    );
+  });
+
+  it('passes the resolved diagnostics boolean to job handler construction', async () => {
+    await fs.writeFile(path.join(tempDirPath, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const buildJobHandler = jest.fn(() => async () => undefined);
+    const app = buildApp(
+      queueEngine,
+      { PATH_TO_SEMANTIC_SCORER_DIR: tempDirPath },
+      buildJobHandler,
+      true
+    );
+
+    const response = await request(app).post('/semantic-scorer/start-job').send({});
+
+    expect(response.status).toBe(202);
+    expect(buildJobHandler).toHaveBeenCalledWith(
+      tempDirPath,
+      { articleIdMinExclusive: undefined, articleIdMaxInclusive: undefined },
+      { diagnosticsEnabled: true }
+    );
   });
 });

@@ -27,6 +27,30 @@ const requiredEnv = {
 
 describe("startup config validation", () => {
   it.each([
+    ["true", true],
+    ["false", false],
+  ])(
+    "passes the validated diagnostics boolean %s to the injected app factory",
+    async (rawValue, expectedValue) => {
+      const listen = jest.fn();
+      const appFactory = jest.fn(() => ({ listen }));
+
+      await startServer({
+        env: {
+          ...requiredEnv,
+          WORKER_HTTP_DIAGNOSTICS_ENABLED: rawValue,
+        },
+        appFactory,
+      });
+
+      expect(appFactory).toHaveBeenCalledWith({
+        workerHttpDiagnosticsEnabled: expectedValue,
+      });
+      expect(listen).toHaveBeenCalledWith(3002, expect.any(Function));
+    },
+  );
+
+  it.each([
     ["absent", undefined],
     ["blank", "   "],
   ])(

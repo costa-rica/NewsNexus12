@@ -10,10 +10,15 @@ import {
 import { globalQueueEngine } from '../modules/queue/globalQueue';
 import { GlobalQueueEngine } from '../modules/queue/queueEngine';
 
-interface SemanticScorerRouteDependencies {
-  queueEngine: GlobalQueueEngine;
-  env: NodeJS.ProcessEnv;
-  buildJobHandler: (semanticScorerDir: string, targeting?: SemanticScorerTargeting) => QueueJobHandler;
+export interface SemanticScorerRouteDependencies {
+  queueEngine?: GlobalQueueEngine;
+  env?: NodeJS.ProcessEnv;
+  buildJobHandler?: (
+    semanticScorerDir: string,
+    targeting?: SemanticScorerTargeting,
+    dependencies?: { diagnosticsEnabled?: boolean }
+  ) => QueueJobHandler;
+  diagnosticsEnabled?: boolean;
 }
 
 const parseOptionalPositiveInt = (value: unknown): number | undefined => {
@@ -41,14 +46,13 @@ const resolveSemanticScorerDirFromEnv = (env: NodeJS.ProcessEnv): string => {
 };
 
 export const createSemanticScorerRouter = (
-  dependencies: SemanticScorerRouteDependencies = {
-    queueEngine: globalQueueEngine,
-    env: process.env,
-    buildJobHandler: (dir, targeting) => createSemanticScorerJobHandler(dir, targeting)
-  }
+  dependencies: SemanticScorerRouteDependencies = {}
 ): Router => {
   const router = Router();
-  const { queueEngine, env, buildJobHandler } = dependencies;
+  const queueEngine = dependencies.queueEngine ?? globalQueueEngine;
+  const env = dependencies.env ?? process.env;
+  const buildJobHandler = dependencies.buildJobHandler ?? createSemanticScorerJobHandler;
+  const diagnosticsEnabled = dependencies.diagnosticsEnabled ?? false;
 
   router.post('/start-job', async (req, res, next) => {
     try {
@@ -65,7 +69,7 @@ export const createSemanticScorerRouter = (
 
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
-        run: buildJobHandler(semanticScorerDir, targeting)
+        run: buildJobHandler(semanticScorerDir, targeting, { diagnosticsEnabled })
       });
 
       return res.status(202).json({

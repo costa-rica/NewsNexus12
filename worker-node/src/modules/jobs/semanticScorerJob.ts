@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { performance } from 'node:perf_hooks';
 import {
   Article,
   ArticleApproved,
@@ -13,6 +14,13 @@ import {
 } from '@newsnexus/db-models';
 import logger from '../logger';
 import { QueueExecutionContext } from '../queue/queueEngine';
+import {
+  createSemanticScorerDiagnostics,
+  SemanticScorerBoundary,
+  SemanticScorerBoundaryMetadata,
+  SemanticScorerDiagnostics,
+  SemanticScorerDiagnosticsOptions
+} from './semanticScorerDiagnostics';
 
 export interface SemanticScorerTargeting {
   articleIdMinExclusive?: number;
@@ -24,10 +32,13 @@ export interface SemanticScorerJobContext {
   semanticScorerDir: string;
   signal: AbortSignal;
   targeting?: SemanticScorerTargeting;
+  diagnostics: SemanticScorerDiagnostics;
 }
 
 export interface SemanticScorerJobDependencies {
   runLegacyWorkflow?: (context: SemanticScorerJobContext) => Promise<SemanticScorerJobResult>;
+  diagnosticsEnabled?: boolean;
+  createDiagnostics?: (options: SemanticScorerDiagnosticsOptions) => SemanticScorerDiagnostics;
 }
 
 export interface ScorableArticle {
@@ -77,6 +88,7 @@ interface ProcessArticlesOptions {
   progressEvery: number;
   writeRunningStatus: (count: number) => Promise<void>;
   writeCompletedStatus: (count: number) => Promise<void>;
+  onFirstArticleAttempt?: () => void;
   log: {
     info: (message: string) => void;
     warn: (message: string) => void;
@@ -120,14 +132,25 @@ const LEGACY_AI_MODEL = 'Xenova/paraphrase-MiniLM-L6-v2';
 const LEGACY_AI_MODEL_TYPE = 'feature-extraction';
 const DEFAULT_ITERATION_TIMEOUT_MS = 10_000;
 const PROCESS_LOG_EVERY = 100;
+const ALLOWED_MODEL_INITIALIZATION_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'EPIPE',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ABORT_ERR',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT'
+]);
 
 let dbReadyPromise: Promise<void> | null = null;
-let embedderPromise: Promise<
-  (
-    text: string,
-    options: { pooling: 'mean'; normalize: true }
-  ) => Promise<{ data: Float32Array | number[] }>
-> | null = null;
+type SemanticEmbedder = (
+  text: string,
+  options: { pooling: 'mean'; normalize: true }
+) => Promise<{ data: Float32Array | number[] }>;
+
+let embedderPromise: Promise<SemanticEmbedder> | null = null;
 
 const ensureDbReady = async (): Promise<void> => {
   if (dbReadyPromise) {
@@ -179,24 +202,14 @@ const pickArticleText = (article: ScorableArticle): string | null => {
   return null;
 };
 
-const getEmbedder = async (): Promise<
-  (
-    text: string,
-    options: { pooling: 'mean'; normalize: true }
-  ) => Promise<{ data: Float32Array | number[] }>
-> => {
+const getEmbedder = async (): Promise<SemanticEmbedder> => {
   if (!embedderPromise) {
     embedderPromise = (async () => {
       const transformers = (await import('@huggingface/transformers')) as {
         pipeline: (
           task: 'feature-extraction',
           model: string
-        ) => Promise<
-          (
-            text: string,
-            options: { pooling: 'mean'; normalize: true }
-          ) => Promise<{ data: Float32Array | number[] }>
-        >;
+        ) => Promise<SemanticEmbedder>;
       };
 
       logger.info(`Loading semantic scorer model: ${LEGACY_AI_MODEL}`);
@@ -205,6 +218,52 @@ const getEmbedder = async (): Promise<
   }
 
   return embedderPromise;
+};
+
+const safeModelInitializationError = (error: unknown): { errorName: string; errorCode?: string } => {
+  const errorRecord = error && typeof error === 'object'
+    ? error as { name?: unknown; code?: unknown }
+    : {};
+  const allowedErrorNames = new Set([
+    'Error',
+    'TypeError',
+    'RangeError',
+    'ReferenceError',
+    'SyntaxError',
+    'URIError',
+    'AggregateError'
+  ]);
+  const errorName = typeof errorRecord.name === 'string' && allowedErrorNames.has(errorRecord.name)
+    ? errorRecord.name
+    : 'UnknownError';
+  const errorCode = typeof errorRecord.code === 'string' &&
+    ALLOWED_MODEL_INITIALIZATION_ERROR_CODES.has(errorRecord.code)
+    ? errorRecord.code
+    : undefined;
+
+  return { errorName, ...(errorCode ? { errorCode } : {}) };
+};
+
+export const initializeSemanticScorerModel = async (
+  diagnostics: SemanticScorerDiagnostics,
+  loadEmbedder: () => Promise<SemanticEmbedder> = getEmbedder,
+  monotonicNow: () => number = () => performance.now()
+): Promise<SemanticEmbedder> => {
+  diagnostics.boundary('model_initialization_started');
+  const startedAt = monotonicNow();
+  try {
+    const embedder = await loadEmbedder();
+    diagnostics.boundary('model_initialization_completed', {
+      durationMs: monotonicNow() - startedAt
+    });
+    return embedder;
+  } catch (error) {
+    diagnostics.boundary('model_initialization_failed', {
+      durationMs: monotonicNow() - startedAt,
+      ...safeModelInitializationError(error)
+    });
+    throw error;
+  }
 };
 
 export const scoreArticleWithEmbeddings = async (
@@ -439,12 +498,14 @@ export const processArticlesWithTimeout = async ({
   progressEvery,
   writeRunningStatus: writeRunningStatusFile,
   writeCompletedStatus: writeCompletedStatusFile,
+  onFirstArticleAttempt,
   log
 }: ProcessArticlesOptions): Promise<SemanticScorerJobResult> => {
   const selectedArticleIds = articles.map(({ id }) => id);
   const scoredArticleIds: number[] = [];
   const skippedArticles: SemanticScorerArticleOutcome<SemanticScorerSkipReason>[] = [];
   const failedArticles: SemanticScorerArticleOutcome<SemanticScorerFailureReason>[] = [];
+  let firstArticleAttemptStarted = false;
 
   const createResult = (
     endingReason: SemanticScorerEndingReason,
@@ -478,6 +539,14 @@ export const processArticlesWithTimeout = async ({
       let scoringFailed = false;
 
       try {
+        if (!firstArticleAttemptStarted) {
+          firstArticleAttemptStarted = true;
+          try {
+            onFirstArticleAttempt?.();
+          } catch {
+            // Optional instrumentation hooks cannot prevent article scoring.
+          }
+        }
         scoreResult = await withTimeout(
           scoreArticle(article, keywords, signal),
           iterationTimeoutMs
@@ -549,7 +618,12 @@ const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<Sem
 
   const keywords = await loadKeywordsFromExcel(keywordsWorkbookPath);
   logger.info(`Loaded keywords: ${keywords.length}`);
-  const embedder = await getEmbedder();
+  context.diagnostics.boundary('selection_completed', {
+    candidateCount: articles.length,
+    keywordCount: keywords.length
+  });
+
+  const embedder = await initializeSemanticScorerModel(context.diagnostics);
 
   return processArticlesWithTimeout({
     articles,
@@ -568,6 +642,7 @@ const runLegacyWorkflow = async (context: SemanticScorerJobContext): Promise<Sem
     progressEvery: PROCESS_LOG_EVERY,
     writeRunningStatus: (count) => writeRunningStatus(context.semanticScorerDir, count),
     writeCompletedStatus: (count) => writeCompletedStatus(context.semanticScorerDir, count),
+    onFirstArticleAttempt: () => context.diagnostics.boundary('first_article_attempt_started'),
     log: logger
   });
 };
@@ -578,33 +653,91 @@ export const createSemanticScorerJobHandler = (
   dependencies: SemanticScorerJobDependencies = {}
 ) => {
   const workflowRunner = dependencies.runLegacyWorkflow ?? runLegacyWorkflow;
+  const diagnosticsFactory = dependencies.createDiagnostics ?? createSemanticScorerDiagnostics;
 
   return async (queueContext: QueueExecutionContext): Promise<void> => {
-    await verifySemanticScorerDirectoryExists(semanticScorerDir);
-    await verifyKeywordsWorkbookExists(semanticScorerDir);
+    let rawDiagnostics: SemanticScorerDiagnostics;
+    try {
+      rawDiagnostics = diagnosticsFactory({
+        enabled: dependencies.diagnosticsEnabled ?? false,
+        queueJobId: queueContext.jobId,
+        logger
+      });
+    } catch {
+      rawDiagnostics = createSemanticScorerDiagnostics({
+        enabled: false,
+        queueJobId: queueContext.jobId,
+        logger
+      });
+    }
+
+    const diagnostics: SemanticScorerDiagnostics = {
+      boundary: ((event: SemanticScorerBoundary, ...args: unknown[]) => {
+        try {
+          const emit = rawDiagnostics.boundary as (
+            boundary: SemanticScorerBoundary,
+            metadata?: SemanticScorerBoundaryMetadata[keyof SemanticScorerBoundaryMetadata]
+          ) => void;
+          emit(event, args[0] as SemanticScorerBoundaryMetadata[keyof SemanticScorerBoundaryMetadata]);
+        } catch {
+          // Diagnostics are best-effort and cannot alter queue work.
+        }
+      }) as SemanticScorerDiagnostics['boundary'],
+      stop: () => {
+        try {
+          rawDiagnostics.stop();
+        } catch {
+          // Diagnostics are best-effort and cannot alter queue work.
+        }
+      }
+    };
+    let terminalEventEmitted = false;
 
     try {
-      const result = await workflowRunner({
-        jobId: queueContext.jobId,
-        semanticScorerDir,
-        signal: queueContext.signal,
-        targeting
-      });
-      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+      diagnostics.boundary('job_started');
+      await verifySemanticScorerDirectoryExists(semanticScorerDir);
+      await verifyKeywordsWorkbookExists(semanticScorerDir);
+
+      try {
+        const result = await workflowRunner({
+          jobId: queueContext.jobId,
+          semanticScorerDir,
+          signal: queueContext.signal,
+          targeting,
+          diagnostics
+        });
+        const terminalEvent = result.endingReason === 'canceled'
+          ? 'job_canceled'
+          : result.endingReason === 'error'
+            ? 'job_failed'
+            : 'job_completed';
+        await queueContext.updateResult(result as unknown as Record<string, unknown>);
+        diagnostics.boundary(terminalEvent);
+        terminalEventEmitted = true;
+      } catch (error) {
+        diagnostics.boundary('job_failed');
+        terminalEventEmitted = true;
+        const result = error instanceof SemanticScorerProcessingError
+          ? error.result
+          : buildSemanticScorerResult({
+              endingReason: 'error',
+              terminalMessage: error instanceof Error ? error.message : 'Semantic scorer failed.',
+              selectedArticleIds: [],
+              scoredArticleIds: [],
+              skippedArticles: [],
+              failedArticles: [],
+              unattemptedArticleIds: []
+            });
+        await queueContext.updateResult(result as unknown as Record<string, unknown>);
+        throw error;
+      }
     } catch (error) {
-      const result = error instanceof SemanticScorerProcessingError
-        ? error.result
-        : buildSemanticScorerResult({
-            endingReason: 'error',
-            terminalMessage: error instanceof Error ? error.message : 'Semantic scorer failed.',
-            selectedArticleIds: [],
-            scoredArticleIds: [],
-            skippedArticles: [],
-            failedArticles: [],
-            unattemptedArticleIds: []
-          });
-      await queueContext.updateResult(result as unknown as Record<string, unknown>);
+      if (!terminalEventEmitted) {
+        diagnostics.boundary('job_failed');
+      }
       throw error;
+    } finally {
+      diagnostics.stop();
     }
   };
 };

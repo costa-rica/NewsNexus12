@@ -3,9 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   createSemanticScorerJobHandler,
+  initializeSemanticScorerModel,
   processArticlesWithTimeout,
   SemanticScorerJobResult
 } from '../../src/modules/jobs/semanticScorerJob';
+import { createSemanticScorerDiagnostics } from '../../src/modules/jobs/semanticScorerDiagnostics';
 
 const silentLog = {
   info: () => undefined,
@@ -174,6 +176,390 @@ describe('semanticScorer job handler', () => {
       unattemptedCount: 2
     });
     expect(writeCompletedStatus).not.toHaveBeenCalled();
+  });
+
+  it('calls the first-attempt hook once immediately before the first usable article is scored', async () => {
+    const order: string[] = [];
+
+    await processArticlesWithTimeout({
+      articles: [
+        { id: 1, title: null, description: ' ' },
+        { id: 2, title: 'usable', description: null },
+        { id: 3, title: 'also usable', description: null }
+      ],
+      keywords: ['fire'],
+      iterationTimeoutMs: 100,
+      signal: new AbortController().signal,
+      onFirstArticleAttempt: () => order.push('first-attempt'),
+      scoreArticle: async (article) => {
+        order.push(`score-${article.id}`);
+        return { keyword: null, keywordRating: null };
+      },
+      persistScore: async () => undefined,
+      progressEvery: 100,
+      writeRunningStatus: async () => undefined,
+      writeCompletedStatus: async () => undefined,
+      log: silentLog
+    });
+
+    expect(order).toEqual(['first-attempt', 'score-2', 'score-3']);
+  });
+
+  it('does not call the first-attempt hook when every selected article has no usable text', async () => {
+    const onFirstArticleAttempt = jest.fn();
+
+    await processArticlesWithTimeout({
+      articles: [{ id: 1, title: null, description: ' ' }],
+      keywords: ['fire'],
+      iterationTimeoutMs: 100,
+      signal: new AbortController().signal,
+      onFirstArticleAttempt,
+      scoreArticle: async () => ({ keyword: null, keywordRating: null }),
+      persistScore: async () => undefined,
+      progressEvery: 100,
+      writeRunningStatus: async () => undefined,
+      writeCompletedStatus: async () => undefined,
+      log: silentLog
+    });
+
+    expect(onFirstArticleAttempt).not.toHaveBeenCalled();
+  });
+
+  it('continues scoring when the first-attempt hook throws', async () => {
+    const scoreArticle = jest.fn(async () => ({ keyword: null, keywordRating: null }));
+
+    const result = await processArticlesWithTimeout({
+      articles: [{ id: 1, title: 'usable', description: null }],
+      keywords: ['fire'],
+      iterationTimeoutMs: 100,
+      signal: new AbortController().signal,
+      onFirstArticleAttempt: () => { throw new Error('hook failure'); },
+      scoreArticle,
+      persistScore: async () => undefined,
+      progressEvery: 100,
+      writeRunningStatus: async () => undefined,
+      writeCompletedStatus: async () => undefined,
+      log: silentLog
+    });
+
+    expect(scoreArticle).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      endingReason: 'completed',
+      skippedArticles: [{ articleId: 1, reason: 'no_score_result' }],
+      failedArticles: []
+    });
+  });
+
+  it.each([
+    ['completed', 'job_completed'],
+    ['canceled', 'job_canceled']
+  ] as const)('emits correlated job lifecycle events for a %s result', async (endingReason, terminalEvent) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-lifecycle-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const createDiagnostics = jest.fn(() => ({ boundary, stop }));
+    const result = { ...completedResult(), endingReason } as SemanticScorerJobResult;
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics,
+      runLegacyWorkflow: async (context) => {
+        context.diagnostics.boundary('selection_completed', { candidateCount: 0, keywordCount: 2 });
+        context.diagnostics.boundary('model_initialization_started');
+        context.diagnostics.boundary('model_initialization_completed', { durationMs: 5 });
+        context.diagnostics.boundary('first_article_attempt_started');
+        return result;
+      }
+    });
+
+    await handler({
+      jobId: 'job-lifecycle',
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult: () => Promise.resolve()
+    });
+
+    expect(createDiagnostics).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: true,
+      queueJobId: 'job-lifecycle'
+    }));
+    expect(createDiagnostics).toHaveBeenCalledTimes(1);
+    expect(boundary.mock.calls.map(([event]) => event)).toEqual([
+      'job_started',
+      'selection_completed',
+      'model_initialization_started',
+      'model_initialization_completed',
+      'first_article_attempt_started',
+      terminalEvent
+    ]);
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    'completed',
+    'canceled'
+  ] as const)('emits only job_failed when result persistence rejects after a %s workflow', async (endingReason) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-result-rejection-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const persistenceError = new Error(`${endingReason} result persistence failed`);
+    const failedResultPersistenceError = new Error('failed-result persistence also failed');
+    const updateResult = jest.fn()
+      .mockRejectedValueOnce(persistenceError)
+      .mockRejectedValueOnce(failedResultPersistenceError);
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async () => ({ ...completedResult(), endingReason })
+    });
+
+    await expect(handler({
+      jobId: `job-${endingReason}-result-rejection`,
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).rejects.toBe(failedResultPersistenceError);
+
+    const terminalEvents = boundary.mock.calls
+      .map(([event]) => event)
+      .filter((event) => ['job_completed', 'job_canceled', 'job_failed'].includes(event));
+    expect(terminalEvents).toEqual(['job_failed']);
+    expect(updateResult).toHaveBeenCalledTimes(2);
+    expect(updateResult).toHaveBeenNthCalledWith(1, expect.objectContaining({ endingReason }));
+    expect(updateResult).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      endingReason: 'error',
+      terminalMessage: persistenceError.message
+    }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('starts diagnostics before preflight and emits failed plus cleanup when preflight fails', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-preflight-'));
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop })
+    });
+
+    await expect(handler({
+      jobId: 'job-preflight',
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult: () => Promise.resolve()
+    })).rejects.toThrow('keywords workbook not found');
+
+    expect(boundary.mock.calls.map(([event]) => event)).toEqual(['job_started', 'job_failed']);
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('does not let diagnostics failures replace the original workflow error', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-isolation-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({
+        boundary: () => { throw new Error('diagnostics boundary failure'); },
+        stop: () => { throw new Error('diagnostics cleanup failure'); }
+      }),
+      runLegacyWorkflow: async () => { throw new Error('original workflow failure'); }
+    });
+
+    await expect(handler({
+      jobId: 'job-isolation',
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult: () => Promise.resolve()
+    })).rejects.toThrow('original workflow failure');
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('does not let diagnostics failures alter a successful result', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-success-isolation-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const result = completedResult();
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({
+        boundary: () => { throw new Error('diagnostics boundary failure'); },
+        stop: () => { throw new Error('diagnostics cleanup failure'); }
+      }),
+      runLegacyWorkflow: async () => result
+    });
+
+    await expect(handler({
+      jobId: 'job-success-isolation',
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).resolves.toBeUndefined();
+    expect(updateResult).toHaveBeenCalledWith(result);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('keeps disabled diagnostics silent while preserving the workflow result', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-disabled-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const records: Record<string, unknown>[] = [];
+    const result = completedResult();
+    const updateResult = jest.fn(() => Promise.resolve());
+    const createDiagnostics = jest.fn((options) => createSemanticScorerDiagnostics({
+      ...options,
+      logger: {
+        info: (_message: string, metadata: Record<string, unknown>) => records.push(metadata)
+      } as never
+    }));
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      createDiagnostics,
+      runLegacyWorkflow: async () => result
+    });
+
+    await handler({
+      jobId: 'job-disabled',
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    });
+
+    expect(createDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    expect(records).toEqual([]);
+    expect(updateResult).toHaveBeenCalledWith(result);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('emits model initialization completion with monotonic duration', async () => {
+    const boundary = jest.fn();
+    const diagnostics = { boundary, stop: jest.fn() };
+    const embedder = jest.fn(async () => ({ data: [] as number[] }));
+    const times = [50, 82];
+
+    await expect(initializeSemanticScorerModel(
+      diagnostics,
+      async () => embedder,
+      () => times.shift() ?? 82
+    )).resolves.toBe(embedder);
+
+    expect(boundary.mock.calls).toEqual([
+      ['model_initialization_started'],
+      ['model_initialization_completed', { durationMs: 32 }]
+    ]);
+  });
+
+  it('bounds model initialization failure metadata and preserves the original error', async () => {
+    const originalError = Object.assign(new Error('model detail must not be logged'), {
+      name: 'Unsafe Error Name with article text',
+      code: 'unsafe code with spaces'
+    });
+    const boundary = jest.fn();
+    const diagnostics = { boundary, stop: jest.fn() };
+    const times = [100, 125];
+
+    await expect(initializeSemanticScorerModel(
+      diagnostics,
+      async () => { throw originalError; },
+      () => times.shift() ?? 125
+    )).rejects.toBe(originalError);
+
+    expect(boundary.mock.calls).toEqual([
+      ['model_initialization_started'],
+      ['model_initialization_failed', {
+        durationMs: 25,
+        errorName: 'UnknownError'
+      }]
+    ]);
+  });
+
+  it('includes an allowlisted operational code in model initialization failure metadata', async () => {
+    const originalError = Object.assign(new Error('connection reset'), { code: 'ECONNRESET' });
+    const boundary = jest.fn();
+    const diagnostics = { boundary, stop: jest.fn() };
+
+    await expect(initializeSemanticScorerModel(
+      diagnostics,
+      async () => { throw originalError; },
+      () => 100
+    )).rejects.toBe(originalError);
+
+    expect(boundary).toHaveBeenLastCalledWith('model_initialization_failed', {
+      durationMs: 0,
+      errorName: 'Error',
+      errorCode: 'ECONNRESET'
+    });
+  });
+
+  it('omits a credential-like regex-valid code from model initialization failure metadata', async () => {
+    const originalError = Object.assign(new Error('must not leak code'), {
+      code: 'DATABASE_PASSWORD'
+    });
+    const boundary = jest.fn();
+    const diagnostics = { boundary, stop: jest.fn() };
+
+    await expect(initializeSemanticScorerModel(
+      diagnostics,
+      async () => { throw originalError; },
+      () => 100
+    )).rejects.toBe(originalError);
+
+    expect(boundary).toHaveBeenLastCalledWith('model_initialization_failed', {
+      durationMs: 0,
+      errorName: 'Error'
+    });
+  });
+
+  it.each([
+    ['zero-selected', []],
+    ['all-skipped', [{ id: 41, title: null, description: ' ' }]]
+  ] as const)('terminates %s work without fabricating a first-attempt event', async (_case, articles) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-no-attempt-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async (context) => processArticlesWithTimeout({
+        articles: [...articles],
+        keywords: ['fire'],
+        iterationTimeoutMs: 100,
+        signal: context.signal,
+        onFirstArticleAttempt: () => context.diagnostics.boundary('first_article_attempt_started'),
+        scoreArticle: async () => ({ keyword: null, keywordRating: null }),
+        persistScore: async () => undefined,
+        progressEvery: 100,
+        writeRunningStatus: async () => undefined,
+        writeCompletedStatus: async () => undefined,
+        log: silentLog
+      })
+    });
+
+    await handler({
+      jobId: `job-${_case}`,
+      endpointName: '/semantic-scorer/start-job',
+      signal: new AbortController().signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    });
+
+    expect(boundary.mock.calls.map(([event]) => event)).toEqual(['job_started', 'job_completed']);
+    expect(updateResult).toHaveBeenCalledWith(expect.objectContaining({
+      endingReason: 'completed',
+      selectedCount: articles.length,
+      skippedCount: articles.length
+    }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   it('persists a normal structured result through the queue context', async () => {

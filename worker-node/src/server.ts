@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createApp } from './app';
+import { createApp, CreateAppOptions } from './app';
 import logger, { initializeLogger, isLoggerInitialized } from './modules/logger';
 import { isStartupConfigError, loadAppConfig } from './modules/startup/config';
 import { ensureStateAssignerDirectories } from './modules/startup/stateAssignerFiles';
@@ -24,6 +24,9 @@ interface StartServerOptions {
   env?: NodeJS.ProcessEnv;
   exit?: (code: number) => never;
   exitDelayMs?: number;
+  appFactory?: (options?: CreateAppOptions) => {
+    listen: (port: number, callback: () => void) => unknown;
+  };
 }
 
 export const startServer = async (options: StartServerOptions = {}): Promise<void> => {
@@ -52,13 +55,17 @@ export const startServer = async (options: StartServerOptions = {}): Promise<voi
       pathToSemanticScorerDir: config.pathToSemanticScorerDir,
       pathToLogs: config.pathToLogs,
       deleteArticlesBatchSize: config.deleteArticlesBatchSize,
-      limitArticleAgeInDays: config.limitArticleAgeInDays
+      limitArticleAgeInDays: config.limitArticleAgeInDays,
+      workerHttpDiagnosticsEnabled: config.workerHttpDiagnosticsEnabled
     });
     await ensureStateAssignerDirectories(config.pathToStateAssignerFiles);
     const queueStore = new QueueJobStore(resolveDefaultQueueStorePath(config.pathUtilities));
     const queueMaintenanceResult = await runQueueStartupMaintenance(queueStore);
     logger.info('Queue startup maintenance completed', queueMaintenanceResult);
-    const app = createApp();
+    const appFactory = options.appFactory ?? createApp;
+    const app = appFactory({
+      workerHttpDiagnosticsEnabled: config.workerHttpDiagnosticsEnabled
+    });
     app.listen(config.port, () => {
       logger.info(`Worker-node listening on port ${config.port}`);
     });

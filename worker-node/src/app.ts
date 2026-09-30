@@ -2,15 +2,23 @@ import express from 'express';
 import healthRouter from './routes/health';
 import queueInfoRouter from './routes/queueInfo';
 import requestGoogleRssRouter from './routes/requestGoogleRss';
-import semanticScorerRouter from './routes/semanticScorer';
+import { createSemanticScorerRouter } from './routes/semanticScorer';
 import stateAssignerRouter from './routes/stateAssigner';
 import articleContentScraper02Router from './routes/articleContentScraper02';
 import deleteArticlesRouter from './routes/deleteArticles';
 import logger from './modules/logger';
 import { errorHandler, notFoundHandler } from './modules/middleware/errorHandlers';
 
-export const createApp = (): express.Express => {
+export interface CreateAppOptions {
+  workerHttpDiagnosticsEnabled?: boolean;
+  semanticScorerRouterFactory?: typeof createSemanticScorerRouter;
+}
+
+export const createApp = (options: CreateAppOptions = {}): express.Express => {
   const app = express();
+  const diagnosticsEnabled = options.workerHttpDiagnosticsEnabled ?? false;
+  const semanticScorerRouterFactory = options.semanticScorerRouterFactory ?? createSemanticScorerRouter;
+  const resolvedSemanticScorerRouter = semanticScorerRouterFactory({ diagnosticsEnabled });
 
   app.use((req, res, next) => {
     const startedAt = Date.now();
@@ -38,7 +46,7 @@ export const createApp = (): express.Express => {
   app.use('/queue-info', queueInfoRouter);
 
   app.use('/request-google-rss', requestGoogleRssRouter);
-  app.use('/semantic-scorer', semanticScorerRouter);
+  app.use('/semantic-scorer', resolvedSemanticScorerRouter);
   app.use('/state-assigner', stateAssignerRouter);
   app.use('/article-content-scraper-02', articleContentScraper02Router);
   app.use('/delete-articles', deleteArticlesRouter);

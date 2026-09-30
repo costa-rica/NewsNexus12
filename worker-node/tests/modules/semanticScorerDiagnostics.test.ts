@@ -214,6 +214,44 @@ describe('semantic scorer diagnostics', () => {
     expect(JSON.stringify(records)).not.toMatch(/credential|password|prompt|article|sql|url|body/i);
   });
 
+  it('emits only the typed allowlisted lifecycle metadata keys', () => {
+    const harness = createHarness();
+    const diagnostics = createSemanticScorerDiagnostics({
+      enabled: true,
+      queueJobId: 'queue-lifecycle',
+      logger: harness.logger,
+      dependencies: harness.dependencies
+    });
+
+    diagnostics.boundary('selection_completed', { candidateCount: 12, keywordCount: 3 });
+    diagnostics.boundary('model_initialization_completed', { durationMs: 45 });
+    diagnostics.boundary('model_initialization_failed', {
+      durationMs: 46,
+      errorName: 'TypeError',
+      errorCode: 'ERR_MODEL_LOAD'
+    });
+
+    const records = harness.records().slice(1);
+    const processMetricKeys = [
+      'eventLoopDelayMs',
+      'eventLoopUtilization',
+      'memoryBytes',
+      'processUptimeSeconds'
+    ];
+    expect(Object.keys(records[0]).sort()).toEqual([
+      'candidateCount', 'elapsedMs', 'eventName', 'keywordCount', 'queueJobId', 'scope',
+      'timestampUtc', ...processMetricKeys
+    ].sort());
+    expect(Object.keys(records[1]).sort()).toEqual([
+      'durationMs', 'elapsedMs', 'eventName', 'queueJobId', 'scope', 'timestampUtc',
+      ...processMetricKeys
+    ].sort());
+    expect(Object.keys(records[2]).sort()).toEqual([
+      'durationMs', 'elapsedMs', 'errorCode', 'errorName', 'eventName', 'queueJobId',
+      'scope', 'timestampUtc', ...processMetricKeys
+    ].sort());
+  });
+
   it('uses cumulative ELU snapshots as the rolling baseline across multiple samples', () => {
     const harness = createHarness();
     const cumulative = [

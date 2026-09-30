@@ -14,7 +14,28 @@ export type SemanticScorerBoundary =
   | 'scoring_completed'
   | 'job_completed'
   | 'job_failed'
-  | 'job_cancelled';
+  | 'job_cancelled'
+  | 'job_started'
+  | 'model_initialization_started'
+  | 'model_initialization_completed'
+  | 'model_initialization_failed'
+  | 'first_article_attempt_started'
+  | 'job_canceled';
+
+export interface SemanticScorerBoundaryMetadata {
+  selection_completed: { candidateCount: number; keywordCount: number };
+  model_initialization_completed: { durationMs: number };
+  model_initialization_failed: {
+    durationMs: number;
+    errorName: string;
+    errorCode?: string;
+  };
+}
+
+type SemanticScorerBoundaryArgs<Event extends SemanticScorerBoundary> =
+  Event extends keyof SemanticScorerBoundaryMetadata
+    ? [metadata: SemanticScorerBoundaryMetadata[Event]]
+    : [];
 
 type IntervalHandle = {
   unref?: () => void;
@@ -70,7 +91,10 @@ export interface SemanticScorerDiagnosticsOptions {
 }
 
 export interface SemanticScorerDiagnostics {
-  boundary: (event: SemanticScorerBoundary) => void;
+  boundary: <Event extends SemanticScorerBoundary>(
+    event: Event,
+    ...args: SemanticScorerBoundaryArgs<Event>
+  ) => void;
   stop: () => void;
 }
 
@@ -90,13 +114,47 @@ const defaultDependencies: SemanticScorerDiagnosticsDependencies = {
 
 const finiteNumber = (value: number): number => (Number.isFinite(value) ? value : 0);
 const nanosecondsToMilliseconds = (value: number): number => finiteNumber(value) / 1_000_000;
+const boundedNonNegativeNumber = (value: number): number => Math.max(0, finiteNumber(value));
+const boundedErrorValue = (value: string, fallback: string): string => {
+  const bounded = value.slice(0, 64);
+  return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(bounded) ? bounded : fallback;
+};
+
+const allowlistedBoundaryFields = <Event extends SemanticScorerBoundary>(
+  event: Event,
+  metadata?: SemanticScorerBoundaryMetadata[keyof SemanticScorerBoundaryMetadata]
+): Record<string, unknown> => {
+  if (event === 'selection_completed' && metadata && 'candidateCount' in metadata) {
+    return {
+      candidateCount: Math.floor(boundedNonNegativeNumber(metadata.candidateCount)),
+      keywordCount: Math.floor(boundedNonNegativeNumber(metadata.keywordCount))
+    };
+  }
+  if (event === 'model_initialization_completed' && metadata && 'durationMs' in metadata) {
+    return { durationMs: boundedNonNegativeNumber(metadata.durationMs) };
+  }
+  if (event === 'model_initialization_failed' && metadata && 'errorName' in metadata) {
+    return {
+      durationMs: boundedNonNegativeNumber(metadata.durationMs),
+      errorName: boundedErrorValue(metadata.errorName, 'UnknownError'),
+      ...(metadata.errorCode
+        ? { errorCode: boundedErrorValue(metadata.errorCode, 'UNKNOWN') }
+        : {})
+    };
+  }
+  return {};
+};
 
 export const createSemanticScorerDiagnostics = (
   options: SemanticScorerDiagnosticsOptions
 ): SemanticScorerDiagnostics => {
   if (!options.enabled) {
+    const boundary = <Event extends SemanticScorerBoundary>(
+      _event: Event,
+      ..._args: SemanticScorerBoundaryArgs<Event>
+    ): void => undefined;
     return {
-      boundary: () => undefined,
+      boundary,
       stop: () => undefined
     };
   }
@@ -350,17 +408,25 @@ export const createSemanticScorerDiagnostics = (
     deadline = undefined;
   }
 
-  return {
-    boundary: (event) => {
-      try {
-        if (finalized) {
-          return;
-        }
-        emit(`semantic_${event}`, captureProcessMetrics());
-      } catch {
-        // Boundary diagnostics must never affect queue work.
+  const boundary = <Event extends SemanticScorerBoundary>(
+    event: Event,
+    ...args: SemanticScorerBoundaryArgs<Event>
+  ): void => {
+    try {
+      if (finalized) {
+        return;
       }
-    },
+      emit(`semantic_${event}`, {
+        ...captureProcessMetrics(),
+        ...allowlistedBoundaryFields(event, args[0])
+      });
+    } catch {
+      // Boundary diagnostics must never affect queue work.
+    }
+  };
+
+  return {
+    boundary,
     stop: () => {
       try {
         finalize('stopped');
