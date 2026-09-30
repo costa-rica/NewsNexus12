@@ -706,17 +706,17 @@ export const createSemanticScorerJobHandler = (
           targeting,
           diagnostics
         });
-        const terminalEvent = result.endingReason === 'canceled'
-          ? 'job_canceled'
-          : result.endingReason === 'error'
-            ? 'job_failed'
-            : 'job_completed';
         await queueContext.updateResult(result as unknown as Record<string, unknown>);
+        const terminalEvent = queueContext.signal.aborted
+          ? 'job_canceled'
+          : result.endingReason === 'canceled'
+            ? 'job_canceled'
+            : result.endingReason === 'error'
+              ? 'job_failed'
+              : 'job_completed';
         diagnostics.boundary(terminalEvent);
         terminalEventEmitted = true;
       } catch (error) {
-        diagnostics.boundary('job_failed');
-        terminalEventEmitted = true;
         const result = error instanceof SemanticScorerProcessingError
           ? error.result
           : buildSemanticScorerResult({
@@ -728,12 +728,20 @@ export const createSemanticScorerJobHandler = (
               failedArticles: [],
               unattemptedArticleIds: []
             });
-        await queueContext.updateResult(result as unknown as Record<string, unknown>);
+        try {
+          await queueContext.updateResult(result as unknown as Record<string, unknown>);
+        } catch (persistenceError) {
+          diagnostics.boundary(queueContext.signal.aborted ? 'job_canceled' : 'job_failed');
+          terminalEventEmitted = true;
+          throw persistenceError;
+        }
+        diagnostics.boundary(queueContext.signal.aborted ? 'job_canceled' : 'job_failed');
+        terminalEventEmitted = true;
         throw error;
       }
     } catch (error) {
       if (!terminalEventEmitted) {
-        diagnostics.boundary('job_failed');
+        diagnostics.boundary(queueContext.signal.aborted ? 'job_canceled' : 'job_failed');
       }
       throw error;
     } finally {

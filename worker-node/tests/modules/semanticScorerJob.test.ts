@@ -297,6 +297,173 @@ describe('semanticScorer job handler', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
+  it('emits only job_canceled when cancellation races with successful result persistence', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-cancel-persistence-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const controller = new AbortController();
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const result = completedResult();
+    const updateResult = jest.fn(async () => {
+      controller.abort();
+    });
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async () => result
+    });
+
+    await expect(handler({
+      jobId: 'job-canceled-during-result-persistence',
+      endpointName: '/semantic-scorer/start-job',
+      signal: controller.signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).resolves.toBeUndefined();
+
+    const terminalEvents = boundary.mock.calls
+      .map(([event]) => event)
+      .filter((event) => ['job_completed', 'job_canceled', 'job_failed'].includes(event));
+    expect(terminalEvents).toEqual(['job_canceled']);
+    expect(updateResult).toHaveBeenCalledTimes(1);
+    expect(updateResult).toHaveBeenCalledWith(result);
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('defers a rejected workflow terminal event until fallback persistence resolves', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-fallback-cancel-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const controller = new AbortController();
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const workflowError = new Error('workflow failed before fallback persistence');
+    const updateResult = jest.fn(async () => {
+      controller.abort();
+    });
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async () => { throw workflowError; }
+    });
+
+    expect(controller.signal.aborted).toBe(false);
+    await expect(handler({
+      jobId: 'job-canceled-during-fallback-persistence',
+      endpointName: '/semantic-scorer/start-job',
+      signal: controller.signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).rejects.toBe(workflowError);
+
+    const terminalEvents = boundary.mock.calls
+      .map(([event]) => event)
+      .filter((event) => ['job_completed', 'job_canceled', 'job_failed'].includes(event));
+    expect(terminalEvents).toEqual(['job_canceled']);
+    expect(updateResult).toHaveBeenCalledTimes(1);
+    expect(updateResult).toHaveBeenCalledWith(expect.objectContaining({
+      endingReason: 'error',
+      terminalMessage: workflowError.message
+    }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('propagates a rejected fallback persistence error after cancellation without duplicating the terminal event', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-fallback-reject-cancel-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const controller = new AbortController();
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const workflowError = new Error('workflow failed before rejected fallback persistence');
+    const persistenceError = new Error('fallback result persistence failed');
+    const updateResult = jest.fn(async () => {
+      controller.abort();
+      throw persistenceError;
+    });
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async () => { throw workflowError; }
+    });
+
+    expect(controller.signal.aborted).toBe(false);
+    await expect(handler({
+      jobId: 'job-canceled-during-rejected-fallback-persistence',
+      endpointName: '/semantic-scorer/start-job',
+      signal: controller.signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).rejects.toBe(persistenceError);
+
+    const terminalEvents = boundary.mock.calls
+      .map(([event]) => event)
+      .filter((event) => ['job_completed', 'job_canceled', 'job_failed'].includes(event));
+    expect(terminalEvents).toEqual(['job_canceled']);
+    expect(updateResult).toHaveBeenCalledTimes(1);
+    expect(updateResult).toHaveBeenCalledWith(expect.objectContaining({
+      endingReason: 'error',
+      terminalMessage: workflowError.message
+    }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    'workflow',
+    'result persistence'
+  ] as const)('emits only job_canceled when an aborted job has a %s failure', async (failureSource) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'semantic-scorer-canceled-failure-'));
+    await fs.writeFile(path.join(tempDir, 'NewsNexusSemanticScorerKeywords.xlsx'), 'stub', 'utf8');
+    const controller = new AbortController();
+    const boundary = jest.fn();
+    const stop = jest.fn();
+    const result = completedResult();
+    const originalError = new Error(`${failureSource} failed`);
+    const updateResult = failureSource === 'workflow'
+      ? jest.fn().mockResolvedValue(undefined)
+      : jest.fn()
+          .mockImplementationOnce(async () => {
+            controller.abort();
+            throw originalError;
+          })
+          .mockResolvedValueOnce(undefined);
+    const handler = createSemanticScorerJobHandler(tempDir, undefined, {
+      diagnosticsEnabled: true,
+      createDiagnostics: () => ({ boundary, stop }),
+      runLegacyWorkflow: async () => {
+        if (failureSource === 'workflow') {
+          controller.abort();
+          throw originalError;
+        }
+        return result;
+      }
+    });
+
+    await expect(handler({
+      jobId: `job-canceled-${failureSource.replace(' ', '-')}-failure`,
+      endpointName: '/semantic-scorer/start-job',
+      signal: controller.signal,
+      registerCancelableProcess: () => undefined,
+      updateResult
+    })).rejects.toBe(originalError);
+
+    const terminalEvents = boundary.mock.calls
+      .map(([event]) => event)
+      .filter((event) => ['job_completed', 'job_canceled', 'job_failed'].includes(event));
+    expect(terminalEvents).toEqual(['job_canceled']);
+    expect(updateResult).toHaveBeenCalledTimes(failureSource === 'workflow' ? 1 : 2);
+    if (failureSource === 'result persistence') {
+      expect(updateResult).toHaveBeenNthCalledWith(1, result);
+    }
+    expect(updateResult).toHaveBeenLastCalledWith(expect.objectContaining({
+      endingReason: 'error',
+      terminalMessage: originalError.message
+    }));
+    expect(stop).toHaveBeenCalledTimes(1);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
   it.each([
     'completed',
     'canceled'
