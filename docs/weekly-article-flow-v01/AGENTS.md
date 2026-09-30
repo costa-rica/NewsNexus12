@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-30T21:20:58Z
-updated_at: 2026-09-30T21:20:58Z
+updated_at: 2026-09-30T21:30:45Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -44,6 +44,8 @@ Keep all four existing reports. Each contributes distinct evidence.
 
 These files are expected deliverables, not existing evidence. Each agent owns its host's account and must distinguish local observations from evidence reported by the other host.
 
+- Each lessons-learned document must contain a `## Host Inventory` section following the requirements below. Keep the inventory in that host's lessons document rather than creating a separate file.
+
 ## Server-agent workflow
 
 1. Read the retained reports and applicable repository instructions before writing.
@@ -74,12 +76,34 @@ Use focused sections, bullets, and numbered steps. Keep paragraphs under 50 word
    - Explain what the replacement must account for and how the operator can verify the behavior.
    - Include stage completion criteria, cohort scope, partial outcomes, interruption/recovery, diagnostics, and alert delivery where supported by experience.
    - Keep proposed design choices distinguishable from operator-approved requirements.
-6. Host dependencies and operator handoff
-   - Summarize relevant service names, paths, configuration variable names, runtime/model compatibility, permission constraints, and useful evidence locations.
+6. Host Inventory
+   - Complete the required inventory below using read-only inspection of your own server.
    - Include concise evidence excerpts where needed so the lessons remain useful after source removal. Never include credentials, tokens, or protected environment values.
-   - Describe external host state that a Git revert would not change, such as installed units, timers, environment files, or durable records. Document it without modifying it.
 7. Open questions, if material decisions remain
    - Make this the final section and follow the repository's numbered-question and empty `Operator Response` format.
+
+## Host inventory requirements
+
+A Git revert changes repository content; it does not automatically undo installed services, schedules, host configuration, or database changes. Capture the current host state so the operator can plan those changes separately.
+
+1. Services and schedules
+   - List relevant installed systemd services, timers, drop-ins, alert helpers, and cron entries, including their paths and runtime users.
+   - Record enabled/disabled and active/inactive state separately, plus schedules and next trigger times with timezone when available.
+2. Configuration and permissions
+   - List environment-file paths, relevant variable names, service working directories, runtime/model dependencies, file ownership, permissions, and relevant sudoers or service-hardening settings.
+   - Record names and nonsecret operational details only; do not copy environment files or secret values into the document.
+3. Files and retained evidence
+   - List backup, log, journal, alert, lock, and other workflow resource locations outside the repository, with their purpose and ownership when available.
+4. Database state
+   - Identify workflow-specific tables, schema changes, migration records if present, and durable run records using read-only inspection.
+   - Distinguish V01 additions from pre-existing shared structures when evidence permits. Document known data effects, such as cleanup or ingestion, that reverting code would not reverse.
+5. Operator disposition
+   - For each item or related group, record its evidence source, observation time in UTC, whether it is shared or V01-specific, and whether it survives a Git revert.
+   - Recommend retaining, disabling, removing, or reviewing it, with a short reason. Mark uncertain ownership or impact as needing review.
+   - These are recommendations for the operator, not authorization to change host state. Do not disable timers, remove files, or modify database structures during inventory collection.
+
+- Use a compact table or consistent bullets so the operator can compare both hosts.
+- Mark each category as inspected, not applicable, or unverified, and explain missing access or evidence. Do not treat an uninspected category as empty.
 
 ## Evidence topics to address
 
