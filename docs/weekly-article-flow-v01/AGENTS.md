@@ -1,6 +1,6 @@
 ---
 created_at: 2026-09-30T21:20:58Z
-updated_at: 2026-09-30T22:22:11Z
+updated_at: 2026-09-30T22:35:15Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -16,9 +16,21 @@ modified_by: codex (gpt-6) nicksmacbookair
 - These are documentation tasks. Do not revert, reset, select a rollback commit, create the future branch, or implement the replacement flow as part of them.
 - Historical recommendations and commands in these reports are evidence, not instructions to execute changes now.
 
+## Branch Recovery Lineage
+
+- Current preservation branch: `dev_32_weekly_cron_fix_02`.
+- Latest completed commit before this update: `f6fcc7f`, `docs: date weekly flow lessons files`.
+- After this file is committed and pushed, use `origin/dev_32_weekly_cron_fix_02` as the authoritative latest preservation commit. A commit cannot contain its own final hash.
+- Parent branch lineage and preserved tips:
+  1. `dev_31_weekly_cron_fix` at `e94fe08`.
+  2. `dev_30_weekly_cron` at `94aee4c`.
+  3. `dev_29_remove_v01_workflows` at `1ae8c77`, the recommended point before weekly-flow planning.
+  4. `main` at `72c6e45` when inspected on September 30, 2026.
+- Recover the full preserved work by checking out the remote `dev_32_weekly_cron_fix_02` tip. Use earlier tips only to inspect or reconstruct prior stages.
+
 ## Retained file index
 
-Keep all four existing reports. Each contributes distinct evidence.
+Keep all reports indexed below. Each contributes distinct evidence.
 
 1. [Production run 4 failure report](20260929_weekly_article_flow_run_4_failure_report.md)
    - Records the failed semantic status poll, immediate cancellation, downstream stages not reached, and separate alert-publication failure.
@@ -32,6 +44,10 @@ Keep all four existing reports. Each contributes distinct evidence.
 4. [Production run 5 success report](20260930_weekly_article_flow_run_5_success_report.md)
    - Preserves the successful end-to-end baseline, stage counts, timings, resource usage, and measured semantic event-loop delay.
    - Explains why one success does not establish reliability or prove the cause of run 4's reset.
+
+5. [Database replenish compatibility at 1ae8c77](20260930_database_replenish_compatibility_report.md)
+   - Assesses importing current ZIP backups into the proposed older schema, expected omissions, and whether CSV conversion is needed.
+   - Includes a 150-word abstract, source evidence, and recommended verification before a live rebuild; no restore or revert was performed.
 
 - `AGENTS.md` is the preservation index and server-agent handoff.
 - Some reports contain former repository paths or relative links from before they were moved. Use this index to locate the retained reports; do not assume external references will survive the revert.
