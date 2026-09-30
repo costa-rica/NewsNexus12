@@ -257,6 +257,30 @@ export const createSemanticScorerDiagnostics = (
     }
 
     const delay = delayMonitor;
+    const zeroEventLoopDelayMs = {
+      mean: 0,
+      min: 0,
+      max: 0,
+      stddev: 0,
+      p99: 0
+    };
+    let eventLoopDelayMs = zeroEventLoopDelayMs;
+    let meanNanoseconds = Number.NaN;
+    try {
+      meanNanoseconds = delay?.mean ?? Number.NaN;
+    } catch {
+      // Treat an unreadable histogram as having no valid observations.
+    }
+    if (Number.isFinite(meanNanoseconds)) {
+      eventLoopDelayMs = {
+        mean: nanosecondsToMilliseconds(meanNanoseconds),
+        min: safeNumber(() => nanosecondsToMilliseconds(delay?.min ?? 0)),
+        max: safeNumber(() => nanosecondsToMilliseconds(delay?.max ?? 0)),
+        stddev: safeNumber(() => nanosecondsToMilliseconds(delay?.stddev ?? 0)),
+        p99: safeNumber(() => nanosecondsToMilliseconds(delay?.percentile(99) ?? 0))
+      };
+    }
+
     return {
       processUptimeSeconds: safeNumber(dependencies.processUptime),
       memoryBytes,
@@ -265,13 +289,7 @@ export const createSemanticScorerDiagnostics = (
         active: finiteNumber(utilization.active),
         utilization: finiteNumber(utilization.utilization)
       },
-      eventLoopDelayMs: {
-        mean: safeNumber(() => nanosecondsToMilliseconds(delay?.mean ?? 0)),
-        min: safeNumber(() => nanosecondsToMilliseconds(delay?.min ?? 0)),
-        max: safeNumber(() => nanosecondsToMilliseconds(delay?.max ?? 0)),
-        stddev: safeNumber(() => nanosecondsToMilliseconds(delay?.stddev ?? 0)),
-        p99: safeNumber(() => nanosecondsToMilliseconds(delay?.percentile(99) ?? 0))
-      }
+      eventLoopDelayMs
     };
   };
 

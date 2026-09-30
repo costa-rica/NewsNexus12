@@ -214,6 +214,27 @@ describe('semantic scorer diagnostics', () => {
     expect(JSON.stringify(records)).not.toMatch(/credential|password|prompt|article|sql|url|body/i);
   });
 
+  it('emits zero event-loop delay metrics when the histogram has no observations', () => {
+    const harness = createHarness();
+    harness.monitor.mean = Number.NaN;
+    harness.monitor.min = 9_223_372_036_854_776_000;
+    harness.monitor.max = 0;
+    harness.monitor.stddev = Number.NaN;
+    harness.monitor.percentile.mockReturnValue(0);
+    const diagnostics = createSemanticScorerDiagnostics({
+      enabled: true,
+      queueJobId: 'queue-empty-delay-histogram',
+      logger: harness.logger,
+      dependencies: harness.dependencies
+    });
+
+    diagnostics.boundary('selection_started');
+
+    expect(harness.records()[1]).toMatchObject({
+      eventLoopDelayMs: { mean: 0, min: 0, max: 0, stddev: 0, p99: 0 }
+    });
+  });
+
   it('emits only the typed allowlisted lifecycle metadata keys', () => {
     const harness = createHarness();
     const diagnostics = createSemanticScorerDiagnostics({
