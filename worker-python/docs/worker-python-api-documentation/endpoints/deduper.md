@@ -1,3 +1,10 @@
+---
+created_at: 2026-10-01T23:18:45Z
+updated_at: 2026-10-01T23:18:45Z
+created_by: codex (gpt-6) nicksmacbookair
+modified_by: codex (gpt-6) nicksmacbookair
+---
+
 # Deduper endpoints
 
 These endpoints manage deduper job lifecycle operations including create, status, cancel, list, health checks, and table clear operations.
@@ -27,6 +34,7 @@ curl --location 'http://localhost:5000/deduper/jobs'
 
 ### Error responses
 
+- `409`: A deduper submission or clear operation already holds the operation guard
 - `500`: Internal server error
 
 ## GET /deduper/jobs/reportId/{report_id}
@@ -56,6 +64,7 @@ curl --location 'http://localhost:5000/deduper/jobs/reportId/125'
 ### Error responses
 
 - `422`: Invalid `report_id` type
+- `409`: A deduper submission or clear operation already holds the operation guard
 - `500`: Internal server error
 
 ## GET /deduper/jobs/{job_id}
@@ -213,7 +222,12 @@ curl --location 'http://localhost:5000/deduper/health'
 
 ## DELETE /deduper/clear-db-table
 
-Cancels active jobs and clears the `ArticleDuplicateAnalyses` table in-process.
+Cancels only deduper jobs and clears the `ArticleDuplicateAnalyses` table in-process after running deduper execution has exited.
+
+- AI Approver V02, location-scoring jobs, and the worker service remain running. There is no option to cancel other workflows through this endpoint.
+- `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS` is a positive integer, default 30. It bounds cancellation waiting, not the duration of analysis or deletion. Timeout prevents deletion.
+- New deduper submissions and concurrent clear requests return 409 while the operation guard is held. The guard applies within the existing single queue-owning process.
+- `cancelledJobs` lists confirmed cancellations. `cancellationRequestedJobs` lists running jobs signaled to stop; it may overlap with `cancelledJobs` and does not itself confirm cancellation.
 
 ### parameters
 
@@ -230,7 +244,9 @@ curl --location --request DELETE 'http://localhost:5000/deduper/clear-db-table'
 ```json
 {
   "cleared": true,
-  "cancelledJobs": [9],
+  "rowsDeleted": 1024,
+  "cancelledJobs": ["0009"],
+  "cancellationRequestedJobs": ["0009"],
   "exitCode": 0,
   "stdout": "Successfully deleted 1024 rows from ArticleDuplicateAnalyses table.",
   "stderr": "",
@@ -241,3 +257,17 @@ curl --location --request DELETE 'http://localhost:5000/deduper/clear-db-table'
 ### Error responses
 
 - `500`: Missing DB environment variables or internal clear-table failure
+- `409`: Another deduper submission or clear operation holds the guard; no cancellation or deletion is started by this request
+- `504`: Deduper execution did not stop before the configured cancellation deadline; no deletion is attempted
+
+Failure responses include `cleared: false`, `error`, `cancelledJobs`, `cancellationRequestedJobs`, and `timestamp`. Completed cancellations are not undone by a later failure. For example:
+
+```json
+{
+  "cleared": false,
+  "error": "Deduper did not stop within 30 seconds; table was not cleared",
+  "cancelledJobs": ["0010"],
+  "cancellationRequestedJobs": ["0009"],
+  "timestamp": "2026-10-01T23:17:20+00:00"
+}
+```

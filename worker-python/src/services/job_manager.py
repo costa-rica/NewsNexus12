@@ -4,11 +4,16 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
+from time import monotonic
 from typing import Any
 
 from loguru import logger
 
-from src.modules.deduper.clear_control import DeduperClearControl
+from src.modules.deduper.clear_control import (
+    DeduperCancellationProgress,
+    DeduperClearControl,
+    DeduperClearFailedError,
+)
 from src.modules.deduper.config import DeduperConfig
 from src.modules.deduper.errors import DeduperProcessorError
 from src.modules.deduper.orchestrator import DeduperOrchestrator
@@ -68,13 +73,14 @@ class JobManager:
         if report_id is not None:
             parameters = {"reportId": report_id}
 
-        result = self.queue_engine.enqueue_job(
-            EnqueueJobInput(
-                endpointName=self.DEDUPER_ENDPOINT_NAME,
-                run=self._build_deduper_runner(report_id),
-                parameters=parameters,
+        with self.deduper_clear_control.exclusive_operation():
+            result = self.queue_engine.enqueue_job(
+                EnqueueJobInput(
+                    endpointName=self.DEDUPER_ENDPOINT_NAME,
+                    run=self._build_deduper_runner(report_id),
+                    parameters=parameters,
+                )
             )
-        )
 
         return {
             "jobId": result.jobId,
@@ -139,29 +145,38 @@ class JobManager:
 
         return checks
 
-    def cancel_all_active_jobs(self) -> list[str]:
-        cancelled_jobs: list[str] = []
-
-        for job in self.queue_store.get_jobs():
-            if job.status not in {QueueJobStatus.QUEUED, QueueJobStatus.RUNNING}:
-                continue
-
-            success, _message = self.cancel_job(job.jobId)
-            if success:
-                cancelled_jobs.append(job.jobId)
-
-        return cancelled_jobs
-
     def run_clear_table(self) -> dict[str, Any]:
-        cancelled_jobs = self.cancel_all_active_jobs()
-        orchestrator, repository = self._create_orchestrator()
+        progress = DeduperCancellationProgress()
+        started = monotonic()
         try:
-            response = orchestrator.run_clear_table(skip_confirmation=True)
-        finally:
-            repository.close()
-
-        response["cancelledJobs"] = cancelled_jobs
-        return response
+            with self.deduper_clear_control.exclusive_operation():
+                self.logger.info("event=deduper_clear_started")
+                self.deduper_clear_control.cancel_and_wait(progress)
+                self.logger.info(
+                    "event=deduper_clear_stopped targets={} requested={} cancelled={} wait_seconds={}",
+                    progress.target_job_ids, progress.cancellation_requested_jobs,
+                    progress.cancelled_jobs, monotonic() - started,
+                )
+                orchestrator, repository = self._create_orchestrator()
+                try:
+                    self.deduper_clear_control.verify_stopped()
+                    response = orchestrator.run_clear_table(skip_confirmation=True)
+                finally:
+                    repository.close()
+                response["cancelledJobs"] = progress.cancelled_jobs
+                response["cancellationRequestedJobs"] = progress.cancellation_requested_jobs
+                self.logger.info(
+                    "event=deduper_clear_completed rows_deleted={} elapsed_seconds={}",
+                    response["rowsDeleted"], monotonic() - started,
+                )
+                return response
+        except Exception as exc:
+            self.logger.error(
+                "event=deduper_clear_failed targets={} requested={} cancelled={} elapsed_seconds={} error={}",
+                progress.target_job_ids, progress.cancellation_requested_jobs,
+                progress.cancelled_jobs, monotonic() - started, str(exc),
+            )
+            raise DeduperClearFailedError(exc, progress) from exc
 
     def wait_for_idle(self, timeout: float | None = None) -> bool:
         return self.queue_engine.on_idle(timeout=timeout)

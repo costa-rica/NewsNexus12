@@ -106,6 +106,8 @@ def test_clear_db_table_in_process_success(client, monkeypatch: pytest.MonkeyPat
     body = response.json()
     assert body["cleared"] is True
     assert body["exitCode"] == 0
+    assert body["rowsDeleted"] == 1
+    assert client.delete("/deduper/clear-db-table").json()["rowsDeleted"] == 0
 
 
 @pytest.mark.integration

@@ -254,6 +254,7 @@ def test_content_hash_and_embedding_flows(repo: DeduperRepository) -> None:
 
 @pytest.mark.unit
 def test_clear_all_analysis_data(repo: DeduperRepository) -> None:
+    articles_before = repo.execute_query('SELECT COUNT(*) AS c FROM "Articles"')
     repo.insert_article_duplicate_analysis_batch(
         [{"articleIdNew": 1, "articleIdApproved": 2, "sameArticleIdFlag": 0}]
     )
@@ -263,3 +264,5 @@ def test_clear_all_analysis_data(repo: DeduperRepository) -> None:
 
     remaining = repo.execute_query('SELECT COUNT(*) AS c FROM "ArticleDuplicateAnalyses"')
     assert remaining[0]["c"] == 0
+    assert repo.clear_all_analysis_data() == 0
+    assert repo.execute_query('SELECT COUNT(*) AS c FROM "Articles"') == articles_before

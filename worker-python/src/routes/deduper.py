@@ -3,19 +3,30 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from src.modules.deduper.clear_control import (
+    DeduperClearBusyError,
+    DeduperClearFailedError,
+    DeduperClearTimeoutError,
+)
 from src.services.job_manager import JobStatus, job_manager, utc_now_iso
 
 router = APIRouter(prefix="/deduper", tags=["deduper"])
 
 
 @router.get("/jobs", status_code=201)
-def create_deduper_job() -> dict:
-    return job_manager.enqueue_deduper_job()
+def create_deduper_job():
+    try:
+        return job_manager.enqueue_deduper_job()
+    except DeduperClearBusyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
 
 
 @router.get("/jobs/reportId/{report_id}", status_code=201)
-def create_deduper_job_by_report_id(report_id: int) -> dict:
-    return job_manager.enqueue_deduper_job(report_id=report_id)
+def create_deduper_job_by_report_id(report_id: int):
+    try:
+        return job_manager.enqueue_deduper_job(report_id=report_id)
+    except DeduperClearBusyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
 
 
 @router.get("/jobs/list")
@@ -89,11 +100,29 @@ def clear_db_table() -> JSONResponse:
         if response["cleared"]:
             return JSONResponse(response, status_code=200)
         return JSONResponse(response, status_code=500)
+    except DeduperClearFailedError as exc:
+        status_code = 500
+        if isinstance(exc.cause, DeduperClearBusyError):
+            status_code = 409
+        elif isinstance(exc.cause, DeduperClearTimeoutError):
+            status_code = 504
+        return JSONResponse(
+            {
+                "cleared": False,
+                "error": str(exc),
+                "cancelledJobs": exc.progress.cancelled_jobs,
+                "cancellationRequestedJobs": exc.progress.cancellation_requested_jobs,
+                "timestamp": utc_now_iso(),
+            },
+            status_code=status_code,
+        )
     except Exception as exc:
         return JSONResponse(
             {
+                "cleared": False,
                 "error": str(exc),
                 "cancelledJobs": [],
+                "cancellationRequestedJobs": [],
                 "timestamp": utc_now_iso(),
             },
             status_code=500,

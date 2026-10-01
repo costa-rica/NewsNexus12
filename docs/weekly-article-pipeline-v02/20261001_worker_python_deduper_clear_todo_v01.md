@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T21:58:44Z
-updated_at: 2026-10-01T23:10:27Z
+updated_at: 2026-10-01T23:18:45Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -17,11 +17,12 @@ modified_by: codex (gpt-6) nicksmacbookair
 
 ## Implementation progress
 
-- The first increment adds `DeduperClearControl` and timeout parsing. Each job manager owns one control instance; endpoint and submission wiring remain Phase 2 work. The existing clear endpoint still has its old behavior and is not ready for pipeline use.
-- Verification: 50 focused clear-control, configuration, queue, and database-free job-manager tests passed; `compileall` passed. No separate Python build, lint, or type-check command is configured.
-- Tests used temporary queue/log paths and disabled dotenv loading. PostgreSQL settings pointed to an unreachable local port so this increment could not exercise a real database. Destructive database verification remains pending.
-- Both deduper start routes use the same job manager. The documented local launch uses one queue-owning process; actual Ubuntu deployment process counts have not been verified. Confirm that assumption before connecting or deploying the guarded endpoint.
-- Operator review of this increment and endpoint integration are still pending. Keep server validation and later-phase checkboxes open.
+- Phase 1 helpers and Phase 2 endpoint integration are implemented. Plain DELETE requests now cancel only deduper jobs, wait for execution to end, and clear the table. The broad cancellation helper is removed; unrelated services and jobs remain running.
+- The endpoint reports 409 for conflicts, 504 for cancellation timeout, and 500 for other failures, preserving cancellation results. Success includes the committed DELETE count in `rowsDeleted`. Deduper start routes retain their successful response contract.
+- Validation: 87 focused configuration, queue, job-manager, deduper, and clear-route tests passed using an isolated temporary PostgreSQL instance. The temporary instance was stopped and removed. Python syntax checks passed; no dedicated Python build/lint/type-check command is configured.
+- Additional route checks cover unrelated queue progress during deletion and unchanged successful deduper starts. README and worker API documentation were updated with the endpoint behavior and configuration.
+- Both deduper start routes use the same job manager and admission guard. The supported deployment remains one queue-owning process; actual Ubuntu process counts and server behavior still need verification before deployment.
+- Phase 2 awaits operator review. Full-suite/API-proxy regression checks and Ubuntu validation remain Phase 3/4 work. No coordinator or production deployment changes were made.
 
 ## Implementation approach to vet
 
@@ -51,7 +52,7 @@ modified_by: codex (gpt-6) nicksmacbookair
 
 - [x] Record the operator-approved `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS` setting: positive integer, default 30 seconds. Review the implemented guard and wait with the operator during this increment's closeout before endpoint integration.
 - [ ] Confirm every live deduper enqueue path uses the same job manager and guard, and confirm the single queue-owner deployment assumption. Record the supported scope without changing deployment configuration.
-- [ ] Before database-backed tests, explicitly select a disposable PostgreSQL database and isolate queue/log paths. `tests/conftest.py` uses `setdefault`, and `reset_public_schema()` drops the public schema; inherited environment values must not select the development or production database by accident.
+- [x] Before database-backed tests, explicitly select a disposable PostgreSQL database and isolate queue/log paths. `tests/conftest.py` uses `setdefault`, and `reset_public_schema()` drops the public schema; inherited environment values must not select the development or production database by accident.
 - [x] Add timeout parsing and focused validation tests using the existing deduper configuration conventions. Reject invalid values before cancellation or deletion begins.
 - [x] Add the deduper-only guard and helper operations in `src/services/job_manager.py` or a small deduper helper module. Leave unrelated queue behavior intact; do not hold the queue engine's state lock during waiting or database work.
 - [x] Implement filtered cancellation and bounded completion checking using the existing queue methods. Handle jobs completing between selection and cancellation, queued-to-running transitions, and cancellation requests that remain pending.
@@ -61,17 +62,17 @@ modified_by: codex (gpt-6) nicksmacbookair
 
 ## Phase 2: endpoint integration
 
-- [ ] Integrate the guard into `enqueue_deduper_job()` so both existing deduper start routes reject conflicting submissions with the proposed 409 response. Do not enqueue a job or leave an orphan queue record on rejection.
-- [ ] Replace `run_clear_table()`'s broad cancellation with the guarded deduper-only sequence: select, cancel, await execution exit, delete, and report. Remove `cancel_all_active_jobs()` if the repository search confirms no remaining callers.
-- [ ] Check for affected deduper work immediately before deletion while retaining the guard. Ensure a second clear or new deduper submission cannot enter the protected interval. Do not wait for the whole worker-python queue to drain.
-- [ ] Add `rowsDeleted` to the clear result through the deduper repository/orchestrator boundary. Use the committed DELETE's affected-row count rather than reporting an unverified pre-delete count as actual deletion.
-- [ ] Preserve `DeduperOrchestrator.run_analyze()` and `run_analyze_fast()` using their internal clear-first path. Endpoint coordination must not cause a running deduper to wait for or cancel itself.
-- [ ] Update `src/routes/deduper.py` to return the agreed success, busy, timeout, and failure responses. Keep the DELETE endpoint argument-free and provide no cancellation-all option or fallback.
-- [ ] Preserve actual cancellation results on failures. Release the guard and close any opened repository in all exit paths, including configuration, cancellation, and database errors.
-- [ ] Log selected deduper IDs, requests, confirmed cancellations, wait duration, affected rows, and failure context through the existing worker-python logger. Do not log credentials.
-- [ ] Extend `tests/integration/test_routes.py`, `tests/unit/test_job_manager.py`, and relevant deduper tests for success, empty table, timeout, concurrent clear, conflicting job starts, database failure, and successful reuse after a failure releases the guard.
-- [ ] Test that an unrelated job can finish and another unrelated job can progress during the clear operation. Verify canceled queued deduper jobs never execute and a running deduper cannot write after clearing starts.
-- [ ] Complete the phase closeout below and review the real endpoint behavior with the operator before progressing.
+- [x] Integrate the guard into `enqueue_deduper_job()` so both existing deduper start routes reject conflicting submissions with the proposed 409 response. Do not enqueue a job or leave an orphan queue record on rejection.
+- [x] Replace `run_clear_table()`'s broad cancellation with the guarded deduper-only sequence: select, cancel, await execution exit, delete, and report. Remove `cancel_all_active_jobs()` if the repository search confirms no remaining callers.
+- [x] Check for affected deduper work immediately before deletion while retaining the guard. Ensure a second clear or new deduper submission cannot enter the protected interval. Do not wait for the whole worker-python queue to drain.
+- [x] Add `rowsDeleted` to the clear result through the deduper repository/orchestrator boundary. Use the committed DELETE's affected-row count rather than reporting an unverified pre-delete count as actual deletion.
+- [x] Preserve `DeduperOrchestrator.run_analyze()` and `run_analyze_fast()` using their internal clear-first path. Endpoint coordination must not cause a running deduper to wait for or cancel itself.
+- [x] Update `src/routes/deduper.py` to return the agreed success, busy, timeout, and failure responses. Keep the DELETE endpoint argument-free and provide no cancellation-all option or fallback.
+- [x] Preserve actual cancellation results on failures. Release the guard and close any opened repository in all exit paths, including configuration, cancellation, and database errors.
+- [x] Log selected deduper IDs, requests, confirmed cancellations, wait duration, affected rows, and failure context through the existing worker-python logger. Do not log credentials.
+- [x] Extend `tests/integration/test_routes.py`, `tests/unit/test_job_manager.py`, and relevant deduper tests for success, empty table, timeout, concurrent clear, conflicting job starts, database failure, and successful reuse after a failure releases the guard.
+- [x] Test that an unrelated job can finish and another unrelated job can progress during the clear operation. Verify canceled queued deduper jobs never execute and a running deduper cannot write after clearing starts.
+- [ ] Review Phase 2 with the operator before progressing. Implementation, focused tests, syntax checks, and documentation are complete; commit this increment under the phase closeout rules.
 
 ## Phase 3: regression checks and documentation
 

@@ -175,10 +175,8 @@ class DeduperRepository:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM "ArticleDuplicateAnalyses"')
-            row_count = int(self._scalar(cursor.fetchone()))
-
             cursor.execute('DELETE FROM "ArticleDuplicateAnalyses"')
+            row_count = cursor.rowcount
             conn.commit()
             return row_count
         except psycopg.Error as exc:

@@ -147,6 +147,7 @@ class DeduperOrchestrator:
         rows_deleted = self.repository.clear_all_analysis_data()
         return {
             "cleared": True,
+            "rowsDeleted": rows_deleted,
             "cancelledJobs": [],
             "exitCode": 0,
             "stdout": (

@@ -49,6 +49,19 @@ def config() -> DeduperConfig:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("method", ["run_analyze", "run_analyze_fast"])
+def test_analysis_keeps_internal_clear_without_endpoint_cancellation(monkeypatch, config, method):
+    from src.modules.deduper import orchestrator as orch_mod
+
+    repo = _Repo()
+    orch = DeduperOrchestrator(repo, config)
+    for name in ("LoadProcessor", "StatesProcessor", "UrlCheckProcessor", "ContentHashProcessor", "EmbeddingProcessor"):
+        monkeypatch.setattr(orch_mod, name, _Proc)
+    assert getattr(orch, method)(report_id=5).status == "completed"
+    assert repo.cleared == 1
+
+
+@pytest.mark.unit
 def test_run_analyze_fast_resume_without_clear(monkeypatch: pytest.MonkeyPatch, config) -> None:
     from src.modules.deduper import orchestrator as orch_mod
 

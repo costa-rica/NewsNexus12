@@ -31,6 +31,15 @@ class DeduperCancellationProgress:
     cancelled_jobs: list[str] = field(default_factory=list)
 
 
+class DeduperClearFailedError(DeduperError):
+    """Keep partial cancellation results available to the HTTP error response."""
+
+    def __init__(self, cause: Exception, progress: DeduperCancellationProgress) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.progress = progress
+
+
 class DeduperClearControl:
     def __init__(
         self,
@@ -106,3 +115,18 @@ class DeduperClearControl:
                     f"Deduper did not stop within {timeout} seconds; table was not cleared"
                 )
             self._wait(min(0.05, remaining))
+
+    def verify_stopped(self) -> None:
+        """Recheck immediately before deletion while the admission guard is held."""
+        active_id = self._engine.get_running_job_id()
+        jobs = self._store.get_jobs()
+        if active_id is not None and not any(job.jobId == active_id for job in jobs):
+            raise DeduperError("Cannot verify active job: record missing")
+        if any(
+            job.endpointName == self._endpoint_name
+            and (job.jobId == active_id or job.status in {
+                QueueJobStatus.QUEUED, QueueJobStatus.RUNNING
+            })
+            for job in jobs
+        ):
+            raise DeduperError("Deduper work is still active; table was not cleared")
