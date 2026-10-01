@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T21:58:44Z
-updated_at: 2026-10-01T21:58:44Z
+updated_at: 2026-10-01T23:10:27Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -13,7 +13,15 @@ modified_by: codex (gpt-6) nicksmacbookair
 - Complete this endpoint change before connecting the working weekly phase 1 module. The coordinator scaffold is separate work and is not part of this todo.
 - This todo includes the focused implementation approach for Claude to vet under [Plan and Vet](../PLAN_AND_VET.md). Do not treat the PRD review as an assessment of this new todo or its concurrency design.
 - Work in small increments with the operator. Review each implementation phase and its verification before moving to the next. Do not deploy a partially completed endpoint change.
-- The PRD's proposed 30-second cancellation timeout remains an agent recommendation. Confirm it with the operator before implementing the default; no recommendation is silently treated as an operator response.
+- The operator approved the configurable 30-second cancellation timeout on 2026-10-01 and directed implementation to begin.
+
+## Implementation progress
+
+- The first increment adds `DeduperClearControl` and timeout parsing. Each job manager owns one control instance; endpoint and submission wiring remain Phase 2 work. The existing clear endpoint still has its old behavior and is not ready for pipeline use.
+- Verification: 50 focused clear-control, configuration, queue, and database-free job-manager tests passed; `compileall` passed. No separate Python build, lint, or type-check command is configured.
+- Tests used temporary queue/log paths and disabled dotenv loading. PostgreSQL settings pointed to an unreachable local port so this increment could not exercise a real database. Destructive database verification remains pending.
+- Both deduper start routes use the same job manager. The documented local launch uses one queue-owning process; actual Ubuntu deployment process counts have not been verified. Confirm that assumption before connecting or deploying the guarded endpoint.
+- Operator review of this increment and endpoint integration are still pending. Keep server validation and later-phase checkboxes open.
 
 ## Implementation approach to vet
 
@@ -41,14 +49,14 @@ modified_by: codex (gpt-6) nicksmacbookair
 
 ## Phase 1: scoped cancellation primitives
 
-- [ ] Review the guard, wait, response contract, and configurable timeout with the operator. Resolve the default in the PRD's open question before coding it; proposed setting: `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS`, positive integer, default 30 seconds.
+- [x] Record the operator-approved `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS` setting: positive integer, default 30 seconds. Review the implemented guard and wait with the operator during this increment's closeout before endpoint integration.
 - [ ] Confirm every live deduper enqueue path uses the same job manager and guard, and confirm the single queue-owner deployment assumption. Record the supported scope without changing deployment configuration.
 - [ ] Before database-backed tests, explicitly select a disposable PostgreSQL database and isolate queue/log paths. `tests/conftest.py` uses `setdefault`, and `reset_public_schema()` drops the public schema; inherited environment values must not select the development or production database by accident.
-- [ ] Add timeout parsing and focused validation tests using the existing deduper configuration conventions. Reject invalid values before cancellation or deletion begins.
-- [ ] Add the deduper-only guard and helper operations in `src/services/job_manager.py` or a small deduper helper module. Leave unrelated queue behavior intact; do not hold the queue engine's state lock during waiting or database work.
-- [ ] Implement filtered cancellation and bounded completion checking using the existing queue methods. Handle jobs completing between selection and cancellation, queued-to-running transitions, and cancellation requests that remain pending.
-- [ ] Add deterministic tests in `tests/unit/test_job_manager.py` and, only if queue support changes are needed, `tests/unit/queue/`. Use events/barriers and isolated queue stores rather than relying on long sleeps.
-- [ ] Verify a mixed queue preserves unrelated jobs, the helper waits for an affected running handler to exit, it does not wait for unrelated work, and timeout produces no deletion call.
+- [x] Add timeout parsing and focused validation tests using the existing deduper configuration conventions. Reject invalid values before cancellation or deletion begins.
+- [x] Add the deduper-only guard and helper operations in `src/services/job_manager.py` or a small deduper helper module. Leave unrelated queue behavior intact; do not hold the queue engine's state lock during waiting or database work.
+- [x] Implement filtered cancellation and bounded completion checking using the existing queue methods. Handle jobs completing between selection and cancellation, queued-to-running transitions, and cancellation requests that remain pending.
+- [x] Add deterministic helper tests in `tests/unit/deduper/test_clear_control.py`, alongside configuration tests, and run relevant existing queue/job-manager checks. Use events/barriers and isolated queue stores rather than relying on long sleeps.
+- [x] Verify a mixed queue preserves unrelated jobs, the helper waits for an affected running handler to exit, it does not wait for unrelated work, and timeout prevents the caller from reaching its deletion step. Real endpoint deletion tests remain Phase 2 work.
 - [ ] Complete the phase closeout below: applicable checks, focused tests, Python syntax verification, checked-off tasks, task-related commit, and operator review. Keep the endpoint marked unfinished until Phase 2 is complete.
 
 ## Phase 2: endpoint integration

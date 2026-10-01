@@ -2,8 +2,28 @@ import os
 
 import pytest
 
-from src.modules.deduper.config import DeduperConfig
+from src.modules.deduper.config import DeduperConfig, resolve_clear_cancel_timeout_seconds
 from src.modules.deduper.errors import DeduperConfigError
+
+
+@pytest.mark.unit
+def test_clear_cancel_timeout_default(monkeypatch) -> None:
+    monkeypatch.delenv("DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS", raising=False)
+    assert resolve_clear_cancel_timeout_seconds() == 30
+
+
+@pytest.mark.unit
+def test_clear_cancel_timeout_override(monkeypatch) -> None:
+    monkeypatch.setenv("DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS", "60")
+    assert resolve_clear_cancel_timeout_seconds() == 60
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", ["0", "-1", "", "1.5", "invalid"])
+def test_clear_cancel_timeout_invalid(monkeypatch, value) -> None:
+    monkeypatch.setenv("DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS", value)
+    with pytest.raises(DeduperConfigError, match="DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS"):
+        resolve_clear_cancel_timeout_seconds()
 
 
 @pytest.mark.unit

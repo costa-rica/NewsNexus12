@@ -39,6 +39,11 @@ def _parse_positive_int(value: str, key: str) -> int:
     return parsed
 
 
+def resolve_clear_cancel_timeout_seconds() -> int:
+    key = "DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS"
+    return _parse_positive_int(os.getenv(key, "30"), key)
+
+
 @dataclass(slots=True)
 class DeduperConfig:
     pg_host: str

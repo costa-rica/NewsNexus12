@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from src.modules.deduper.clear_control import DeduperClearControl
 from src.modules.deduper.config import DeduperConfig
 from src.modules.deduper.errors import DeduperProcessorError
 from src.modules.deduper.orchestrator import DeduperOrchestrator
@@ -58,6 +59,9 @@ class JobManager:
         self.queue_engine = queue_engine
         self.queue_store = queue_store
         self.logger = logger
+        self.deduper_clear_control = DeduperClearControl(
+            queue_engine, queue_store, self.DEDUPER_ENDPOINT_NAME
+        )
 
     def enqueue_deduper_job(self, report_id: int | None = None) -> dict[str, str | int]:
         parameters: dict[str, str | int | float | bool | None] | None = None

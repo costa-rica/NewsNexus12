@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T21:26:59Z
-updated_at: 2026-10-01T21:54:01Z
+updated_at: 2026-10-01T23:10:27Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -74,7 +74,7 @@ The current RSS result reports `articlesAddedCount` but does not expose the requ
 
 - Implement and verify the [Worker Python Deduper Clear PRD](20261001_worker_python_deduper_clear_prd_v01.md) before connecting the working phase 1 module. The initial logging stub can be built independently.
 - Every endpoint call must cancel only deduper jobs, wait for running deduper work to stop, and then clear the table. Remove cancellation of unrelated workflows entirely, with no option to restore it. Keep worker-python running.
-- Worker-python owns protection against concurrent deduper writes and the bounded cancellation wait. The endpoint PRD defines these requirements and contains the pending timeout decision.
+- Worker-python owns protection against concurrent deduper writes and the bounded cancellation wait. The endpoint PRD defines these requirements, including the operator-approved configurable 30-second cancellation wait.
 - Ops makes the HTTP request and logs the confirmed cancellation and deletion results. It does not delete analysis rows directly. A timeout, failed request, or unsuccessful response must not be reported as phase completion or trigger phase 2.
 
 ## Progress and recovery

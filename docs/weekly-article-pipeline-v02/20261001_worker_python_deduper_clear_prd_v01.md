@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T21:45:25Z
-updated_at: 2026-10-01T21:54:01Z
+updated_at: 2026-10-01T23:10:27Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -37,7 +37,7 @@ Make `DELETE /deduper/clear-db-table` cancel only deduper jobs and wait for runn
 
 ## Bounded waiting and failure
 
-- Use a finite, configurable wait for running deduper work to stop. The initial timeout is the open decision below.
+- Use `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS`, a positive integer with a 30-second default, to bound the wait for running deduper work to stop. The operator approved this default on 2026-10-01. This bounds cancellation waiting, not normal analysis duration or the database deletion itself.
 - If the timeout expires or stopping the deduper cannot be verified, do not begin deletion. Return a non-success HTTP response with `cleared = false` and an actionable explanation.
 - Distinguish jobs whose cancellation was requested from jobs confirmed canceled. Do not report a still-running job as successfully stopped.
 - If deletion fails, report the failure rather than claiming success. Release temporary coordination in all exit paths. Cancellation already performed is not undone by a later deletion failure.
@@ -70,13 +70,3 @@ Make `DELETE /deduper/clear-db-table` cancel only deduper jobs and wait for runn
 - Review the cancellation filter, completion wait, concurrent-start protection, and response handling with the operator in small increments.
 - Validate locally on macOS, then on the Ubuntu development server before the weekly phase 1 module relies on the endpoint.
 - Do not implement the weekly coordinator, later phases, a replacement queue, or a broader scheduler as part of this change.
-
-## Open Questions
-
-### 1. Cancellation wait timeout
-
-How long should the endpoint wait for running deduper work to stop before returning a failure without clearing the table?
-
-#### Operator Response
-
-(codex) Recommend a configurable 30-second default. If deduper work does not stop in that time, return failure without deleting rows.
