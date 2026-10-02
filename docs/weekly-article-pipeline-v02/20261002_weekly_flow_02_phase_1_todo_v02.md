@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T21:59:25Z
+updated_at: 2026-10-02T22:03:06Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -163,7 +163,7 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 - [x] Review error messages to confirm they are actionable and do not expose the configured worker URL.
 - [x] Record commands, versions, executed test files, test count, and results below.
 - [x] Commit only Phase 2 files and this todo update using the repository commit-message guidance.
-- [ ] Review Phase 2 with the operator before beginning Phase 3.
+- [x] Review Phase 2 with the operator before beginning Phase 3.
 
 ### Phase 2 verification record
 
@@ -179,42 +179,50 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 3: Coordinator integration and documentation
 
-- [ ] Make `runCoordinator()` asynchronous and pass it `OpsConfig` from `index.ts`.
-- [ ] Await `runCoordinator()` before draining and closing the logger.
-- [ ] Pass the worker URL, timeout, and request dependency directly from the coordinator to Phase 1.
-- [ ] Keep the default production request dependency as `globalThis.fetch`.
-- [ ] Log Phase 1 start before issuing the request.
-- [ ] Await the validated Phase 1 result.
-- [ ] Log Phase 1 completion with `rowsDeleted`, `cancelledJobs`, and `cancellationRequestedJobs`.
-- [ ] Replace the stub message with a message that execution stopped before unimplemented Phase 2.
-- [ ] Allow every Phase 1 error to reach the existing top-level handler and produce a nonzero exit status.
-- [ ] Confirm a failure never logs Phase 1 completion or the scaffold success boundary.
-- [ ] Keep the next invocation starting from Phase 1; do not add retry or state inspection.
-- [ ] Add coordinator success and failure cases to `01_clearDuplicateAnalyses.test.ts` so the explicit test-file list remains unchanged.
-- [ ] Test that HTTP, invalid-response, connection, and timeout failures prevent completion logging and later work.
-- [ ] Update `ops/README.md` with the real Phase 1 call sequence, success output, failure behavior, and safe rerun behavior.
-- [ ] Rewrite or retire the existing temporary-log scaffold check because the new configuration is required and the flow performs a real DELETE.
-- [ ] If a runnable README check remains, require a controlled local fixture and explicit environment values; never let it fall back to the worker URL in `ops/.env`.
-- [ ] Document where a manual operator sees failure: terminal output, nonzero exit, and configured coordinator log.
-- [ ] State that future systemd execution must expose the failed unit, journal entry, and application log before unattended rollout.
-- [ ] Do not add systemd files or notification logic in this increment.
+- [x] Make `runCoordinator()` asynchronous and pass it `OpsConfig` from `index.ts`.
+- [x] Await `runCoordinator()` before draining and closing the logger.
+- [x] Pass the worker URL, timeout, and request dependency directly from the coordinator to Phase 1.
+- [x] Keep the default production request dependency as `globalThis.fetch`.
+- [x] Log Phase 1 start before issuing the request.
+- [x] Await the validated Phase 1 result.
+- [x] Log Phase 1 completion with `rowsDeleted`, `cancelledJobs`, and `cancellationRequestedJobs`.
+- [x] Replace the stub message with a message that execution stopped before unimplemented Phase 2.
+- [x] Allow every Phase 1 error to reach the existing top-level handler and produce a nonzero exit status.
+- [x] Confirm a failure never logs Phase 1 completion or the scaffold success boundary.
+- [x] Keep the next invocation starting from Phase 1; do not add retry or state inspection.
+- [x] Add coordinator success and failure cases to `01_clearDuplicateAnalyses.test.ts` so the explicit test-file list remains unchanged.
+- [x] Test that HTTP, invalid-response, connection, and timeout failures prevent completion logging and later work.
+- [x] Update `ops/README.md` with the real Phase 1 call sequence, success output, failure behavior, and safe rerun behavior.
+- [x] Rewrite or retire the existing temporary-log scaffold check because the new configuration is required and the flow performs a real DELETE.
+- [x] If a runnable README check remains, require a controlled local fixture and explicit environment values; never let it fall back to the worker URL in `ops/.env`.
+- [x] Document where a manual operator sees failure: terminal output, nonzero exit, and configured coordinator log.
+- [x] State that future systemd execution must expose the failed unit, journal entry, and application log before unattended rollout.
+- [x] Do not add systemd files or notification logic in this increment.
 
 ### Phase 3 verification and closeout
 
-- [ ] Confirm both expected compiled test files exist before running tests.
-- [ ] Run the complete ops test command and confirm both files report results.
-- [ ] Confirm the test count is not lower than the Phase 2 count and includes the new coordinator cases.
-- [ ] Run the ops type check and clean production build.
-- [ ] Confirm success logs contain validated counts and no stub completion claim remains.
-- [ ] Confirm each tested failure produces no Phase 1 completion message.
-- [ ] Confirm generated test output remains ignored and absent from the commit.
-- [ ] Record commands, versions, executed test files, test count, and results below.
-- [ ] Commit only Phase 3 files and this todo update using the repository commit-message guidance.
+- [x] Confirm both expected compiled test files exist before running tests.
+- [x] Run the complete ops test command and confirm both files report results.
+- [x] Confirm the test count is not lower than the Phase 2 count and includes the new coordinator cases.
+- [x] Run the ops type check and clean production build.
+- [x] Confirm success logs contain validated counts and no stub completion claim remains.
+- [x] Confirm each tested failure produces no Phase 1 completion message.
+- [x] Confirm generated test output remains ignored and absent from the commit.
+- [x] Record commands, versions, executed test files, test count, and results below.
+- [x] Commit only Phase 3 files and this todo update using the repository commit-message guidance.
 - [ ] Review Phase 3 with the operator before beginning Phase 4.
 
 ### Phase 3 verification record
 
-- Pending.
+- Environment: macOS, Node v24.11.0, npm 11.6.1.
+- `npm test --workspace newsnexus12-ops`: passed with both explicit compiled test paths.
+- Test result: 27 tests passed in four suites, up from the Phase 2 total of 25. The two new coordinator cases cover success and four failure categories.
+- `npm run typecheck --workspace newsnexus12-ops`: passed.
+- `npm run build --workspace newsnexus12-ops`: passed after cleaning production output.
+- Both expected compiled test files existed. The success case recorded validated counts and job collections before the Phase 2 boundary message.
+- HTTP, invalid-response, connection, and timeout cases logged Phase 1 failure and produced no Phase 1 completion or Phase 2 boundary message.
+- `git status --short -- ops/dist-test` produced no output. Generated test output remained ignored, and production output contained no tests or stale unnumbered module.
+- The README scaffold command was retired because the entry point now performs the real DELETE. Automated verification uses injected request substitutes and does not contact worker-python.
 
 ## Implementation phase 4: Local runtime verification
 

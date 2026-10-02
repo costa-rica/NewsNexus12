@@ -1,6 +1,23 @@
-import type { Logger } from 'winston';
+import type { OpsConfig } from '../../config';
+import {
+  requestClearDuplicateAnalyses,
+  type ClearDuplicateAnalysesResult,
+  type WorkerRequest
+} from './01_clearDuplicateAnalysesRequest';
 
-export function clearDuplicateAnalyses(logger: Logger): void {
-  // The worker-python request will be added in a separately reviewed increment.
-  logger.info('Phase 1 entered; clearing not implemented', { phase: 1 });
-}
+export type { ClearDuplicateAnalysesResult, WorkerRequest };
+
+type PhaseOneConfig = Pick<
+  OpsConfig,
+  'workerPythonBaseUrl' | 'workerPythonRequestTimeoutSeconds'
+>;
+
+export const clearDuplicateAnalyses = (
+  config: PhaseOneConfig,
+  request: WorkerRequest = globalThis.fetch
+): Promise<ClearDuplicateAnalysesResult> =>
+  requestClearDuplicateAnalyses(
+    config.workerPythonBaseUrl,
+    config.workerPythonRequestTimeoutSeconds,
+    request
+  );

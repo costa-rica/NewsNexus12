@@ -7,7 +7,7 @@ async function main(): Promise<void> {
   const logger = initializeLogger(config);
 
   try {
-    runCoordinator(logger);
+    await runCoordinator(logger, config);
   } finally {
     // Let the last messages reach their destinations before the process exits.
     await finishLogging(logger);
@@ -16,6 +16,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   // Configuration or logger startup can fail before file logging is available.
-  console.error('Weekly pipeline scaffold failed:', error);
+  console.error('Weekly pipeline failed:', error);
   process.exitCode = 1;
 });

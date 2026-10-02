@@ -1,11 +1,43 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { OpsConfig } from '../../src/config';
+import {
+  runCoordinator,
+  type CoordinatorLogger
+} from '../../src/weekly-flow-02/coordinator';
 import {
   ClearDuplicateAnalysesError,
   parseClearDuplicateAnalysesResponse,
   requestClearDuplicateAnalyses,
   type WorkerRequest
 } from '../../src/weekly-flow-02/phases/01_clearDuplicateAnalysesRequest';
+
+interface LogEntry {
+  level: 'error' | 'info';
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
+const coordinatorConfig: OpsConfig = {
+  nodeEnv: 'testing',
+  nameApp: 'weekly-flow-test',
+  workerPythonBaseUrl: 'http://worker.test:5000/',
+  workerPythonRequestTimeoutSeconds: 90,
+  pathToLogs: '/tmp/weekly-flow-test',
+  logMaxSizeMb: 5,
+  logMaxFiles: 5
+};
+
+const recordingLogger = (): { logger: CoordinatorLogger; entries: LogEntry[] } => {
+  const entries: LogEntry[] = [];
+  return {
+    entries,
+    logger: {
+      info: (message, metadata) => entries.push({ level: 'info', message, metadata }),
+      error: (message, metadata) => entries.push({ level: 'error', message, metadata })
+    }
+  };
+};
 
 const successfulBody = (rowsDeleted = 3): Record<string, unknown> => ({
   cleared: true,
@@ -213,5 +245,63 @@ describe('requestClearDuplicateAnalyses', () => {
 
     assert.equal(error.cause, timeoutFailure);
     assert.match(error.message, /90 seconds; outcome unverified/);
+  });
+});
+
+describe('runCoordinator', () => {
+  it('logs validated Phase 1 completion and stops before Phase 2', async () => {
+    const { logger, entries } = recordingLogger();
+    const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
+
+    await runCoordinator(logger, coordinatorConfig, request);
+
+    const completion = entries.find((entry) => entry.message.startsWith('Phase 1 completed'));
+    assert.deepEqual(completion, {
+      level: 'info',
+      message: 'Phase 1 completed: duplicate analyses cleared',
+      metadata: {
+        phase: 1,
+        rowsDeleted: 7,
+        cancelledJobs: ['deduper-queued'],
+        cancellationRequestedJobs: ['deduper-running'],
+        workerTimestamp: '2026-10-02T21:00:00Z'
+      }
+    });
+    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 2')));
+    assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
+  });
+
+  it('logs each Phase 1 failure category and does not log completion', async () => {
+    const cases: Array<[ClearDuplicateAnalysesError['category'], WorkerRequest]> = [
+      ['http', async () => jsonResponse({ error: 'worker failed' }, 500)],
+      ['invalid_response', async () => jsonResponse({ cleared: false })],
+      [
+        'connection',
+        async () => {
+          throw new Error('connection refused');
+        }
+      ],
+      [
+        'timeout',
+        async () => {
+          throw new DOMException('timed out', 'TimeoutError');
+        }
+      ]
+    ];
+
+    for (const [category, request] of cases) {
+      const { logger, entries } = recordingLogger();
+
+      await assert.rejects(
+        runCoordinator(logger, coordinatorConfig, request),
+        (error: unknown) =>
+          error instanceof ClearDuplicateAnalysesError && error.category === category
+      );
+
+      const failure = entries.find((entry) => entry.level === 'error');
+      assert.equal(failure?.metadata?.failureCategory, category);
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 1 completed')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 2')));
+    }
   });
 });
