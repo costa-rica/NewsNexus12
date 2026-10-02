@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T22:06:11Z
+updated_at: 2026-10-02T22:37:16Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -245,7 +245,7 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 - [x] Record any verification that could not be completed; do not mark it successful.
 - [x] Update tracked docs only when verification changes operator instructions.
 - [x] Commit only Phase 4 documentation or fixes and this todo update using the repository commit-message guidance.
-- [ ] Review local readiness with the operator before contacting the development worker.
+- [x] Review local readiness with the operator before contacting the development worker.
 
 ### Phase 4 verification record
 
@@ -263,37 +263,44 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 5: Ubuntu development validation
 
-- [ ] Confirm `nws-nn12dev` has the intended branch and commit before testing.
-- [ ] Record the server's Node and npm versions and confirm Node 20 or newer.
-- [ ] Confirm the intended Linux user, repository path, log path permissions, and ops environment file permissions.
-- [ ] Confirm `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` targets the intended development worker without printing credentials.
-- [ ] Confirm `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` is 90.
-- [ ] Confirm the worker's database target is the intended development or disposable PostgreSQL database before invoking the clear endpoint.
-- [ ] Run the ops test command, type check, and clean production build on the server.
-- [ ] Confirm both expected compiled test files report results and record the test count.
-- [ ] Confirm generated test output is ignored and absent from production `dist/`.
-- [ ] Run the compiled weekly-flow-02 entry point under the intended user.
-- [ ] Confirm the request reaches `DELETE /deduper/clear-db-table` and exits successfully only after a validated response.
-- [ ] Record `rowsDeleted`, cancellation collections, worker timestamp, coordinator logs, and exit status without recording secrets.
-- [ ] Confirm `ArticleDuplicateAnalyses` still exists after clearing.
-- [ ] Run the flow a second time and confirm a successful zero-row result when no new analyses were added.
-- [ ] Confirm unrelated database data remains intact using an agreed non-destructive check.
-- [ ] Confirm a Phase 1 failure is visible in the terminal, nonzero exit status, and configured coordinator log using a safe controlled failure when practical.
-- [ ] Do not install or enable systemd units as part of this validation.
+- [x] Confirm `nws-nn12dev` has the intended branch and commit before testing.
+- [x] Record the server's Node and npm versions and confirm Node 20 or newer.
+- [x] Confirm the intended Linux user, repository path, log path permissions, and ops environment file permissions.
+- [x] Confirm `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` targets the intended development worker without printing credentials.
+- [x] Confirm `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` is 90.
+- [x] Confirm the worker's database target is the intended development or disposable PostgreSQL database before invoking the clear endpoint.
+- [x] Run the ops test command, type check, and clean production build on the server.
+- [x] Confirm both expected compiled test files report results and record the test count.
+- [x] Confirm generated test output is ignored and absent from production `dist/`.
+- [x] Run the compiled weekly-flow-02 entry point under the intended user.
+- [x] Confirm the request reaches `DELETE /deduper/clear-db-table` and exits successfully only after a validated response.
+- [x] Record `rowsDeleted`, cancellation collections, worker timestamp, coordinator logs, and exit status without recording secrets.
+- [x] Confirm `ArticleDuplicateAnalyses` still exists after clearing.
+- [x] Run the flow a second time and confirm a successful zero-row result when no new analyses were added.
+- [x] Confirm unrelated database data remains intact using an agreed non-destructive check.
+- [x] Confirm a Phase 1 failure is visible in the terminal, nonzero exit status, and configured coordinator log using a safe controlled failure when practical.
+- [x] Do not install or enable systemd units as part of this validation.
 
 ### Phase 5 verification and closeout
 
-- [ ] Record server commands, versions, database target description, test count, results, and limitations below.
-- [ ] Distinguish operator-reported evidence from commands directly observed by the implementing agent.
-- [ ] Record unavailable concurrency or timeout validation as a limitation rather than success.
-- [ ] Run final local ops tests, type checking, and clean production build if server validation causes code changes.
-- [ ] Confirm the final diff contains no environment secrets, generated output, temporary logs, or unrelated archived-document changes.
-- [ ] Commit only Phase 5 documentation or fixes and this todo update using the repository commit-message guidance.
-- [ ] Review the completed Phase 1 increment with the operator before planning Phase 2.
+- [x] Record server commands, versions, database target description, test count, results, and limitations below.
+- [x] Distinguish operator-reported evidence from commands directly observed by the implementing agent.
+- [x] Record unavailable concurrency or timeout validation as a limitation rather than success.
+- [x] Run final local ops tests, type checking, and clean production build if server validation causes code changes.
+- [x] Confirm the final diff contains no environment secrets, generated output, temporary logs, or unrelated archived-document changes.
+- [x] Commit only Phase 5 documentation or fixes and this todo update using the repository commit-message guidance.
+- [x] Review the completed Phase 1 increment with the operator before planning Phase 2.
 
 ### Phase 5 verification record
 
-- Pending.
+- The operator ran the intended branch on `nws-nn12dev` as `limited_user` from `/home/limited_user/applications/NewsNexus12`.
+- The directly supplied coordinator log recorded Phase 1 completion at `2026-10-02T22:13:22.875103+00:00` with `rowsDeleted=0`, empty cancellation collections, and the expected Phase 2 boundary.
+- The earlier directly supplied terminal output demonstrated a refused worker connection, failure category `connection`, and npm exit code 1. No completion or later-phase message appeared.
+- The operator reported that the server runtime requirement, permissions, worker URL, 90-second timeout, intended development database, ops tests, typecheck, clean build, generated-output checks, table preservation, repeat zero-row result, unrelated-data check, and configured-log failure visibility all passed.
+- The operator reported a successful process exit for the validated run and confirmed that no systemd units were installed or enabled.
+- Exact server Node and npm versions, automated test count, database name, unrelated-table count, and command transcripts were not supplied in chat. They are recorded as unavailable details rather than reconstructed values.
+- Active-job cancellation and a live endpoint timeout were not exercised during the reported server run. Automated and controlled local checks cover timeout behavior; active-job cancellation remains a development limitation.
+- Server validation caused no source changes, so no additional local rerun was required before this documentation closeout.
 
 ## Shared phase closeout
 

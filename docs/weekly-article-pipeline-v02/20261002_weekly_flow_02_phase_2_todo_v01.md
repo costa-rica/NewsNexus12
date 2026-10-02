@@ -1,0 +1,382 @@
+---
+created_at: 2026-10-02T22:33:54Z
+updated_at: 2026-10-02T22:37:16Z
+created_by: codex (gpt-6) nicksmacbookair
+modified_by: codex (gpt-6) nicksmacbookair
+---
+
+# Weekly Flow 02 Phase 2 Todo V01
+
+## Basis and scope
+
+- Accepted plan: [Weekly Flow 02 Phase 2 Plan V03](20261002_weekly_flow_02_phase_2_plan_v03.md).
+- V02 assessment: [Assessment by Claude](20261002_weekly_flow_02_phase_2_plan_v02_assessment_claude.md).
+- V01 assessment: [Assessment by Claude](20261002_weekly_flow_02_phase_2_plan_v01_assessment_claude.md).
+- Product requirements: [Weekly Combined Flow PRD V05](20261001_weekly_combined_flow_prd_v05.md).
+- Overall technical direction: [Weekly Pipeline Ops Plan V01](20261001_weekly_pipeline_ops_plan_v01.md).
+- Phase 1 implementation record: [Weekly Flow 02 Phase 1 Todo V02](20261002_weekly_flow_02_phase_1_todo_v02.md).
+- Review process: [Plan and Vet](../PLAN_AND_VET.md).
+
+Codex is the todo creator. Claude is the assessor unless the operator changes either role.
+
+This todo adds the Phase 2 database backup, verifies its artifact, and connects it after Phase 1. It includes db-manager changes, ops changes, local harness verification, and one real development-server backup.
+
+This increment does not add Phase 3 article deletion, run persistence, continuation, retries, systemd units, notifications, or production rollout.
+
+## Working agreement
+
+1. Complete the implementation phases in order.
+2. Continue between internal phases after tests and commits pass. Do not stop for operator review between them.
+3. Use one operator checkpoint immediately before the real development-server backup.
+4. Keep control flow direct and names descriptive.
+5. Preserve unrelated operator changes in the worktree.
+6. Check off only completed work and record actual verification results.
+7. Do not run a real database backup from automated tests or local fixtures.
+8. Do not run the production weekly-flow entry point locally against db-manager.
+9. Do not advance to Phase 3 unless Phase 2 has a verified result.
+10. Confirm every expected compiled test file exists before running `node --test`.
+
+## Existing planning files
+
+These uncommitted documents are part of the accepted planning history:
+
+- `20261002_weekly_flow_02_phase_2_plan_v01.md`
+- `20261002_weekly_flow_02_phase_2_plan_v01_assessment_claude.md`
+- `20261002_weekly_flow_02_phase_2_plan_v02.md`
+- `20261002_weekly_flow_02_phase_2_plan_v02_assessment_claude.md`
+- `20261002_weekly_flow_02_phase_2_plan_v03.md`
+- This todo.
+
+Preserve each version. Do not replace or rename earlier plan and assessment files.
+
+## Implementation phase 0: Baseline and Phase 1 closeout
+
+- [x] Review the planning files and confirm they contain no environment secrets or generated output.
+- [x] Update the Phase 1 todo with the development-server evidence supplied by the operator.
+- [x] Distinguish the directly supplied coordinator log from checks reported by the operator.
+- [x] Record that the integrated run completed Phase 1 with `rowsDeleted=0`, empty cancellation collections, a worker timestamp, and the Phase 2 boundary.
+- [x] Record the operator's confirmation that the command exit, server tests, typecheck, table preservation, zero-row result, unrelated-data check, timeout configuration, and failure visibility passed.
+- [x] Do not invent unreported version numbers, row counts, paths, or command output.
+- [x] Commit the accepted Phase 2 planning history, this todo, and the Phase 1 closeout before changing runtime code.
+- [x] Continue directly to implementation phase 1 after the baseline commit.
+
+### Phase 0 verification record
+
+- Reviewed all Phase 2 planning files for secrets and generated output; none were present.
+- Updated the Phase 1 todo with the supplied coordinator log and separately labeled operator-reported checks.
+- Preserved unavailable server versions, counts, and transcripts as limitations instead of reconstructing values.
+- The baseline contains documentation only and makes no runtime changes.
+
+## Implementation phase 1: Db-manager artifact contract
+
+- [ ] Record the current db-manager test count before changing code.
+- [ ] Add `BACKUP_MANIFEST_VERSION = 1` to `db-manager/src/modules/backup.ts`.
+- [ ] Define typed backup-manifest and backup-result structures.
+- [ ] Change `createDatabaseBackupZipFile()` to return the typed result instead of only a path.
+- [ ] Resolve `PATH_DB_BACKUPS` with `path.resolve()` before constructing temporary or ZIP paths.
+- [ ] Preserve support for relative values by resolving them from the db-manager working directory.
+- [ ] Add one manifest entry for every model discovered by the existing model registry.
+- [ ] Record model name, CSV filename, row count, byte size, and SHA-256 for every nonempty model.
+- [ ] Record zero rows and null file metadata for empty models.
+- [ ] Write `manifest.json` before archiving the temporary directory.
+- [ ] Preserve the existing ZIP compression behavior.
+- [ ] After archive close, confirm the ZIP is a regular file with a positive size.
+- [ ] Calculate the completed archive SHA-256 without converting it to a text representation first.
+- [ ] Return the absolute path, byte size, archive SHA-256, and manifest version.
+- [ ] Remove the temporary directory and incomplete ZIP after every handled backup failure.
+- [ ] Preserve the completed ZIP after successful archive creation.
+- [ ] Add a pure formatter for the stable `database_backup_created` JSON line.
+- [ ] Update `db-manager/src/index.ts` to log the human-readable path and write the stable JSON line to stdout.
+- [ ] Emit the success line only after archive metadata calculation succeeds.
+- [ ] Keep the later database-status query and final exit behavior unchanged.
+- [ ] If the later status query fails, return exit status 1 and leave the completed ZIP in place.
+- [ ] Confirm the ZIP importer continues selecting CSV entries and ignoring `manifest.json`.
+
+### Db-manager tests
+
+- [ ] Update existing backup tests for the typed result.
+- [ ] Test absolute and relative backup-root values.
+- [ ] Test positive archive size and matching archive SHA-256.
+- [ ] Test manifest version and ISO creation timestamp.
+- [ ] Test nonempty model row counts, CSV filenames, byte sizes, and hashes.
+- [ ] Test empty-model entries with null file metadata.
+- [ ] Test that every registered model has one manifest entry.
+- [ ] Test temporary-directory cleanup after success.
+- [ ] Test temporary-directory and incomplete-ZIP cleanup after handled failure.
+- [ ] Test the stable JSON formatter without depending on Winston output.
+- [ ] Update affected index-routing mocks or expectations for the typed result.
+- [ ] Do not add a real database dependency to the db-manager tests.
+
+### Phase 1 verification and closeout
+
+- [ ] Run the focused db-manager backup and routing tests.
+- [ ] Run the complete db-manager test suite.
+- [ ] Build db-models before building db-manager.
+- [ ] Run the db-manager TypeScript build.
+- [ ] Inspect one test ZIP and confirm its manifest matches the generated CSV files.
+- [ ] Confirm no test ZIP, CSV, temporary directory, log, or `.env` is staged.
+- [ ] Record commands, Node and npm versions, executed test files, test count, and results below.
+- [ ] Commit only the db-manager contract changes, tests, and this todo update.
+- [ ] Continue directly to implementation phase 2.
+
+### Phase 1 verification record
+
+- Pending.
+
+## Implementation phase 2: Ops configuration and command runner
+
+### Configuration
+
+- [ ] Extend `OpsConfig` with `dbManagerBackupTimeoutSeconds`.
+- [ ] Parse required `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` as a positive integer.
+- [ ] Add configuration tests for missing, zero, negative, fractional, and nonnumeric values.
+- [ ] Add `DB_MANAGER_BACKUP_TIMEOUT_SECONDS=1800` to `ops/.env.example`.
+- [ ] Document the setting as an overall child-process timeout in seconds.
+- [ ] Keep db-manager entry-path selection out of `OpsConfig` and `.env.example`.
+
+### Result parsing and artifact verification
+
+- [ ] Define the Phase 2 result with `backupPath`, `byteSize`, `sha256`, and `manifestVersion`.
+- [ ] Keep parsed JSON typed as `unknown` until validation succeeds.
+- [ ] Require `event` to equal `database_backup_created`.
+- [ ] Require an absolute, nonempty backup path.
+- [ ] Require a positive safe-integer byte size.
+- [ ] Require a lowercase 64-character hexadecimal SHA-256.
+- [ ] Require reported manifest version 1.
+- [ ] Verify the path exists and is a regular file.
+- [ ] Verify the observed size matches the reported positive size.
+- [ ] Calculate the archive SHA-256 with a stream and compare it to the reported value.
+- [ ] Do not load the complete ZIP into memory.
+- [ ] Name the coordinator field `reportedManifestVersion` when logging it.
+
+### Fixed production command and code-only seam
+
+- [ ] Add `02_createDatabaseBackup.ts` as the public Phase 2 function.
+- [ ] Add `02_createDatabaseBackupCommand.ts` for command construction and execution.
+- [ ] Define a small command specification or launcher interface used only through function arguments.
+- [ ] Build the production command with `process.execPath`.
+- [ ] Resolve the fixed compiled entry point at `db-manager/dist/index.js` from the monorepo layout.
+- [ ] Set the production working directory to `db-manager/`.
+- [ ] Pass `--create_backup` as an argument without invoking a shell.
+- [ ] Do not add an environment, CLI, or file-based command-path override.
+- [ ] Allow tests and temporary harnesses to pass a controlled command through the code-only seam.
+
+### Environment isolation
+
+- [ ] Start with a copy of the parent environment.
+- [ ] Remove `NODE_ENV`, `NAME_APP`, and `NEXT_PUBLIC_MODE`.
+- [ ] Remove `PATH_TO_LOGS`, `LOG_MAX_SIZE`, and `LOG_MAX_FILES`.
+- [ ] Remove `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` and `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS`.
+- [ ] Remove `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` and `PATH_DB_BACKUPS`.
+- [ ] Remove every inherited key whose name begins with `PG_`.
+- [ ] Preserve ordinary values such as `PATH`, `HOME`, locale, temporary-directory settings, and Node runtime settings.
+- [ ] Never log the child environment or database credentials.
+- [ ] Confirm the production child loads its application settings from `db-manager/.env` through its working directory.
+
+### Continuous output handling
+
+- [ ] Drain child stdout and stderr continuously until both streams end and the child closes.
+- [ ] Never pause, detach, or stop reading a stream when diagnostic retention reaches its cap.
+- [ ] Decode stdout chunks with Node's `StringDecoder` or equivalent split-character-safe behavior.
+- [ ] Retain an incomplete line fragment between chunks.
+- [ ] Process every complete stdout line as it arrives.
+- [ ] Process the final unterminated fragment when stdout ends.
+- [ ] Store valid success candidates and their count separately from retained diagnostics.
+- [ ] Require exactly one valid success candidate.
+- [ ] Set the maximum incomplete-line size to 64 KiB.
+- [ ] Mark an oversized line as an output-contract failure while continuing to drain the process.
+- [ ] Keep only the last 32 KiB from stdout and the last 32 KiB from stderr for diagnostics.
+- [ ] Apply the caps only to diagnostic tails, never to success-candidate storage or stream consumption.
+
+### Process completion and timeout
+
+- [ ] Require a normal child exit with code 0 after both output streams are drained.
+- [ ] Reject signal exits and every nonzero exit, even if a success candidate appeared earlier.
+- [ ] Apply the configured timeout at the child-process boundary.
+- [ ] On timeout, send the normal termination signal and begin a five-second grace period.
+- [ ] Force termination if the child remains open after the grace period.
+- [ ] Continue draining both streams until process close.
+- [ ] Treat timeout as an unverified result and do not delete possible artifacts.
+- [ ] Categorize spawn, timeout, exit, output-contract, and artifact-verification failures.
+- [ ] Preserve original errors as causes when wrapping them.
+- [ ] Include only concise, bounded, safe diagnostics in errors.
+
+### Ops tests
+
+- [ ] Add `ops/tests/weekly-flow-02/02_createDatabaseBackup.test.ts` before changing the test script.
+- [ ] Parse one valid result among unrelated stdout lines.
+- [ ] Parse a result line split across multiple chunks and UTF-8 boundaries.
+- [ ] Preserve a result surrounded by output larger than both diagnostic caps.
+- [ ] Confirm a child writing past the cap exits without blocking.
+- [ ] Reject missing, duplicate, oversized, malformed, and incorrectly typed results.
+- [ ] Test the fixed executable, arguments, and working directory.
+- [ ] Test the code-only fixture seam without adding configuration.
+- [ ] Set sentinel values for every named removed key and representative `PG_*` keys.
+- [ ] Confirm removed sentinels do not reach the production child.
+- [ ] Confirm ordinary operating-system sentinels remain present.
+- [ ] Cover spawn failure, nonzero exit after a candidate, signal exit, timeout, and forced termination.
+- [ ] Cover missing file, directory path, empty file, size mismatch, and checksum mismatch.
+- [ ] Confirm failure text is bounded and excludes environment values.
+- [ ] Append `dist-test/tests/weekly-flow-02/02_createDatabaseBackup.test.js` to the explicit test script only after the source exists.
+
+### Phase 2 verification and closeout
+
+- [ ] Confirm all three expected compiled ops test files exist before running `node --test`.
+- [ ] Run the complete ops test command and record every executed file and the total count.
+- [ ] Run ops type checking and the clean production build.
+- [ ] Confirm `dist-test/` remains ignored and production output contains no tests or stale modules.
+- [ ] Confirm no command-path configuration was added.
+- [ ] Confirm no `.env`, artifact, fixture, temporary directory, or log is staged.
+- [ ] Record commands, versions, test count, and results below.
+- [ ] Commit only the ops configuration, command module, tests, documentation, and this todo update.
+- [ ] Continue directly to implementation phase 3.
+
+### Phase 2 verification record
+
+- Pending.
+
+## Implementation phase 3: Coordinator integration and local harnesses
+
+### Coordinator integration
+
+- [ ] Replace the Phase 2 scaffold boundary with a Phase 2 start log.
+- [ ] Run Phase 2 only after Phase 1 returns its validated result.
+- [ ] Await the verified backup result.
+- [ ] Log Phase 2 completion with path, byte size, SHA-256, and `reportedManifestVersion`.
+- [ ] Replace the stop message with the boundary before unimplemented Phase 3.
+- [ ] Add a small coordinator dependencies object with production defaults.
+- [ ] Preserve the default `globalThis.fetch` request for Phase 1.
+- [ ] Preserve the fixed db-manager command as the Phase 2 production default.
+- [ ] Keep command overrides available only through code arguments used by tests and harnesses.
+- [ ] Allow every Phase 2 error to reach the top-level handler and produce a nonzero exit.
+- [ ] Confirm Phase 2 failure never logs completion or the Phase 3 boundary.
+- [ ] Confirm Phase 1 failure still prevents Phase 2 start.
+- [ ] Keep reruns starting again at Phase 1 without retry or durable state.
+
+### Coordinator tests
+
+- [ ] Update existing coordinator tests for the dependencies object.
+- [ ] Confirm the call order is Phase 1, then Phase 2, then the Phase 3 boundary.
+- [ ] Confirm Phase 2 receives the configured timeout and fixed production command by default.
+- [ ] Confirm completion logs contain verified backup metadata.
+- [ ] Test every Phase 2 failure category and confirm no later work is logged.
+- [ ] Preserve every existing Phase 1 success and failure assertion.
+
+### Operator documentation
+
+- [ ] Update `ops/README.md` with the Phase 2 call sequence and 1800-second timeout.
+- [ ] Document the fixed compiled db-manager entry point and build-order prerequisite.
+- [ ] Document that db-manager uses its own `.env`, logging identity, database target, and backup path.
+- [ ] Document the stable result metadata and coordinator log fields.
+- [ ] Document failure, timeout, retained-artifact, and rerun behavior.
+- [ ] State that routine execution verifies external metadata but does not independently read the manifest.
+- [ ] State that the backup is not one transactionally consistent cross-table snapshot.
+- [ ] Warn that the normal weekly-flow entry point performs a real database backup.
+
+### Local source and compiled harnesses
+
+- [ ] Create the fixture command and harnesses outside the tracked tree.
+- [ ] Make the fixture write a controlled ZIP-like artifact and stable result line without accessing PostgreSQL.
+- [ ] Make the source harness import source modules and pass the fixture command through the code-only seam.
+- [ ] Make the compiled harness import built modules and pass the same fixture command.
+- [ ] Construct every config value explicitly; do not load either package's `.env`.
+- [ ] Inject a successful Phase 1 request if exercising the full coordinator.
+- [ ] Exercise successful, nonzero-exit, malformed-output, oversized-output, checksum-mismatch, and delayed modes.
+- [ ] Confirm successful source and compiled runs log both phase completions and the Phase 3 boundary.
+- [ ] Confirm every failure run exits unsuccessfully without Phase 2 completion or the Phase 3 boundary.
+- [ ] Confirm output beyond the diagnostic cap does not block or hide the success result.
+- [ ] Do not replace or edit `db-manager/dist/index.js` for fixture testing.
+- [ ] Do not run `weekly-flow-02:dev` or `weekly-flow-02:start` against local package configuration.
+- [ ] Remove all temporary harnesses, fixtures, artifacts, and logs.
+
+### Phase 3 verification and closeout
+
+- [ ] Run the complete db-manager suite and build after integration.
+- [ ] Run the complete ops suite, typecheck, and clean build after integration.
+- [ ] Confirm all expected compiled test paths exist and record the test count.
+- [ ] Confirm generated output remains ignored and no temporary runtime files remain.
+- [ ] Inspect the scoped diff for secrets, backup files, logs, and unrelated changes.
+- [ ] Record commands, versions, test counts, harness behavior, and results below.
+- [ ] Commit only coordinator integration, tests, documentation, fixes, and this todo update.
+- [ ] Stop at the single operator checkpoint before implementation phase 4.
+
+### Phase 3 verification record
+
+- Pending.
+
+## Operator checkpoint: Development backup readiness
+
+- [ ] Present the completed local implementation, tests, builds, and harness evidence.
+- [ ] Present the exact branch and commit intended for `nws-nn12dev`.
+- [ ] Ask the operator to confirm the development database and backup destination before the real backup.
+- [ ] Do not contact the development worker or run db-manager against its database until this checkpoint is approved.
+
+## Implementation phase 4: Development-server verification
+
+### Server preflight
+
+- [ ] Confirm `nws-nn12dev` has the approved branch and commit.
+- [ ] Record server Node and npm versions.
+- [ ] Confirm the command runs as `limited_user` from the intended repository path.
+- [ ] Confirm worker-python targets the intended development database.
+- [ ] Confirm db-manager targets the same intended development database.
+- [ ] Confirm `PATH_DB_BACKUPS` is the intended directory without displaying credentials.
+- [ ] Confirm `limited_user` can read db-manager configuration and write the backup directory.
+- [ ] Record available disk space before the backup.
+- [ ] Confirm `DB_MANAGER_BACKUP_TIMEOUT_SECONDS=1800` in ops configuration.
+
+### Server build and tests
+
+- [ ] Build db-models, then db-manager, then ops.
+- [ ] Run the complete db-manager test suite and record its test count.
+- [ ] Run the complete ops test suite and record its files and test count.
+- [ ] Run ops type checking.
+- [ ] Confirm generated tests remain ignored and production builds contain no tests or stale modules.
+
+### Real development backup
+
+- [ ] Record the backup directory contents before the run.
+- [ ] Run the real compiled weekly-flow entry point as `limited_user`.
+- [ ] Use `/usr/bin/time -v` when available and record its combined peak resident memory.
+- [ ] Record the process exit status.
+- [ ] Confirm Phase 1 completes before Phase 2 starts.
+- [ ] Confirm exactly one new ZIP is created for the run.
+- [ ] Confirm the coordinator logs path, positive byte size, SHA-256, and `reportedManifestVersion=1`.
+- [ ] Confirm the ZIP path, size, and SHA-256 match independent server commands.
+- [ ] Confirm the ZIP owner and permissions are appropriate for operations and recovery.
+- [ ] Confirm the db-manager and coordinator logs agree on the backup location.
+- [ ] Confirm the process exits successfully at the Phase 3 boundary.
+- [ ] Inspect `manifest.json` without restoring the ZIP.
+- [ ] Confirm manifest version 1.
+- [ ] Confirm the `ArticleDuplicateAnalysis` entry reports zero rows and null file metadata when no new analysis rows appeared.
+- [ ] Record the sequential-read, non-snapshot limitation.
+- [ ] Do not restore the ZIP into the active development database.
+
+### Phase 4 verification and closeout
+
+- [ ] Record commands, versions, commit, database target description, backup path, size, SHA-256, manifest result, exit status, memory result, and limitations below.
+- [ ] Distinguish operator-reported evidence from commands observed directly by the implementing agent.
+- [ ] Record unavailable measurements as limitations rather than successes.
+- [ ] Run final local tests, typechecks, and builds only if server validation causes code changes.
+- [ ] Confirm the final diff contains no secrets, `.env`, ZIP, CSV, log, generated output, or temporary files.
+- [ ] Commit only server-verification documentation or fixes and this todo update.
+- [ ] Do not push additional changes unless the operator requests it.
+
+### Phase 4 verification record
+
+- Pending.
+
+## Shared phase closeout
+
+At the end of every implementation phase:
+
+1. Run the tests, type checks, builds, and focused runtime checks applicable to that phase.
+2. Fix failures without weakening required behavior or deleting meaningful tests.
+3. Check `git status` and inspect the scoped diff before staging anything.
+4. Confirm no `.env`, credential, generated output, backup artifact, temporary fixture, or unrelated operator change is staged.
+5. Confirm every expected compiled test path exists before relying on the test result.
+6. Record the executed test files and count, comparing them with the prior phase when applicable.
+7. Update this todo's completed checkboxes, verification record, `updated_at`, and `modified_by`.
+8. Commit only the completed phase using the repository commit-message guidance.
+9. Continue to the next internal phase without an operator pause unless the development-backup checkpoint has been reached.
+10. Do not push unless the operator separately requests it.
