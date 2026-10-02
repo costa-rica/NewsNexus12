@@ -5,17 +5,17 @@ import {
   ArticleIsRelevant,
 } from "@newsnexus/db-models";
 import { logger } from "../config/logger";
+import { calculateOldArticleCutoffDate } from "./deleteArticlesCutoff";
 
 const DELETE_BATCH_SIZE = 5000;
 const DELETE_SAMPLE_SIZE = 1000;
 
-function toDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 export type DeleteArticlesResult = {
-  deletedCount: number;
+  daysOldThreshold: number;
   cutoffDate: string;
+  eligibleCount: number;
+  processedCount: number;
+  deletedCount: number;
 };
 
 export type DeleteTrimResult = {
@@ -24,12 +24,23 @@ export type DeleteTrimResult = {
   deletedCount: number;
 };
 
+export function formatDeleteOldArticlesResult(
+  result: DeleteArticlesResult,
+): string {
+  return JSON.stringify({
+    event: "old_articles_deleted",
+    daysOldThreshold: result.daysOldThreshold,
+    cutoffDate: result.cutoffDate,
+    eligibleCount: result.eligibleCount,
+    processedCount: result.processedCount,
+    deletedCount: result.deletedCount,
+  });
+}
+
 export async function deleteOldUnapprovedArticles(
   daysOldThreshold: number,
 ): Promise<DeleteArticlesResult> {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - daysOldThreshold);
-  const cutoffDateOnly = toDateOnly(cutoffDate);
+  const cutoffDate = calculateOldArticleCutoffDate(daysOldThreshold);
 
   const [relevantRows, approvedRows] = await Promise.all([
     ArticleIsRelevant.findAll({
@@ -59,36 +70,52 @@ export async function deleteOldUnapprovedArticles(
   }
 
   const conditions: any[] = [
-    { publishedDate: { [Op.lt]: cutoffDateOnly } },
+    { publishedDate: { [Op.lt]: cutoffDate } },
   ];
 
   if (protectedIds.size > 0) {
     conditions.push({ id: { [Op.notIn]: Array.from(protectedIds) } });
   }
 
-  const totalToDelete = await Article.count({
+  const eligibleCount = await Article.count({
     where: { [Op.and]: conditions } as any,
   });
-
-  logger.info(
-    `Found ${totalToDelete} articles eligible for deletion (before ${cutoffDateOnly}).`,
-  );
-
-  if (totalToDelete === 0) {
-    return { deletedCount: 0, cutoffDate: cutoffDateOnly };
+  if (!Number.isSafeInteger(eligibleCount) || eligibleCount < 0) {
+    throw new Error(
+      `Article.count returned invalid eligible count: ${String(eligibleCount)}`,
+    );
   }
 
+  logger.info(
+    `Found ${eligibleCount} articles eligible for deletion (before ${cutoffDate}).`,
+  );
+
+  if (eligibleCount === 0) {
+    return {
+      daysOldThreshold,
+      cutoffDate,
+      eligibleCount: 0,
+      processedCount: 0,
+      deletedCount: 0,
+    };
+  }
+
+  let processedCount = 0;
   let deletedCount = 0;
   let lastId = 0;
   let batchNumber = 0;
   let didSampleEstimate = false;
 
-  while (deletedCount < totalToDelete) {
+  while (processedCount < eligibleCount) {
     batchNumber += 1;
-    const batchSize =
-      !didSampleEstimate && totalToDelete > DELETE_BATCH_SIZE
+    const preferredBatchSize =
+      !didSampleEstimate && eligibleCount > DELETE_BATCH_SIZE
         ? DELETE_SAMPLE_SIZE
         : DELETE_BATCH_SIZE;
+    const batchSize = Math.min(
+      preferredBatchSize,
+      eligibleCount - processedCount,
+    );
     const batchConditions = [
       ...conditions,
       { id: { [Op.gt]: lastId } },
@@ -108,35 +135,57 @@ export async function deleteOldUnapprovedArticles(
 
     const ids = rows
       .map((row) => Number((row as { id?: number }).id))
-      .filter((id) => Number.isFinite(id));
+      .filter((id) => Number.isSafeInteger(id) && id > 0)
+      .slice(0, batchSize);
 
     if (ids.length === 0) {
-      break;
+      throw new Error(
+        "Article deletion batch contained rows without valid primary IDs",
+      );
     }
 
     const batchStart = Date.now();
-    await Article.destroy({ where: { id: { [Op.in]: ids } } as any });
+    const destroyedRows = await Article.destroy({
+      where: { id: { [Op.in]: ids } } as any,
+    });
     const batchDurationMs = Date.now() - batchStart;
-    deletedCount += ids.length;
-    lastId = ids[ids.length - 1];
+    if (
+      !Number.isSafeInteger(destroyedRows) ||
+      destroyedRows < 0 ||
+      destroyedRows > ids.length
+    ) {
+      throw new Error(
+        `Article.destroy returned invalid deletion count: ${String(destroyedRows)}`,
+      );
+    }
+
+    processedCount += ids.length;
+    deletedCount += destroyedRows;
+    lastId = Math.max(...ids);
 
     if (!didSampleEstimate && batchSize === DELETE_SAMPLE_SIZE) {
       didSampleEstimate = true;
       const perItemMs = batchDurationMs / ids.length;
-      const remaining = totalToDelete - deletedCount;
+      const remaining = eligibleCount - processedCount;
       const estimateMs = Math.round(perItemMs * remaining);
       const estimateMinutes = Math.round((estimateMs / 60000) * 10) / 10;
       logger.info(
-        `Estimated time remaining: ~${estimateMinutes} minutes based on ${ids.length} deletions.`,
+        `Estimated time remaining: ~${estimateMinutes} minutes based on ${ids.length} processed articles.`,
       );
     }
 
     logger.info(
-      `Deleted ${deletedCount} of ${totalToDelete} articles (batch ${batchNumber}).`,
+      `Deleted ${deletedCount} rows after processing ${processedCount} of ${eligibleCount} eligible articles (batch ${batchNumber}).`,
     );
   }
 
-  return { deletedCount, cutoffDate: cutoffDateOnly };
+  return {
+    daysOldThreshold,
+    cutoffDate,
+    eligibleCount,
+    processedCount,
+    deletedCount,
+  };
 }
 
 export async function deleteOldestEligibleArticles(

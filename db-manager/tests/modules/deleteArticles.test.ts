@@ -34,6 +34,7 @@ import { logger } from "../../src/config/logger";
 import {
   deleteOldUnapprovedArticles,
   deleteOldestEligibleArticles,
+  formatDeleteOldArticlesResult,
 } from "../../src/modules/deleteArticles";
 
 describe("Delete articles module", () => {
@@ -48,15 +49,20 @@ describe("Delete articles module", () => {
   });
 
   describe("deleteOldUnapprovedArticles()", () => {
-    it("returns { deletedCount: 0 } when no articles match the cutoff", async () => {
+    it("returns an all-zero result when no articles match the cutoff", async () => {
       (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
       (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
       (Article.count as jest.Mock).mockResolvedValue(0);
 
       const result = await deleteOldUnapprovedArticles(180);
 
-      expect(result.deletedCount).toBe(0);
-      expect(result.cutoffDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(result).toEqual({
+        daysOldThreshold: 180,
+        cutoffDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        eligibleCount: 0,
+        processedCount: 0,
+        deletedCount: 0,
+      });
       expect(Article.destroy).not.toHaveBeenCalled();
     });
 
@@ -82,6 +88,8 @@ describe("Delete articles module", () => {
 
       const result = await deleteOldUnapprovedArticles(180);
 
+      expect(result.eligibleCount).toBe(10);
+      expect(result.processedCount).toBe(10);
       expect(result.deletedCount).toBe(10);
       expect(Article.destroy).toHaveBeenCalledTimes(1);
       expect(Article.destroy).toHaveBeenCalledWith({
@@ -206,10 +214,14 @@ describe("Delete articles module", () => {
         // No more batches
         .mockResolvedValueOnce([]);
 
-      (Article.destroy as jest.Mock).mockResolvedValue(null);
+      (Article.destroy as jest.Mock)
+        .mockResolvedValueOnce(10)
+        .mockResolvedValueOnce(5);
 
       const result = await deleteOldUnapprovedArticles(180);
 
+      expect(result.eligibleCount).toBe(15);
+      expect(result.processedCount).toBe(15);
       expect(result.deletedCount).toBe(15);
       expect(Article.destroy).toHaveBeenCalledTimes(2);
       expect(Article.destroy).toHaveBeenNthCalledWith(1, {
@@ -241,7 +253,134 @@ describe("Delete articles module", () => {
         expect.stringContaining("Found 5 articles eligible for deletion"),
       );
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining("Deleted 5 of 5 articles"),
+        expect.stringContaining("Deleted 5 rows after processing 5 of 5"),
+      );
+    });
+
+    it("uses an initial 1,000-row sample when more than 5,000 rows are eligible", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(5001);
+      (Article.findAll as jest.Mock).mockResolvedValue([]);
+
+      const result = await deleteOldUnapprovedArticles(180);
+
+      expect((Article.findAll as jest.Mock).mock.calls[0][0].limit).toBe(1000);
+      expect(result.processedCount).toBe(0);
+      expect(result.deletedCount).toBe(0);
+    });
+
+    it("caps a returned batch at the remaining initial eligible count", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(2);
+      (Article.findAll as jest.Mock).mockResolvedValue([
+        { id: 1 },
+        { id: 2 },
+        { id: 3 },
+      ]);
+      (Article.destroy as jest.Mock).mockResolvedValue(2);
+
+      const result = await deleteOldUnapprovedArticles(180);
+
+      expect((Article.findAll as jest.Mock).mock.calls[0][0].limit).toBe(2);
+      expect(Article.destroy).toHaveBeenCalledWith({
+        where: { id: { [Op.in]: [1, 2] } },
+      });
+      expect(result.processedCount).toBe(2);
+      expect(result.deletedCount).toBe(2);
+    });
+
+    it("treats an empty later batch as successful concurrent exhaustion", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(3);
+      (Article.findAll as jest.Mock)
+        .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])
+        .mockResolvedValueOnce([]);
+      (Article.destroy as jest.Mock).mockResolvedValue(2);
+
+      const result = await deleteOldUnapprovedArticles(180);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          eligibleCount: 3,
+          processedCount: 2,
+          deletedCount: 2,
+        }),
+      );
+    });
+
+    it("tracks processed IDs separately from rows actually deleted", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(3);
+      (Article.findAll as jest.Mock).mockResolvedValue([
+        { id: 1 },
+        { id: 2 },
+        { id: 3 },
+      ]);
+      (Article.destroy as jest.Mock).mockResolvedValue(2);
+
+      const result = await deleteOldUnapprovedArticles(180);
+
+      expect(result.eligibleCount).toBe(3);
+      expect(result.processedCount).toBe(3);
+      expect(result.deletedCount).toBe(2);
+      expect(result.deletedCount).toBeLessThanOrEqual(result.processedCount);
+      expect(result.processedCount).toBeLessThanOrEqual(result.eligibleCount);
+    });
+
+    it("rejects a nonempty batch without valid primary IDs", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(1);
+      (Article.findAll as jest.Mock).mockResolvedValue([
+        { id: null },
+        { id: "invalid" },
+      ]);
+
+      await expect(deleteOldUnapprovedArticles(180)).rejects.toThrow(
+        "without valid primary IDs",
+      );
+      expect(Article.destroy).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid destroy return", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(1);
+      (Article.findAll as jest.Mock).mockResolvedValue([{ id: 1 }]);
+      (Article.destroy as jest.Mock).mockResolvedValue(null);
+
+      await expect(deleteOldUnapprovedArticles(180)).rejects.toThrow(
+        "invalid deletion count",
+      );
+    });
+
+    it("rejects an invalid initial eligible count", async () => {
+      (ArticleIsRelevant.findAll as jest.Mock).mockResolvedValue([]);
+      (ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (Article.count as jest.Mock).mockResolvedValue(-1);
+
+      await expect(deleteOldUnapprovedArticles(180)).rejects.toThrow(
+        "invalid eligible count",
+      );
+      expect(Article.findAll).not.toHaveBeenCalled();
+      expect(Article.destroy).not.toHaveBeenCalled();
+    });
+
+    it("formats the stable deletion result independently from logging", () => {
+      expect(
+        formatDeleteOldArticlesResult({
+          daysOldThreshold: 180,
+          cutoffDate: "2026-04-05",
+          eligibleCount: 12,
+          processedCount: 10,
+          deletedCount: 9,
+        }),
+      ).toBe(
+        '{"event":"old_articles_deleted","daysOldThreshold":180,"cutoffDate":"2026-04-05","eligibleCount":12,"processedCount":10,"deletedCount":9}',
       );
     });
   });

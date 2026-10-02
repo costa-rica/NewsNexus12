@@ -106,6 +106,7 @@ export async function runDbManager(
     const {
       deleteOldUnapprovedArticles,
       deleteOldestEligibleArticles,
+      formatDeleteOldArticlesResult,
     } = await import("./modules/deleteArticles");
     const { createDatabaseBackupZipFile, formatDatabaseBackupResult } =
       await import("./modules/backup");
@@ -199,6 +200,7 @@ export async function runDbManager(
       logger.info(
         `Deleted ${result.deletedCount} articles older than ${result.cutoffDate}`,
       );
+      process.stdout.write(`${formatDeleteOldArticlesResult(result)}\n`);
     }
 
     if (options.deleteArticlesNoState) {

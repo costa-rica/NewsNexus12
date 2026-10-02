@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T23:11:05Z
-updated_at: 2026-10-02T23:17:39Z
+updated_at: 2026-10-02T23:23:02Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -75,88 +75,92 @@ Do not replace or rename earlier versions.
 
 ### Shared cutoff calculation
 
-- [ ] Add the pure module at `db-manager/src/modules/deleteArticlesCutoff.ts` with no database or environment imports.
-- [ ] Export the exact function name `calculateOldArticleCutoffDate(daysOldThreshold, now = new Date())` because the compiled server preflight command depends on this filename and export.
-- [ ] Preserve the current algorithm: subtract days with local `Date.setDate()`, then return the UTC `YYYY-MM-DD` portion.
-- [ ] Change `deleteOldUnapprovedArticles()` to use this helper.
-- [ ] Add deterministic unit tests with fixed dates.
+- [x] Add the pure module at `db-manager/src/modules/deleteArticlesCutoff.ts` with no database or environment imports.
+- [x] Export the exact function name `calculateOldArticleCutoffDate(daysOldThreshold, now = new Date())` because the compiled server preflight command depends on this filename and export.
+- [x] Preserve the current algorithm: subtract days with local `Date.setDate()`, then return the UTC `YYYY-MM-DD` portion.
+- [x] Change `deleteOldUnapprovedArticles()` to use this helper.
+- [x] Add deterministic unit tests with fixed dates.
 - [ ] Use the compiled helper during server preflight so the pre-run SQL does not use a hand-calculated cutoff.
 
 ### Typed bounded-pass result
 
-- [ ] Extend `DeleteArticlesResult` with `daysOldThreshold`, `eligibleCount`, `processedCount`, and `deletedCount`.
-- [ ] Keep `cutoffDate` in `YYYY-MM-DD` form.
-- [ ] Define `eligibleCount` as the count snapshot before batch selection.
-- [ ] Define `processedCount` as valid Article IDs submitted to `Article.destroy()`.
-- [ ] Define `deletedCount` as the sum of numeric values returned by `Article.destroy()`.
-- [ ] Require all three counts to be non-negative safe integers.
-- [ ] Preserve zero eligible rows as a successful all-zero result.
+- [x] Extend `DeleteArticlesResult` with `daysOldThreshold`, `eligibleCount`, `processedCount`, and `deletedCount`.
+- [x] Keep `cutoffDate` in `YYYY-MM-DD` form.
+- [x] Define `eligibleCount` as the count snapshot before batch selection.
+- [x] Define `processedCount` as valid Article IDs submitted to `Article.destroy()`.
+- [x] Define `deletedCount` as the sum of numeric values returned by `Article.destroy()`.
+- [x] Require all three counts to be non-negative safe integers.
+- [x] Preserve zero eligible rows as a successful all-zero result.
 
 ### Bounded deletion loop
 
-- [ ] Preserve the approved and relevant ID protection snapshot.
-- [ ] Preserve ascending ID pagination.
-- [ ] Preserve the initial 1,000-row sample when more than 5,000 rows are eligible.
-- [ ] Preserve the ordinary 5,000-row batch size.
-- [ ] Limit each query to `Math.min(batchSize, eligibleCount - processedCount)`.
-- [ ] Stop when `processedCount` reaches `eligibleCount`.
-- [ ] Treat an empty later batch as successful exhaustion.
-- [ ] Throw when a nonempty model result contains no valid primary-key IDs.
-- [ ] Advance `lastId` with the highest valid ID in the returned batch.
-- [ ] Add valid IDs to `processedCount` before the next selection.
-- [ ] Add the numeric `Article.destroy()` return to `deletedCount`.
-- [ ] Throw if a destroy return is not a non-negative safe integer.
-- [ ] Preserve existing human-readable progress and estimate logs with corrected count meanings.
-- [ ] Do not process more IDs than the initial `eligibleCount`.
+- [x] Preserve the approved and relevant ID protection snapshot.
+- [x] Preserve ascending ID pagination.
+- [x] Preserve the initial 1,000-row sample when more than 5,000 rows are eligible.
+- [x] Preserve the ordinary 5,000-row batch size.
+- [x] Limit each query to `Math.min(batchSize, eligibleCount - processedCount)`.
+- [x] Stop when `processedCount` reaches `eligibleCount`.
+- [x] Treat an empty later batch as successful exhaustion.
+- [x] Throw when a nonempty model result contains no valid primary-key IDs.
+- [x] Advance `lastId` with the highest valid ID in the returned batch.
+- [x] Add valid IDs to `processedCount` before the next selection.
+- [x] Add the numeric `Article.destroy()` return to `deletedCount`.
+- [x] Throw if a destroy return is not a non-negative safe integer.
+- [x] Preserve existing human-readable progress and estimate logs with corrected count meanings.
+- [x] Do not process more IDs than the initial `eligibleCount`.
 
 ### Stable result event
 
-- [ ] Add a pure formatter for one `old_articles_deleted` JSON line.
-- [ ] Include `daysOldThreshold`, `cutoffDate`, `eligibleCount`, `processedCount`, and `deletedCount`.
-- [ ] Emit the line exactly once after successful deletion completion.
-- [ ] Do not emit the line when deletion throws.
-- [ ] Keep the later database-status query and normal exit behavior.
-- [ ] Return exit status 1 if the later status query fails, even after emitting the result.
+- [x] Add a pure formatter for one `old_articles_deleted` JSON line.
+- [x] Include `daysOldThreshold`, `cutoffDate`, `eligibleCount`, `processedCount`, and `deletedCount`.
+- [x] Emit the line exactly once after successful deletion completion.
+- [x] Do not emit the line when deletion throws.
+- [x] Keep the later database-status query and normal exit behavior.
+- [x] Return exit status 1 if the later status query fails, even after emitting the result.
 
 ### Db-manager tests
 
-- [ ] Preserve CLI coverage proving bare `--delete_articles` uses `DEFAULT_DELETE_DAYS`.
-- [ ] Update existing deletion expectations for the expanded result.
-- [ ] Test zero-row success.
-- [ ] Test approved and relevant protection.
-- [ ] Test ordinary and multi-batch completion.
-- [ ] Update the existing batching test near `deleteArticles.test.ts:209` so its two destroy calls return `10` and `5` instead of `null`.
-- [ ] Make that batching test assert `processedCount=15` and `deletedCount=15` separately.
-- [ ] Do not weaken the invalid destroy-return check to preserve the old `null` mock behavior.
-- [ ] Test the initial sample batch.
-- [ ] Test that the last batch is capped by the remaining initial count.
-- [ ] Test overshoot prevention when more rows appear after the initial count.
-- [ ] Test an empty later batch as successful concurrent-disappearance exhaustion.
-- [ ] Test `processedCount` separately from actual `deletedCount`.
-- [ ] Test a nonempty batch with no valid IDs.
-- [ ] Test an invalid destroy return.
-- [ ] Test `deletedCount <= processedCount <= eligibleCount` for successful results.
-- [ ] Test the stable formatter independently from Winston.
-- [ ] Test exactly one stdout result after successful deletion.
-- [ ] Test no result after deletion failure.
-- [ ] Test exit status 1 after a later status-query failure.
-- [ ] Do not add a real production or development database dependency.
+- [x] Preserve CLI coverage proving bare `--delete_articles` uses `DEFAULT_DELETE_DAYS`.
+- [x] Update existing deletion expectations for the expanded result.
+- [x] Test zero-row success.
+- [x] Test approved and relevant protection.
+- [x] Test ordinary and multi-batch completion.
+- [x] Update the existing batching test near `deleteArticles.test.ts:209` so its two destroy calls return `10` and `5` instead of `null`.
+- [x] Make that batching test assert `processedCount=15` and `deletedCount=15` separately.
+- [x] Do not weaken the invalid destroy-return check to preserve the old `null` mock behavior.
+- [x] Test the initial sample batch.
+- [x] Test that the last batch is capped by the remaining initial count.
+- [x] Test overshoot prevention when more rows appear after the initial count.
+- [x] Test an empty later batch as successful concurrent-disappearance exhaustion.
+- [x] Test `processedCount` separately from actual `deletedCount`.
+- [x] Test a nonempty batch with no valid IDs.
+- [x] Test an invalid destroy return.
+- [x] Test `deletedCount <= processedCount <= eligibleCount` for successful results.
+- [x] Test the stable formatter independently from Winston.
+- [x] Test exactly one stdout result after successful deletion.
+- [x] Test no result after deletion failure.
+- [x] Test exit status 1 after a later status-query failure.
+- [x] Do not add a real production or development database dependency.
 
 ### Phase 1 verification and closeout
 
-- [ ] Run focused deletion, cutoff, CLI, and index-routing tests.
-- [ ] Run the complete db-manager suite.
-- [ ] Build db-models before db-manager.
-- [ ] Run the db-manager TypeScript build.
-- [ ] Inspect the scoped diff for unrelated behavior changes.
-- [ ] Confirm no `.env`, database dump, ZIP, CSV, log, or generated output is staged.
-- [ ] Record commands, versions, test files, counts, and results below.
-- [ ] Commit only the db-manager deletion contract, tests, and this todo update.
-- [ ] Continue directly to implementation phase 2.
+- [x] Run focused deletion, cutoff, CLI, and index-routing tests.
+- [x] Run the complete db-manager suite.
+- [x] Build db-models before db-manager.
+- [x] Run the db-manager TypeScript build.
+- [x] Inspect the scoped diff for unrelated behavior changes.
+- [x] Confirm no `.env`, database dump, ZIP, CSV, log, or generated output is staged.
+- [x] Record commands, versions, test files, counts, and results below.
+- [x] Commit only the db-manager deletion contract, tests, and this todo update.
+- [x] Continue directly to implementation phase 2.
 
 ### Phase 1 verification record
 
-- Pending.
+- Environment: Node `v24.11.0`; npm `11.6.1`.
+- Focused verification: 83 tests passed across deletion, cutoff, CLI, and index-routing suites.
+- Full verification: 232 tests passed across 14 db-manager suites, including the final eligible-count assertion.
+- Build order: `db-models` followed by `db-manager`; both TypeScript builds passed.
+- Scope inspection: no unrelated runtime changes or generated artifacts were present.
 
 ## Implementation phase 2: Shared db-manager process runner
 

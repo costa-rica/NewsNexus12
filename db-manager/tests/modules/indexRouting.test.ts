@@ -27,6 +27,7 @@ jest.mock("../../src/modules/status", () => ({
 jest.mock("../../src/modules/deleteArticles", () => ({
   deleteOldUnapprovedArticles: jest.fn(),
   deleteOldestEligibleArticles: jest.fn(),
+  formatDeleteOldArticlesResult: jest.fn(),
 }));
 
 jest.mock("../../src/modules/backup", () => ({
@@ -57,6 +58,10 @@ import {
   createDatabaseBackupZipFile,
   formatDatabaseBackupResult,
 } from "../../src/modules/backup";
+import {
+  deleteOldUnapprovedArticles,
+  formatDeleteOldArticlesResult,
+} from "../../src/modules/deleteArticles";
 import { deleteNoStateArticles } from "../../src/modules/deleteArticlesNoState";
 import { deleteRetiredSourcesArticles } from "../../src/modules/deleteArticlesRetiredSources";
 import { runDryRunValidator } from "../../src/modules/dryRunValidator";
@@ -98,6 +103,16 @@ describe("db-manager index routing", () => {
     (formatDatabaseBackupResult as jest.Mock).mockReturnValue(
       '{"event":"database_backup_created"}',
     );
+    (deleteOldUnapprovedArticles as jest.Mock).mockResolvedValue({
+      daysOldThreshold: 180,
+      cutoffDate: "2026-04-05",
+      eligibleCount: 3,
+      processedCount: 3,
+      deletedCount: 3,
+    });
+    (formatDeleteOldArticlesResult as jest.Mock).mockReturnValue(
+      '{"event":"old_articles_deleted"}',
+    );
     stderrWriteSpy = jest
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -134,6 +149,45 @@ describe("db-manager index routing", () => {
     expect(exitCode).toBe(1);
     expect(stdoutWriteSpy).toHaveBeenCalledWith(
       '{"event":"database_backup_created"}\n',
+    );
+  });
+
+  it("emits exactly one stable result after successful old-article deletion", async () => {
+    const exitCode = await runDbManager(["--delete_articles"]);
+
+    expect(exitCode).toBe(0);
+    expect(deleteOldUnapprovedArticles).toHaveBeenCalledWith(180);
+    expect(formatDeleteOldArticlesResult).toHaveBeenCalledWith(
+      expect.objectContaining({ daysOldThreshold: 180 }),
+    );
+    expect(stdoutWriteSpy).toHaveBeenCalledTimes(1);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      '{"event":"old_articles_deleted"}\n',
+    );
+  });
+
+  it("does not emit a result when old-article deletion fails", async () => {
+    (deleteOldUnapprovedArticles as jest.Mock).mockRejectedValueOnce(
+      new Error("delete failed"),
+    );
+
+    const exitCode = await runDbManager(["--delete_articles"]);
+
+    expect(exitCode).toBe(1);
+    expect(formatDeleteOldArticlesResult).not.toHaveBeenCalled();
+    expect(stdoutWriteSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns failure after emitting a deletion result when status fails", async () => {
+    (getDatabaseStatus as jest.Mock).mockRejectedValueOnce(
+      new Error("status unavailable"),
+    );
+
+    const exitCode = await runDbManager(["--delete_articles"]);
+
+    expect(exitCode).toBe(1);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      '{"event":"old_articles_deleted"}\n',
     );
   });
 
