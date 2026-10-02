@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T23:11:05Z
-updated_at: 2026-10-02T23:23:12Z
+updated_at: 2026-10-02T23:25:34Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -238,73 +238,78 @@ Do not replace or rename earlier versions.
 
 ### Configuration
 
-- [ ] Add `dbManagerDeleteArticlesTimeoutSeconds` to `OpsConfig`.
-- [ ] Parse required `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS` as a positive safe integer.
-- [ ] Test missing, zero, negative, fractional, nonnumeric, and valid values.
-- [ ] Add `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS=1800` to `ops/.env.example`.
-- [ ] Describe it as the overall child-process timeout.
-- [ ] Do not add deletion-threshold or command-path configuration.
+- [x] Add `dbManagerDeleteArticlesTimeoutSeconds` to `OpsConfig`.
+- [x] Parse required `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS` as a positive safe integer.
+- [x] Test missing, zero, negative, fractional, nonnumeric, and valid values.
+- [x] Add `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS=1800` to `ops/.env.example`.
+- [x] Describe it as the overall child-process timeout.
+- [x] Do not add deletion-threshold or command-path configuration.
 
 ### Public phase and fixed command
 
-- [ ] Add `03_deleteOldArticles.ts` as the public Phase 3 function.
-- [ ] Add `03_deleteOldArticlesCommand.ts` for command construction and result validation.
-- [ ] Use `process.execPath`.
-- [ ] Resolve the fixed compiled entry at `db-manager/dist/index.js`.
-- [ ] Set the working directory to `db-manager/`.
-- [ ] Pass only `--delete_articles`.
-- [ ] Do not invoke a shell.
-- [ ] Use the shared isolated child environment.
-- [ ] Keep command substitution available only through code arguments.
+- [x] Add `03_deleteOldArticles.ts` as the public Phase 3 function.
+- [x] Add `03_deleteOldArticlesCommand.ts` for command construction and result validation.
+- [x] Use `process.execPath`.
+- [x] Resolve the fixed compiled entry at `db-manager/dist/index.js`.
+- [x] Set the working directory to `db-manager/`.
+- [x] Pass only `--delete_articles`.
+- [x] Do not invoke a shell.
+- [x] Use the shared isolated child environment.
+- [x] Keep command substitution available only through code arguments.
 
 ### Result validation
 
-- [ ] Keep parsed JSON as `unknown` until validation succeeds.
-- [ ] Require event `old_articles_deleted`.
-- [ ] Require `daysOldThreshold=180`.
-- [ ] Require a real calendar date formatted as `YYYY-MM-DD`.
-- [ ] Require non-negative safe-integer eligible, processed, and deleted counts.
-- [ ] Require `deletedCount <= processedCount <= eligibleCount`.
-- [ ] Accept an all-zero result.
-- [ ] Require exactly one valid candidate and normal exit status 0.
-- [ ] Reject malformed expected events, duplicate candidates, signals, nonzero exits, timeouts, and oversized lines.
-- [ ] Allow unrelated log lines.
+- [x] Keep parsed JSON as `unknown` until validation succeeds.
+- [x] Require event `old_articles_deleted`.
+- [x] Require `daysOldThreshold=180`.
+- [x] Require a real calendar date formatted as `YYYY-MM-DD`.
+- [x] Require non-negative safe-integer eligible, processed, and deleted counts.
+- [x] Require `deletedCount <= processedCount <= eligibleCount`.
+- [x] Accept an all-zero result.
+- [x] Require exactly one valid candidate and normal exit status 0.
+- [x] Reject malformed expected events, duplicate candidates, signals, nonzero exits, timeouts, and oversized lines.
+- [x] Allow unrelated log lines.
 
 ### Phase 3 tests
 
-- [ ] Add `ops/tests/weekly-flow-02/03_deleteOldArticles.test.ts` before changing the explicit test script.
-- [ ] Test the fixed executable, entry point, working directory, and only argument.
-- [ ] Test the code-only fixture seam.
-- [ ] Parse one valid result among unrelated lines.
-- [ ] Parse a final result without a trailing newline.
-- [ ] Parse split chunks and UTF-8 boundaries.
-- [ ] Preserve a result around output larger than both diagnostic caps.
-- [ ] Confirm output beyond the caps cannot block child completion.
-- [ ] Accept zero-row success.
-- [ ] Accept concurrent-disappearance counts below the initial eligible count.
-- [ ] Reject missing, duplicate, malformed, oversized, and incorrectly typed results.
-- [ ] Reject the wrong threshold and invalid calendar dates.
-- [ ] Reject every invalid count relationship.
-- [ ] Cover spawn failure, nonzero exit after a result, signal exit, timeout, and forced termination.
-- [ ] Confirm failure text is bounded and excludes environment values.
-- [ ] Append the compiled Phase 3 test path to `ops/package.json` only after the source file exists.
+- [x] Add `ops/tests/weekly-flow-02/03_deleteOldArticles.test.ts` before changing the explicit test script.
+- [x] Test the fixed executable, entry point, working directory, and only argument.
+- [x] Test the code-only fixture seam.
+- [x] Parse one valid result among unrelated lines.
+- [x] Parse a final result without a trailing newline.
+- [x] Parse split chunks and UTF-8 boundaries.
+- [x] Preserve a result around output larger than both diagnostic caps.
+- [x] Confirm output beyond the caps cannot block child completion.
+- [x] Accept zero-row success.
+- [x] Accept concurrent-disappearance counts below the initial eligible count.
+- [x] Reject missing, duplicate, malformed, oversized, and incorrectly typed results.
+- [x] Reject the wrong threshold and invalid calendar dates.
+- [x] Reject every invalid count relationship.
+- [x] Cover spawn failure, nonzero exit after a result, signal exit, timeout, and forced termination.
+- [x] Confirm failure text is bounded and excludes environment values.
+- [x] Append the compiled Phase 3 test path to `ops/package.json` only after the source file exists.
 
 ### Phase 3 verification and closeout
 
-- [ ] Confirm config, Phase 1, Phase 2, and Phase 3 compiled test files exist.
-- [ ] Run the complete ops test command and record every executed file and total count.
-- [ ] Run ops type checking and a clean production build.
-- [ ] Run the complete db-manager suite and build.
-- [ ] Confirm generated output remains ignored and production output has no tests.
-- [ ] Confirm no command-path or threshold override was added.
-- [ ] Confirm no `.env`, artifact, fixture, temporary directory, or log is staged.
-- [ ] Record commands, versions, test counts, and results below.
-- [ ] Commit only Phase 3 configuration, command module, tests, documentation updates, and this todo update.
-- [ ] Continue directly to implementation phase 4.
+- [x] Confirm config, Phase 1, Phase 2, and Phase 3 compiled test files exist.
+- [x] Run the complete ops test command and record every executed file and total count.
+- [x] Run ops type checking and a clean production build.
+- [x] Run the complete db-manager suite and build.
+- [x] Confirm generated output remains ignored and production output has no tests.
+- [x] Confirm no command-path or threshold override was added.
+- [x] Confirm no `.env`, artifact, fixture, temporary directory, or log is staged.
+- [x] Record commands, versions, test counts, and results below.
+- [x] Commit only Phase 3 configuration, command module, tests, documentation updates, and this todo update.
+- [x] Continue directly to implementation phase 4.
 
 ### Phase 3 verification record
 
-- Pending.
+- Ops verification: 55 tests passed across 11 suites using the explicit config, Phase 1, Phase 2, and Phase 3 compiled test paths.
+- Ops type checking and the clean production build passed.
+- Db-manager verification: 232 tests passed across 14 suites and the TypeScript build passed.
+- Production inspection: Phase 3 runtime files were present in `ops/dist/`; tests remained only under ignored `ops/dist-test/`.
+- Configuration inspection: the command and 180-day threshold remained fixed in code; only the required overall timeout was configurable.
+- Scope inspection: no `.env`, artifact, fixture, temporary directory, generated output, or log was staged.
 
 ## Implementation phase 4: Coordinator, documentation, and harnesses
 

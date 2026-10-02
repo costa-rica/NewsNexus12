@@ -7,6 +7,7 @@ export interface OpsConfig {
   workerPythonBaseUrl: string;
   workerPythonRequestTimeoutSeconds: number;
   dbManagerBackupTimeoutSeconds: number;
+  dbManagerDeleteArticlesTimeoutSeconds: number;
   pathToLogs: string;
   logMaxSizeMb: number;
   logMaxFiles: number;
@@ -71,6 +72,10 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
     dbManagerBackupTimeoutSeconds: requiredPositiveInteger(
       env,
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS'
+    ),
+    dbManagerDeleteArticlesTimeoutSeconds: requiredPositiveInteger(
+      env,
+      'DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS'
     ),
     pathToLogs: path.resolve(baseDirectory, required(env, 'PATH_TO_LOGS')),
     logMaxSizeMb: optionalPositiveInteger(env.LOG_MAX_SIZE, 'LOG_MAX_SIZE'),

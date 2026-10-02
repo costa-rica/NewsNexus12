@@ -28,6 +28,7 @@ const coordinatorConfig: OpsConfig = {
   workerPythonBaseUrl: 'http://worker.test:5000/',
   workerPythonRequestTimeoutSeconds: 90,
   dbManagerBackupTimeoutSeconds: 1800,
+  dbManagerDeleteArticlesTimeoutSeconds: 1800,
   pathToLogs: '/tmp/weekly-flow-test',
   logMaxSizeMb: 5,
   logMaxFiles: 5

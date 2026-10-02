@@ -11,6 +11,7 @@ const validEnvironment = (): NodeJS.ProcessEnv => ({
   URL_BASE_NEWS_NEXUS_PYTHON_QUEUER: 'http://127.0.0.1:5000/',
   WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS: '90',
   DB_MANAGER_BACKUP_TIMEOUT_SECONDS: '1800',
+  DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS: '1800',
   PATH_TO_LOGS: './logs'
 });
 
@@ -23,6 +24,7 @@ describe('parseOpsConfig', () => {
     assert.equal(config.workerPythonBaseUrl, 'http://127.0.0.1:5000/');
     assert.equal(config.workerPythonRequestTimeoutSeconds, 90);
     assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
+    assert.equal(config.dbManagerDeleteArticlesTimeoutSeconds, 1800);
     assert.equal(config.pathToLogs, path.join(baseDirectory, 'logs'));
     assert.equal(config.logMaxSizeMb, 5);
     assert.equal(config.logMaxFiles, 5);
@@ -51,6 +53,7 @@ describe('parseOpsConfig', () => {
       'URL_BASE_NEWS_NEXUS_PYTHON_QUEUER',
       'WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS',
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS',
+      'DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS',
       'PATH_TO_LOGS'
     ];
 
@@ -104,6 +107,18 @@ describe('parseOpsConfig', () => {
       assert.throws(
         () => parseOpsConfig(env, baseDirectory),
         /DB_MANAGER_BACKUP_TIMEOUT_SECONDS/
+      );
+    }
+  });
+
+  it('requires a positive integer old-article deletion timeout', () => {
+    for (const timeout of ['0', '-1', '1.5', 'not-a-number', '']) {
+      const env = validEnvironment();
+      env.DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS = timeout;
+
+      assert.throws(
+        () => parseOpsConfig(env, baseDirectory),
+        /DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS/
       );
     }
   });
