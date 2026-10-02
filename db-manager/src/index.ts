@@ -107,7 +107,8 @@ export async function runDbManager(
       deleteOldUnapprovedArticles,
       deleteOldestEligibleArticles,
     } = await import("./modules/deleteArticles");
-    const { createDatabaseBackupZipFile } = await import("./modules/backup");
+    const { createDatabaseBackupZipFile, formatDatabaseBackupResult } =
+      await import("./modules/backup");
     const { deleteNoStateArticles } = await import("./modules/deleteArticlesNoState");
     const { deleteRetiredSourcesArticles } = await import("./modules/deleteArticlesRetiredSources");
     const { importZipFileToDatabase, rebuildSchema } = await import("./modules/zipImport");
@@ -150,8 +151,9 @@ export async function runDbManager(
 
     if (options.createBackup) {
       logger.info("Creating database backup zip file");
-      const backupPath = await createDatabaseBackupZipFile();
-      logger.info(`Backup created at: ${backupPath}`);
+      const backupResult = await createDatabaseBackupZipFile();
+      logger.info(`Backup created at: ${backupResult.backupPath}`);
+      process.stdout.write(`${formatDatabaseBackupResult(backupResult)}\n`);
     }
 
     if (options.zipFilePath) {

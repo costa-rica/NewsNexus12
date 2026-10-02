@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T22:33:54Z
-updated_at: 2026-10-02T22:37:16Z
+updated_at: 2026-10-02T22:42:30Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -69,59 +69,67 @@ Preserve each version. Do not replace or rename earlier plan and assessment file
 
 ## Implementation phase 1: Db-manager artifact contract
 
-- [ ] Record the current db-manager test count before changing code.
-- [ ] Add `BACKUP_MANIFEST_VERSION = 1` to `db-manager/src/modules/backup.ts`.
-- [ ] Define typed backup-manifest and backup-result structures.
-- [ ] Change `createDatabaseBackupZipFile()` to return the typed result instead of only a path.
-- [ ] Resolve `PATH_DB_BACKUPS` with `path.resolve()` before constructing temporary or ZIP paths.
-- [ ] Preserve support for relative values by resolving them from the db-manager working directory.
-- [ ] Add one manifest entry for every model discovered by the existing model registry.
-- [ ] Record model name, CSV filename, row count, byte size, and SHA-256 for every nonempty model.
-- [ ] Record zero rows and null file metadata for empty models.
-- [ ] Write `manifest.json` before archiving the temporary directory.
-- [ ] Preserve the existing ZIP compression behavior.
-- [ ] After archive close, confirm the ZIP is a regular file with a positive size.
-- [ ] Calculate the completed archive SHA-256 without converting it to a text representation first.
-- [ ] Return the absolute path, byte size, archive SHA-256, and manifest version.
-- [ ] Remove the temporary directory and incomplete ZIP after every handled backup failure.
-- [ ] Preserve the completed ZIP after successful archive creation.
-- [ ] Add a pure formatter for the stable `database_backup_created` JSON line.
-- [ ] Update `db-manager/src/index.ts` to log the human-readable path and write the stable JSON line to stdout.
-- [ ] Emit the success line only after archive metadata calculation succeeds.
-- [ ] Keep the later database-status query and final exit behavior unchanged.
-- [ ] If the later status query fails, return exit status 1 and leave the completed ZIP in place.
-- [ ] Confirm the ZIP importer continues selecting CSV entries and ignoring `manifest.json`.
+- [x] Record the current db-manager test count before changing code.
+- [x] Add `BACKUP_MANIFEST_VERSION = 1` to `db-manager/src/modules/backup.ts`.
+- [x] Define typed backup-manifest and backup-result structures.
+- [x] Change `createDatabaseBackupZipFile()` to return the typed result instead of only a path.
+- [x] Resolve `PATH_DB_BACKUPS` with `path.resolve()` before constructing temporary or ZIP paths.
+- [x] Preserve support for relative values by resolving them from the db-manager working directory.
+- [x] Add one manifest entry for every model discovered by the existing model registry.
+- [x] Record model name, CSV filename, row count, byte size, and SHA-256 for every nonempty model.
+- [x] Record zero rows and null file metadata for empty models.
+- [x] Write `manifest.json` before archiving the temporary directory.
+- [x] Preserve the existing ZIP compression behavior.
+- [x] After archive close, confirm the ZIP is a regular file with a positive size.
+- [x] Calculate the completed archive SHA-256 without converting it to a text representation first.
+- [x] Return the absolute path, byte size, archive SHA-256, and manifest version.
+- [x] Remove the temporary directory and incomplete ZIP after every handled backup failure.
+- [x] Preserve the completed ZIP after successful archive creation.
+- [x] Add a pure formatter for the stable `database_backup_created` JSON line.
+- [x] Update `db-manager/src/index.ts` to log the human-readable path and write the stable JSON line to stdout.
+- [x] Emit the success line only after archive metadata calculation succeeds.
+- [x] Keep the later database-status query and final exit behavior unchanged.
+- [x] If the later status query fails, return exit status 1 and leave the completed ZIP in place.
+- [x] Confirm the ZIP importer continues selecting CSV entries and ignoring `manifest.json`.
 
 ### Db-manager tests
 
-- [ ] Update existing backup tests for the typed result.
-- [ ] Test absolute and relative backup-root values.
-- [ ] Test positive archive size and matching archive SHA-256.
-- [ ] Test manifest version and ISO creation timestamp.
-- [ ] Test nonempty model row counts, CSV filenames, byte sizes, and hashes.
-- [ ] Test empty-model entries with null file metadata.
-- [ ] Test that every registered model has one manifest entry.
-- [ ] Test temporary-directory cleanup after success.
-- [ ] Test temporary-directory and incomplete-ZIP cleanup after handled failure.
-- [ ] Test the stable JSON formatter without depending on Winston output.
-- [ ] Update affected index-routing mocks or expectations for the typed result.
-- [ ] Do not add a real database dependency to the db-manager tests.
+- [x] Update existing backup tests for the typed result.
+- [x] Test absolute and relative backup-root values.
+- [x] Test positive archive size and matching archive SHA-256.
+- [x] Test manifest version and ISO creation timestamp.
+- [x] Test nonempty model row counts, CSV filenames, byte sizes, and hashes.
+- [x] Test empty-model entries with null file metadata.
+- [x] Test that every registered model has one manifest entry.
+- [x] Test temporary-directory cleanup after success.
+- [x] Test temporary-directory and incomplete-ZIP cleanup after handled failure.
+- [x] Test the stable JSON formatter without depending on Winston output.
+- [x] Update affected index-routing mocks or expectations for the typed result.
+- [x] Do not add a real database dependency to the db-manager tests.
 
 ### Phase 1 verification and closeout
 
-- [ ] Run the focused db-manager backup and routing tests.
-- [ ] Run the complete db-manager test suite.
-- [ ] Build db-models before building db-manager.
-- [ ] Run the db-manager TypeScript build.
-- [ ] Inspect one test ZIP and confirm its manifest matches the generated CSV files.
-- [ ] Confirm no test ZIP, CSV, temporary directory, log, or `.env` is staged.
-- [ ] Record commands, Node and npm versions, executed test files, test count, and results below.
-- [ ] Commit only the db-manager contract changes, tests, and this todo update.
-- [ ] Continue directly to implementation phase 2.
+- [x] Run the focused db-manager backup and routing tests.
+- [x] Run the complete db-manager test suite.
+- [x] Build db-models before building db-manager.
+- [x] Run the db-manager TypeScript build.
+- [x] Inspect one test ZIP and confirm its manifest matches the generated CSV files.
+- [x] Confirm no test ZIP, CSV, temporary directory, log, or `.env` is staged.
+- [x] Record commands, Node and npm versions, executed test files, test count, and results below.
+- [x] Commit only the db-manager contract changes, tests, and this todo update.
+- [x] Continue directly to implementation phase 2.
 
 ### Phase 1 verification record
 
-- Pending.
+- Baseline: 214 tests passed across 13 db-manager suites before implementation.
+- Environment: macOS, Node v24.11.0, npm 11.6.1.
+- Focused backup and index-routing result: 24 tests passed across two suites.
+- Complete db-manager result: 219 tests passed across 13 suites.
+- `npm run build --workspace @newsnexus/db-models`: passed.
+- `npm run build --workspace @newsnexus/db-manager`: passed.
+- The focused test required approved access to the disposable local PostgreSQL test database after the sandbox blocked its first setup attempt.
+- Tests opened the generated ZIP, compared manifest CSV metadata and hashes, verified empty entries, and removed temporary artifacts afterward.
+- Git status contained only the four intended db-manager source and test files plus this todo update. No ZIP, CSV, log, `.env`, or generated build output was staged.
 
 ## Implementation phase 2: Ops configuration and command runner
 

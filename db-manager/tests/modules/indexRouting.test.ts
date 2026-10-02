@@ -31,6 +31,7 @@ jest.mock("../../src/modules/deleteArticles", () => ({
 
 jest.mock("../../src/modules/backup", () => ({
   createDatabaseBackupZipFile: jest.fn(),
+  formatDatabaseBackupResult: jest.fn(),
 }));
 
 jest.mock("../../src/modules/deleteArticlesNoState", () => ({
@@ -52,6 +53,10 @@ jest.mock("../../src/modules/dryRunValidator", () => ({
 
 import { ensureSchemaReady, sequelize } from "@newsnexus/db-models";
 import { runDbManager } from "../../src/index";
+import {
+  createDatabaseBackupZipFile,
+  formatDatabaseBackupResult,
+} from "../../src/modules/backup";
 import { deleteNoStateArticles } from "../../src/modules/deleteArticlesNoState";
 import { deleteRetiredSourcesArticles } from "../../src/modules/deleteArticlesRetiredSources";
 import { runDryRunValidator } from "../../src/modules/dryRunValidator";
@@ -68,6 +73,7 @@ const statusSummary = {
 
 describe("db-manager index routing", () => {
   let stderrWriteSpy: jest.SpyInstance;
+  let stdoutWriteSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -83,13 +89,52 @@ describe("db-manager index routing", () => {
     });
     (runDryRunValidator as jest.Mock).mockResolvedValue({ success: true });
     (getDatabaseStatus as jest.Mock).mockResolvedValue(statusSummary);
+    (createDatabaseBackupZipFile as jest.Mock).mockResolvedValue({
+      backupPath: "/tmp/backup.zip",
+      byteSize: 123,
+      sha256: "a".repeat(64),
+      manifestVersion: 1,
+    });
+    (formatDatabaseBackupResult as jest.Mock).mockReturnValue(
+      '{"event":"database_backup_created"}',
+    );
     stderrWriteSpy = jest
       .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    stdoutWriteSpy = jest
+      .spyOn(process.stdout, "write")
       .mockImplementation(() => true);
   });
 
   afterEach(() => {
     stderrWriteSpy.mockRestore();
+    stdoutWriteSpy.mockRestore();
+  });
+
+  it("emits the stable backup result before completing the command", async () => {
+    const exitCode = await runDbManager(["--create_backup"]);
+
+    expect(exitCode).toBe(0);
+    expect(formatDatabaseBackupResult).toHaveBeenCalledWith(
+      expect.objectContaining({ backupPath: "/tmp/backup.zip" }),
+    );
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      '{"event":"database_backup_created"}\n',
+    );
+    expect(getDatabaseStatus).toHaveBeenCalled();
+  });
+
+  it("returns failure after emitting a backup result when status fails", async () => {
+    (getDatabaseStatus as jest.Mock).mockRejectedValueOnce(
+      new Error("status unavailable"),
+    );
+
+    const exitCode = await runDbManager(["--create_backup"]);
+
+    expect(exitCode).toBe(1);
+    expect(stdoutWriteSpy).toHaveBeenCalledWith(
+      '{"event":"database_backup_created"}\n',
+    );
   });
 
   it("routes --delete_articles_no_state execute path to the no-state module", async () => {
