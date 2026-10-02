@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-02T00:16:54Z
+updated_at: 2026-10-02T21:54:51Z
 created_by: codex (gpt-6) nicksmacbookair
-modified_by: codex (gpt-6) nicksmacbookair
+modified_by: codex (gpt-5) nicksmacbookair
 ---
 
 # NewsNexus12 Operations
@@ -14,7 +14,7 @@ This workspace holds operational processes for NewsNexus12. Its first process, w
 ## Project Overview
 
 - Available now: a one-shot coordinator, configuration, console/file logging, and a phase 1 skeleton.
-- Pending: the actual clearing operation, later phases, and scheduled execution.
+- Pending: the actual worker request, later phases, and scheduled execution.
 - Running the scaffold makes no worker requests or database changes.
 
 Stack: Node.js, TypeScript, dotenv, Winston, npm workspaces.
@@ -35,9 +35,10 @@ Prerequisites:
 npm install
 ```
 
-2. Check types and build this workspace explicitly:
+2. Run focused tests, check types, and build this workspace explicitly:
 
 ```bash
+npm test --workspace newsnexus12-ops
 npm run typecheck --workspace newsnexus12-ops
 npm run build --workspace newsnexus12-ops
 ```
@@ -49,6 +50,15 @@ if [ ! -e ops/.env ]; then
   cp ops/.env.example ops/.env
 fi
 ```
+
+Required worker settings:
+
+- `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER`: worker-python base URL using HTTP or HTTPS.
+- `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS`: positive integer overall request timeout in seconds.
+
+The example timeout is 90 seconds. Keep it longer than worker-python's `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS`, which defaults to 30 seconds, plus expected database deletion and response time.
+
+The current scaffold validates these values but does not contact the worker. The working Phase 1 increment will use them for its DELETE request.
 
 ---
 
@@ -87,6 +97,8 @@ Run this complete block from the repository root on macOS or Ubuntu after buildi
   trap 'rm -rf "$test_dir"' EXIT
 
   env NODE_ENV=testing NAME_APP=weekly-pipeline-smoke \
+    URL_BASE_NEWS_NEXUS_PYTHON_QUEUER=http://127.0.0.1:1/ \
+    WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS=90 \
     PATH_TO_LOGS="$test_dir" LOG_MAX_SIZE=5 LOG_MAX_FILES=5 \
     npm run weekly-flow-02:start --workspace newsnexus12-ops
 
@@ -109,9 +121,12 @@ Rebuild after source changes, rerun, and compare the messages.
 ```text
 ops/
 ├── .env.example     # Local configuration template
-├── package.json     # Workspace build and type-check commands
+├── package.json     # Workspace test, build, and type-check commands
+├── tsconfig.test.json # Isolated test build settings
 ├── tsconfig.json    # TypeScript build settings
 ├── README.md        # Operator setup and smoke check
+├── tests/
+│   └── config.test.ts # Pure configuration tests
 └── src/
     ├── config.ts    # Shared configuration loading
     ├── logger.ts    # Shared console/file logging
@@ -119,7 +134,7 @@ ops/
         ├── index.ts       # Weekly flow entry point
         ├── coordinator.ts # Calls the phase 1 stub
         └── phases/
-            └── clearDuplicateAnalyses.ts # Phase 1 skeleton
+            └── 01_clearDuplicateAnalyses.ts # Phase 1 skeleton
 ```
 
 ---
@@ -128,4 +143,6 @@ ops/
 
 - [Weekly pipeline requirements](../docs/weekly-article-pipeline-v02/20261001_weekly_combined_flow_prd_v05.md)
 - [Ops implementation plan](../docs/weekly-article-pipeline-v02/20261001_weekly_pipeline_ops_plan_v01.md)
-- [Coordinator scaffold checklist](../docs/weekly-article-pipeline-v02/20261001_ops_coordinator_scaffold_todo_v01.md)
+- [Phase 1 plan](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_1_plan_v04.md)
+- [Phase 1 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_1_todo_v02.md)
+- [Archived coordinator scaffold checklist](../docs/archive/202610/20261001_ops_coordinator_scaffold_todo_v01.md)

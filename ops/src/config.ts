@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 export interface OpsConfig {
   nodeEnv: 'development' | 'testing' | 'production';
   nameApp: string;
+  workerPythonBaseUrl: string;
+  workerPythonRequestTimeoutSeconds: number;
   pathToLogs: string;
   logMaxSizeMb: number;
   logMaxFiles: number;
@@ -18,13 +20,57 @@ const required = (env: NodeJS.ProcessEnv, key: string): string => {
   return value;
 };
 
-const positiveInteger = (value: string | undefined, key: string): number => {
+const optionalPositiveInteger = (value: string | undefined, key: string): number => {
   if (!value?.trim()) return 5;
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`${key} must be a positive integer`);
   }
   return parsed;
+};
+
+const requiredPositiveInteger = (env: NodeJS.ProcessEnv, key: string): number => {
+  const value = required(env, key);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${key} must be a positive integer`);
+  }
+  return parsed;
+};
+
+const requiredHttpUrl = (env: NodeJS.ProcessEnv, key: string): string => {
+  const value = required(env, key);
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${key} must be a valid URL`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`${key} must use http or https`);
+  }
+  return value;
+};
+
+export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): OpsConfig => {
+  const requestedEnv = required(env, 'NODE_ENV');
+  const nodeEnv = requestedEnv === 'test' ? 'testing' : requestedEnv;
+  if (!['development', 'testing', 'production'].includes(nodeEnv)) {
+    throw new Error('NODE_ENV must be development, testing, or production');
+  }
+
+  return {
+    nodeEnv: nodeEnv as OpsConfig['nodeEnv'],
+    nameApp: required(env, 'NAME_APP'),
+    workerPythonBaseUrl: requiredHttpUrl(env, 'URL_BASE_NEWS_NEXUS_PYTHON_QUEUER'),
+    workerPythonRequestTimeoutSeconds: requiredPositiveInteger(
+      env,
+      'WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS'
+    ),
+    pathToLogs: path.resolve(baseDirectory, required(env, 'PATH_TO_LOGS')),
+    logMaxSizeMb: optionalPositiveInteger(env.LOG_MAX_SIZE, 'LOG_MAX_SIZE'),
+    logMaxFiles: optionalPositiveInteger(env.LOG_MAX_FILES, 'LOG_MAX_FILES')
+  };
 };
 
 export const loadConfig = (): OpsConfig => {
@@ -34,17 +80,5 @@ export const loadConfig = (): OpsConfig => {
     throw result.error;
   }
 
-  const requestedEnv = required(process.env, 'NODE_ENV');
-  const nodeEnv = requestedEnv === 'test' ? 'testing' : requestedEnv;
-  if (!['development', 'testing', 'production'].includes(nodeEnv)) {
-    throw new Error('NODE_ENV must be development, testing, or production');
-  }
-
-  return {
-    nodeEnv: nodeEnv as OpsConfig['nodeEnv'],
-    nameApp: required(process.env, 'NAME_APP'),
-    pathToLogs: path.resolve(opsDirectory, required(process.env, 'PATH_TO_LOGS')),
-    logMaxSizeMb: positiveInteger(process.env.LOG_MAX_SIZE, 'LOG_MAX_SIZE'),
-    logMaxFiles: positiveInteger(process.env.LOG_MAX_FILES, 'LOG_MAX_FILES')
-  };
+  return parseOpsConfig(process.env, opsDirectory);
 };

@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T21:52:28Z
+updated_at: 2026-10-02T21:55:52Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -62,7 +62,7 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 - [x] Inspect the scoped diff and confirm the old file deletion, new file addition, and coordinator import move together.
 - [x] Record commands, Node version, and results below.
 - [x] Commit the rename, coordinator import, and todo baseline using the repository commit-message guidance.
-- [ ] Review the rename baseline with the operator before beginning Phase 1.
+- [x] Review the rename baseline with the operator before beginning Phase 1.
 
 ### Phase 0 verification record
 
@@ -77,45 +77,54 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 1: Test and configuration foundation
 
-- [ ] Add `dist-test/` to `ops/.gitignore` while preserving the existing `logs/` rule.
-- [ ] Add `ops/tsconfig.test.json` extending the production TypeScript settings.
-- [ ] Configure the test build with `rootDir: "."`, `outDir: "dist-test"`, and includes for `src/**/*` and `tests/**/*`.
-- [ ] Exclude `dist`, `dist-test`, and `node_modules` from the test build.
-- [ ] Add the accepted `clean`, `clean:test`, and `test:build` scripts to `ops/package.json`.
-- [ ] Change the production `build` script to clean `dist/` before compiling.
-- [ ] For Phase 1, make `test` compile and run only `dist-test/tests/config.test.js`.
-- [ ] Do not list the Phase 2 test path before that source file exists.
-- [ ] Extend `OpsConfig` with `workerPythonBaseUrl` and `workerPythonRequestTimeoutSeconds`.
-- [ ] Extract pure `parseOpsConfig(env, baseDirectory)` configuration parsing.
-- [ ] Keep `loadConfig()` responsible only for dotenv loading and calling the pure parser with the real `opsDirectory`.
-- [ ] Preserve the `NODE_ENV=test` alias, environment precedence, and existing log rotation defaults.
-- [ ] Validate `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` as a required HTTP or HTTPS URL.
-- [ ] Validate `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` with a required-positive-integer parser.
-- [ ] Do not reuse the optional log-rotation integer parser for the required request timeout.
-- [ ] Resolve relative log paths against the explicit base directory supplied to `parseOpsConfig()`.
-- [ ] Add `ops/tests/config.test.ts` without reading `.env` or mutating shared `process.env`.
-- [ ] Test required values, accepted URLs, malformed URLs, rejected protocols, invalid timeout values, log defaults, the test environment alias, and explicit base-directory path resolution.
-- [ ] Preserve the operator-added variables in `ops/.env.example` and change `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` from 30 to 90.
-- [ ] Keep the operator's environment-specific `ops/.env` untracked and unchanged by implementation code.
-- [ ] Update `ops/README.md` with the variable names, units, validation, and relationship to worker-python's cancellation timeout.
+- [x] Add `dist-test/` to `ops/.gitignore` while preserving the existing `logs/` rule.
+- [x] Add `ops/tsconfig.test.json` extending the production TypeScript settings.
+- [x] Configure the test build with `rootDir: "."`, `outDir: "dist-test"`, and includes for `src/**/*` and `tests/**/*`.
+- [x] Exclude `dist`, `dist-test`, and `node_modules` from the test build.
+- [x] Add the accepted `clean`, `clean:test`, and `test:build` scripts to `ops/package.json`.
+- [x] Change the production `build` script to clean `dist/` before compiling.
+- [x] For Phase 1, make `test` compile and run only `dist-test/tests/config.test.js`.
+- [x] Do not list the Phase 2 test path before that source file exists.
+- [x] Extend `OpsConfig` with `workerPythonBaseUrl` and `workerPythonRequestTimeoutSeconds`.
+- [x] Extract pure `parseOpsConfig(env, baseDirectory)` configuration parsing.
+- [x] Keep `loadConfig()` responsible only for dotenv loading and calling the pure parser with the real `opsDirectory`.
+- [x] Preserve the `NODE_ENV=test` alias, environment precedence, and existing log rotation defaults.
+- [x] Validate `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` as a required HTTP or HTTPS URL.
+- [x] Validate `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` with a required-positive-integer parser.
+- [x] Do not reuse the optional log-rotation integer parser for the required request timeout.
+- [x] Resolve relative log paths against the explicit base directory supplied to `parseOpsConfig()`.
+- [x] Add `ops/tests/config.test.ts` without reading `.env` or mutating shared `process.env`.
+- [x] Test required values, accepted URLs, malformed URLs, rejected protocols, invalid timeout values, log defaults, the test environment alias, and explicit base-directory path resolution.
+- [x] Preserve the operator-added variables in `ops/.env.example` and change `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS` from 30 to 90.
+- [x] Keep the operator's environment-specific `ops/.env` untracked and unchanged by implementation code.
+- [x] Update `ops/README.md` with the variable names, units, validation, and relationship to worker-python's cancellation timeout.
 
 ### Phase 1 verification and closeout
 
-- [ ] Run `git check-ignore ops/dist-test/example.js` and confirm it succeeds.
-- [ ] Confirm `ops/dist-test/tests/config.test.js` exists after `test:build` before running tests.
-- [ ] Run the Phase 1 workspace test command and confirm only the configuration test file reports results.
-- [ ] Record the exact test count as the Phase 1 baseline.
-- [ ] Run the ops type check and clean production build.
-- [ ] Confirm no test files are emitted into `ops/dist/`.
-- [ ] Confirm the stale pre-rename `dist/weekly-flow-02/phases/clearDuplicateAnalyses.js` file is absent after the clean build.
-- [ ] Confirm `git status --short -- ops/dist-test` reports no generated files.
-- [ ] Record commands, versions, executed test file, test count, and results below.
-- [ ] Commit only Phase 1 files and this todo update using the repository commit-message guidance.
+- [x] Run `git check-ignore ops/dist-test/example.js` and confirm it succeeds.
+- [x] Confirm `ops/dist-test/tests/config.test.js` exists after `test:build` before running tests.
+- [x] Run the Phase 1 workspace test command and confirm only the configuration test file reports results.
+- [x] Record the exact test count as the Phase 1 baseline.
+- [x] Run the ops type check and clean production build.
+- [x] Confirm no test files are emitted into `ops/dist/`.
+- [x] Confirm the stale pre-rename `dist/weekly-flow-02/phases/clearDuplicateAnalyses.js` file is absent after the clean build.
+- [x] Confirm `git status --short -- ops/dist-test` reports no generated files.
+- [x] Record commands, versions, executed test file, test count, and results below.
+- [x] Commit only Phase 1 files and this todo update using the repository commit-message guidance.
 - [ ] Review Phase 1 with the operator before beginning Phase 2.
 
 ### Phase 1 verification record
 
-- Pending.
+- Environment: macOS, Node v24.11.0, npm 11.6.1.
+- `npm test --workspace newsnexus12-ops`: passed with only `dist-test/tests/config.test.js`; 11 tests passed in one suite.
+- `npm run typecheck --workspace newsnexus12-ops`: passed.
+- `npm run build --workspace newsnexus12-ops`: passed after the new clean step.
+- `git check-ignore -v ops/dist-test/example.js`: matched `ops/.gitignore` line 2.
+- The test build emitted only `config.test.js` and its source map under `dist-test/tests/`.
+- Production `dist/` contains no test files. The stale unnumbered Phase 1 module was removed, and only `01_clearDuplicateAnalyses.js` remains.
+- `git status --short -- ops/dist-test`: no output.
+- The updated README temporary-log check passed with all required environment values supplied explicitly and did not contact worker-python.
+- `ops/.env` remained ignored and unchanged. The tracked example timeout is now 90 seconds.
 
 ## Implementation phase 2: Phase result and worker request
 
