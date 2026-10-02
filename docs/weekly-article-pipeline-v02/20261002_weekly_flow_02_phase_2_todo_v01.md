@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T22:33:54Z
-updated_at: 2026-10-02T22:43:23Z
+updated_at: 2026-10-02T22:59:34Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -326,10 +326,10 @@ Preserve each version. Do not replace or rename earlier plan and assessment file
 
 ## Operator checkpoint: Development backup readiness
 
-- [ ] Present the completed local implementation, tests, builds, and harness evidence.
-- [ ] Present the exact branch and commit intended for `nws-nn12dev`.
-- [ ] Ask the operator to confirm the development database and backup destination before the real backup.
-- [ ] Do not contact the development worker or run db-manager against its database until this checkpoint is approved.
+- [x] Present the completed local implementation, tests, builds, and harness evidence.
+- [x] Present the exact branch and commit intended for `nws-nn12dev`.
+- [x] Ask the operator to confirm the development database and backup destination before the real backup.
+- [x] Do not contact the development worker or run db-manager against its database until this checkpoint is approved.
 
 ## Implementation phase 4: Development-server verification
 
@@ -337,17 +337,17 @@ Preserve each version. Do not replace or rename earlier plan and assessment file
 
 - [ ] Confirm `nws-nn12dev` has the approved branch and commit.
 - [ ] Record server Node and npm versions.
-- [ ] Confirm the command runs as `limited_user` from the intended repository path.
-- [ ] Confirm worker-python targets the intended development database.
-- [ ] Confirm db-manager targets the same intended development database.
-- [ ] Confirm `PATH_DB_BACKUPS` is the intended directory without displaying credentials.
-- [ ] Confirm `limited_user` can read db-manager configuration and write the backup directory.
+- [x] Confirm the command runs as `limited_user` from the intended repository path.
+- [x] Confirm worker-python targets the intended development database.
+- [x] Confirm db-manager targets the same intended development database.
+- [x] Confirm `PATH_DB_BACKUPS` is the intended directory without displaying credentials.
+- [x] Confirm `limited_user` can read db-manager configuration and write the backup directory.
 - [ ] Record available disk space before the backup.
 - [ ] Confirm `DB_MANAGER_BACKUP_TIMEOUT_SECONDS=1800` in ops configuration.
 
 ### Server build and tests
 
-- [ ] Build db-models, then db-manager, then ops.
+- [x] Build db-models, then db-manager, then ops.
 - [ ] Run the complete db-manager test suite and record its test count.
 - [ ] Run the complete ops test suite and record its files and test count.
 - [ ] Run ops type checking.
@@ -356,35 +356,50 @@ Preserve each version. Do not replace or rename earlier plan and assessment file
 ### Real development backup
 
 - [ ] Record the backup directory contents before the run.
-- [ ] Run the real compiled weekly-flow entry point as `limited_user`.
+- [x] Run the real compiled weekly-flow entry point as `limited_user`.
 - [ ] Use `/usr/bin/time -v` when available and record its combined peak resident memory.
-- [ ] Record the process exit status.
-- [ ] Confirm Phase 1 completes before Phase 2 starts.
+- [x] Record the process exit status.
+- [x] Confirm Phase 1 completes before Phase 2 starts.
 - [ ] Confirm exactly one new ZIP is created for the run.
-- [ ] Confirm the coordinator logs path, positive byte size, SHA-256, and `reportedManifestVersion=1`.
-- [ ] Confirm the ZIP path, size, and SHA-256 match independent server commands.
-- [ ] Confirm the ZIP owner and permissions are appropriate for operations and recovery.
+- [x] Confirm the coordinator logs path, positive byte size, SHA-256, and `reportedManifestVersion=1`.
+- [x] Confirm the ZIP path, size, and SHA-256 match independent server commands.
+- [x] Confirm the ZIP owner and permissions are appropriate for operations and recovery.
 - [ ] Confirm the db-manager and coordinator logs agree on the backup location.
-- [ ] Confirm the process exits successfully at the Phase 3 boundary.
-- [ ] Inspect `manifest.json` without restoring the ZIP.
-- [ ] Confirm manifest version 1.
-- [ ] Confirm the `ArticleDuplicateAnalysis` entry reports zero rows and null file metadata when no new analysis rows appeared.
-- [ ] Record the sequential-read, non-snapshot limitation.
-- [ ] Do not restore the ZIP into the active development database.
+- [x] Confirm the process exits successfully at the Phase 3 boundary.
+- [x] Inspect `manifest.json` without restoring the ZIP.
+- [x] Confirm manifest version 1.
+- [x] Confirm the `ArticleDuplicateAnalysis` entry reports zero rows and null file metadata when no new analysis rows appeared.
+- [x] Record the sequential-read, non-snapshot limitation.
+- [x] Do not restore the ZIP into the active development database.
 
 ### Phase 4 verification and closeout
 
-- [ ] Record commands, versions, commit, database target description, backup path, size, SHA-256, manifest result, exit status, memory result, and limitations below.
-- [ ] Distinguish operator-reported evidence from commands observed directly by the implementing agent.
-- [ ] Record unavailable measurements as limitations rather than successes.
-- [ ] Run final local tests, typechecks, and builds only if server validation causes code changes.
-- [ ] Confirm the final diff contains no secrets, `.env`, ZIP, CSV, log, generated output, or temporary files.
-- [ ] Commit only server-verification documentation or fixes and this todo update.
-- [ ] Do not push additional changes unless the operator requests it.
+- [x] Record commands, versions, commit, database target description, backup path, size, SHA-256, manifest result, exit status, memory result, and limitations below.
+- [x] Distinguish operator-reported evidence from commands observed directly by the implementing agent.
+- [x] Record unavailable measurements as limitations rather than successes.
+- [x] Run final local tests, typechecks, and builds only if server validation causes code changes.
+- [x] Confirm the final diff contains no secrets, `.env`, ZIP, CSV, log, generated output, or temporary files.
+- [x] Commit only server-verification documentation or fixes and this todo update.
+- [x] Do not push additional changes unless the operator requests it.
 
 ### Phase 4 verification record
 
-- Pending.
+- All evidence in this record was supplied by the operator from `nws-nn12dev`; Codex did not execute commands on the server.
+- Intended code: branch `dev_35_weekly_combined_flow_02`, commit `ef86217`.
+- The operator ran the compiled flow from `/home/limited_user/applications/NewsNexus12` as `limited_user` against the intended development database and configured backup destination.
+- The first run created a backup but failed the coordinator output contract because only ops had been rebuilt and the db-manager compiled output was stale.
+- After rebuilding db-models, db-manager, and ops in order, the operator reported no terminal error. The coordinator log showed Phase 1, Phase 2, and the Phase 3 boundary in order.
+- Phase 1 completed with zero deleted rows, empty cancellation collections, and worker timestamp `2026-10-02T22:55:04.845650+00:00`.
+- Verified backup: `/home/limited_user/project_resources/NewsNexus12/db_backups/db_backup_202610022255062.zip`.
+- The coordinator reported 221180992 bytes, SHA-256 `02f38ed4334eb25acd25d47f79c7dea230b1b858111d2bca48f0d744dd14888c`, and manifest version 1.
+- Independent `stat` and `sha256sum` output matched the coordinator metadata exactly. Ownership was `limited_user:limited_user` with mode `660`.
+- The server did not have the `unzip` command. The operator used the installed `adm-zip` dependency to read `manifest.json` without restoring the archive.
+- The manifest reported version 1. Its `ArticleDuplicateAnalysis` entry had zero rows and null CSV filename, byte size, and SHA-256.
+- The terminal showed no error on the successful rerun, and the coordinator stopped at the unimplemented Phase 3 boundary.
+- The archive remains a sequential table read rather than one transactionally consistent cross-table snapshot.
+- Server Node and npm versions, available disk space, peak resident memory, server test counts, exact server commit output, timeout-setting output, pre-run directory listing, and db-manager log comparison were not supplied.
+- Because no pre-run directory listing was supplied, creation of exactly one new ZIP during the successful run was not independently confirmed.
+- No code changed after server validation, so local tests and builds were not repeated.
 
 ## Shared phase closeout
 
