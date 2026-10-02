@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T23:47:44Z
-updated_at: 2026-10-01T23:52:41Z
+updated_at: 2026-10-02T00:00:30Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -45,7 +45,7 @@ The operator reported 30 passing worker-python tests on Ubuntu. Those tests supp
 - [x] Verify an error's stack and structured metadata remain readable. Verify logs finish writing before the smoke process exits.
 - [x] Run applicable existing tests or lint checks if configured; do not introduce a new framework solely for scaffold checks.
 - [x] Record verification results, update completed checkboxes, and commit this phase with a reference to this todo and phase 1.
-- [ ] Review the workspace, configuration, and logging with the operator before phase 2.
+- [x] Review the workspace, configuration, and logging with the operator before phase 2.
 
 ### Phase 1 verification record
 
@@ -53,28 +53,38 @@ The operator reported 30 passing worker-python tests on Ubuntu. Those tests supp
 - Temporary smoke harness passed: root and ops working directories, dotenv precedence, relative paths, defaults, invalid configuration, and the worker-node-compatible `test` alias.
 - Development, testing, and production transport checks passed, including structured metadata, error stacks, debug filtering, and the final file message after process exit. Temporary fixtures and logs were removed.
 - Dependencies installed from the local npm cache; existing dependency versions were retained. No ops test or lint framework is configured.
-- Ubuntu checks and operator review remain pending. Phase 2 has not started.
+- The operator reviewed the scaffold direction and authorized phase 2. Ubuntu checks remain pending.
 
 ## Implementation phase 2: Coordinator and stub
 
-- [ ] Add `ops/src/index.ts` to load configuration, initialize logging, and invoke the coordinator once.
-- [ ] Add `ops/src/coordinator.ts` with an understandable startup header following worker-node's logging style and a direct call to the phase 1 module.
-- [ ] Add `ops/src/phases/clearDuplicateAnalyses.ts` as an explicit stub. Log that the module was entered and clearing is not implemented.
-- [ ] End execution after the stub. Do not log that rows were deleted, runtime phase 1 completed, or the weekly pipeline completed. Do not invent persisted run IDs.
-- [ ] Report bootstrap errors clearly and return a nonzero exit status when startup fails. Finish pending logs before exit; do not add a general recovery or retry system.
-- [ ] Add one-shot workspace commands: `dev` using `tsx src/index.ts` and `start` using `node dist/index.js`. Do not use watch mode.
-- [ ] Add a concise `ops/README.md` explaining configuration, manual commands, expected messages, and the stub boundary. Include the repository's required Markdown frontmatter.
+- [x] Add `ops/src/index.ts` to load configuration, initialize logging, and invoke the coordinator once.
+- [x] Add `ops/src/coordinator.ts` with an understandable startup header following worker-node's logging style and a direct call to the phase 1 module.
+- [x] Add `ops/src/phases/clearDuplicateAnalyses.ts` as an explicit stub. Log that the module was entered and clearing is not implemented.
+- [x] End execution after the stub. Do not log that rows were deleted, runtime phase 1 completed, or the weekly pipeline completed. Do not invent persisted run IDs.
+- [x] Report bootstrap errors clearly and return a nonzero exit status when startup fails. Finish pending logs before exit; do not add a general recovery or retry system.
+- [x] Add one-shot workspace commands: `dev` using `tsx src/index.ts` and `start` using `node dist/index.js`. Do not use watch mode.
+- [x] Add a concise `ops/README.md` explaining configuration, manual commands, expected messages, and the stub boundary. Include the repository's required Markdown frontmatter.
 
 ### Verification and closeout
 
-- [ ] Run scoped type checking, the ops build, and any applicable configured tests or lint checks; fix failures.
-- [ ] Run the development entry point and compiled entry point on macOS. Confirm one startup, one stub invocation, and a clean exit with final logs written.
-- [ ] Verify testing writes console and file output and production writes file output using temporary log directories.
-- [ ] Confirm invocation from the repository root and `ops/` behaves consistently. Confirm invalid startup configuration produces a clear error and nonzero exit.
-- [ ] Review the call path to confirm there are no worker requests, subprocess launches, database operations, or automatic advancement.
-- [ ] Document repeatable Ubuntu smoke commands using the Node workspace and temporary logs. No Python virtual environment or running workers should be needed.
-- [ ] Record verification results, update completed checkboxes, and commit this phase with a reference to this todo and phase 2.
+- [x] Run scoped type checking, the ops build, and any applicable configured tests or lint checks; fix failures.
+- [x] Run the development entry point and compiled entry point on macOS. Confirm one startup, one stub invocation, and a clean exit with final logs written.
+- [x] Verify testing writes console and file output and production writes file output using temporary log directories.
+- [x] Confirm invocation from the repository root and `ops/` behaves consistently. Confirm invalid startup configuration produces a clear error and nonzero exit.
+- [x] Review the call path to confirm there are no worker requests, subprocess launches, database operations, or automatic advancement.
+- [x] Document repeatable Ubuntu smoke commands using the Node workspace and temporary logs. No Python virtual environment or running workers should be needed.
+- [x] Record verification results, update completed checkboxes, and commit this phase with a reference to this todo and phase 2.
 - [ ] Walk through the entry point, coordinator, and stub with the operator before adding real phase behavior.
+
+### Phase 2 verification record
+
+- Local macOS: scoped type checking and compilation passed. No ops lint or automated test framework is configured.
+- Smoke checks passed for both development and compiled commands, from repository root and ops, in all three logging environments (12 combinations).
+- Each run logged one coordinator startup and one stub entry, wrote its final message, and exited cleanly. Production emitted application logs only to file.
+- Invalid configuration returned a nonzero status with a clear error. The README temporary-log command also passed verbatim.
+- The development command required execution outside the agent sandbox because tsx opens a local IPC socket; it passed when permitted.
+- Reviewed the source call path: entry point loads configuration and logging, coordinator calls the stub, and logging drains before exit. No worker, database, or subprocess operations were added.
+- Ubuntu validation and operator walkthrough remain pending before adding real phase behavior.
 
 ## Ubuntu validation and next handoff
 
