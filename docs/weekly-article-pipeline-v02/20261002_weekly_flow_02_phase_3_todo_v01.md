@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T23:11:05Z
-updated_at: 2026-10-02T23:23:02Z
+updated_at: 2026-10-02T23:23:12Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -166,69 +166,73 @@ Do not replace or rename earlier versions.
 
 ### Extraction
 
-- [ ] Extract the command specification and launcher types from `02_createDatabaseBackupCommand.ts` into one focused shared module.
-- [ ] Extract fixed db-manager entry resolution and child-environment isolation.
-- [ ] Extract spawn handling without a shell.
-- [ ] Extract continuous stdout and stderr draining.
-- [ ] Preserve `StringDecoder` handling across UTF-8 chunk boundaries.
-- [ ] Preserve incomplete-line retention and final unterminated-line processing.
-- [ ] Preserve the 64 KiB line limit.
-- [ ] Preserve independent 32 KiB stdout and stderr diagnostic tails.
-- [ ] Preserve result candidates separately from diagnostic retention.
-- [ ] Preserve normal-exit, signal, nonzero-exit, timeout, SIGTERM, and delayed SIGKILL handling.
-- [ ] Preserve the five-second production termination grace period.
-- [ ] Preserve spawn, timeout, exit, and output-contract categories.
-- [ ] Keep original errors as causes where applicable.
-- [ ] Keep failure messages concise and free of environment values.
-- [ ] Do not retain a second copy of the process runner.
+- [x] Extract the command specification and launcher types from `02_createDatabaseBackupCommand.ts` into one focused shared module.
+- [x] Extract fixed db-manager entry resolution and child-environment isolation.
+- [x] Extract spawn handling without a shell.
+- [x] Extract continuous stdout and stderr draining.
+- [x] Preserve `StringDecoder` handling across UTF-8 chunk boundaries.
+- [x] Preserve incomplete-line retention and final unterminated-line processing.
+- [x] Preserve the 64 KiB line limit.
+- [x] Preserve independent 32 KiB stdout and stderr diagnostic tails.
+- [x] Preserve result candidates separately from diagnostic retention.
+- [x] Preserve normal-exit, signal, nonzero-exit, timeout, SIGTERM, and delayed SIGKILL handling.
+- [x] Preserve the five-second production termination grace period.
+- [x] Preserve spawn, timeout, exit, and output-contract categories.
+- [x] Keep original errors as causes where applicable.
+- [x] Keep failure messages concise and free of environment values.
+- [x] Do not retain a second copy of the process runner.
 
 ### Phase-specific ownership
 
-- [ ] Keep Phase 2 command arguments, result parsing, and artifact verification in the Phase 2 module.
-- [ ] Keep `artifact_verification` as a Phase 2-specific failure.
-- [ ] Preserve the `CreateDatabaseBackupResult` public shape.
-- [ ] Preserve Phase 2's fixed `--create_backup` command.
-- [ ] Preserve every Phase 2 coordinator log field.
-- [ ] Allow code-only command and launcher injection for tests and temporary harnesses.
-- [ ] Do not add environment, CLI, or file-based command overrides.
+- [x] Keep Phase 2 command arguments, result parsing, and artifact verification in the Phase 2 module.
+- [x] Keep `artifact_verification` as a Phase 2-specific failure.
+- [x] Preserve the `CreateDatabaseBackupResult` public shape.
+- [x] Preserve Phase 2's fixed `--create_backup` command.
+- [x] Preserve every Phase 2 coordinator log field.
+- [x] Allow code-only command and launcher injection for tests and temporary harnesses.
+- [x] Do not add environment, CLI, or file-based command overrides.
 
 ### Environment isolation
 
-- [ ] Start with a copy of the parent environment.
-- [ ] Remove every previously isolated ops key.
-- [ ] Add `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS` to the removed keys.
-- [ ] Remove every inherited `PG_*` key.
-- [ ] Preserve ordinary operating-system and Node values.
-- [ ] Confirm production children load db-manager's `.env` through the fixed working directory.
-- [ ] Never log child environment values or credentials.
+- [x] Start with a copy of the parent environment.
+- [x] Remove every previously isolated ops key.
+- [x] Add `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS` to the removed keys.
+- [x] Remove every inherited `PG_*` key.
+- [x] Preserve ordinary operating-system and Node values.
+- [x] Confirm production children load db-manager's `.env` through the fixed working directory.
+- [x] Never log child environment values or credentials.
 
 ### Regression tests
 
-- [ ] Preserve every Phase 2 parser and artifact test.
-- [ ] Preserve split-chunk and UTF-8-boundary coverage.
-- [ ] Preserve large-output and no-blocking coverage.
-- [ ] Preserve missing, duplicate, malformed, oversized, and incorrectly typed result coverage.
-- [ ] Preserve spawn, exit, signal, timeout, and force-termination coverage.
-- [ ] Preserve missing-file, directory, empty-file, size, and checksum verification coverage.
-- [ ] Test the new timeout key is removed from the production child environment.
-- [ ] Confirm ordinary environment sentinels remain present.
-- [ ] Confirm errors remain bounded and exclude sentinels.
+- [x] Preserve every Phase 2 parser and artifact test.
+- [x] Preserve split-chunk and UTF-8-boundary coverage.
+- [x] Preserve large-output and no-blocking coverage.
+- [x] Preserve missing, duplicate, malformed, oversized, and incorrectly typed result coverage.
+- [x] Preserve spawn, exit, signal, timeout, and force-termination coverage.
+- [x] Preserve missing-file, directory, empty-file, size, and checksum verification coverage.
+- [x] Test the new timeout key is removed from the production child environment.
+- [x] Confirm ordinary environment sentinels remain present.
+- [x] Confirm errors remain bounded and exclude sentinels.
 
 ### Phase 2 verification and closeout
 
-- [ ] Run the complete ops suite after extraction.
-- [ ] Run ops type checking and a clean production build.
-- [ ] Run the complete db-manager suite and build.
-- [ ] Confirm all currently expected compiled test files exist and execute.
-- [ ] Confirm production output contains no tests or stale modules.
-- [ ] Inspect the diff for unintended Phase 2 behavior changes.
-- [ ] Record commands, versions, test paths, counts, and results below.
-- [ ] Commit only the shared-runner extraction, Phase 2 adaptations, tests, and this todo update.
-- [ ] Continue directly to implementation phase 3.
+- [x] Run the complete ops suite after extraction.
+- [x] Run ops type checking and a clean production build.
+- [x] Run the complete db-manager suite and build.
+- [x] Confirm all currently expected compiled test files exist and execute.
+- [x] Confirm production output contains no tests or stale modules.
+- [x] Inspect the diff for unintended Phase 2 behavior changes.
+- [x] Record commands, versions, test paths, counts, and results below.
+- [x] Commit only the shared-runner extraction, Phase 2 adaptations, tests, and this todo update.
+- [x] Continue directly to implementation phase 3.
 
 ### Phase 2 verification record
 
-- Pending.
+- Ops verification: 42 tests passed across eight suites; type checking and the clean production build passed.
+- Compiled test paths: config, Phase 1, and Phase 2 test files were present and executed from `ops/dist-test/tests/`.
+- Production inspection: `ops/dist/` contained runtime modules only, including the shared runner; no tests or stale modules were present.
+- Db-manager verification: 232 tests passed across 14 suites and the TypeScript build passed.
+- Environment regression: the new Phase 3 timeout key and all `PG_*` sentinels were removed while ordinary operating-system and Node values remained.
 
 ## Implementation phase 3: Ops Phase 3 module
 
