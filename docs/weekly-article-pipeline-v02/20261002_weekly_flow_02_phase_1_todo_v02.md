@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T21:55:52Z
+updated_at: 2026-10-02T21:59:25Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -111,7 +111,7 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 - [x] Confirm `git status --short -- ops/dist-test` reports no generated files.
 - [x] Record commands, versions, executed test file, test count, and results below.
 - [x] Commit only Phase 1 files and this todo update using the repository commit-message guidance.
-- [ ] Review Phase 1 with the operator before beginning Phase 2.
+- [x] Review Phase 1 with the operator before beginning Phase 2.
 
 ### Phase 1 verification record
 
@@ -128,46 +128,54 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 2: Phase result and worker request
 
-- [ ] Define a small typed successful result with `rowsDeleted`, `cancelledJobs`, `cancellationRequestedJobs`, and `timestamp`.
-- [ ] Keep runtime response input typed as `unknown` until validation succeeds.
-- [ ] Validate `cleared` as exactly `true`.
-- [ ] Validate `rowsDeleted` as a non-negative safe integer.
-- [ ] Validate both job collections as arrays containing strings only.
-- [ ] Validate `timestamp` as a non-empty string.
-- [ ] Keep `exitCode`, `stdout`, and `stderr` optional and outside success determination.
-- [ ] Implement one DELETE request to `/deduper/clear-db-table` with no body or query parameters.
-- [ ] Construct the endpoint with `URL` and support base URLs with or without a trailing slash.
-- [ ] Use `globalThis.fetch` in production and accept a small compatible request dependency for tests.
-- [ ] Apply the configured 90-second limit with the Node abort API at the request boundary.
-- [ ] Convert seconds to milliseconds only when creating the request timeout.
-- [ ] Treat 409, 500, 504, and every other non-success status as a Phase 1 failure.
-- [ ] Include the status and concise worker `error` value when available without dumping the full response.
-- [ ] Distinguish HTTP rejection, invalid response data, connection failure, and timeout in error context.
-- [ ] Preserve the original error as the cause when wrapping request failures.
-- [ ] Do not log credentials or a complete worker URL that may contain sensitive components.
-- [ ] Do not poll, retry, query the database, or reconcile an uncertain result.
-- [ ] Return only the validated typed result on success.
-- [ ] Add `ops/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.ts`.
-- [ ] Test valid success, zero rows, malformed JSON, `cleared = false`, missing fields, wrong field types, invalid numeric values, and invalid job collections.
-- [ ] Test the DELETE method, exact endpoint, trailing-slash behavior, 409, 500, 504, connection failure, timeout, and concise error extraction.
-- [ ] Use deterministic request substitutes or controlled fixtures; do not contact worker-python.
-- [ ] Update the `test` script only after creating the Phase 2 test file so it runs both explicit compiled paths.
+- [x] Define a small typed successful result with `rowsDeleted`, `cancelledJobs`, `cancellationRequestedJobs`, and `timestamp`.
+- [x] Keep runtime response input typed as `unknown` until validation succeeds.
+- [x] Validate `cleared` as exactly `true`.
+- [x] Validate `rowsDeleted` as a non-negative safe integer.
+- [x] Validate both job collections as arrays containing strings only.
+- [x] Validate `timestamp` as a non-empty string.
+- [x] Keep `exitCode`, `stdout`, and `stderr` optional and outside success determination.
+- [x] Implement one DELETE request to `/deduper/clear-db-table` with no body or query parameters.
+- [x] Construct the endpoint with `URL` and support base URLs with or without a trailing slash.
+- [x] Use `globalThis.fetch` in production and accept a small compatible request dependency for tests.
+- [x] Apply the configured 90-second limit with the Node abort API at the request boundary.
+- [x] Convert seconds to milliseconds only when creating the request timeout.
+- [x] Treat 409, 500, 504, and every other non-success status as a Phase 1 failure.
+- [x] Include the status and concise worker `error` value when available without dumping the full response.
+- [x] Distinguish HTTP rejection, invalid response data, connection failure, and timeout in error context.
+- [x] Preserve the original error as the cause when wrapping request failures.
+- [x] Do not log credentials or a complete worker URL that may contain sensitive components.
+- [x] Do not poll, retry, query the database, or reconcile an uncertain result.
+- [x] Return only the validated typed result on success.
+- [x] Add `ops/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.ts`.
+- [x] Test valid success, zero rows, malformed JSON, `cleared = false`, missing fields, wrong field types, invalid numeric values, and invalid job collections.
+- [x] Test the DELETE method, exact endpoint, trailing-slash behavior, 409, 500, 504, connection failure, timeout, and concise error extraction.
+- [x] Use deterministic request substitutes or controlled fixtures; do not contact worker-python.
+- [x] Update the `test` script only after creating the Phase 2 test file so it runs both explicit compiled paths.
 
 ### Phase 2 verification and closeout
 
-- [ ] Confirm both expected compiled test files exist before running `node --test`.
-- [ ] Run the complete ops test command and confirm both files report results.
-- [ ] Confirm the total test count is at least the recorded Phase 1 count plus the new Phase 2 tests.
-- [ ] Run the ops type check and clean production build.
-- [ ] Confirm test output remains ignored and production output contains no tests or stale renamed files.
-- [ ] Review error messages to confirm they are actionable and do not expose the configured worker URL.
-- [ ] Record commands, versions, executed test files, test count, and results below.
-- [ ] Commit only Phase 2 files and this todo update using the repository commit-message guidance.
+- [x] Confirm both expected compiled test files exist before running `node --test`.
+- [x] Run the complete ops test command and confirm both files report results.
+- [x] Confirm the total test count is at least the recorded Phase 1 count plus the new Phase 2 tests.
+- [x] Run the ops type check and clean production build.
+- [x] Confirm test output remains ignored and production output contains no tests or stale renamed files.
+- [x] Review error messages to confirm they are actionable and do not expose the configured worker URL.
+- [x] Record commands, versions, executed test files, test count, and results below.
+- [x] Commit only Phase 2 files and this todo update using the repository commit-message guidance.
 - [ ] Review Phase 2 with the operator before beginning Phase 3.
 
 ### Phase 2 verification record
 
-- Pending.
+- Environment: macOS, Node v24.11.0, npm 11.6.1.
+- `npm test --workspace newsnexus12-ops`: passed with both explicit compiled test paths.
+- Test result: 25 tests passed in three suites, up from the Phase 1 baseline of 11. The Phase 2 file contributed 14 tests in its response-parser and request suites.
+- `npm run typecheck --workspace newsnexus12-ops`: passed.
+- `npm run build --workspace newsnexus12-ops`: passed after cleaning production output.
+- Both expected compiled test files existed before the test run. `git status --short -- ops/dist-test` produced no output.
+- Production `dist/` contains the numbered stub and request module, no test files, and no stale unnumbered module.
+- Tests covered 409, 500, 504, malformed success data, connection failure, and timeout without contacting worker-python on port 5000.
+- HTTP error details are limited to 300 characters. Connection and timeout messages do not include the configured worker URL.
 
 ## Implementation phase 3: Coordinator integration and documentation
 
