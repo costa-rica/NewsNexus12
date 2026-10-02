@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T22:03:06Z
+updated_at: 2026-10-02T22:06:11Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -210,7 +210,7 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 - [x] Confirm generated test output remains ignored and absent from the commit.
 - [x] Record commands, versions, executed test files, test count, and results below.
 - [x] Commit only Phase 3 files and this todo update using the repository commit-message guidance.
-- [ ] Review Phase 3 with the operator before beginning Phase 4.
+- [x] Review Phase 3 with the operator before beginning Phase 4.
 
 ### Phase 3 verification record
 
@@ -226,30 +226,40 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 4: Local runtime verification
 
-- [ ] Create a temporary controlled HTTP fixture outside the tracked source tree.
-- [ ] Return the documented worker success shape from the fixture without accessing PostgreSQL.
-- [ ] Run the development entry point against the fixture and confirm one DELETE request, Phase 1 completion, the Phase 2 boundary message, and a clean exit.
-- [ ] Run the compiled entry point against the fixture and confirm the same behavior.
-- [ ] Exercise a controlled non-success response and confirm a nonzero exit with no completion message.
-- [ ] Exercise a controlled delayed response beyond a one-second test timeout and confirm safe timeout failure without waiting 90 seconds.
-- [ ] Supply every required environment variable explicitly for fixture checks; do not read the worker URL from `ops/.env`.
-- [ ] Verify invocation from both the repository root and `ops/` still resolves configuration and logs consistently.
-- [ ] Run the complete ops test command, type check, and clean production build after runtime checks.
-- [ ] Confirm both expected test files ran and the count did not drop below the Phase 3 count.
-- [ ] Confirm `ops/dist-test/` is ignored and `ops/dist/` contains no tests or stale modules.
-- [ ] Remove temporary fixtures and logs created for verification.
+- [x] Create a temporary controlled HTTP fixture outside the tracked source tree.
+- [x] Return the documented worker success shape from the fixture without accessing PostgreSQL.
+- [x] Run the development entry point against the fixture and confirm one DELETE request, Phase 1 completion, the Phase 2 boundary message, and a clean exit.
+- [x] Run the compiled entry point against the fixture and confirm the same behavior.
+- [x] Exercise a controlled non-success response and confirm a nonzero exit with no completion message.
+- [x] Exercise a controlled delayed response beyond a one-second test timeout and confirm safe timeout failure without waiting 90 seconds.
+- [x] Supply every required environment variable explicitly for fixture checks; do not read the worker URL from `ops/.env`.
+- [x] Verify invocation from both the repository root and `ops/` still resolves configuration and logs consistently.
+- [x] Run the complete ops test command, type check, and clean production build after runtime checks.
+- [x] Confirm both expected test files ran and the count did not drop below the Phase 3 count.
+- [x] Confirm `ops/dist-test/` is ignored and `ops/dist/` contains no tests or stale modules.
+- [x] Remove temporary fixtures and logs created for verification.
 
 ### Phase 4 verification and closeout
 
-- [ ] Record fixture behavior, commands, Node version, exit statuses, executed test files, test count, and log results below.
-- [ ] Record any verification that could not be completed; do not mark it successful.
-- [ ] Update tracked docs only when verification changes operator instructions.
-- [ ] Commit only Phase 4 documentation or fixes and this todo update using the repository commit-message guidance.
+- [x] Record fixture behavior, commands, Node version, exit statuses, executed test files, test count, and log results below.
+- [x] Record any verification that could not be completed; do not mark it successful.
+- [x] Update tracked docs only when verification changes operator instructions.
+- [x] Commit only Phase 4 documentation or fixes and this todo update using the repository commit-message guidance.
 - [ ] Review local readiness with the operator before contacting the development worker.
 
 ### Phase 4 verification record
 
-- Pending.
+- Environment: macOS, Node v24.11.0, npm 11.6.1.
+- A temporary Node HTTP fixture listened on `127.0.0.1:51234`. It recorded four requests, each using `DELETE /deduper/clear-db-table`, and did not access PostgreSQL.
+- The development entry point ran from the repository root with explicit environment values. It logged `rowsDeleted=4`, both fixture job collections, the worker timestamp, and the Phase 2 boundary before exiting with status 0.
+- The compiled entry point ran from `ops/` with explicit environment values and produced the same success result with exit status 0.
+- The controlled HTTP 500 run exited with status 1. Its terminal and application log contained `failureCategory=http` and no Phase 1 completion or Phase 2 boundary.
+- The delayed response exceeded the explicit one-second timeout. The run failed after about one second with status 1, `failureCategory=timeout`, and an unverified-outcome message.
+- Every runtime command supplied all required settings explicitly. No command used the worker URL or other values from `ops/.env`, and worker-python on port 5000 was not contacted.
+- `npm test --workspace newsnexus12-ops`: 27 tests passed across both compiled test files and four suites.
+- `npm run typecheck --workspace newsnexus12-ops` and `npm run build --workspace newsnexus12-ops`: passed.
+- Test output remained ignored. Production output contained no tests or stale unnumbered module.
+- The temporary fixture, mode file, request record, and application logs were removed. No additional operator documentation changes were needed.
 
 ## Implementation phase 5: Ubuntu development validation
 
