@@ -1,21 +1,22 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-02T22:43:37Z
+updated_at: 2026-10-02T23:28:00Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
 
 # NewsNexus12 Operations
 
-This workspace holds operational processes for NewsNexus12. Its first process, weekly-flow-02, clears duplicate analyses through worker-python, creates and verifies a database backup through db-manager, and stops before Phase 3.
+This workspace holds operational processes for NewsNexus12. Weekly-flow-02 clears duplicate analyses, creates and verifies a database backup, deletes old unprotected articles, and stops before Phase 4.
 
 ---
 
 ## Project Overview
 
-- Available now: a one-shot coordinator, configuration, console/file logging, the Phase 1 worker request, and the Phase 2 database backup.
+- Available now: a one-shot coordinator, configuration, console/file logging, and the first three weekly-flow-02 phases.
 - Phase 1 calls `DELETE /deduper/clear-db-table` and continues only after validating the success response.
 - Phase 2 starts only after Phase 1 succeeds. It runs the fixed compiled entry point at `db-manager/dist/index.js --create_backup` with Node and verifies the reported ZIP size and SHA-256.
+- Phase 3 starts only after Phase 2 succeeds. It runs the fixed compiled entry point at `db-manager/dist/index.js --delete_articles` with Node.
 - Pending: later phases and scheduled execution.
 
 Stack: Node.js, TypeScript, dotenv, Winston, npm workspaces.
@@ -74,11 +75,19 @@ Required backup setting:
 
 The example is 1800 seconds. Db-manager loads its own `db-manager/.env` because the child runs from the db-manager directory. Its database target, backup path, and logging identity remain separate from ops configuration.
 
+Required deletion setting:
+
+- `DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS`: positive integer overall timeout for the Phase 3 child process.
+
+The example is 1800 seconds. Phase 3 uses db-manager's bare `--delete_articles` command, which keeps the db-manager default threshold of 180 days.
+
 ---
 
 ## Usage
 
 Run from the repository root after setup:
+
+These normal entry points perform real deletion against the database configured in `worker-python/.env` and `db-manager/.env`. Use them only when clearing duplicate analyses, creating a full backup, and deleting eligible old articles are intended.
 
 ```bash
 # Run once from TypeScript (no watch process).
@@ -93,7 +102,7 @@ npm run weekly-flow-02:start --workspace newsnexus12-ops
 # npm run build && npm run weekly-flow-02:start
 ```
 
-- Expected sequence: startup header, Phase 1 start and completion, Phase 2 start and completion, and a message that execution stopped before unimplemented Phase 3.
+- Expected sequence: startup header, Phase 1 completion, Phase 2 completion, Phase 3 completion, and a message that execution stopped before unimplemented Phase 4.
 - The named commands run only weekly-flow-02; future processes can have separate commands in this workspace.
 - Each command runs once and exits. A rerun starts again at Phase 1 and safely repeats the clear operation; there is no resume state or automatic retry.
 - The example configuration logs to the console in development. Testing writes to console and file; production writes to file only.
@@ -104,21 +113,27 @@ npm run weekly-flow-02:start --workspace newsnexus12-ops
 - Phase 2 completion logs the absolute backup path, byte size, SHA-256, and `reportedManifestVersion`.
 - The db-manager success result reports the same metadata. Ops independently verifies the external ZIP size and SHA-256 but does not read `manifest.json` during routine execution.
 - A timeout leaves the backup outcome unverified. A possible artifact is retained for investigation; the coordinator does not delete it.
-- A rerun begins again at Phase 1 and can create another backup. There is no automatic retry or durable resume state.
-- The backup reads tables sequentially and is not one transactionally consistent cross-table snapshot.
+- Phase 3 excludes Articles referenced by the approved and relevant tables using a protection snapshot taken before deletion.
+- Phase 3 reports `eligibleCount` from its initial count, `processedCount` for IDs submitted to deletion, and `deletedCount` from the database deletion results.
+- An all-zero Phase 3 result is a successful completion. Concurrent changes can also produce `deletedCount <= processedCount <= eligibleCount`.
+- The protection snapshot can become stale while Phase 3 runs. Concurrent approval or relevance changes are not a transactionally consistent guard for the whole pass.
+- A Phase 3 timeout, process exit, or signal can occur after partial deletion. The outcome is unverified, and the coordinator does not retry or restore automatically.
+- The verified Phase 2 ZIP is the recovery artifact for investigating a Phase 3 failure.
+- The backup reads tables sequentially. An Article inserted after its table is exported but before Phase 3 can be deleted without appearing in that backup.
+- A rerun begins again at Phase 1 and creates another full backup before retrying Phase 3. There is no automatic retry or durable resume state.
 - A manual operator sees failure in terminal output, the nonzero process exit status, and the configured coordinator log.
 - A Phase 1 timeout leaves the worker outcome unverified. Check worker and database state before rerunning.
 
 ### Safe verification
 
-Use the automated tests for local verification. Their injected request and backup fixtures do not contact worker-python, PostgreSQL, or either package's `.env`.
+Use the automated tests for local verification. Their injected request, backup artifact, and deletion command do not contact worker-python, PostgreSQL, or package `.env` files.
 
 ```bash
 npm test --workspace newsnexus12-ops
 ```
 
 - Do not use the development or compiled entry point as a smoke test unless clearing the configured database and creating a real backup are intended.
-- Runtime fixture checks must supply every configuration value explicitly and inject controlled Phase 1 and Phase 2 dependencies. They must not fall back to either `.env` file.
+- Runtime fixture checks must supply every configuration value explicitly and inject controlled Phase 1, Phase 2, and Phase 3 dependencies. They must not fall back to package `.env` files.
 - Future systemd execution must expose the failed unit status, journal entry, and application log before unattended rollout.
 - This increment does not add systemd units or notification behavior.
 
@@ -139,18 +154,22 @@ ops/
 │   ├── config.test.ts # Pure configuration tests
 │   └── weekly-flow-02/
 │       ├── 01_clearDuplicateAnalyses.test.ts # Request and coordinator tests
-│       └── 02_createDatabaseBackup.test.ts # Process and artifact tests
+│       ├── 02_createDatabaseBackup.test.ts # Process and artifact tests
+│       └── 03_deleteOldArticles.test.ts # Deletion command and result tests
 └── src/
     ├── config.ts    # Shared configuration loading
     ├── logger.ts    # Shared console/file logging
     └── weekly-flow-02/
         ├── index.ts       # Weekly flow entry point
-        ├── coordinator.ts # Runs Phases 1 and 2 in order
+        ├── coordinator.ts # Runs Phases 1, 2, and 3 in order
+        ├── dbManagerCommandRunner.ts # Shared child-process runner
         └── phases/
             ├── 01_clearDuplicateAnalyses.ts # Phase 1 entry
             ├── 01_clearDuplicateAnalysesRequest.ts # Worker request and validation
             ├── 02_createDatabaseBackup.ts # Phase 2 entry
-            └── 02_createDatabaseBackupCommand.ts # Child process and artifact verification
+            ├── 02_createDatabaseBackupCommand.ts # Backup result and artifact verification
+            ├── 03_deleteOldArticles.ts # Phase 3 entry
+            └── 03_deleteOldArticlesCommand.ts # Deletion command and result validation
 ```
 
 ---
@@ -163,4 +182,6 @@ ops/
 - [Phase 1 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_1_todo_v02.md)
 - [Phase 2 plan](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_2_plan_v03.md)
 - [Phase 2 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_2_todo_v01.md)
+- [Phase 3 plan](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_3_plan_v02.md)
+- [Phase 3 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_3_todo_v01.md)
 - [Archived coordinator scaffold checklist](../docs/archive/202610/20261001_ops_coordinator_scaffold_todo_v01.md)

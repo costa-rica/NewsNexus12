@@ -9,6 +9,11 @@ import {
   type CreateDatabaseBackupResult
 } from './phases/02_createDatabaseBackup';
 import { CreateDatabaseBackupError } from './phases/02_createDatabaseBackupCommand';
+import {
+  deleteOldArticles,
+  type DeleteOldArticlesResult
+} from './phases/03_deleteOldArticles';
+import { DeleteOldArticlesError } from './phases/03_deleteOldArticlesCommand';
 
 export interface CoordinatorLogger {
   info(message: string, metadata?: Record<string, unknown>): void;
@@ -19,14 +24,20 @@ type CreateBackup = (
   config: Pick<OpsConfig, 'dbManagerBackupTimeoutSeconds'>
 ) => Promise<CreateDatabaseBackupResult>;
 
+type DeleteArticles = (
+  config: Pick<OpsConfig, 'dbManagerDeleteArticlesTimeoutSeconds'>
+) => Promise<DeleteOldArticlesResult>;
+
 export interface CoordinatorDependencies {
   request: WorkerRequest;
   createBackup: CreateBackup;
+  deleteArticles: DeleteArticles;
 }
 
 const productionDependencies: CoordinatorDependencies = {
   request: globalThis.fetch,
-  createBackup: createDatabaseBackup
+  createBackup: createDatabaseBackup,
+  deleteArticles: deleteOldArticles
 };
 
 export async function runCoordinator(
@@ -36,6 +47,7 @@ export async function runCoordinator(
 ): Promise<void> {
   const request = dependencies.request ?? productionDependencies.request;
   const createBackup = dependencies.createBackup ?? productionDependencies.createBackup;
+  const deleteArticles = dependencies.deleteArticles ?? productionDependencies.deleteArticles;
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
   logger.info('Phase 1 started: clearing duplicate analyses', { phase: 1 });
@@ -80,5 +92,27 @@ export async function runCoordinator(
     throw error;
   }
 
-  logger.info('Weekly pipeline stopped before phase 3; phase 3 is not implemented');
+  logger.info('Phase 3 started: deleting old unprotected articles', { phase: 3 });
+
+  try {
+    const result = await deleteArticles(config);
+    logger.info('Phase 3 completed: old unprotected articles deleted', {
+      phase: 3,
+      daysOldThreshold: result.daysOldThreshold,
+      cutoffDate: result.cutoffDate,
+      eligibleCount: result.eligibleCount,
+      processedCount: result.processedCount,
+      deletedCount: result.deletedCount
+    });
+  } catch (error: unknown) {
+    logger.error('Phase 3 failed: old-article deletion was not verified', {
+      phase: 3,
+      failureCategory:
+        error instanceof DeleteOldArticlesError ? error.category : 'unknown',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+
+  logger.info('Weekly pipeline stopped before phase 4; phase 4 is not implemented');
 }

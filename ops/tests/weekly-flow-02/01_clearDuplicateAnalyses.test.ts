@@ -15,6 +15,10 @@ import {
   CreateDatabaseBackupError,
   type CreateDatabaseBackupResult
 } from '../../src/weekly-flow-02/phases/02_createDatabaseBackupCommand';
+import {
+  DeleteOldArticlesError,
+  type DeleteOldArticlesResult
+} from '../../src/weekly-flow-02/phases/03_deleteOldArticlesCommand';
 
 interface LogEntry {
   level: 'error' | 'info';
@@ -61,6 +65,14 @@ const successfulBackup: CreateDatabaseBackupResult = {
   byteSize: 2048,
   sha256: 'a'.repeat(64),
   manifestVersion: 1
+};
+
+const successfulDeletion: DeleteOldArticlesResult = {
+  daysOldThreshold: 180,
+  cutoffDate: '2026-04-05',
+  eligibleCount: 12,
+  processedCount: 10,
+  deletedCount: 9
 };
 
 const jsonResponse = (body: unknown, status = 200): Response =>
@@ -262,7 +274,7 @@ describe('requestClearDuplicateAnalyses', () => {
 });
 
 describe('runCoordinator', () => {
-  it('runs Phase 1, then Phase 2, then stops before Phase 3', async () => {
+  it('runs Phases 1, 2, and 3 in order, then stops before Phase 4', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
     const calls: string[] = [];
@@ -276,6 +288,11 @@ describe('runCoordinator', () => {
         calls.push('phase-2');
         assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
         return successfulBackup;
+      },
+      deleteArticles: async (config) => {
+        calls.push('phase-3');
+        assert.equal(config.dbManagerDeleteArticlesTimeoutSeconds, 1800);
+        return successfulDeletion;
       }
     });
 
@@ -291,7 +308,7 @@ describe('runCoordinator', () => {
         workerTimestamp: '2026-10-02T21:00:00Z'
       }
     });
-    assert.deepEqual(calls, ['phase-1', 'phase-2']);
+    assert.deepEqual(calls, ['phase-1', 'phase-2', 'phase-3']);
     assert.deepEqual(
       entries.find((entry) => entry.message.startsWith('Phase 2 completed')),
       {
@@ -306,7 +323,22 @@ describe('runCoordinator', () => {
         }
       }
     );
-    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 3')));
+    assert.deepEqual(
+      entries.find((entry) => entry.message.startsWith('Phase 3 completed')),
+      {
+        level: 'info',
+        message: 'Phase 3 completed: old unprotected articles deleted',
+        metadata: {
+          phase: 3,
+          daysOldThreshold: 180,
+          cutoffDate: '2026-04-05',
+          eligibleCount: 12,
+          processedCount: 10,
+          deletedCount: 9
+        }
+      }
+    );
+    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
   });
 
@@ -334,7 +366,8 @@ describe('runCoordinator', () => {
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
           request,
-          createBackup: async () => successfulBackup
+          createBackup: async () => successfulBackup,
+          deleteArticles: async () => successfulDeletion
         }),
         (error: unknown) =>
           error instanceof ClearDuplicateAnalysesError && error.category === category
@@ -344,7 +377,8 @@ describe('runCoordinator', () => {
       assert.equal(failure?.metadata?.failureCategory, category);
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 1 completed')));
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 started')));
-      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 3')));
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 started')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
     }
   });
 
@@ -366,7 +400,8 @@ describe('runCoordinator', () => {
           request: async () => jsonResponse(successfulBody()),
           createBackup: async () => {
             throw error;
-          }
+          },
+          deleteArticles: async () => successfulDeletion
         }),
         error
       );
@@ -376,7 +411,61 @@ describe('runCoordinator', () => {
       const failure = entries.find((entry) => entry.message.startsWith('Phase 2 failed'));
       assert.equal(failure?.metadata?.failureCategory, category);
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 completed')));
-      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 3')));
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 started')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
     }
+  });
+
+  it('logs every Phase 3 failure category and stops later work', async () => {
+    const categories: DeleteOldArticlesError['category'][] = [
+      'exit',
+      'output_contract',
+      'spawn',
+      'timeout'
+    ];
+
+    for (const category of categories) {
+      const { logger, entries } = recordingLogger();
+      const error = new DeleteOldArticlesError(category, `fixture ${category}`);
+
+      await assert.rejects(
+        runCoordinator(logger, coordinatorConfig, {
+          request: async () => jsonResponse(successfulBody()),
+          createBackup: async () => successfulBackup,
+          deleteArticles: async () => {
+            throw error;
+          }
+        }),
+        error
+      );
+
+      assert.ok(entries.some((entry) => entry.message.startsWith('Phase 2 completed')));
+      assert.ok(entries.some((entry) => entry.message.startsWith('Phase 3 started')));
+      const failure = entries.find((entry) => entry.message.startsWith('Phase 3 failed'));
+      assert.equal(failure?.metadata?.failureCategory, category);
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 completed')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
+    }
+  });
+
+  it('accepts an all-zero Phase 3 result', async () => {
+    const { logger, entries } = recordingLogger();
+
+    await runCoordinator(logger, coordinatorConfig, {
+      request: async () => jsonResponse(successfulBody()),
+      createBackup: async () => successfulBackup,
+      deleteArticles: async () => ({
+        ...successfulDeletion,
+        eligibleCount: 0,
+        processedCount: 0,
+        deletedCount: 0
+      })
+    });
+
+    const completion = entries.find((entry) => entry.message.startsWith('Phase 3 completed'));
+    assert.equal(completion?.metadata?.eligibleCount, 0);
+    assert.equal(completion?.metadata?.processedCount, 0);
+    assert.equal(completion?.metadata?.deletedCount, 0);
+    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
   });
 });

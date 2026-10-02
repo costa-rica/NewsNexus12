@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T23:11:05Z
-updated_at: 2026-10-02T23:25:34Z
+updated_at: 2026-10-02T23:28:15Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -315,76 +315,83 @@ Do not replace or rename earlier versions.
 
 ### Coordinator integration
 
-- [ ] Extend the dependencies object with a Phase 3 code-only dependency and production default.
-- [ ] Preserve the default global fetch request for Phase 1.
-- [ ] Preserve the fixed production backup command for Phase 2.
-- [ ] Require validated Phase 1 and Phase 2 completion before logging Phase 3 start.
-- [ ] Log Phase 3 start with `phase=3`.
-- [ ] Await the validated deletion result.
-- [ ] Log Phase 3 completion with threshold, cutoff, eligible, processed, and deleted counts.
-- [ ] Replace the Phase 3 boundary with the boundary before unimplemented Phase 4.
-- [ ] Categorize and log every Phase 3 failure without exposing child output or environment values.
-- [ ] Let every Phase 3 error reach the top-level handler and produce nonzero exit.
-- [ ] Confirm Phase 3 failure never logs completion or the Phase 4 boundary.
-- [ ] Preserve rerun behavior beginning again at Phase 1.
+- [x] Extend the dependencies object with a Phase 3 code-only dependency and production default.
+- [x] Preserve the default global fetch request for Phase 1.
+- [x] Preserve the fixed production backup command for Phase 2.
+- [x] Require validated Phase 1 and Phase 2 completion before logging Phase 3 start.
+- [x] Log Phase 3 start with `phase=3`.
+- [x] Await the validated deletion result.
+- [x] Log Phase 3 completion with threshold, cutoff, eligible, processed, and deleted counts.
+- [x] Replace the Phase 3 boundary with the boundary before unimplemented Phase 4.
+- [x] Categorize and log every Phase 3 failure without exposing child output or environment values.
+- [x] Let every Phase 3 error reach the top-level handler and produce nonzero exit.
+- [x] Confirm Phase 3 failure never logs completion or the Phase 4 boundary.
+- [x] Preserve rerun behavior beginning again at Phase 1.
 
 ### Coordinator tests
 
-- [ ] Confirm order: Phase 1, Phase 2, Phase 3, Phase 4 boundary.
-- [ ] Confirm Phase 3 receives its configured timeout.
-- [ ] Confirm Phase 1 failure prevents Phase 2 and Phase 3.
-- [ ] Confirm Phase 2 failure prevents Phase 3.
-- [ ] Test each Phase 3 failure category and confirm no later work.
-- [ ] Confirm all-zero deletion completes normally.
-- [ ] Confirm completion metadata uses distinct count fields.
-- [ ] Preserve every existing Phase 1 and Phase 2 assertion.
+- [x] Confirm order: Phase 1, Phase 2, Phase 3, Phase 4 boundary.
+- [x] Confirm Phase 3 receives its configured timeout.
+- [x] Confirm Phase 1 failure prevents Phase 2 and Phase 3.
+- [x] Confirm Phase 2 failure prevents Phase 3.
+- [x] Test each Phase 3 failure category and confirm no later work.
+- [x] Confirm all-zero deletion completes normally.
+- [x] Confirm completion metadata uses distinct count fields.
+- [x] Preserve every existing Phase 1 and Phase 2 assertion.
 
 ### Operator documentation
 
-- [ ] Update `ops/README.md` for the three-phase sequence and Phase 4 boundary.
-- [ ] Document the bare `--delete_articles` command and 180-day default.
-- [ ] Document approved and relevant protection.
-- [ ] Document the Phase 3 timeout.
-- [ ] Explain eligible, processed, and deleted counts.
-- [ ] Document all-zero completion.
-- [ ] Document partial and uncertain failure outcomes.
-- [ ] Document the verified Phase 2 backup as the recovery artifact.
-- [ ] Document that the protection snapshot can become stale during deletion.
-- [ ] Document that the sequential backup can miss an Article inserted before deletion.
-- [ ] Document that every rerun creates another full backup.
-- [ ] Warn that the normal weekly-flow entry point performs real deletion.
-- [ ] Preserve the dependency build order.
+- [x] Update `ops/README.md` for the three-phase sequence and Phase 4 boundary.
+- [x] Document the bare `--delete_articles` command and 180-day default.
+- [x] Document approved and relevant protection.
+- [x] Document the Phase 3 timeout.
+- [x] Explain eligible, processed, and deleted counts.
+- [x] Document all-zero completion.
+- [x] Document partial and uncertain failure outcomes.
+- [x] Document the verified Phase 2 backup as the recovery artifact.
+- [x] Document that the protection snapshot can become stale during deletion.
+- [x] Document that the sequential backup can miss an Article inserted before deletion.
+- [x] Document that every rerun creates another full backup.
+- [x] Warn that the normal weekly-flow entry point performs real deletion.
+- [x] Preserve the dependency build order.
 
 ### Local source and compiled harnesses
 
-- [ ] Create all harnesses, commands, artifacts, and logs outside the tracked tree.
-- [ ] Construct configuration explicitly without loading package `.env` files.
-- [ ] Inject a successful Phase 1 response.
-- [ ] Inject a verified Phase 2 fixture artifact and result.
-- [ ] Inject a controlled Phase 3 command.
-- [ ] Exercise ordinary success, zero-row success, and concurrent-disappearance counts.
-- [ ] Exercise nonzero exit after a result, malformed output, duplicate output, oversized output, and delayed forced termination.
-- [ ] Confirm source and compiled success reach the Phase 4 boundary.
-- [ ] Confirm every failure exits unsuccessfully without Phase 3 completion or later work.
-- [ ] Confirm large output does not block or hide the result.
-- [ ] Do not replace or edit compiled db-manager files for fixture testing.
-- [ ] Do not run the normal weekly-flow entry points.
-- [ ] Remove every temporary harness, fixture, artifact, and log.
+- [x] Create all harnesses, commands, artifacts, and logs outside the tracked tree.
+- [x] Construct configuration explicitly without loading package `.env` files.
+- [x] Inject a successful Phase 1 response.
+- [x] Inject a verified Phase 2 fixture artifact and result.
+- [x] Inject a controlled Phase 3 command.
+- [x] Exercise ordinary success, zero-row success, and concurrent-disappearance counts.
+- [x] Exercise nonzero exit after a result, malformed output, duplicate output, oversized output, and delayed forced termination.
+- [x] Confirm source and compiled success reach the Phase 4 boundary.
+- [x] Confirm every failure exits unsuccessfully without Phase 3 completion or later work.
+- [x] Confirm large output does not block or hide the result.
+- [x] Do not replace or edit compiled db-manager files for fixture testing.
+- [x] Do not run the normal weekly-flow entry points.
+- [x] Remove every temporary harness, fixture, artifact, and log.
 
 ### Phase 4 verification and closeout
 
-- [ ] Run the complete db-manager suite and build.
-- [ ] Run the complete ops suite, typecheck, and clean build.
-- [ ] Confirm all expected compiled test paths and record the total count.
-- [ ] Confirm generated output remains ignored and no temporary files remain.
-- [ ] Inspect the scoped diff for secrets, artifacts, logs, and unrelated changes.
-- [ ] Record commands, versions, test counts, harness modes, and results below.
-- [ ] Commit only coordinator integration, documentation, harness-driven fixes, tests, and this todo update.
-- [ ] Continue directly to Phase 5 read-only development-server preflight.
+- [x] Run the complete db-manager suite and build.
+- [x] Run the complete ops suite, typecheck, and clean build.
+- [x] Confirm all expected compiled test paths and record the total count.
+- [x] Confirm generated output remains ignored and no temporary files remain.
+- [x] Inspect the scoped diff for secrets, artifacts, logs, and unrelated changes.
+- [x] Record commands, versions, test counts, harness modes, and results below.
+- [x] Commit only coordinator integration, documentation, harness-driven fixes, tests, and this todo update.
+- [x] Continue directly to Phase 5 read-only development-server preflight.
 
 ### Phase 4 verification record
 
-- Pending.
+- Ops verification: 57 tests passed across 11 suites; type checking and the clean production build passed.
+- Compiled test paths: config, Phase 1, Phase 2, and Phase 3 files were present and executed from `ops/dist-test/tests/`.
+- Db-manager verification: 232 tests passed across 14 suites and the TypeScript build passed.
+- Source harness: ordinary, zero-row, concurrent-disappearance, and large-output successes reached the Phase 4 boundary; five failure modes stopped before completion.
+- Compiled harness: the same four success modes and five failure modes passed.
+- Failure modes: nonzero exit after a result, malformed output, duplicate output, oversized output, and delayed forced termination.
+- Harness isolation: configuration and dependencies were injected, no `.env` was loaded, no normal weekly-flow entry point ran, and all temporary files were removed.
+- Scope inspection: generated output remained ignored and no secrets, artifacts, logs, fixtures, or unrelated changes were present.
 
 ## Implementation phase 5: Development-server read-only preflight
 
