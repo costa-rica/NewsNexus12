@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T21:46:42Z
-updated_at: 2026-10-02T21:48:00Z
+updated_at: 2026-10-02T21:52:28Z
 created_by: codex (gpt-5) nicksmacbookair
 modified_by: codex (gpt-5) nicksmacbookair
 ---
@@ -47,26 +47,33 @@ Phase 0 commits the complete rename, including the coordinator import and the ex
 
 ## Implementation phase 0: Adopt the filename rename
 
-- [ ] Review the existing deletion and addition to confirm they represent only the intended rename to `01_clearDuplicateAnalyses.ts`.
-- [ ] Confirm the renamed file still exports `clearDuplicateAnalyses` and retains the current stub behavior.
-- [ ] Confirm `coordinator.ts` imports `./phases/01_clearDuplicateAnalyses`.
-- [ ] Treat the existing quote-style formatting in `coordinator.ts` as part of this operator-authored baseline; do not rewrite it solely for style.
-- [ ] Search active ops source for imports or references to the old filename and update any remaining references.
-- [ ] Leave `ops/.env.example` unstaged until Phase 1 changes its timeout from 30 to 90.
+- [x] Review the existing deletion and addition to confirm they represent only the intended rename to `01_clearDuplicateAnalyses.ts`.
+- [x] Confirm the renamed file still exports `clearDuplicateAnalyses` and retains the current stub behavior.
+- [x] Confirm `coordinator.ts` imports `./phases/01_clearDuplicateAnalyses`.
+- [x] Treat the existing quote-style formatting in `coordinator.ts` as part of this operator-authored baseline; do not rewrite it solely for style.
+- [x] Search active ops source for imports or references to the old filename and update any remaining references.
+- [x] Record that the operator-directed baseline commit included `ops/.env.example`; Phase 1 will change its timeout from 30 to 90.
 
 ### Phase 0 verification and closeout
 
-- [ ] Run the ops type check and production build using the currently available scripts.
-- [ ] Run the existing development and compiled scaffold entry points without adding a worker call.
-- [ ] Confirm both runs enter the renamed stub and exit cleanly.
-- [ ] Inspect the scoped diff and confirm the old file deletion, new file addition, and coordinator import move together.
-- [ ] Record commands, Node version, and results below.
-- [ ] Commit the rename, coordinator import, and this todo progress together using the repository commit-message guidance.
+- [x] Run the ops type check and production build using the currently available scripts.
+- [x] Run the existing development and compiled scaffold entry points without adding a worker call.
+- [x] Confirm both runs enter the renamed stub and exit cleanly.
+- [x] Inspect the scoped diff and confirm the old file deletion, new file addition, and coordinator import move together.
+- [x] Record commands, Node version, and results below.
+- [x] Commit the rename, coordinator import, and todo baseline using the repository commit-message guidance.
 - [ ] Review the rename baseline with the operator before beginning Phase 1.
 
 ### Phase 0 verification record
 
-- Pending.
+- Baseline commit: `786d87d prepare weekly flow phase 1 implementation`.
+- Node: v24.11.0 on macOS.
+- `npm run typecheck --workspace newsnexus12-ops`: passed.
+- `npm run build --workspace newsnexus12-ops`: passed.
+- Development entry point: passed after allowing the existing tsx IPC socket requirement. Console output showed coordinator startup, renamed Phase 1 stub entry, and the scaffold stop message.
+- Compiled entry point: passed with the same startup, stub-entry, and stop messages.
+- Active source search found only the `01_clearDuplicateAnalyses` import. Git recorded the source change as a 100 percent rename.
+- The operator requested that every existing change be committed before implementation. That baseline commit therefore included the current `.env.example` placeholder value of 30; Phase 1 remains responsible for changing it to 90.
 
 ## Implementation phase 1: Test and configuration foundation
 
