@@ -2,12 +2,12 @@
   "name": "newsnexus12-ops",
   "version": "0.1.0",
   "private": true,
-  "description": "Weekly pipeline coordinator for NewsNexus12",
+  "description": "Operational processes for NewsNexus12",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js"
+    "weekly-flow-02:dev": "tsx src/weekly-flow-02/index.ts",
+    "weekly-flow-02:start": "node dist/weekly-flow-02/index.js"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

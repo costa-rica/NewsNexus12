@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T21:26:59Z
-updated_at: 2026-10-01T21:54:01Z
+updated_at: 2026-10-02T00:16:54Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -29,11 +29,11 @@ Use a small, explicit structure; do not build a generic pipeline framework.
 
 | Proposed file | Responsibility |
 | --- | --- |
-| `ops/src/index.ts` | Load configuration, initialize logging, and invoke the coordinator once. |
+| `ops/src/weekly-flow-02/index.ts` | Load configuration, initialize logging, and invoke the coordinator once. |
 | `ops/src/config.ts` | Read only configuration required by the implemented increment. |
 | `ops/src/logger.ts` | Provide the coordinator's own Winston logger using worker-node's output conventions. |
-| `ops/src/coordinator.ts` | Log coordinator startup and call the phase 1 module. |
-| `ops/src/phases/clearDuplicateAnalyses.ts` | Initially expose an explicitly labeled phase 1 stub; later call worker-python's clear endpoint and validate and log its result. |
+| `ops/src/weekly-flow-02/coordinator.ts` | Log coordinator startup and call the phase 1 module. |
+| `ops/src/weekly-flow-02/phases/clearDuplicateAnalyses.ts` | Initially expose an explicitly labeled phase 1 stub; later call worker-python's clear endpoint and validate and log its result. |
 
 - The stub provides a real module boundary for the coordinator to call. Its log makes clear that phase 1 was entered but database clearing is not yet implemented. It must not report that analysis rows were removed or that phase 1 completed.
 - The first increment ends after demonstrating that invocation and its logs. It includes no retries, recovery state machine, failure policy, automatic phase advancement, or simulated successful database work.

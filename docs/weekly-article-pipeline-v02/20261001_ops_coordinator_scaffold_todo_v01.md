@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T23:47:44Z
-updated_at: 2026-10-02T00:00:30Z
+updated_at: 2026-10-02T00:16:54Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -57,12 +57,12 @@ The operator reported 30 passing worker-python tests on Ubuntu. Those tests supp
 
 ## Implementation phase 2: Coordinator and stub
 
-- [x] Add `ops/src/index.ts` to load configuration, initialize logging, and invoke the coordinator once.
-- [x] Add `ops/src/coordinator.ts` with an understandable startup header following worker-node's logging style and a direct call to the phase 1 module.
-- [x] Add `ops/src/phases/clearDuplicateAnalyses.ts` as an explicit stub. Log that the module was entered and clearing is not implemented.
+- [x] Add `ops/src/weekly-flow-02/index.ts` to load configuration, initialize logging, and invoke the coordinator once.
+- [x] Add `ops/src/weekly-flow-02/coordinator.ts` with an understandable startup header following worker-node's logging style and a direct call to the phase 1 module.
+- [x] Add `ops/src/weekly-flow-02/phases/clearDuplicateAnalyses.ts` as an explicit stub. Log that the module was entered and clearing is not implemented.
 - [x] End execution after the stub. Do not log that rows were deleted, runtime phase 1 completed, or the weekly pipeline completed. Do not invent persisted run IDs.
 - [x] Report bootstrap errors clearly and return a nonzero exit status when startup fails. Finish pending logs before exit; do not add a general recovery or retry system.
-- [x] Add one-shot workspace commands: `dev` using `tsx src/index.ts` and `start` using `node dist/index.js`. Do not use watch mode.
+- [x] Add one-shot workspace commands: `weekly-flow-02:dev` using `tsx src/weekly-flow-02/index.ts` and `weekly-flow-02:start` using `node dist/weekly-flow-02/index.js`. Do not use watch mode.
 - [x] Add a concise `ops/README.md` explaining configuration, manual commands, expected messages, and the stub boundary. Include the repository's required Markdown frontmatter.
 
 ### Verification and closeout

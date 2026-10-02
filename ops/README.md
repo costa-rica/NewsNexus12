@@ -1,13 +1,13 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-01T23:59:46Z
+updated_at: 2026-10-02T00:16:54Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
 
-# NewsNexus12 Weekly Pipeline
+# NewsNexus12 Operations
 
-This workspace will coordinate the weekly article pipeline. Currently, it starts the coordinator, enters a phase 1 stub, and exits.
+This workspace holds operational processes for NewsNexus12. Its first process, weekly-flow-02, starts the weekly coordinator, enters a phase 1 stub, and exits.
 
 ---
 
@@ -58,18 +58,19 @@ Run from the repository root after setup:
 
 ```bash
 # Run once from TypeScript (no watch process).
-npm run dev --workspace newsnexus12-ops
+npm run weekly-flow-02:dev --workspace newsnexus12-ops
 
 # Run compiled JavaScript; rebuild after source changes.
 npm run build --workspace newsnexus12-ops
-npm run start --workspace newsnexus12-ops
+npm run weekly-flow-02:start --workspace newsnexus12-ops
 
 # If your terminal is already inside ops/, use:
-# npm run dev
-# npm run build && npm run start
+# npm run weekly-flow-02:dev
+# npm run build && npm run weekly-flow-02:start
 ```
 
 - Expected sequence: startup header, “Phase 1 entered; clearing not implemented”, and “Scaffold stopped after phase 1 stub; no pipeline work performed”.
+- The named commands run only weekly-flow-02; future processes can have separate commands in this workspace.
 - Each command runs once and exits. There is no resume behavior yet.
 - The example configuration logs to the console in development. Testing writes to console and file; production writes to file only.
 - File logs use the configured directory and application name. Relative log directories resolve from the ops workspace.
@@ -87,7 +88,7 @@ Run this complete block from the repository root on macOS or Ubuntu after buildi
 
   env NODE_ENV=testing NAME_APP=weekly-pipeline-smoke \
     PATH_TO_LOGS="$test_dir" LOG_MAX_SIZE=5 LOG_MAX_FILES=5 \
-    npm run start --workspace newsnexus12-ops
+    npm run weekly-flow-02:start --workspace newsnexus12-ops
 
   grep -q 'Scaffold stopped after phase 1 stub' "$test_dir/weekly-pipeline-smoke.log"
   cat "$test_dir/weekly-pipeline-smoke.log"
@@ -112,12 +113,13 @@ ops/
 ├── tsconfig.json    # TypeScript build settings
 ├── README.md        # Operator setup and smoke check
 └── src/
-    ├── config.ts    # Configuration loading
-    ├── logger.ts    # Console/file logging
-    ├── index.ts     # One-shot entry point
-    ├── coordinator.ts # Calls the phase 1 stub
-    └── phases/
-        └── clearDuplicateAnalyses.ts # Phase 1 skeleton
+    ├── config.ts    # Shared configuration loading
+    ├── logger.ts    # Shared console/file logging
+    └── weekly-flow-02/
+        ├── index.ts       # Weekly flow entry point
+        ├── coordinator.ts # Calls the phase 1 stub
+        └── phases/
+            └── clearDuplicateAnalyses.ts # Phase 1 skeleton
 ```
 
 ---

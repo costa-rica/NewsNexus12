@@ -1,5 +1,5 @@
-import { loadConfig } from './config';
-import { initializeLogger, finishLogging } from './logger';
+import { loadConfig } from '../config';
+import { initializeLogger, finishLogging } from '../logger';
 import { runCoordinator } from './coordinator';
 
 async function main(): Promise<void> {
