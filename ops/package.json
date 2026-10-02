@@ -8,7 +8,7 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "clean:test": "node -e \"require('node:fs').rmSync('dist-test', { recursive: true, force: true })\"",
     "test:build": "npm run clean:test && tsc -p tsconfig.test.json",
-    "test": "npm run test:build && node --test dist-test/tests/config.test.js dist-test/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.js",
+    "test": "npm run test:build && node --test dist-test/tests/config.test.js dist-test/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.js dist-test/tests/weekly-flow-02/02_createDatabaseBackup.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "weekly-flow-02:dev": "tsx src/weekly-flow-02/index.ts",
     "weekly-flow-02:start": "node dist/weekly-flow-02/index.js"

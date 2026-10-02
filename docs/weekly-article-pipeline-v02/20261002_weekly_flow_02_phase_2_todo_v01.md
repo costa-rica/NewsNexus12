@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-02T22:33:54Z
-updated_at: 2026-10-02T22:42:30Z
+updated_at: 2026-10-02T22:43:23Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6) nicksmacbookair
 ---
@@ -135,182 +135,194 @@ Preserve each version. Do not replace or rename earlier plan and assessment file
 
 ### Configuration
 
-- [ ] Extend `OpsConfig` with `dbManagerBackupTimeoutSeconds`.
-- [ ] Parse required `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` as a positive integer.
-- [ ] Add configuration tests for missing, zero, negative, fractional, and nonnumeric values.
-- [ ] Add `DB_MANAGER_BACKUP_TIMEOUT_SECONDS=1800` to `ops/.env.example`.
-- [ ] Document the setting as an overall child-process timeout in seconds.
-- [ ] Keep db-manager entry-path selection out of `OpsConfig` and `.env.example`.
+- [x] Extend `OpsConfig` with `dbManagerBackupTimeoutSeconds`.
+- [x] Parse required `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` as a positive integer.
+- [x] Add configuration tests for missing, zero, negative, fractional, and nonnumeric values.
+- [x] Add `DB_MANAGER_BACKUP_TIMEOUT_SECONDS=1800` to `ops/.env.example`.
+- [x] Document the setting as an overall child-process timeout in seconds.
+- [x] Keep db-manager entry-path selection out of `OpsConfig` and `.env.example`.
 
 ### Result parsing and artifact verification
 
-- [ ] Define the Phase 2 result with `backupPath`, `byteSize`, `sha256`, and `manifestVersion`.
-- [ ] Keep parsed JSON typed as `unknown` until validation succeeds.
-- [ ] Require `event` to equal `database_backup_created`.
-- [ ] Require an absolute, nonempty backup path.
-- [ ] Require a positive safe-integer byte size.
-- [ ] Require a lowercase 64-character hexadecimal SHA-256.
-- [ ] Require reported manifest version 1.
-- [ ] Verify the path exists and is a regular file.
-- [ ] Verify the observed size matches the reported positive size.
-- [ ] Calculate the archive SHA-256 with a stream and compare it to the reported value.
-- [ ] Do not load the complete ZIP into memory.
-- [ ] Name the coordinator field `reportedManifestVersion` when logging it.
+- [x] Define the Phase 2 result with `backupPath`, `byteSize`, `sha256`, and `manifestVersion`.
+- [x] Keep parsed JSON typed as `unknown` until validation succeeds.
+- [x] Require `event` to equal `database_backup_created`.
+- [x] Require an absolute, nonempty backup path.
+- [x] Require a positive safe-integer byte size.
+- [x] Require a lowercase 64-character hexadecimal SHA-256.
+- [x] Require reported manifest version 1.
+- [x] Verify the path exists and is a regular file.
+- [x] Verify the observed size matches the reported positive size.
+- [x] Calculate the archive SHA-256 with a stream and compare it to the reported value.
+- [x] Do not load the complete ZIP into memory.
+- [x] Name the coordinator field `reportedManifestVersion` when logging it.
 
 ### Fixed production command and code-only seam
 
-- [ ] Add `02_createDatabaseBackup.ts` as the public Phase 2 function.
-- [ ] Add `02_createDatabaseBackupCommand.ts` for command construction and execution.
-- [ ] Define a small command specification or launcher interface used only through function arguments.
-- [ ] Build the production command with `process.execPath`.
-- [ ] Resolve the fixed compiled entry point at `db-manager/dist/index.js` from the monorepo layout.
-- [ ] Set the production working directory to `db-manager/`.
-- [ ] Pass `--create_backup` as an argument without invoking a shell.
-- [ ] Do not add an environment, CLI, or file-based command-path override.
-- [ ] Allow tests and temporary harnesses to pass a controlled command through the code-only seam.
+- [x] Add `02_createDatabaseBackup.ts` as the public Phase 2 function.
+- [x] Add `02_createDatabaseBackupCommand.ts` for command construction and execution.
+- [x] Define a small command specification or launcher interface used only through function arguments.
+- [x] Build the production command with `process.execPath`.
+- [x] Resolve the fixed compiled entry point at `db-manager/dist/index.js` from the monorepo layout.
+- [x] Set the production working directory to `db-manager/`.
+- [x] Pass `--create_backup` as an argument without invoking a shell.
+- [x] Do not add an environment, CLI, or file-based command-path override.
+- [x] Allow tests and temporary harnesses to pass a controlled command through the code-only seam.
 
 ### Environment isolation
 
-- [ ] Start with a copy of the parent environment.
-- [ ] Remove `NODE_ENV`, `NAME_APP`, and `NEXT_PUBLIC_MODE`.
-- [ ] Remove `PATH_TO_LOGS`, `LOG_MAX_SIZE`, and `LOG_MAX_FILES`.
-- [ ] Remove `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` and `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS`.
-- [ ] Remove `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` and `PATH_DB_BACKUPS`.
-- [ ] Remove every inherited key whose name begins with `PG_`.
-- [ ] Preserve ordinary values such as `PATH`, `HOME`, locale, temporary-directory settings, and Node runtime settings.
-- [ ] Never log the child environment or database credentials.
-- [ ] Confirm the production child loads its application settings from `db-manager/.env` through its working directory.
+- [x] Start with a copy of the parent environment.
+- [x] Remove `NODE_ENV`, `NAME_APP`, and `NEXT_PUBLIC_MODE`.
+- [x] Remove `PATH_TO_LOGS`, `LOG_MAX_SIZE`, and `LOG_MAX_FILES`.
+- [x] Remove `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER` and `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS`.
+- [x] Remove `DB_MANAGER_BACKUP_TIMEOUT_SECONDS` and `PATH_DB_BACKUPS`.
+- [x] Remove every inherited key whose name begins with `PG_`.
+- [x] Preserve ordinary values such as `PATH`, `HOME`, locale, temporary-directory settings, and Node runtime settings.
+- [x] Never log the child environment or database credentials.
+- [x] Confirm the production child loads its application settings from `db-manager/.env` through its working directory.
 
 ### Continuous output handling
 
-- [ ] Drain child stdout and stderr continuously until both streams end and the child closes.
-- [ ] Never pause, detach, or stop reading a stream when diagnostic retention reaches its cap.
-- [ ] Decode stdout chunks with Node's `StringDecoder` or equivalent split-character-safe behavior.
-- [ ] Retain an incomplete line fragment between chunks.
-- [ ] Process every complete stdout line as it arrives.
-- [ ] Process the final unterminated fragment when stdout ends.
-- [ ] Store valid success candidates and their count separately from retained diagnostics.
-- [ ] Require exactly one valid success candidate.
-- [ ] Set the maximum incomplete-line size to 64 KiB.
-- [ ] Mark an oversized line as an output-contract failure while continuing to drain the process.
-- [ ] Keep only the last 32 KiB from stdout and the last 32 KiB from stderr for diagnostics.
-- [ ] Apply the caps only to diagnostic tails, never to success-candidate storage or stream consumption.
+- [x] Drain child stdout and stderr continuously until both streams end and the child closes.
+- [x] Never pause, detach, or stop reading a stream when diagnostic retention reaches its cap.
+- [x] Decode stdout chunks with Node's `StringDecoder` or equivalent split-character-safe behavior.
+- [x] Retain an incomplete line fragment between chunks.
+- [x] Process every complete stdout line as it arrives.
+- [x] Process the final unterminated fragment when stdout ends.
+- [x] Store valid success candidates and their count separately from retained diagnostics.
+- [x] Require exactly one valid success candidate.
+- [x] Set the maximum incomplete-line size to 64 KiB.
+- [x] Mark an oversized line as an output-contract failure while continuing to drain the process.
+- [x] Keep only the last 32 KiB from stdout and the last 32 KiB from stderr for diagnostics.
+- [x] Apply the caps only to diagnostic tails, never to success-candidate storage or stream consumption.
 
 ### Process completion and timeout
 
-- [ ] Require a normal child exit with code 0 after both output streams are drained.
-- [ ] Reject signal exits and every nonzero exit, even if a success candidate appeared earlier.
-- [ ] Apply the configured timeout at the child-process boundary.
-- [ ] On timeout, send the normal termination signal and begin a five-second grace period.
-- [ ] Force termination if the child remains open after the grace period.
-- [ ] Continue draining both streams until process close.
-- [ ] Treat timeout as an unverified result and do not delete possible artifacts.
-- [ ] Categorize spawn, timeout, exit, output-contract, and artifact-verification failures.
-- [ ] Preserve original errors as causes when wrapping them.
-- [ ] Include only concise, bounded, safe diagnostics in errors.
+- [x] Require a normal child exit with code 0 after both output streams are drained.
+- [x] Reject signal exits and every nonzero exit, even if a success candidate appeared earlier.
+- [x] Apply the configured timeout at the child-process boundary.
+- [x] On timeout, send the normal termination signal and begin a five-second grace period.
+- [x] Force termination if the child remains open after the grace period.
+- [x] Continue draining both streams until process close.
+- [x] Treat timeout as an unverified result and do not delete possible artifacts.
+- [x] Categorize spawn, timeout, exit, output-contract, and artifact-verification failures.
+- [x] Preserve original errors as causes when wrapping them.
+- [x] Include only concise, bounded, safe diagnostics in errors.
 
 ### Ops tests
 
-- [ ] Add `ops/tests/weekly-flow-02/02_createDatabaseBackup.test.ts` before changing the test script.
-- [ ] Parse one valid result among unrelated stdout lines.
-- [ ] Parse a result line split across multiple chunks and UTF-8 boundaries.
-- [ ] Preserve a result surrounded by output larger than both diagnostic caps.
-- [ ] Confirm a child writing past the cap exits without blocking.
-- [ ] Reject missing, duplicate, oversized, malformed, and incorrectly typed results.
-- [ ] Test the fixed executable, arguments, and working directory.
-- [ ] Test the code-only fixture seam without adding configuration.
-- [ ] Set sentinel values for every named removed key and representative `PG_*` keys.
-- [ ] Confirm removed sentinels do not reach the production child.
-- [ ] Confirm ordinary operating-system sentinels remain present.
-- [ ] Cover spawn failure, nonzero exit after a candidate, signal exit, timeout, and forced termination.
-- [ ] Cover missing file, directory path, empty file, size mismatch, and checksum mismatch.
-- [ ] Confirm failure text is bounded and excludes environment values.
-- [ ] Append `dist-test/tests/weekly-flow-02/02_createDatabaseBackup.test.js` to the explicit test script only after the source exists.
+- [x] Add `ops/tests/weekly-flow-02/02_createDatabaseBackup.test.ts` before changing the test script.
+- [x] Parse one valid result among unrelated stdout lines.
+- [x] Parse a result line split across multiple chunks and UTF-8 boundaries.
+- [x] Preserve a result surrounded by output larger than both diagnostic caps.
+- [x] Confirm a child writing past the cap exits without blocking.
+- [x] Reject missing, duplicate, oversized, malformed, and incorrectly typed results.
+- [x] Test the fixed executable, arguments, and working directory.
+- [x] Test the code-only fixture seam without adding configuration.
+- [x] Set sentinel values for every named removed key and representative `PG_*` keys.
+- [x] Confirm removed sentinels do not reach the production child.
+- [x] Confirm ordinary operating-system sentinels remain present.
+- [x] Cover spawn failure, nonzero exit after a candidate, signal exit, timeout, and forced termination.
+- [x] Cover missing file, directory path, empty file, size mismatch, and checksum mismatch.
+- [x] Confirm failure text is bounded and excludes environment values.
+- [x] Append `dist-test/tests/weekly-flow-02/02_createDatabaseBackup.test.js` to the explicit test script only after the source exists.
 
 ### Phase 2 verification and closeout
 
-- [ ] Confirm all three expected compiled ops test files exist before running `node --test`.
-- [ ] Run the complete ops test command and record every executed file and the total count.
-- [ ] Run ops type checking and the clean production build.
-- [ ] Confirm `dist-test/` remains ignored and production output contains no tests or stale modules.
-- [ ] Confirm no command-path configuration was added.
-- [ ] Confirm no `.env`, artifact, fixture, temporary directory, or log is staged.
-- [ ] Record commands, versions, test count, and results below.
-- [ ] Commit only the ops configuration, command module, tests, documentation, and this todo update.
-- [ ] Continue directly to implementation phase 3.
+- [x] Confirm all three expected compiled ops test files exist before running `node --test`.
+- [x] Run the complete ops test command and record every executed file and the total count.
+- [x] Run ops type checking and the clean production build.
+- [x] Confirm `dist-test/` remains ignored and production output contains no tests or stale modules.
+- [x] Confirm no command-path configuration was added.
+- [x] Confirm no `.env`, artifact, fixture, temporary directory, or log is staged.
+- [x] Record commands, versions, test count, and results below.
+- [x] Commit only the ops configuration, command module, tests, documentation, and this todo update.
+- [x] Continue directly to implementation phase 3.
 
 ### Phase 2 verification record
 
-- Pending.
+- Environment: macOS on nicksmacbookair, Node v24.11.0, npm 11.6.1.
+- The explicit ops test command ran config, Phase 1, and Phase 2 compiled test files. All 41 tests passed before coordinator integration.
+- Ops type checking and the clean production build passed.
+- Production output contained no test files or stale modules. `dist-test/` and `dist/` remained ignored.
+- The fixed command path stayed in code. No command-path configuration, environment file, artifact, fixture, temporary directory, or log was staged.
 
 ## Implementation phase 3: Coordinator integration and local harnesses
 
 ### Coordinator integration
 
-- [ ] Replace the Phase 2 scaffold boundary with a Phase 2 start log.
-- [ ] Run Phase 2 only after Phase 1 returns its validated result.
-- [ ] Await the verified backup result.
-- [ ] Log Phase 2 completion with path, byte size, SHA-256, and `reportedManifestVersion`.
-- [ ] Replace the stop message with the boundary before unimplemented Phase 3.
-- [ ] Add a small coordinator dependencies object with production defaults.
-- [ ] Preserve the default `globalThis.fetch` request for Phase 1.
-- [ ] Preserve the fixed db-manager command as the Phase 2 production default.
-- [ ] Keep command overrides available only through code arguments used by tests and harnesses.
-- [ ] Allow every Phase 2 error to reach the top-level handler and produce a nonzero exit.
-- [ ] Confirm Phase 2 failure never logs completion or the Phase 3 boundary.
-- [ ] Confirm Phase 1 failure still prevents Phase 2 start.
-- [ ] Keep reruns starting again at Phase 1 without retry or durable state.
+- [x] Replace the Phase 2 scaffold boundary with a Phase 2 start log.
+- [x] Run Phase 2 only after Phase 1 returns its validated result.
+- [x] Await the verified backup result.
+- [x] Log Phase 2 completion with path, byte size, SHA-256, and `reportedManifestVersion`.
+- [x] Replace the stop message with the boundary before unimplemented Phase 3.
+- [x] Add a small coordinator dependencies object with production defaults.
+- [x] Preserve the default `globalThis.fetch` request for Phase 1.
+- [x] Preserve the fixed db-manager command as the Phase 2 production default.
+- [x] Keep command overrides available only through code arguments used by tests and harnesses.
+- [x] Allow every Phase 2 error to reach the top-level handler and produce a nonzero exit.
+- [x] Confirm Phase 2 failure never logs completion or the Phase 3 boundary.
+- [x] Confirm Phase 1 failure still prevents Phase 2 start.
+- [x] Keep reruns starting again at Phase 1 without retry or durable state.
 
 ### Coordinator tests
 
-- [ ] Update existing coordinator tests for the dependencies object.
-- [ ] Confirm the call order is Phase 1, then Phase 2, then the Phase 3 boundary.
-- [ ] Confirm Phase 2 receives the configured timeout and fixed production command by default.
-- [ ] Confirm completion logs contain verified backup metadata.
-- [ ] Test every Phase 2 failure category and confirm no later work is logged.
-- [ ] Preserve every existing Phase 1 success and failure assertion.
+- [x] Update existing coordinator tests for the dependencies object.
+- [x] Confirm the call order is Phase 1, then Phase 2, then the Phase 3 boundary.
+- [x] Confirm Phase 2 receives the configured timeout and fixed production command by default.
+- [x] Confirm completion logs contain verified backup metadata.
+- [x] Test every Phase 2 failure category and confirm no later work is logged.
+- [x] Preserve every existing Phase 1 success and failure assertion.
 
 ### Operator documentation
 
-- [ ] Update `ops/README.md` with the Phase 2 call sequence and 1800-second timeout.
-- [ ] Document the fixed compiled db-manager entry point and build-order prerequisite.
-- [ ] Document that db-manager uses its own `.env`, logging identity, database target, and backup path.
-- [ ] Document the stable result metadata and coordinator log fields.
-- [ ] Document failure, timeout, retained-artifact, and rerun behavior.
-- [ ] State that routine execution verifies external metadata but does not independently read the manifest.
-- [ ] State that the backup is not one transactionally consistent cross-table snapshot.
-- [ ] Warn that the normal weekly-flow entry point performs a real database backup.
+- [x] Update `ops/README.md` with the Phase 2 call sequence and 1800-second timeout.
+- [x] Document the fixed compiled db-manager entry point and build-order prerequisite.
+- [x] Document that db-manager uses its own `.env`, logging identity, database target, and backup path.
+- [x] Document the stable result metadata and coordinator log fields.
+- [x] Document failure, timeout, retained-artifact, and rerun behavior.
+- [x] State that routine execution verifies external metadata but does not independently read the manifest.
+- [x] State that the backup is not one transactionally consistent cross-table snapshot.
+- [x] Warn that the normal weekly-flow entry point performs a real database backup.
 
 ### Local source and compiled harnesses
 
-- [ ] Create the fixture command and harnesses outside the tracked tree.
-- [ ] Make the fixture write a controlled ZIP-like artifact and stable result line without accessing PostgreSQL.
-- [ ] Make the source harness import source modules and pass the fixture command through the code-only seam.
-- [ ] Make the compiled harness import built modules and pass the same fixture command.
-- [ ] Construct every config value explicitly; do not load either package's `.env`.
-- [ ] Inject a successful Phase 1 request if exercising the full coordinator.
-- [ ] Exercise successful, nonzero-exit, malformed-output, oversized-output, checksum-mismatch, and delayed modes.
-- [ ] Confirm successful source and compiled runs log both phase completions and the Phase 3 boundary.
-- [ ] Confirm every failure run exits unsuccessfully without Phase 2 completion or the Phase 3 boundary.
-- [ ] Confirm output beyond the diagnostic cap does not block or hide the success result.
-- [ ] Do not replace or edit `db-manager/dist/index.js` for fixture testing.
-- [ ] Do not run `weekly-flow-02:dev` or `weekly-flow-02:start` against local package configuration.
-- [ ] Remove all temporary harnesses, fixtures, artifacts, and logs.
+- [x] Create the fixture command and harnesses outside the tracked tree.
+- [x] Make the fixture write a controlled ZIP-like artifact and stable result line without accessing PostgreSQL.
+- [x] Make the source harness import source modules and pass the fixture command through the code-only seam.
+- [x] Make the compiled harness import built modules and pass the same fixture command.
+- [x] Construct every config value explicitly; do not load either package's `.env`.
+- [x] Inject a successful Phase 1 request if exercising the full coordinator.
+- [x] Exercise successful, nonzero-exit, malformed-output, oversized-output, checksum-mismatch, and delayed modes.
+- [x] Confirm successful source and compiled runs log both phase completions and the Phase 3 boundary.
+- [x] Confirm every failure run exits unsuccessfully without Phase 2 completion or the Phase 3 boundary.
+- [x] Confirm output beyond the diagnostic cap does not block or hide the success result.
+- [x] Do not replace or edit `db-manager/dist/index.js` for fixture testing.
+- [x] Do not run `weekly-flow-02:dev` or `weekly-flow-02:start` against local package configuration.
+- [x] Remove all temporary harnesses, fixtures, artifacts, and logs.
 
 ### Phase 3 verification and closeout
 
-- [ ] Run the complete db-manager suite and build after integration.
-- [ ] Run the complete ops suite, typecheck, and clean build after integration.
-- [ ] Confirm all expected compiled test paths exist and record the test count.
-- [ ] Confirm generated output remains ignored and no temporary runtime files remain.
-- [ ] Inspect the scoped diff for secrets, backup files, logs, and unrelated changes.
-- [ ] Record commands, versions, test counts, harness behavior, and results below.
-- [ ] Commit only coordinator integration, tests, documentation, fixes, and this todo update.
-- [ ] Stop at the single operator checkpoint before implementation phase 4.
+- [x] Run the complete db-manager suite and build after integration.
+- [x] Run the complete ops suite, typecheck, and clean build after integration.
+- [x] Confirm all expected compiled test paths exist and record the test count.
+- [x] Confirm generated output remains ignored and no temporary runtime files remain.
+- [x] Inspect the scoped diff for secrets, backup files, logs, and unrelated changes.
+- [x] Record commands, versions, test counts, harness behavior, and results below.
+- [x] Commit only coordinator integration, tests, documentation, fixes, and this todo update.
+- [x] Stop at the single operator checkpoint before implementation phase 4.
 
 ### Phase 3 verification record
 
-- Pending.
+- Environment: macOS on nicksmacbookair, Node v24.11.0, npm 11.6.1.
+- The complete db-manager suite passed: 219 tests across 13 suites.
+- The final explicit ops test command ran config, Phase 1, and Phase 2 compiled test files. All 42 tests across eight suites passed.
+- Db-models, db-manager, and ops production builds passed. Ops type checking passed.
+- Source and compiled harnesses used explicit configuration, an injected successful Phase 1 response, and a temporary Phase 2 command outside the repository.
+- Success mode produced output beyond the diagnostic caps, completed both phases, logged verified metadata, and reached the Phase 3 boundary.
+- Nonzero-exit, malformed-output, oversized-output, checksum-mismatch, and delayed timeout modes exited unsuccessfully without Phase 2 completion or the Phase 3 boundary in both harnesses.
+- The source harness required approved execution because tsx creates a temporary IPC socket blocked by the sandbox.
+- All temporary harnesses, fixtures, artifacts, and logs were removed. Generated build and test output remained ignored.
 
 ## Operator checkpoint: Development backup readiness
 

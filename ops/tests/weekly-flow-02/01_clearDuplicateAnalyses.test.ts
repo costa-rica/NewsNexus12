@@ -11,6 +11,10 @@ import {
   requestClearDuplicateAnalyses,
   type WorkerRequest
 } from '../../src/weekly-flow-02/phases/01_clearDuplicateAnalysesRequest';
+import {
+  CreateDatabaseBackupError,
+  type CreateDatabaseBackupResult
+} from '../../src/weekly-flow-02/phases/02_createDatabaseBackupCommand';
 
 interface LogEntry {
   level: 'error' | 'info';
@@ -23,6 +27,7 @@ const coordinatorConfig: OpsConfig = {
   nameApp: 'weekly-flow-test',
   workerPythonBaseUrl: 'http://worker.test:5000/',
   workerPythonRequestTimeoutSeconds: 90,
+  dbManagerBackupTimeoutSeconds: 1800,
   pathToLogs: '/tmp/weekly-flow-test',
   logMaxSizeMb: 5,
   logMaxFiles: 5
@@ -49,6 +54,13 @@ const successfulBody = (rowsDeleted = 3): Record<string, unknown> => ({
   stdout: 'human-readable output is not used for success',
   stderr: ''
 });
+
+const successfulBackup: CreateDatabaseBackupResult = {
+  backupPath: '/tmp/weekly-flow-backup.zip',
+  byteSize: 2048,
+  sha256: 'a'.repeat(64),
+  manifestVersion: 1
+};
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -249,11 +261,22 @@ describe('requestClearDuplicateAnalyses', () => {
 });
 
 describe('runCoordinator', () => {
-  it('logs validated Phase 1 completion and stops before Phase 2', async () => {
+  it('runs Phase 1, then Phase 2, then stops before Phase 3', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
+    const calls: string[] = [];
 
-    await runCoordinator(logger, coordinatorConfig, request);
+    await runCoordinator(logger, coordinatorConfig, {
+      request: async (...args) => {
+        calls.push('phase-1');
+        return request(...args);
+      },
+      createBackup: async (config) => {
+        calls.push('phase-2');
+        assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
+        return successfulBackup;
+      }
+    });
 
     const completion = entries.find((entry) => entry.message.startsWith('Phase 1 completed'));
     assert.deepEqual(completion, {
@@ -267,7 +290,22 @@ describe('runCoordinator', () => {
         workerTimestamp: '2026-10-02T21:00:00Z'
       }
     });
-    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 2')));
+    assert.deepEqual(calls, ['phase-1', 'phase-2']);
+    assert.deepEqual(
+      entries.find((entry) => entry.message.startsWith('Phase 2 completed')),
+      {
+        level: 'info',
+        message: 'Phase 2 completed: database backup created and verified',
+        metadata: {
+          phase: 2,
+          backupPath: successfulBackup.backupPath,
+          byteSize: successfulBackup.byteSize,
+          sha256: successfulBackup.sha256,
+          reportedManifestVersion: 1
+        }
+      }
+    );
+    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 3')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
   });
 
@@ -293,7 +331,10 @@ describe('runCoordinator', () => {
       const { logger, entries } = recordingLogger();
 
       await assert.rejects(
-        runCoordinator(logger, coordinatorConfig, request),
+        runCoordinator(logger, coordinatorConfig, {
+          request,
+          createBackup: async () => successfulBackup
+        }),
         (error: unknown) =>
           error instanceof ClearDuplicateAnalysesError && error.category === category
       );
@@ -301,7 +342,40 @@ describe('runCoordinator', () => {
       const failure = entries.find((entry) => entry.level === 'error');
       assert.equal(failure?.metadata?.failureCategory, category);
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 1 completed')));
-      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 2')));
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 started')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 3')));
+    }
+  });
+
+  it('logs every Phase 2 failure category and stops later work', async () => {
+    const categories: CreateDatabaseBackupError['category'][] = [
+      'artifact_verification',
+      'exit',
+      'output_contract',
+      'spawn',
+      'timeout'
+    ];
+
+    for (const category of categories) {
+      const { logger, entries } = recordingLogger();
+      const error = new CreateDatabaseBackupError(category, `fixture ${category}`);
+
+      await assert.rejects(
+        runCoordinator(logger, coordinatorConfig, {
+          request: async () => jsonResponse(successfulBody()),
+          createBackup: async () => {
+            throw error;
+          }
+        }),
+        error
+      );
+
+      assert.ok(entries.some((entry) => entry.message.startsWith('Phase 1 completed')));
+      assert.ok(entries.some((entry) => entry.message.startsWith('Phase 2 started')));
+      const failure = entries.find((entry) => entry.message.startsWith('Phase 2 failed'));
+      assert.equal(failure?.metadata?.failureCategory, category);
+      assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 completed')));
+      assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 3')));
     }
   });
 });

@@ -4,17 +4,38 @@ import {
   clearDuplicateAnalyses,
   type WorkerRequest
 } from './phases/01_clearDuplicateAnalyses';
+import {
+  createDatabaseBackup,
+  type CreateDatabaseBackupResult
+} from './phases/02_createDatabaseBackup';
+import { CreateDatabaseBackupError } from './phases/02_createDatabaseBackupCommand';
 
 export interface CoordinatorLogger {
   info(message: string, metadata?: Record<string, unknown>): void;
   error(message: string, metadata?: Record<string, unknown>): void;
 }
 
+type CreateBackup = (
+  config: Pick<OpsConfig, 'dbManagerBackupTimeoutSeconds'>
+) => Promise<CreateDatabaseBackupResult>;
+
+export interface CoordinatorDependencies {
+  request: WorkerRequest;
+  createBackup: CreateBackup;
+}
+
+const productionDependencies: CoordinatorDependencies = {
+  request: globalThis.fetch,
+  createBackup: createDatabaseBackup
+};
+
 export async function runCoordinator(
   logger: CoordinatorLogger,
   config: OpsConfig,
-  request: WorkerRequest = globalThis.fetch
+  dependencies: Partial<CoordinatorDependencies> = {}
 ): Promise<void> {
+  const request = dependencies.request ?? productionDependencies.request;
+  const createBackup = dependencies.createBackup ?? productionDependencies.createBackup;
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
   logger.info('Phase 1 started: clearing duplicate analyses', { phase: 1 });
@@ -38,5 +59,26 @@ export async function runCoordinator(
     throw error;
   }
 
-  logger.info('Weekly pipeline stopped before phase 2; phase 2 is not implemented');
+  logger.info('Phase 2 started: creating database backup', { phase: 2 });
+
+  try {
+    const result = await createBackup(config);
+    logger.info('Phase 2 completed: database backup created and verified', {
+      phase: 2,
+      backupPath: result.backupPath,
+      byteSize: result.byteSize,
+      sha256: result.sha256,
+      reportedManifestVersion: result.manifestVersion
+    });
+  } catch (error: unknown) {
+    logger.error('Phase 2 failed: database backup was not verified', {
+      phase: 2,
+      failureCategory:
+        error instanceof CreateDatabaseBackupError ? error.category : 'unknown',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+
+  logger.info('Weekly pipeline stopped before phase 3; phase 3 is not implemented');
 }
