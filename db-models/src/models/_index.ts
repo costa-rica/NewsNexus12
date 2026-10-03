@@ -94,6 +94,15 @@ import { initReport, Report } from "./Report";
 import { initState, State } from "./State";
 import { initUser, User } from "./User";
 import { initWebsiteDomain, WebsiteDomain } from "./WebsiteDomain";
+import {
+	initWeeklyArticleFlowRun02,
+	WeeklyArticleFlowRun02,
+} from "./WeeklyArticleFlowRun02";
+import type {
+	WeeklyArticleFlowErrorData,
+	WeeklyArticleFlowPhaseData,
+	WeeklyArticleFlowRun02Attributes,
+} from "./WeeklyArticleFlowRun02";
 
 import { applyAssociations } from "./_associations";
 import { MODEL_LOAD_ORDER } from "./_loadOrder";
@@ -131,6 +140,7 @@ export function initModels() {
 	initState();
 	initUser();
 	initWebsiteDomain();
+	initWeeklyArticleFlowRun02();
 
 	applyAssociations();
 
@@ -166,6 +176,7 @@ export function initModels() {
 		State,
 		User,
 		WebsiteDomain,
+		WeeklyArticleFlowRun02,
 	};
 }
 
@@ -179,6 +190,9 @@ export type {
 	AiApproverV02ResultStatus,
 	AiApproverV02SelectionItem,
 	AiApproverV02SelectionMode,
+	WeeklyArticleFlowErrorData,
+	WeeklyArticleFlowPhaseData,
+	WeeklyArticleFlowRun02Attributes,
 };
 
 export {
@@ -216,6 +230,7 @@ export {
 	State,
 	User,
 	WebsiteDomain,
+	WeeklyArticleFlowRun02,
 };
 
 export async function dropLegacyArticleContentsTable(): Promise<void> {

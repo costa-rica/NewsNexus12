@@ -19,6 +19,7 @@ import {
   DeleteOldArticlesError,
   type DeleteOldArticlesResult
 } from '../../src/weekly-flow-02/phases/03_deleteOldArticlesCommand';
+import { createInMemoryPersistence, createRunRecord } from './persistenceTestSupport';
 
 interface LogEntry {
   level: 'error' | 'info';
@@ -278,8 +279,10 @@ describe('runCoordinator', () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
     const calls: string[] = [];
+    const memory = createInMemoryPersistence();
 
     await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
       request: async (...args) => {
         calls.push('phase-1');
         return request(...args);
@@ -301,6 +304,7 @@ describe('runCoordinator', () => {
       level: 'info',
       message: 'Phase 1 completed: duplicate analyses cleared',
       metadata: {
+        runId: 1,
         phase: 1,
         rowsDeleted: 7,
         cancelledJobs: ['deduper-queued'],
@@ -315,6 +319,7 @@ describe('runCoordinator', () => {
         level: 'info',
         message: 'Phase 2 completed: database backup created and verified',
         metadata: {
+          runId: 1,
           phase: 2,
           backupPath: successfulBackup.backupPath,
           byteSize: successfulBackup.byteSize,
@@ -329,6 +334,7 @@ describe('runCoordinator', () => {
         level: 'info',
         message: 'Phase 3 completed: old unprotected articles deleted',
         metadata: {
+          runId: 1,
           phase: 3,
           daysOldThreshold: 180,
           cutoffDate: '2026-04-05',
@@ -340,6 +346,21 @@ describe('runCoordinator', () => {
     );
     assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
+    assert.deepEqual(memory.calls, [
+      'get-latest',
+      'create',
+      'start:1',
+      'complete:1',
+      'start:2',
+      'complete:2',
+      'start:3',
+      'complete:3'
+    ]);
+    assert.equal(memory.runs[0].lastPhaseStarted, 3);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 3);
+    assert.equal(memory.runs[0].runCompleted, false);
+    assert.equal(memory.runs[0].backupPath, successfulBackup.backupPath);
+    assert.equal(memory.runs[0].backupByteSize, '2048');
   });
 
   it('logs each Phase 1 failure category and does not log completion', async () => {
@@ -362,9 +383,11 @@ describe('runCoordinator', () => {
 
     for (const [category, request] of cases) {
       const { logger, entries } = recordingLogger();
+      const memory = createInMemoryPersistence();
 
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
+          persistence: memory.persistence,
           request,
           createBackup: async () => successfulBackup,
           deleteArticles: async () => successfulDeletion
@@ -379,6 +402,7 @@ describe('runCoordinator', () => {
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 started')));
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 started')));
       assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
+      assert.equal(memory.calls.at(-1), 'failure:1');
     }
   });
 
@@ -394,9 +418,11 @@ describe('runCoordinator', () => {
     for (const category of categories) {
       const { logger, entries } = recordingLogger();
       const error = new CreateDatabaseBackupError(category, `fixture ${category}`);
+      const memory = createInMemoryPersistence();
 
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
+          persistence: memory.persistence,
           request: async () => jsonResponse(successfulBody()),
           createBackup: async () => {
             throw error;
@@ -413,6 +439,7 @@ describe('runCoordinator', () => {
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 completed')));
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 started')));
       assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
+      assert.equal(memory.calls.at(-1), 'failure:2');
     }
   });
 
@@ -427,9 +454,11 @@ describe('runCoordinator', () => {
     for (const category of categories) {
       const { logger, entries } = recordingLogger();
       const error = new DeleteOldArticlesError(category, `fixture ${category}`);
+      const memory = createInMemoryPersistence();
 
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
+          persistence: memory.persistence,
           request: async () => jsonResponse(successfulBody()),
           createBackup: async () => successfulBackup,
           deleteArticles: async () => {
@@ -445,13 +474,16 @@ describe('runCoordinator', () => {
       assert.equal(failure?.metadata?.failureCategory, category);
       assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 3 completed')));
       assert.ok(!entries.some((entry) => entry.message.includes('stopped before phase 4')));
+      assert.equal(memory.calls.at(-1), 'failure:3');
     }
   });
 
   it('accepts an all-zero Phase 3 result', async () => {
     const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence();
 
     await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => ({
@@ -467,5 +499,178 @@ describe('runCoordinator', () => {
     assert.equal(completion?.metadata?.processedCount, 0);
     assert.equal(completion?.metadata?.deletedCount, 0);
     assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
+  });
+
+  it('continues a recent run at the Phase 4 boundary without rerunning Phases 1 through 3', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 12,
+        runStartedAt: new Date('2026-10-03T11:00:00.000Z'),
+        runCompleted: false,
+        runCompletedAt: null,
+        lastPhaseStarted: 3,
+        lastPhaseCompleted: 3,
+        phaseData: {
+          phase1: { status: 'completed' },
+          phase2: { status: 'completed' },
+          phase3: { status: 'completed' }
+        },
+        lastError: null,
+        backupPath: '/tmp/previous.zip',
+        backupByteSize: '2048',
+        backupSha256: 'b'.repeat(64),
+        backupManifestVersion: 1,
+        firstRssRequestId: null,
+        firstRssArticleId: null,
+        rssArticlesAddedCount: null,
+        articleCount: null,
+        rssJobId: null,
+        semanticScorerJobId: null,
+        stateAssignerJobId: null,
+        aiApproverV02JobId: null,
+        targetArticleThresholdDaysOld: null,
+        createdAt: new Date('2026-10-03T11:00:00.000Z'),
+        updatedAt: new Date('2026-10-03T11:10:00.000Z')
+      })
+    ]);
+    let phaseCalls = 0;
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      now: () => new Date('2026-10-03T12:00:00.000Z'),
+      request: async () => {
+        phaseCalls += 1;
+        return jsonResponse(successfulBody());
+      },
+      createBackup: async () => {
+        phaseCalls += 1;
+        return successfulBackup;
+      },
+      deleteArticles: async () => {
+        phaseCalls += 1;
+        return successfulDeletion;
+      }
+    });
+
+    assert.equal(phaseCalls, 0);
+    assert.deepEqual(memory.calls, ['get-latest']);
+    assert.equal(memory.runs.length, 1);
+    assert.ok(entries.some((entry) => entry.message.includes('continued to phase 4 boundary')));
+  });
+
+  it('does not invoke Phase 1 when recording its start fails', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence();
+    const originalRecordFailure = memory.persistence.recordFailure;
+    let requestCalls = 0;
+    memory.persistence.recordPhaseStarted = async () => {
+      throw new Error('start write failed');
+    };
+    memory.persistence.recordFailure = async (...args) => {
+      memory.calls.push('failure-after-start-write');
+      return originalRecordFailure(...args);
+    };
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        request: async () => {
+          requestCalls += 1;
+          return jsonResponse(successfulBody());
+        }
+      }),
+      /start write failed/
+    );
+
+    assert.equal(requestCalls, 0);
+    assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 1 started')));
+    assert.ok(memory.calls.includes('failure-after-start-write'));
+  });
+
+  it('records a failure and stops when verified Phase 1 output cannot be persisted', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence();
+    memory.persistence.recordPhaseCompleted = async () => {
+      throw new Error('completion write failed');
+    };
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        request: async () => jsonResponse(successfulBody())
+      }),
+      /completion write failed/
+    );
+
+    assert.equal(memory.calls.at(-1), 'failure:1');
+    assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 1 completed')));
+    assert.ok(!entries.some((entry) => entry.message.startsWith('Phase 2 started')));
+  });
+
+  it('replaces the latest run when it stopped during Phases 1 through 3', async () => {
+    const { logger } = recordingLogger();
+    const priorRun = createRunRecord({
+      id: 7,
+      lastPhaseStarted: 2,
+      lastPhaseCompleted: 1,
+      phaseData: { phase1: { status: 'completed' }, phase2: { status: 'failed' } }
+    });
+    const memory = createInMemoryPersistence([priorRun]);
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      request: async () => jsonResponse(successfulBody()),
+      createBackup: async () => successfulBackup,
+      deleteArticles: async () => successfulDeletion
+    });
+
+    assert.equal(memory.runs.length, 2);
+    assert.equal(memory.runs[0].id, 7);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 1);
+    assert.equal(memory.runs[1].id, 8);
+    assert.equal(memory.runs[1].lastPhaseCompleted, 3);
+  });
+
+  it('continues only the explicit run ID and never searches for a substitute', async () => {
+    const { logger } = recordingLogger();
+    const selected = createRunRecord({
+      id: 4,
+      runStartedAt: new Date('2026-09-01T00:00:00.000Z'),
+      lastPhaseStarted: 3,
+      lastPhaseCompleted: 3
+    });
+    const latest = createRunRecord({
+      id: 5,
+      lastPhaseStarted: 2,
+      lastPhaseCompleted: 1
+    });
+    const memory = createInMemoryPersistence([selected, latest]);
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      invocation: { mode: 'continue', runId: 4 },
+      now: () => new Date('2026-10-03T12:00:00.000Z')
+    });
+
+    assert.deepEqual(memory.calls, ['get:4']);
+    assert.equal(memory.runs.length, 2);
+  });
+
+  it('rejects an ineligible explicit run without writing or starting a phase', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({ id: 9, lastPhaseStarted: 2, lastPhaseCompleted: 1 })
+    ]);
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        invocation: { mode: 'continue', runId: 9 }
+      }),
+      /must be replaced by a new run/
+    );
+
+    assert.deepEqual(memory.calls, ['get:9']);
   });
 });

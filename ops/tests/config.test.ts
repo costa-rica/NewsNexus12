@@ -159,4 +159,22 @@ describe('parseOpsConfig', () => {
 
     assert.equal(parseOpsConfig(env, baseDirectory).pathToLogs, absoluteLogs);
   });
+
+  it('leaves PostgreSQL variables available for the later persistence import', () => {
+    const env = validEnvironment();
+    Object.assign(env, {
+      PG_HOST: 'database.test',
+      PG_PORT: '5432',
+      PG_DATABASE: 'newsnexus_test',
+      PG_USER: 'newsnexus_app',
+      PG_PASSWORD: 'test-only-value',
+      PG_SCHEMA: 'public'
+    });
+
+    parseOpsConfig(env, baseDirectory);
+
+    assert.equal(env.PG_HOST, 'database.test');
+    assert.equal(env.PG_USER, 'newsnexus_app');
+    assert.equal(env.PG_PASSWORD, 'test-only-value');
+  });
 });
