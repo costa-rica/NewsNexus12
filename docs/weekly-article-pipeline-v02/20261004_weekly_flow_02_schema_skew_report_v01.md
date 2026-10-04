@@ -241,4 +241,18 @@ Which exact PostgreSQL database on the development server is authorized for the 
 
 #### Operator Response
 
-(codex) Confirm the target independently before any destructive command because the documented and observed database names differ.
+The commands the operator used after npm install/ build to update the db. were:
+```bash
+# Drop
+sudo -u postgres dropdb newsnexus_prod
+
+# Create
+sudo -u postgres createdb newsnexus_prod
+
+# Apply privileges
+sudo -u postgres psql -d newsnexus_prod -c "GRANT CREATE ON DATABASE newsnexus_prod TO newsnexus_boot;"
+sudo -u postgres psql -d newsnexus_prod -c "GRANT ALL ON SCHEMA public TO newsnexus_boot;"
+sudo -u postgres psql -d newsnexus_prod -c "GRANT ALL ON SCHEMA public TO newsnexus_app;"
+sudo -u postgres psql -d newsnexus_prod -c "ALTER SCHEMA public OWNER TO newsnexus_boot;"
+```
+Then he replenshed using db-manager and a backup in /home/nick/ on the dev server.
