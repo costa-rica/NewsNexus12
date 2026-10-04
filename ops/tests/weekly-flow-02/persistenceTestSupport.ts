@@ -1,4 +1,6 @@
 import type {
+  PhaseFourDatabaseResult,
+  PhaseFourHighWaterMarks,
   WeeklyFlowPersistence,
   WeeklyFlowRunRecord
 } from '../../src/weekly-flow-02/persistence';
@@ -13,6 +15,11 @@ export interface InMemoryPersistence {
   persistence: WeeklyFlowPersistence;
   runs: WeeklyFlowRunRecord[];
   calls: string[];
+}
+
+interface InMemoryPersistenceOptions {
+  phaseFourHighWaterMarks?: PhaseFourHighWaterMarks;
+  phaseFourDatabaseResult?: PhaseFourDatabaseResult;
 }
 
 export const createRunRecord = (
@@ -50,7 +57,8 @@ export const createRunRecord = (
 };
 
 export const createInMemoryPersistence = (
-  initialRuns: WeeklyFlowRunRecord[] = []
+  initialRuns: WeeklyFlowRunRecord[] = [],
+  options: InMemoryPersistenceOptions = {}
 ): InMemoryPersistence => {
   const runs = initialRuns.map(cloneRun);
   const calls: string[] = [];
@@ -96,6 +104,58 @@ export const createInMemoryPersistence = (
       };
       return touch(run, startedAt);
     },
+    async recordPhaseFourStarted(runId, startedAt) {
+      calls.push('start:4');
+      const run = requireRun(runId);
+      const marks = options.phaseFourHighWaterMarks ?? {
+        newsApiRequestIdHighWaterMark: 100,
+        articleIdHighWaterMark: 200
+      };
+      run.lastPhaseStarted = 4;
+      run.newsApiRequestIdHighWaterMark = marks.newsApiRequestIdHighWaterMark;
+      run.articleIdHighWaterMark = marks.articleIdHighWaterMark;
+      run.phaseData.phase4 = {
+        status: 'started',
+        startedAt: startedAt.toISOString(),
+        ...marks
+      };
+      return touch(run, startedAt);
+    },
+    async recordPhaseFourProgress(runId, progress) {
+      calls.push('progress:4');
+      const run = requireRun(runId);
+      if (progress.rssJobId !== undefined) run.rssJobId = progress.rssJobId;
+      if (progress.rssArticlesAddedCount !== undefined) {
+        run.rssArticlesAddedCount = Math.max(
+          run.rssArticlesAddedCount ?? 0,
+          progress.rssArticlesAddedCount
+        );
+      }
+      run.phaseData.phase4 = {
+        ...(run.phaseData.phase4 as Record<string, unknown>),
+        progress: {
+          observedAt: progress.observedAt.toISOString(),
+          ...(progress.rssJobId === undefined ? {} : { rssJobId: progress.rssJobId }),
+          ...(progress.status === undefined ? {} : { status: progress.status }),
+          ...(progress.rssArticlesAddedCount === undefined
+            ? {}
+            : { rssArticlesAddedCount: run.rssArticlesAddedCount }),
+          ...(progress.details === undefined ? {} : { details: structuredClone(progress.details) })
+        }
+      };
+      return touch(run, progress.observedAt);
+    },
+    async readPhaseFourDatabaseResult(runId) {
+      calls.push('database-result:4');
+      requireRun(runId);
+      return structuredClone(
+        options.phaseFourDatabaseResult ?? {
+          firstRssRequestId: 101,
+          firstRssArticleId: 201,
+          articleCount: 1
+        }
+      );
+    },
     async recordPhaseCompleted(runId, phase, completedAt, phaseResult, fields = {}) {
       calls.push(`complete:${phase}`);
       const run = requireRun(runId);
@@ -103,6 +163,45 @@ export const createInMemoryPersistence = (
       Object.assign(run, fields);
       run.phaseData[`phase${phase}`] = {
         ...(run.phaseData[`phase${phase}`] as Record<string, unknown>),
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        result: structuredClone(phaseResult)
+      };
+      return touch(run, completedAt);
+    },
+    async recordPhaseFourCompleted(runId, completedAt, phaseResult, fields) {
+      calls.push('complete:4');
+      const run = requireRun(runId);
+      run.lastPhaseCompleted = 4;
+      run.firstRssRequestId = fields.firstRssRequestId;
+      run.firstRssArticleId = fields.firstRssArticleId;
+      run.rssArticlesAddedCount =
+        fields.rssArticlesAddedCount === null
+          ? run.rssArticlesAddedCount
+          : Math.max(run.rssArticlesAddedCount ?? 0, fields.rssArticlesAddedCount);
+      run.articleCount = fields.articleCount;
+      run.rssJobId = fields.rssJobId;
+      run.phaseData.phase4 = {
+        ...(run.phaseData.phase4 as Record<string, unknown>),
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        result: structuredClone(phaseResult)
+      };
+      return touch(run, completedAt);
+    },
+    async recordPhaseFourZeroWorkCompletion(runId, completedAt, phaseResult, fields) {
+      calls.push('complete-zero:4');
+      const run = requireRun(runId);
+      run.lastPhaseCompleted = 4;
+      run.firstRssRequestId = fields.firstRssRequestId;
+      run.firstRssArticleId = fields.firstRssArticleId;
+      run.rssArticlesAddedCount = fields.rssArticlesAddedCount;
+      run.articleCount = 0;
+      run.rssJobId = fields.rssJobId;
+      run.runCompleted = true;
+      run.runCompletedAt = completedAt;
+      run.phaseData.phase4 = {
+        ...(run.phaseData.phase4 as Record<string, unknown>),
         status: 'completed',
         completedAt: completedAt.toISOString(),
         result: structuredClone(phaseResult)

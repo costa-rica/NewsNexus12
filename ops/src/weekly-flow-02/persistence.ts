@@ -2,6 +2,8 @@ export type WeeklyFlowPhase = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type JsonRecord = Record<string, unknown>;
 
+export const GOOGLE_NEWS_RSS_SOURCE_NAME = 'Google News RSS';
+
 export class WeeklyFlowPersistenceError extends Error {
   constructor(message: string) {
     super(message);
@@ -53,6 +55,41 @@ export interface PhaseCompletionFields {
   targetArticleThresholdDaysOld?: number;
 }
 
+export interface PhaseFourHighWaterMarks {
+  newsApiRequestIdHighWaterMark: number;
+  articleIdHighWaterMark: number;
+}
+
+export interface PhaseFourDatabaseResult {
+  firstRssRequestId: number | null;
+  firstRssArticleId: number | null;
+  articleCount: number;
+}
+
+export interface PhaseFourProgress {
+  observedAt: Date;
+  rssJobId?: string;
+  status?: string;
+  rssArticlesAddedCount?: number;
+  details?: JsonRecord;
+}
+
+export interface PhaseFourCompletionFields {
+  firstRssRequestId: number | null;
+  firstRssArticleId: number | null;
+  rssArticlesAddedCount: number | null;
+  rssJobId: string | null;
+}
+
+export interface PhaseFourNonzeroCompletionFields extends PhaseFourCompletionFields {
+  articleCount: number;
+}
+
+export interface PhaseFourDataStore {
+  readHighWaterMarks(): Promise<PhaseFourHighWaterMarks>;
+  readPostMarkResult(marks: PhaseFourHighWaterMarks): Promise<PhaseFourDatabaseResult>;
+}
+
 export interface WeeklyFlowFailure {
   phase: WeeklyFlowPhase | null;
   category: string;
@@ -69,12 +106,33 @@ export interface WeeklyFlowPersistence {
     phase: WeeklyFlowPhase,
     startedAt: Date
   ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFourStarted(
+    runId: number,
+    startedAt: Date
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFourProgress(
+    runId: number,
+    progress: PhaseFourProgress
+  ): Promise<WeeklyFlowRunRecord>;
+  readPhaseFourDatabaseResult(runId: number): Promise<PhaseFourDatabaseResult>;
   recordPhaseCompleted(
     runId: number,
     phase: WeeklyFlowPhase,
     completedAt: Date,
     phaseResult: JsonRecord,
     fields?: PhaseCompletionFields
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFourCompleted(
+    runId: number,
+    completedAt: Date,
+    phaseResult: JsonRecord,
+    fields: PhaseFourNonzeroCompletionFields
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFourZeroWorkCompletion(
+    runId: number,
+    completedAt: Date,
+    phaseResult: JsonRecord,
+    fields: PhaseFourCompletionFields
   ): Promise<WeeklyFlowRunRecord>;
   recordFailure(runId: number, failure: WeeklyFlowFailure): Promise<WeeklyFlowRunRecord>;
   recordRunCompleted(runId: number, completedAt: Date): Promise<WeeklyFlowRunRecord>;

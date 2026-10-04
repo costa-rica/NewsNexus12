@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  createSequelizePhaseFourDataStore,
   createSequelizeWeeklyFlowPersistence
 } from '../../src/weekly-flow-02/sequelizePersistence';
 import {
+  GOOGLE_NEWS_RSS_SOURCE_NAME,
   WeeklyFlowPersistenceError,
+  type PhaseFourDataStore,
   type WeeklyFlowRunRecord
 } from '../../src/weekly-flow-02/persistence';
+import type { PhaseFourDataModels } from '../../src/weekly-flow-02/sequelizePersistence';
 import { createRunRecord } from './persistenceTestSupport';
 
 type AdapterModel = Parameters<typeof createSequelizeWeeklyFlowPersistence>[0];
@@ -142,6 +146,169 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
+  it('persists immutable Phase 4 marks and compact recoverable progress', async () => {
+    const run = mockRun({
+      id: 7,
+      lastPhaseStarted: 3,
+      lastPhaseCompleted: 3
+    });
+    const fixture = mockModel([run]);
+    const dataStore: PhaseFourDataStore = {
+      async readHighWaterMarks() {
+        return {
+          newsApiRequestIdHighWaterMark: 80,
+          articleIdHighWaterMark: 140
+        };
+      },
+      async readPostMarkResult(marks) {
+        assert.deepEqual(marks, {
+          newsApiRequestIdHighWaterMark: 80,
+          articleIdHighWaterMark: 140
+        });
+        return {
+          firstRssRequestId: 81,
+          firstRssArticleId: 141,
+          articleCount: 9
+        };
+      }
+    };
+    const persistence = createSequelizeWeeklyFlowPersistence(fixture.model, dataStore);
+    const startedAt = new Date('2026-10-04T12:00:00.000Z');
+
+    const started = await persistence.recordPhaseFourStarted(7, startedAt);
+    assert.equal(started.newsApiRequestIdHighWaterMark, 80);
+    assert.equal(started.articleIdHighWaterMark, 140);
+    assert.deepEqual(started.phaseData.phase4, {
+      status: 'started',
+      startedAt: startedAt.toISOString(),
+      newsApiRequestIdHighWaterMark: 80,
+      articleIdHighWaterMark: 140
+    });
+
+    const firstProgressAt = new Date('2026-10-04T12:05:00.000Z');
+    await persistence.recordPhaseFourProgress(7, {
+      observedAt: firstProgressAt,
+      rssJobId: 'job-12',
+      status: 'running',
+      rssArticlesAddedCount: 4
+    });
+    const laterProgress = await persistence.recordPhaseFourProgress(7, {
+      observedAt: new Date('2026-10-04T12:10:00.000Z'),
+      status: 'running',
+      rssArticlesAddedCount: 0
+    });
+    assert.equal(laterProgress.rssJobId, 'job-12');
+    assert.equal(laterProgress.rssArticlesAddedCount, 4);
+    assert.deepEqual(await persistence.readPhaseFourDatabaseResult(7), {
+      firstRssRequestId: 81,
+      firstRssArticleId: 141,
+      articleCount: 9
+    });
+
+    await assert.rejects(
+      persistence.recordPhaseFourStarted(7, startedAt),
+      /high-water marks are already set/
+    );
+
+    const completed = await persistence.recordPhaseFourCompleted(
+      7,
+      new Date('2026-10-04T12:20:00.000Z'),
+      { endingReason: 'queries_exhausted' },
+      {
+        firstRssRequestId: 81,
+        firstRssArticleId: 141,
+        rssArticlesAddedCount: 0,
+        articleCount: 9,
+        rssJobId: 'job-12'
+      }
+    );
+    assert.equal(completed.lastPhaseCompleted, 4);
+    assert.equal(completed.articleCount, 9);
+    assert.equal(completed.rssArticlesAddedCount, 4);
+    assert.equal(completed.runCompleted, false);
+  });
+
+  it('atomically records Phase 4 zero work and completes the run', async () => {
+    const run = mockRun({
+      id: 9,
+      lastPhaseStarted: 3,
+      lastPhaseCompleted: 3
+    });
+    const fixture = mockModel([run]);
+    const dataStore: PhaseFourDataStore = {
+      async readHighWaterMarks() {
+        return {
+          newsApiRequestIdHighWaterMark: 20,
+          articleIdHighWaterMark: 40
+        };
+      },
+      async readPostMarkResult() {
+        return { firstRssRequestId: 21, firstRssArticleId: null, articleCount: 0 };
+      }
+    };
+    const persistence = createSequelizeWeeklyFlowPersistence(fixture.model, dataStore);
+    await persistence.recordPhaseFourStarted(9, new Date('2026-10-04T12:00:00.000Z'));
+    const completedAt = new Date('2026-10-04T12:30:00.000Z');
+    const completed = await persistence.recordPhaseFourZeroWorkCompletion(
+      9,
+      completedAt,
+      { endingReason: 'queries_exhausted' },
+      {
+        firstRssRequestId: 21,
+        firstRssArticleId: null,
+        rssArticlesAddedCount: 0,
+        rssJobId: 'job-9'
+      }
+    );
+
+    assert.equal(completed.lastPhaseCompleted, 4);
+    assert.equal(completed.articleCount, 0);
+    assert.equal(completed.runCompleted, true);
+    assert.equal(completed.runCompletedAt, completedAt);
+    assert.deepEqual(completed.phaseData.phase4, {
+      status: 'completed',
+      startedAt: '2026-10-04T12:00:00.000Z',
+      newsApiRequestIdHighWaterMark: 20,
+      articleIdHighWaterMark: 40,
+      completedAt: completedAt.toISOString(),
+      result: { endingReason: 'queries_exhausted' }
+    });
+  });
+
+  it('leaves both Phase 4 and the run incomplete when zero-work update fails', async () => {
+    const run = mockRun({
+      id: 10,
+      lastPhaseStarted: 4,
+      lastPhaseCompleted: 3,
+      newsApiRequestIdHighWaterMark: 5,
+      articleIdHighWaterMark: 8,
+      phaseData: { phase4: { status: 'started' } }
+    });
+    run.update = async () => {
+      throw new Error('update failed');
+    };
+    const fixture = mockModel([run]);
+    const persistence = createSequelizeWeeklyFlowPersistence(fixture.model);
+
+    await assert.rejects(
+      persistence.recordPhaseFourZeroWorkCompletion(
+        10,
+        new Date('2026-10-04T12:30:00.000Z'),
+        { endingReason: 'queries_exhausted' },
+        {
+          firstRssRequestId: null,
+          firstRssArticleId: null,
+          rssArticlesAddedCount: 0,
+          rssJobId: 'job-10'
+        }
+      ),
+      /Phase 4 zero-work completion could not be persisted/
+    );
+    assert.equal(run.lastPhaseCompleted, 3);
+    assert.equal(run.runCompleted, false);
+    assert.equal(run.runCompletedAt, null);
+  });
+
   it('records sanitized failure data and terminal completion independently', async () => {
     const run = mockRun({ id: 8, lastPhaseStarted: 1 });
     const fixture = mockModel([run]);
@@ -181,5 +348,88 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
       assert.doesNotMatch(error.message, /PG_PASSWORD|do-not-log/);
       return true;
     });
+  });
+});
+
+describe('createSequelizePhaseFourDataStore', () => {
+  it('reads empty and string aggregates and uses the exact RSS source', async () => {
+    const sourceQueries: Array<Record<string, unknown>> = [];
+    const articleQueries: Array<Record<string, unknown>> = [];
+    const fakeNewsApiRequestModel = {
+      async max() {
+        return null;
+      },
+      async min() {
+        return '21';
+      }
+    };
+    const models = {
+      NewsApiRequest: fakeNewsApiRequestModel,
+      NewsArticleAggregatorSource: {
+        async findOne(options: Record<string, unknown>) {
+          sourceQueries.push(options);
+          return { id: 3 };
+        }
+      },
+      Article: {
+        async max() {
+          return '12';
+        },
+        async findOne(options: Record<string, unknown>) {
+          articleQueries.push(options);
+          return { id: 22 };
+        },
+        async count(options: Record<string, unknown>) {
+          articleQueries.push(options);
+          return '7';
+        }
+      }
+    } as unknown as PhaseFourDataModels;
+    const dataStore = createSequelizePhaseFourDataStore(models);
+
+    assert.deepEqual(await dataStore.readHighWaterMarks(), {
+      newsApiRequestIdHighWaterMark: 0,
+      articleIdHighWaterMark: 12
+    });
+    assert.deepEqual(
+      await dataStore.readPostMarkResult({
+        newsApiRequestIdHighWaterMark: 20,
+        articleIdHighWaterMark: 15
+      }),
+      {
+        firstRssRequestId: 21,
+        firstRssArticleId: 22,
+        articleCount: 7
+      }
+    );
+    assert.equal(GOOGLE_NEWS_RSS_SOURCE_NAME, 'Google News RSS');
+    assert.deepEqual(sourceQueries[0]?.where, {
+      nameOfOrg: 'Google News RSS'
+    });
+    const include = articleQueries[0]?.include as Array<Record<string, unknown>>;
+    assert.equal(include[0]?.model, fakeNewsApiRequestModel);
+    assert.equal(include[0]?.required, true);
+  });
+
+  it('rejects unsafe database aggregates', async () => {
+    const models = {
+      NewsApiRequest: {
+        async max() {
+          return '9007199254740992';
+        }
+      },
+      NewsArticleAggregatorSource: {},
+      Article: {
+        async max() {
+          return 1;
+        }
+      }
+    } as unknown as PhaseFourDataModels;
+    const dataStore = createSequelizePhaseFourDataStore(models);
+
+    await assert.rejects(
+      dataStore.readHighWaterMarks(),
+      /NewsApiRequests maximum ID must be a non-negative safe integer/
+    );
   });
 });

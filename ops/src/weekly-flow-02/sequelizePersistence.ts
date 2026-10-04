@@ -1,8 +1,21 @@
-import type { WeeklyArticleFlowRun02 } from '@newsnexus/db-models';
+import type {
+  Article,
+  NewsApiRequest,
+  NewsArticleAggregatorSource,
+  WeeklyArticleFlowRun02
+} from '@newsnexus/db-models';
+import { Op } from 'sequelize';
 import {
+  GOOGLE_NEWS_RSS_SOURCE_NAME,
   isWeeklyFlowPhase,
   type JsonRecord,
   type PhaseCompletionFields,
+  type PhaseFourCompletionFields,
+  type PhaseFourDataStore,
+  type PhaseFourDatabaseResult,
+  type PhaseFourHighWaterMarks,
+  type PhaseFourNonzeroCompletionFields,
+  type PhaseFourProgress,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
   WeeklyFlowPersistenceError,
@@ -12,6 +25,15 @@ import {
 
 type WeeklyFlowRunModel = typeof WeeklyArticleFlowRun02;
 type WeeklyFlowRunInstance = InstanceType<WeeklyFlowRunModel>;
+type ArticleModel = typeof Article;
+type NewsApiRequestModel = typeof NewsApiRequest;
+type NewsArticleAggregatorSourceModel = typeof NewsArticleAggregatorSource;
+
+export interface PhaseFourDataModels {
+  Article: ArticleModel;
+  NewsApiRequest: NewsApiRequestModel;
+  NewsArticleAggregatorSource: NewsArticleAggregatorSourceModel;
+}
 
 const phaseKey = (phase: WeeklyFlowPhase): string => `phase${phase}`;
 
@@ -52,6 +74,106 @@ const asNullableNonNegativeSafeInteger = (
   }
   return value;
 };
+
+const asAggregateInteger = (
+  value: unknown,
+  fieldName: string,
+  options: { nullable: boolean }
+): number | null => {
+  if (value === null || value === undefined) {
+    if (options.nullable) return null;
+    throw new WeeklyFlowPersistenceError(`${fieldName} was not returned by the database`);
+  }
+  const parsed =
+    typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+  if (!Number.isSafeInteger(parsed) || (parsed as number) < 0) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a non-negative safe integer`);
+  }
+  return parsed as number;
+};
+
+const requireValidDate = (value: Date, fieldName: string): void => {
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a valid date`);
+  }
+};
+
+const requireNonEmptyString = (value: string, fieldName: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) throw new WeeklyFlowPersistenceError(`${fieldName} must be a non-empty string`);
+  return trimmed;
+};
+
+export const createSequelizePhaseFourDataStore = (
+  models: PhaseFourDataModels
+): PhaseFourDataStore => ({
+  async readHighWaterMarks() {
+    const [requestMaximum, articleMaximum] = await Promise.all([
+      models.NewsApiRequest.max('id'),
+      models.Article.max('id')
+    ]);
+    return {
+      newsApiRequestIdHighWaterMark:
+        asAggregateInteger(requestMaximum, 'NewsApiRequests maximum ID', {
+          nullable: true
+        }) ?? 0,
+      articleIdHighWaterMark:
+        asAggregateInteger(articleMaximum, 'Articles maximum ID', { nullable: true }) ?? 0
+    };
+  },
+
+  async readPostMarkResult(marks) {
+    const source = await models.NewsArticleAggregatorSource.findOne({
+      attributes: ['id'],
+      where: { nameOfOrg: GOOGLE_NEWS_RSS_SOURCE_NAME }
+    });
+    const firstRequestRaw = source
+      ? await models.NewsApiRequest.min('id', {
+          where: {
+            id: { [Op.gt]: marks.newsApiRequestIdHighWaterMark },
+            newsArticleAggregatorSourceId: source.id
+          }
+        })
+      : null;
+    const firstRssRequestId = asAggregateInteger(
+      firstRequestRaw,
+      'firstRssRequestId',
+      { nullable: true }
+    );
+    const firstArticle = source
+      ? await models.Article.findOne({
+          attributes: ['id'],
+          include: [
+            {
+              model: models.NewsApiRequest,
+              attributes: [],
+              required: true,
+              where: {
+                id: { [Op.gt]: marks.newsApiRequestIdHighWaterMark },
+                newsArticleAggregatorSourceId: source.id
+              }
+            }
+          ],
+          order: [['id', 'ASC']]
+        })
+      : null;
+    const firstRssArticleId = asAggregateInteger(
+      firstArticle?.id ?? null,
+      'firstRssArticleId',
+      { nullable: true }
+    );
+    const articleCountRaw = await models.Article.count({
+      where: { id: { [Op.gt]: marks.articleIdHighWaterMark } }
+    });
+    const articleCount = asAggregateInteger(articleCountRaw, 'articleCount', {
+      nullable: false
+    });
+    if (articleCount === null) {
+      throw new WeeklyFlowPersistenceError('articleCount was not returned by the database');
+    }
+    return { firstRssRequestId, firstRssArticleId, articleCount };
+  }
+});
 
 const toRunRecord = (run: WeeklyFlowRunInstance): WeeklyFlowRunRecord => ({
   id: run.id,
@@ -118,6 +240,31 @@ const assertCanCompletePhase = (run: WeeklyFlowRunInstance, phase: WeeklyFlowPha
   }
 };
 
+const assertPhaseFourInProgress = (run: WeeklyFlowRunInstance): void => {
+  if (
+    run.runCompleted ||
+    run.lastPhaseStarted !== 4 ||
+    (run.lastPhaseCompleted ?? 0) !== 3
+  ) {
+    throw new WeeklyFlowPersistenceError('Phase 4 is not the active incomplete phase');
+  }
+};
+
+const requirePhaseFourMarks = (run: WeeklyFlowRunInstance): PhaseFourHighWaterMarks => {
+  const newsApiRequestIdHighWaterMark = asNullableNonNegativeSafeInteger(
+    run.newsApiRequestIdHighWaterMark,
+    'newsApiRequestIdHighWaterMark'
+  );
+  const articleIdHighWaterMark = asNullableNonNegativeSafeInteger(
+    run.articleIdHighWaterMark,
+    'articleIdHighWaterMark'
+  );
+  if (newsApiRequestIdHighWaterMark === null || articleIdHighWaterMark === null) {
+    throw new WeeklyFlowPersistenceError('Phase 4 high-water marks are missing');
+  }
+  return { newsApiRequestIdHighWaterMark, articleIdHighWaterMark };
+};
+
 const mergePhaseData = (
   currentValue: unknown,
   phase: WeeklyFlowPhase,
@@ -136,7 +283,8 @@ const mergePhaseData = (
 };
 
 export const createSequelizeWeeklyFlowPersistence = (
-  model: WeeklyFlowRunModel
+  model: WeeklyFlowRunModel,
+  phaseFourDataStore?: PhaseFourDataStore
 ): WeeklyFlowPersistence => ({
   async getLatestRun() {
     return performPersistenceOperation('Latest weekly flow run lookup failed', async () => {
@@ -166,6 +314,11 @@ export const createSequelizeWeeklyFlowPersistence = (
   },
 
   async recordPhaseStarted(runId, phase, startedAt) {
+    if (phase === 4) {
+      throw new WeeklyFlowPersistenceError(
+        'Phase 4 must start through recordPhaseFourStarted'
+      );
+    }
     return performPersistenceOperation(`Phase ${phase} start could not be persisted`, async () => {
       const run = await requireRun(model, runId);
       assertCanStartPhase(run, phase);
@@ -177,6 +330,124 @@ export const createSequelizeWeeklyFlowPersistence = (
         })
       });
       return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFourStarted(runId, startedAt) {
+    requireValidDate(startedAt, 'Phase 4 start time');
+    return performPersistenceOperation('Phase 4 start could not be persisted', async () => {
+      if (!phaseFourDataStore) {
+        throw new WeeklyFlowPersistenceError('Phase 4 data store is unavailable');
+      }
+      const run = await requireRun(model, runId);
+      assertCanStartPhase(run, 4);
+      if (
+        run.newsApiRequestIdHighWaterMark !== null ||
+        run.articleIdHighWaterMark !== null
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 4 high-water marks are already set');
+      }
+      const marks = await phaseFourDataStore.readHighWaterMarks();
+      const newsApiRequestIdHighWaterMark = asAggregateInteger(
+        marks.newsApiRequestIdHighWaterMark,
+        'newsApiRequestIdHighWaterMark',
+        { nullable: false }
+      );
+      const articleIdHighWaterMark = asAggregateInteger(
+        marks.articleIdHighWaterMark,
+        'articleIdHighWaterMark',
+        { nullable: false }
+      );
+      if (
+        newsApiRequestIdHighWaterMark === null ||
+        articleIdHighWaterMark === null
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 4 high-water marks are missing');
+      }
+      await run.update({
+        lastPhaseStarted: 4,
+        newsApiRequestIdHighWaterMark,
+        articleIdHighWaterMark,
+        phaseData: mergePhaseData(run.phaseData, 4, {
+          status: 'started',
+          startedAt: startedAt.toISOString(),
+          newsApiRequestIdHighWaterMark,
+          articleIdHighWaterMark
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFourProgress(runId, progress: PhaseFourProgress) {
+    requireValidDate(progress.observedAt, 'Phase 4 progress time');
+    return performPersistenceOperation('Phase 4 progress could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseFourInProgress(run);
+      requirePhaseFourMarks(run);
+      const rssJobId =
+        progress.rssJobId === undefined
+          ? run.rssJobId
+          : requireNonEmptyString(progress.rssJobId, 'rssJobId');
+      const status =
+        progress.status === undefined
+          ? undefined
+          : requireNonEmptyString(progress.status, 'Phase 4 status');
+      const reportedCount =
+        progress.rssArticlesAddedCount === undefined
+          ? undefined
+          : asAggregateInteger(
+              progress.rssArticlesAddedCount,
+              'rssArticlesAddedCount',
+              { nullable: false }
+            );
+      const rssArticlesAddedCount =
+        reportedCount === undefined
+          ? run.rssArticlesAddedCount
+          : Math.max(run.rssArticlesAddedCount ?? 0, reportedCount ?? 0);
+      const progressData: JsonRecord = {
+        observedAt: progress.observedAt.toISOString()
+      };
+      if (rssJobId !== null) progressData.rssJobId = rssJobId;
+      if (status !== undefined) progressData.status = status;
+      if (rssArticlesAddedCount !== null) {
+        progressData.rssArticlesAddedCount = rssArticlesAddedCount;
+      }
+      if (progress.details !== undefined) {
+        progressData.details = asJsonRecord(progress.details);
+      }
+      await run.update({
+        rssJobId,
+        rssArticlesAddedCount,
+        phaseData: mergePhaseData(run.phaseData, 4, {
+          progress: progressData
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async readPhaseFourDatabaseResult(runId): Promise<PhaseFourDatabaseResult> {
+    return performPersistenceOperation('Phase 4 database result lookup failed', async () => {
+      if (!phaseFourDataStore) {
+        throw new WeeklyFlowPersistenceError('Phase 4 data store is unavailable');
+      }
+      const run = await requireRun(model, runId);
+      assertPhaseFourInProgress(run);
+      const marks = requirePhaseFourMarks(run);
+      const result = await phaseFourDataStore.readPostMarkResult(marks);
+      return {
+        firstRssRequestId: asNullableNonNegativeSafeInteger(
+          result.firstRssRequestId,
+          'firstRssRequestId'
+        ),
+        firstRssArticleId: asNullableNonNegativeSafeInteger(
+          result.firstRssArticleId,
+          'firstRssArticleId'
+        ),
+        articleCount:
+          asAggregateInteger(result.articleCount, 'articleCount', { nullable: false }) ?? 0
+      };
     });
   },
 
@@ -193,6 +464,112 @@ export const createSequelizeWeeklyFlowPersistence = (
           completedAt: completedAt.toISOString(),
           result: asJsonRecord(phaseResult)
         })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFourCompleted(
+    runId,
+    completedAt,
+    phaseResult,
+    fields: PhaseFourNonzeroCompletionFields
+  ) {
+    requireValidDate(completedAt, 'Phase 4 completion time');
+    return performPersistenceOperation('Phase 4 completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertCanCompletePhase(run, 4);
+      requirePhaseFourMarks(run);
+      const firstRssRequestId = asNullableNonNegativeSafeInteger(
+        fields.firstRssRequestId,
+        'firstRssRequestId'
+      );
+      const firstRssArticleId = asNullableNonNegativeSafeInteger(
+        fields.firstRssArticleId,
+        'firstRssArticleId'
+      );
+      const reportedRssCount = asNullableNonNegativeSafeInteger(
+        fields.rssArticlesAddedCount,
+        'rssArticlesAddedCount'
+      );
+      const rssArticlesAddedCount =
+        reportedRssCount === null
+          ? run.rssArticlesAddedCount
+          : Math.max(run.rssArticlesAddedCount ?? 0, reportedRssCount);
+      const articleCount = asAggregateInteger(fields.articleCount, 'articleCount', {
+        nullable: false
+      });
+      if (articleCount === null || articleCount <= 0) {
+        throw new WeeklyFlowPersistenceError(
+          'Nonzero Phase 4 completion requires a positive articleCount'
+        );
+      }
+      const rssJobId = requireNonEmptyString(fields.rssJobId ?? '', 'rssJobId');
+      await run.update({
+        firstRssRequestId,
+        firstRssArticleId,
+        rssArticlesAddedCount,
+        articleCount,
+        rssJobId,
+        lastPhaseCompleted: 4,
+        phaseData: mergePhaseData(run.phaseData, 4, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          result: asJsonRecord(phaseResult)
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFourZeroWorkCompletion(
+    runId,
+    completedAt,
+    phaseResult,
+    fields: PhaseFourCompletionFields
+  ) {
+    requireValidDate(completedAt, 'Phase 4 completion time');
+    return performPersistenceOperation('Phase 4 zero-work completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertCanCompletePhase(run, 4);
+      requirePhaseFourMarks(run);
+      const firstRssRequestId = asNullableNonNegativeSafeInteger(
+        fields.firstRssRequestId,
+        'firstRssRequestId'
+      );
+      const firstRssArticleId = asNullableNonNegativeSafeInteger(
+        fields.firstRssArticleId,
+        'firstRssArticleId'
+      );
+      if (firstRssArticleId !== null) {
+        throw new WeeklyFlowPersistenceError(
+          'Zero-work completion cannot contain a first RSS Article ID'
+        );
+      }
+      const rssArticlesAddedCount = asNullableNonNegativeSafeInteger(
+        fields.rssArticlesAddedCount,
+        'rssArticlesAddedCount'
+      );
+      if ((rssArticlesAddedCount ?? 0) > 0) {
+        throw new WeeklyFlowPersistenceError(
+          'Zero-work completion cannot contain a positive RSS-added count'
+        );
+      }
+      const rssJobId = requireNonEmptyString(fields.rssJobId ?? '', 'rssJobId');
+      await run.update({
+        firstRssRequestId,
+        firstRssArticleId,
+        rssArticlesAddedCount,
+        articleCount: 0,
+        rssJobId,
+        lastPhaseCompleted: 4,
+        phaseData: mergePhaseData(run.phaseData, 4, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          result: asJsonRecord(phaseResult)
+        }),
+        runCompleted: true,
+        runCompletedAt: completedAt
       });
       return toRunRecord(run);
     });
@@ -243,7 +620,14 @@ export async function loadWeeklyFlowPersistence(): Promise<LoadedWeeklyFlowPersi
     const models = dbModels.initModels();
     await dbModels.sequelize.authenticate();
     return {
-      persistence: createSequelizeWeeklyFlowPersistence(models.WeeklyArticleFlowRun02),
+      persistence: createSequelizeWeeklyFlowPersistence(
+        models.WeeklyArticleFlowRun02,
+        createSequelizePhaseFourDataStore({
+          Article: models.Article,
+          NewsApiRequest: models.NewsApiRequest,
+          NewsArticleAggregatorSource: models.NewsArticleAggregatorSource
+        })
+      ),
       close: async () => dbModels.sequelize.close()
     };
   } catch (error: unknown) {

@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:16:30Z
+updated_at: 2026-10-04T19:18:42Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -30,26 +30,26 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 2: Add Phase 4 Persistence Operations
 
-- [ ] Add an injected operation that reads `MAX(NewsApiRequests.id)` and `MAX(Articles.id)`, using zero for an empty table.
-- [ ] Persist both high-water marks with the Phase 4 start before any worker-node request.
-- [ ] Reject recalculation or replacement of persisted high-water marks during continuation.
-- [ ] Add a focused progress operation for `rssJobId`, compact status, and timestamps without marking Phase 4 complete.
-- [ ] Recover `firstRssRequestId` as the lowest post-mark request whose source satisfies `NewsArticleAggregatorSources.nameOfOrg = 'Google News RSS'`.
-- [ ] Recover `firstRssArticleId` as the lowest Article associated with those post-mark Google News RSS requests.
-- [ ] Define the exact source name once in ops and add a test asserting the literal value `'Google News RSS'`.
-- [ ] Count all Articles with `id > articleIdHighWaterMark`, regardless of source.
-- [ ] Validate IDs and counts as non-negative safe integers, including database drivers returning `BIGINT` aggregates as strings.
-- [ ] Preserve an unknown RSS-added result as unknown rather than converting it to zero.
-- [ ] Prevent a later zero worker result from erasing an earlier persisted nonzero result.
-- [ ] Add a nonzero Phase 4 completion operation that leaves the run incomplete.
-- [ ] Add one atomic zero-work operation that completes Phase 4 and the run in one database update.
-- [ ] Add database-free persistence tests for empty-table `MAX`, string aggregate conversion, high-water capture, immutability, exact source matching, recovered RSS IDs, broad Article counting, count preservation, ordered transitions, and both completion paths.
-- [ ] Add a test proving atomic failure leaves neither Phase 4 nor run completion persisted.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Review the diff for unrelated changes.
-- [ ] Check off completed Phase 2 tasks and commit the persistence changes using the repository commit-message guidance.
+- [x] Add an injected operation that reads `MAX(NewsApiRequests.id)` and `MAX(Articles.id)`, using zero for an empty table.
+- [x] Persist both high-water marks with the Phase 4 start before any worker-node request.
+- [x] Reject recalculation or replacement of persisted high-water marks during continuation.
+- [x] Add a focused progress operation for `rssJobId`, compact status, and timestamps without marking Phase 4 complete.
+- [x] Recover `firstRssRequestId` as the lowest post-mark request whose source satisfies `NewsArticleAggregatorSources.nameOfOrg = 'Google News RSS'`.
+- [x] Recover `firstRssArticleId` as the lowest Article associated with those post-mark Google News RSS requests.
+- [x] Define the exact source name once in ops and add a test asserting the literal value `'Google News RSS'`.
+- [x] Count all Articles with `id > articleIdHighWaterMark`, regardless of source.
+- [x] Validate IDs and counts as non-negative safe integers, including database drivers returning `BIGINT` aggregates as strings.
+- [x] Preserve an unknown RSS-added result as unknown rather than converting it to zero.
+- [x] Prevent a later zero worker result from erasing an earlier persisted nonzero result.
+- [x] Add a nonzero Phase 4 completion operation that leaves the run incomplete.
+- [x] Add one atomic zero-work operation that completes Phase 4 and the run in one database update.
+- [x] Add database-free persistence tests for empty-table `MAX`, string aggregate conversion, high-water capture, immutability, exact source matching, recovered RSS IDs, broad Article counting, count preservation, ordered transitions, and both completion paths.
+- [x] Add a test proving atomic failure leaves neither Phase 4 nor run completion persisted.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Review the diff for unrelated changes.
+- [x] Check off completed Phase 2 tasks and commit the persistence changes using the repository commit-message guidance.
 
 ## Phase 3: Build the Worker-Node RSS Client
 
