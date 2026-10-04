@@ -77,6 +77,7 @@ const modelNames = [
   "ArticlesApproved02",
   "ArticleStateContract02",
   "Prompt",
+  "WeeklyArticleFlowRun02",
 ] as const;
 
 const dbMock: Record<string, any> = {};
@@ -150,6 +151,7 @@ describe("adminDb routes", () => {
   test("GET /admin-db/db-row-counts-by-table includes retained tables", async () => {
     dbMock.Article.count.mockResolvedValue(7);
     dbMock.ArticleContents02.count.mockResolvedValue(2);
+    dbMock.WeeklyArticleFlowRun02.count.mockResolvedValue(1);
 
     const app = buildApp();
     const response = await request(app).get("/admin-db/db-row-counts-by-table");
@@ -160,6 +162,7 @@ describe("adminDb routes", () => {
       expect.arrayContaining([
         { tableName: "Article", rowCount: 7 },
         { tableName: "ArticleContents02", rowCount: 2 },
+        { tableName: "WeeklyArticleFlowRun02", rowCount: 1 },
       ]),
     );
   });

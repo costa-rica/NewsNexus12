@@ -35,6 +35,7 @@ const {
   ArticlesApproved02,
   ArticleStateContract02,
   Prompt,
+  WeeklyArticleFlowRun02,
 } = require("@newsnexus/db-models");
 
 const tableRegistry = {
@@ -65,6 +66,7 @@ const tableRegistry = {
   ArticlesApproved02,
   ArticleStateContract02,
   Prompt,
+  WeeklyArticleFlowRun02,
 } as const;
 type TableName = keyof typeof tableRegistry;
 type RequestWithUploadFile = Request & { file?: { path: string } };
