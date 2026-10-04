@@ -114,6 +114,34 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
+  it('validates typed Phase 4 high-water marks when reading a run', async () => {
+    const valid = mockRun({
+      id: 5,
+      newsApiRequestIdHighWaterMark: 0,
+      articleIdHighWaterMark: Number.MAX_SAFE_INTEGER
+    });
+    const validPersistence = createSequelizeWeeklyFlowPersistence(
+      mockModel([valid]).model
+    );
+
+    const record = await validPersistence.getLatestRun();
+    assert.equal(record?.newsApiRequestIdHighWaterMark, 0);
+    assert.equal(record?.articleIdHighWaterMark, Number.MAX_SAFE_INTEGER);
+
+    const invalid = mockRun({
+      id: 6,
+      articleIdHighWaterMark: -1
+    });
+    const invalidPersistence = createSequelizeWeeklyFlowPersistence(
+      mockModel([invalid]).model
+    );
+
+    await assert.rejects(
+      invalidPersistence.getLatestRun(),
+      /articleIdHighWaterMark must be a non-negative safe integer/
+    );
+  });
+
   it('records sanitized failure data and terminal completion independently', async () => {
     const run = mockRun({ id: 8, lastPhaseStarted: 1 });
     const fixture = mockModel([run]);

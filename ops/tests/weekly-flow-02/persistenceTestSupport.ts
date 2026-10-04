@@ -32,6 +32,8 @@ export const createRunRecord = (
     backupByteSize: null,
     backupSha256: null,
     backupManifestVersion: null,
+    newsApiRequestIdHighWaterMark: null,
+    articleIdHighWaterMark: null,
     firstRssRequestId: null,
     firstRssArticleId: null,
     rssArticlesAddedCount: null,

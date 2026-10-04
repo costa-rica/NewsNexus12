@@ -17,6 +17,8 @@ export interface WeeklyArticleFlowRun02Attributes {
   backupByteSize: string | null;
   backupSha256: string | null;
   backupManifestVersion: number | null;
+  newsApiRequestIdHighWaterMark: number | null;
+  articleIdHighWaterMark: number | null;
   firstRssRequestId: number | null;
   firstRssArticleId: number | null;
   rssArticlesAddedCount: number | null;
@@ -41,6 +43,8 @@ type WeeklyArticleFlowRun02CreationAttributes = Optional<
   | "backupByteSize"
   | "backupSha256"
   | "backupManifestVersion"
+  | "newsApiRequestIdHighWaterMark"
+  | "articleIdHighWaterMark"
   | "firstRssRequestId"
   | "firstRssArticleId"
   | "rssArticlesAddedCount"
@@ -82,6 +86,8 @@ export class WeeklyArticleFlowRun02
   public backupByteSize!: string | null;
   public backupSha256!: string | null;
   public backupManifestVersion!: number | null;
+  public newsApiRequestIdHighWaterMark!: number | null;
+  public articleIdHighWaterMark!: number | null;
   public firstRssRequestId!: number | null;
   public firstRssArticleId!: number | null;
   public rssArticlesAddedCount!: number | null;
@@ -163,6 +169,18 @@ export function initWeeklyArticleFlowRun02() {
         allowNull: true,
         defaultValue: null,
         validate: { isInt: true, min: 1 },
+      },
+      newsApiRequestIdHighWaterMark: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        validate: { isInt: true, min: 0 },
+      },
+      articleIdHighWaterMark: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        validate: { isInt: true, min: 0 },
       },
       firstRssRequestId: {
         type: DataTypes.INTEGER,

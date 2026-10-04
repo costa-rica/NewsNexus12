@@ -42,6 +42,17 @@ const asPhase = (value: number | null, fieldName: string): WeeklyFlowPhase | nul
   return value;
 };
 
+const asNullableNonNegativeSafeInteger = (
+  value: number | null,
+  fieldName: string
+): number | null => {
+  if (value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a non-negative safe integer`);
+  }
+  return value;
+};
+
 const toRunRecord = (run: WeeklyFlowRunInstance): WeeklyFlowRunRecord => ({
   id: run.id,
   runStartedAt: run.runStartedAt,
@@ -55,6 +66,14 @@ const toRunRecord = (run: WeeklyFlowRunInstance): WeeklyFlowRunRecord => ({
   backupByteSize: run.backupByteSize,
   backupSha256: run.backupSha256,
   backupManifestVersion: run.backupManifestVersion,
+  newsApiRequestIdHighWaterMark: asNullableNonNegativeSafeInteger(
+    run.newsApiRequestIdHighWaterMark,
+    'newsApiRequestIdHighWaterMark'
+  ),
+  articleIdHighWaterMark: asNullableNonNegativeSafeInteger(
+    run.articleIdHighWaterMark,
+    'articleIdHighWaterMark'
+  ),
   firstRssRequestId: run.firstRssRequestId,
   firstRssArticleId: run.firstRssArticleId,
   rssArticlesAddedCount: run.rssArticlesAddedCount,

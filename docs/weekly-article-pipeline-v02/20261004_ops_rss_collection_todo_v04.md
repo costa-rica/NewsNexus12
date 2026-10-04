@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:15:01Z
+updated_at: 2026-10-04T19:16:30Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -13,20 +13,20 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 1: Extend the Typed Run Model
 
-- [ ] Confirm the implementation follows PRD V10 and Plan V06 before changing code.
-- [ ] Add nullable `newsApiRequestIdHighWaterMark` and `articleIdHighWaterMark` fields to `WeeklyArticleFlowRun02`.
-- [ ] Use integer types consistent with the IDs in `NewsApiRequests` and `Articles`.
-- [ ] Keep both fields null before Phase 4 and document their immutability after Phase 4 starts.
-- [ ] Export the fields through the existing db-model initialization and serialization patterns.
-- [ ] Extend the ops `WeeklyFlowRunRecord`, persistence field types, Sequelize conversion, and database-free fixtures.
-- [ ] Add model or adapter validation for safe integer values and null pre-Phase-4 values.
-- [ ] Do not add per-query result columns or an open-ended RSS history structure.
-- [ ] Run `npm run build --workspace @newsnexus/db-models` and fix failures.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Review the code and schema diff for unrelated changes.
-- [ ] Check off completed Phase 1 tasks and commit the typed model changes using the repository commit-message guidance.
+- [x] Confirm the implementation follows PRD V10 and Plan V06 before changing code.
+- [x] Add nullable `newsApiRequestIdHighWaterMark` and `articleIdHighWaterMark` fields to `WeeklyArticleFlowRun02`.
+- [x] Use integer types consistent with the IDs in `NewsApiRequests` and `Articles`.
+- [x] Keep both fields null before Phase 4 and document their immutability after Phase 4 starts.
+- [x] Export the fields through the existing db-model initialization and serialization patterns.
+- [x] Extend the ops `WeeklyFlowRunRecord`, persistence field types, Sequelize conversion, and database-free fixtures.
+- [x] Add model or adapter validation for safe integer values and null pre-Phase-4 values.
+- [x] Do not add per-query result columns or an open-ended RSS history structure.
+- [x] Run `npm run build --workspace @newsnexus/db-models` and fix failures.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Review the code and schema diff for unrelated changes.
+- [x] Check off completed Phase 1 tasks and commit the typed model changes using the repository commit-message guidance.
 
 ## Phase 2: Add Phase 4 Persistence Operations
 

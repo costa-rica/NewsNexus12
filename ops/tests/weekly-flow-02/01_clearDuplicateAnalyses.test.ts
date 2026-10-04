@@ -521,6 +521,8 @@ describe('runCoordinator', () => {
         backupByteSize: '2048',
         backupSha256: 'b'.repeat(64),
         backupManifestVersion: 1,
+        newsApiRequestIdHighWaterMark: null,
+        articleIdHighWaterMark: null,
         firstRssRequestId: null,
         firstRssArticleId: null,
         rssArticlesAddedCount: null,

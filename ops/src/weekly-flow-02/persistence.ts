@@ -22,6 +22,8 @@ export interface WeeklyFlowRunRecord {
   backupByteSize: string | null;
   backupSha256: string | null;
   backupManifestVersion: number | null;
+  newsApiRequestIdHighWaterMark: number | null;
+  articleIdHighWaterMark: number | null;
   firstRssRequestId: number | null;
   firstRssArticleId: number | null;
   rssArticlesAddedCount: number | null;
