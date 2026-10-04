@@ -19,6 +19,11 @@ import {
   DeleteOldArticlesError,
   type DeleteOldArticlesResult
 } from '../../src/weekly-flow-02/phases/03_deleteOldArticlesCommand';
+import type { GoogleNewsRssWorker } from '../../src/weekly-flow-02/phases/04_collectGoogleNewsRss';
+import {
+  GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+  GoogleNewsRssClientError
+} from '../../src/weekly-flow-02/phases/04_googleNewsRssClient';
 import { createInMemoryPersistence, createRunRecord } from './persistenceTestSupport';
 
 interface LogEntry {
@@ -79,6 +84,27 @@ const successfulDeletion: DeleteOldArticlesResult = {
   eligibleCount: 12,
   processedCount: 10,
   deletedCount: 9
+};
+
+const successfulRssWorker: GoogleNewsRssWorker = {
+  start: async () => ({
+    jobId: 'rss-job-1',
+    status: 'queued',
+    endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME
+  }),
+  getStatus: async (jobId, phaseStartedAt) => ({
+    jobId,
+    endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+    status: 'completed',
+    createdAt: phaseStartedAt.toISOString(),
+    endedAt: new Date(phaseStartedAt.getTime() + 60_000).toISOString(),
+    result: {
+      endingReason: 'queries_exhausted',
+      endingMessage: 'All queries processed',
+      articlesAddedCount: 1
+    }
+  }),
+  cancel: async () => 'canceled'
 };
 
 const jsonResponse = (body: unknown, status = 200): Response =>
@@ -280,7 +306,7 @@ describe('requestClearDuplicateAnalyses', () => {
 });
 
 describe('runCoordinator', () => {
-  it('runs Phases 1, 2, and 3 in order, then stops before Phase 4', async () => {
+  it('runs Phases 1 through 4 in order and stops at the Phase 5 boundary', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
     const calls: string[] = [];
@@ -288,6 +314,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      rssWorker: successfulRssWorker,
       request: async (...args) => {
         calls.push('phase-1');
         return request(...args);
@@ -349,7 +376,7 @@ describe('runCoordinator', () => {
         }
       }
     );
-    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 5 boundary')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
     assert.deepEqual(memory.calls, [
       'get-latest',
@@ -359,10 +386,15 @@ describe('runCoordinator', () => {
       'start:2',
       'complete:2',
       'start:3',
-      'complete:3'
+      'complete:3',
+      'start:4',
+      'progress:4',
+      'progress:4',
+      'database-result:4',
+      'complete:4'
     ]);
-    assert.equal(memory.runs[0].lastPhaseStarted, 3);
-    assert.equal(memory.runs[0].lastPhaseCompleted, 3);
+    assert.equal(memory.runs[0].lastPhaseStarted, 4);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 4);
     assert.equal(memory.runs[0].runCompleted, false);
     assert.equal(memory.runs[0].backupPath, successfulBackup.backupPath);
     assert.equal(memory.runs[0].backupByteSize, '2048');
@@ -393,6 +425,7 @@ describe('runCoordinator', () => {
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
           persistence: memory.persistence,
+          rssWorker: successfulRssWorker,
           request,
           createBackup: async () => successfulBackup,
           deleteArticles: async () => successfulDeletion
@@ -428,6 +461,7 @@ describe('runCoordinator', () => {
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
           persistence: memory.persistence,
+          rssWorker: successfulRssWorker,
           request: async () => jsonResponse(successfulBody()),
           createBackup: async () => {
             throw error;
@@ -464,6 +498,7 @@ describe('runCoordinator', () => {
       await assert.rejects(
         runCoordinator(logger, coordinatorConfig, {
           persistence: memory.persistence,
+          rssWorker: successfulRssWorker,
           request: async () => jsonResponse(successfulBody()),
           createBackup: async () => successfulBackup,
           deleteArticles: async () => {
@@ -489,6 +524,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      rssWorker: successfulRssWorker,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => ({
@@ -503,7 +539,7 @@ describe('runCoordinator', () => {
     assert.equal(completion?.metadata?.eligibleCount, 0);
     assert.equal(completion?.metadata?.processedCount, 0);
     assert.equal(completion?.metadata?.deletedCount, 0);
-    assert.ok(entries.some((entry) => entry.message.includes('stopped before phase 4')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 5 boundary')));
   });
 
   it('continues a recent run at the Phase 4 boundary without rerunning Phases 1 through 3', async () => {
@@ -545,6 +581,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      rssWorker: successfulRssWorker,
       now: () => new Date('2026-10-03T12:00:00.000Z'),
       request: async () => {
         phaseCalls += 1;
@@ -561,9 +598,16 @@ describe('runCoordinator', () => {
     });
 
     assert.equal(phaseCalls, 0);
-    assert.deepEqual(memory.calls, ['get-latest']);
+    assert.deepEqual(memory.calls, [
+      'get-latest',
+      'start:4',
+      'progress:4',
+      'progress:4',
+      'database-result:4',
+      'complete:4'
+    ]);
     assert.equal(memory.runs.length, 1);
-    assert.ok(entries.some((entry) => entry.message.includes('continued to phase 4 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 5 boundary')));
   });
 
   it('does not invoke Phase 1 when recording its start fails', async () => {
@@ -582,6 +626,7 @@ describe('runCoordinator', () => {
     await assert.rejects(
       runCoordinator(logger, coordinatorConfig, {
         persistence: memory.persistence,
+        rssWorker: successfulRssWorker,
         request: async () => {
           requestCalls += 1;
           return jsonResponse(successfulBody());
@@ -605,6 +650,7 @@ describe('runCoordinator', () => {
     await assert.rejects(
       runCoordinator(logger, coordinatorConfig, {
         persistence: memory.persistence,
+        rssWorker: successfulRssWorker,
         request: async () => jsonResponse(successfulBody())
       }),
       /completion write failed/
@@ -627,6 +673,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      rssWorker: successfulRssWorker,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => successfulDeletion
@@ -636,7 +683,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].id, 7);
     assert.equal(memory.runs[0].lastPhaseCompleted, 1);
     assert.equal(memory.runs[1].id, 8);
-    assert.equal(memory.runs[1].lastPhaseCompleted, 3);
+    assert.equal(memory.runs[1].lastPhaseCompleted, 4);
   });
 
   it('continues only the explicit run ID and never searches for a substitute', async () => {
@@ -656,12 +703,202 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      rssWorker: successfulRssWorker,
       invocation: { mode: 'continue', runId: 4 },
       now: () => new Date('2026-10-03T12:00:00.000Z')
     });
 
-    assert.deepEqual(memory.calls, ['get:4']);
+    assert.deepEqual(memory.calls, [
+      'get:4',
+      'start:4',
+      'progress:4',
+      'progress:4',
+      'database-result:4',
+      'complete:4'
+    ]);
     assert.equal(memory.runs.length, 2);
+  });
+
+  it('atomically completes the weekly run when Phase 4 verifies zero work', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([], {
+      phaseFourDatabaseResult: {
+        firstRssRequestId: null,
+        firstRssArticleId: null,
+        articleCount: 0
+      }
+    });
+    const zeroWorker: GoogleNewsRssWorker = {
+      ...successfulRssWorker,
+      getStatus: async (jobId, phaseStartedAt) => ({
+        jobId,
+        endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+        status: 'completed',
+        createdAt: phaseStartedAt.toISOString(),
+        endedAt: new Date(phaseStartedAt.getTime() + 60_000).toISOString(),
+        result: {
+          endingReason: 'queries_exhausted',
+          endingMessage: 'All queries processed',
+          articlesAddedCount: 0
+        }
+      })
+    };
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      rssWorker: zeroWorker,
+      request: async () => jsonResponse(successfulBody()),
+      createBackup: async () => successfulBackup,
+      deleteArticles: async () => successfulDeletion
+    });
+
+    assert.equal(memory.runs[0].runCompleted, true);
+    assert.equal(memory.runs[0].articleCount, 0);
+    assert.equal(memory.calls.at(-1), 'complete-zero:4');
+    assert.ok(entries.some((entry) => entry.message.includes('weekly run completed')));
+  });
+
+  it('records a Phase 4 failure without claiming healthy zero work', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 14,
+        runStartedAt: new Date('2026-10-03T11:00:00.000Z'),
+        lastPhaseStarted: 3,
+        lastPhaseCompleted: 3,
+        phaseData: { phase3: { status: 'completed' } }
+      })
+    ]);
+    const failure = new GoogleNewsRssClientError(
+      'transient_request',
+      'RSS start outcome unverified'
+    );
+    const failingWorker: GoogleNewsRssWorker = {
+      ...successfulRssWorker,
+      start: async () => {
+        throw failure;
+      }
+    };
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        rssWorker: failingWorker,
+        now: () => new Date('2026-10-03T12:00:00.000Z')
+      }),
+      failure
+    );
+
+    assert.equal(memory.calls.at(-1), 'failure:4');
+    assert.equal(memory.runs[0].runCompleted, false);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 3);
+    const loggedFailure = entries.find((entry) => entry.message.startsWith('Phase 4 stopped'));
+    assert.equal(loggedFailure?.metadata?.failureCategory, 'transient_request');
+  });
+
+  it('records a Phase 4 persistence failure and does not advance', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 16,
+        runStartedAt: new Date('2026-10-03T11:00:00.000Z'),
+        lastPhaseStarted: 3,
+        lastPhaseCompleted: 3,
+        phaseData: { phase3: { status: 'completed' } }
+      })
+    ]);
+    memory.persistence.recordPhaseFourCompleted = async () => {
+      throw new Error('Phase 4 completion write failed');
+    };
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        rssWorker: successfulRssWorker,
+        now: () => new Date('2026-10-03T12:00:00.000Z')
+      }),
+      /Phase 4 completion write failed/
+    );
+
+    assert.equal(memory.calls.at(-1), 'failure:4');
+    assert.equal(memory.runs[0].lastPhaseCompleted, 3);
+    assert.equal(memory.runs[0].runCompleted, false);
+  });
+
+  it('continues within 72 hours and replaces an older timed-out Phase 4 job', async () => {
+    const { logger } = recordingLogger();
+    const phaseStartedAt = new Date('2026-10-03T13:00:00.000Z');
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 15,
+        runStartedAt: new Date('2026-10-03T12:00:00.000Z'),
+        lastPhaseStarted: 4,
+        lastPhaseCompleted: 3,
+        newsApiRequestIdHighWaterMark: 100,
+        articleIdHighWaterMark: 200,
+        rssJobId: 'saved-job',
+        phaseData: {
+          phase4: { status: 'started', startedAt: phaseStartedAt.toISOString() }
+        }
+      })
+    ]);
+    let starts = 0;
+    let savedStatusCalls = 0;
+    const worker: GoogleNewsRssWorker = {
+      start: async () => {
+        starts += 1;
+        return {
+          jobId: 'replacement-job',
+          status: 'queued',
+          endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME
+        };
+      },
+      getStatus: async (jobId) => {
+        if (jobId === 'replacement-job') {
+          return {
+            jobId,
+            endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+            status: 'completed',
+            createdAt: '2026-10-05T10:00:00.000Z',
+            endedAt: '2026-10-05T10:01:00.000Z',
+            result: {
+              endingReason: 'queries_exhausted',
+              endingMessage: 'All queries processed',
+              articlesAddedCount: 1
+            }
+          };
+        }
+        savedStatusCalls += 1;
+        return savedStatusCalls === 1
+          ? {
+              jobId,
+              endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+              status: 'running',
+              createdAt: phaseStartedAt.toISOString(),
+              startedAt: phaseStartedAt.toISOString()
+            }
+          : {
+              jobId,
+              endpointName: GOOGLE_NEWS_RSS_ENDPOINT_NAME,
+              status: 'canceled',
+              createdAt: phaseStartedAt.toISOString(),
+              endedAt: '2026-10-05T10:00:00.000Z'
+            };
+      },
+      cancel: async () => 'cancel_requested'
+    };
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      rssWorker: worker,
+      now: () => new Date('2026-10-05T10:00:00.000Z'),
+      delay: async () => undefined
+    });
+
+    assert.equal(starts, 1);
+    assert.equal(memory.runs[0].rssJobId, 'replacement-job');
+    assert.equal(memory.runs[0].lastPhaseCompleted, 4);
+    assert.equal(memory.calls.some((call) => call.startsWith('start:1')), false);
   });
 
   it('rejects an ineligible explicit run without writing or starting a phase', async () => {
@@ -673,6 +910,7 @@ describe('runCoordinator', () => {
     await assert.rejects(
       runCoordinator(logger, coordinatorConfig, {
         persistence: memory.persistence,
+        rssWorker: successfulRssWorker,
         invocation: { mode: 'continue', runId: 9 }
       }),
       /must be replaced by a new run/

@@ -170,6 +170,7 @@ describe('Google News RSS status client', () => {
     for (const overrides of [
       { status: 'unknown' },
       { endedAt: 'not-a-date' },
+      { endedAt: '2026-10-04T08:59:59.999Z' },
       { result: undefined },
       { result: { endingReason: 'new_reason', endingMessage: 'x', articlesAddedCount: 1 } },
       {

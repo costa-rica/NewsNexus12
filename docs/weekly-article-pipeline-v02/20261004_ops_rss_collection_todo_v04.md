@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:24:05Z
+updated_at: 2026-10-04T19:26:14Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -112,27 +112,27 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 5: Connect Phase 4 to the Coordinator
 
-- [ ] Extend coordinator dependencies with the Phase 4 module and persistence operations.
-- [ ] Replace the Phase 4 boundary return while preserving continuation past completed Phases 1–3.
-- [ ] For a new Phase 4, persist both high-water marks with Phase 4 start before any worker call.
-- [ ] For continuation, reuse the original marks and saved job ID.
-- [ ] Apply worker identity, timestamps, polling, terminal mapping, timeout, cancellation, follow-up lookup, and replacement rules.
-- [ ] Enforce at most one RSS start per coordinator invocation.
-- [ ] Route Phase 4 failures through the existing failure recorder with `phase: 4`.
-- [ ] Never convert an unavailable or unverified worker outcome into healthy zero-work.
-- [ ] For verified `articleCount = 0`, use the atomic Phase 4 and run completion operation.
-- [ ] For verified `articleCount > 0`, complete Phase 4, keep the run incomplete, and log the Phase 5 boundary.
-- [ ] Log run ID, phase, safe job ID, durations, cancellation outcome, recovery action, RSS-added result when known, broad Article count, elapsed time, and actionable errors.
-- [ ] Keep per-query details in logs rather than run-table metadata.
-- [ ] Extend coordinator tests for phase ordering, recent continuation, per-job timeouts, cancellation, every missing-job follow-up branch, replacement, worker restart, broad counting, zero work, persistence failures, and the Phase 5 boundary.
-- [ ] Test continuation more than 24 hours after original Phase 4 start but within 72 hours of `runStartedAt`.
-- [ ] Test that a timed-out active job prevents replacement until confirmed inactive.
-- [ ] Add every new compiled coordinator test file to the explicit test-file list in `ops/package.json`.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Review the diff for unrelated changes.
-- [ ] Check off completed Phase 5 tasks and commit the coordinator integration using the repository commit-message guidance.
+- [x] Extend coordinator dependencies with the Phase 4 module and persistence operations.
+- [x] Replace the Phase 4 boundary return while preserving continuation past completed Phases 1–3.
+- [x] For a new Phase 4, persist both high-water marks with Phase 4 start before any worker call.
+- [x] For continuation, reuse the original marks and saved job ID.
+- [x] Apply worker identity, timestamps, polling, terminal mapping, timeout, cancellation, follow-up lookup, and replacement rules.
+- [x] Enforce at most one RSS start per coordinator invocation.
+- [x] Route Phase 4 failures through the existing failure recorder with `phase: 4`.
+- [x] Never convert an unavailable or unverified worker outcome into healthy zero-work.
+- [x] For verified `articleCount = 0`, use the atomic Phase 4 and run completion operation.
+- [x] For verified `articleCount > 0`, complete Phase 4, keep the run incomplete, and log the Phase 5 boundary.
+- [x] Log run ID, phase, safe job ID, durations, cancellation outcome, recovery action, RSS-added result when known, broad Article count, elapsed time, and actionable errors.
+- [x] Keep per-query details in logs rather than run-table metadata.
+- [x] Extend coordinator tests for phase ordering, recent continuation, per-job timeouts, cancellation, every missing-job follow-up branch, replacement, worker restart, broad counting, zero work, persistence failures, and the Phase 5 boundary.
+- [x] Test continuation more than 24 hours after original Phase 4 start but within 72 hours of `runStartedAt`.
+- [x] Test that a timed-out active job prevents replacement until confirmed inactive.
+- [x] Add every new compiled coordinator test file to the explicit test-file list in `ops/package.json`.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Review the diff for unrelated changes.
+- [x] Check off completed Phase 5 tasks and commit the coordinator integration using the repository commit-message guidance.
 
 ## Phase 6: Perform the Development Schema Rollout
 

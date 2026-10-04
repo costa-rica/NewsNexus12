@@ -301,6 +301,12 @@ export const parseGoogleNewsRssStatusResponse = (
   const endedAt = terminalStatuses.has(status)
     ? requireTimestamp(raw.endedAt, 'job.endedAt')
     : optionalTimestamp(raw.endedAt, 'job.endedAt');
+  if (endedAt !== undefined && Date.parse(endedAt) < Date.parse(createdAt)) {
+    throw new GoogleNewsRssClientError(
+      'malformed_response',
+      'RSS job endedAt cannot be before createdAt'
+    );
+  }
 
   return {
     jobId,

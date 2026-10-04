@@ -37,6 +37,22 @@ export interface CollectGoogleNewsRssDependencies {
   worker: GoogleNewsRssWorker;
   now: PhaseFourClock;
   delay: PhaseFourDelay;
+  onEvent?: (event: PhaseFourEvent) => void;
+}
+
+export interface PhaseFourEvent {
+  action:
+    | 'job_started'
+    | 'job_status'
+    | 'replacement_eligible'
+    | 'cancellation_confirmed'
+    | 'verified_success';
+  jobId: string;
+  status?: string;
+  durationMilliseconds?: number;
+  recoveryAction?: string;
+  cancellationOutcome?: string;
+  rssArticlesAddedCount?: number;
 }
 
 export type CollectGoogleNewsRssResult =
@@ -213,6 +229,11 @@ export const collectGoogleNewsRss = async (
         rssJobId: jobId,
         status: startResult.status
       });
+      dependencies.onEvent?.({
+        action: 'job_started',
+        jobId,
+        status: startResult.status
+      });
     }
 
     let assessment;
@@ -224,6 +245,15 @@ export const collectGoogleNewsRss = async (
             observedAt: dependencies.now(),
             rssJobId: job.jobId,
             status: job.status
+          });
+          const durationEnd = job.endedAt === undefined
+            ? dependencies.now().getTime()
+            : Date.parse(job.endedAt);
+          dependencies.onEvent?.({
+            action: 'job_status',
+            jobId: job.jobId,
+            status: job.status,
+            durationMilliseconds: Math.max(0, durationEnd - Date.parse(job.createdAt))
           });
         },
         pollIntervalMilliseconds,
@@ -238,6 +268,11 @@ export const collectGoogleNewsRss = async (
         error instanceof GoogleNewsRssClientError &&
         error.category === 'unavailable_job';
       if (replacementEligible) {
+        dependencies.onEvent?.({
+          action: 'replacement_eligible',
+          jobId: jobId as string,
+          recoveryAction: 'saved_job_unavailable'
+        });
         jobId = null;
         continue;
       }
@@ -280,6 +315,12 @@ export const collectGoogleNewsRss = async (
           phaseResult,
           { ...fields, firstRssArticleId: null }
         );
+        dependencies.onEvent?.({
+          action: 'verified_success',
+          jobId: assessment.job.jobId,
+          status: assessment.job.status,
+          rssArticlesAddedCount
+        });
         return {
           kind: 'zero_work',
           articleCount: 0,
@@ -293,6 +334,12 @@ export const collectGoogleNewsRss = async (
         phaseResult,
         { ...fields, articleCount: databaseResult.articleCount }
       );
+      dependencies.onEvent?.({
+        action: 'verified_success',
+        jobId: assessment.job.jobId,
+        status: assessment.job.status,
+        rssArticlesAddedCount
+      });
       return {
         kind: 'ready_for_phase_5',
         articleCount: databaseResult.articleCount,
@@ -319,6 +366,12 @@ export const collectGoogleNewsRss = async (
           `RSS job ended without verified success: ${assessment.reason}`
         );
       }
+      dependencies.onEvent?.({
+        action: 'replacement_eligible',
+        jobId: assessment.job.jobId,
+        status: assessment.job.status,
+        recoveryAction: assessment.reason
+      });
       jobId = null;
       continue;
     }
@@ -349,6 +402,13 @@ export const collectGoogleNewsRss = async (
             ? 'timed_out_unavailable'
             : 'timed_out_inactive'
       });
+      dependencies.onEvent?.({
+        action: 'cancellation_confirmed',
+        jobId: assessment.job.jobId,
+        status: assessment.job.status,
+        cancellationOutcome: cancellation.kind,
+        recoveryAction: cancellation.via
+      });
     }
 
     if (startedThisInvocation) {
@@ -356,6 +416,14 @@ export const collectGoogleNewsRss = async (
         'job_timeout',
         'RSS job exceeded its 24-hour limit; its result was not trusted'
       );
+    }
+    if (!activeTimedOut) {
+      dependencies.onEvent?.({
+        action: 'replacement_eligible',
+        jobId: assessment.job.jobId,
+        status: assessment.job.status,
+        recoveryAction: 'terminal_job_exceeded_time_limit'
+      });
     }
     jobId = null;
   }
