@@ -151,7 +151,7 @@ Optional:
 
 - Type: Postgres 16 via Sequelize 6 in `@newsnexus/db-models`
 - Runtime workers do not run `sequelize.sync()` on startup or inside jobs
-- Expected local development database: `newsnexus_dev`
+- Expected local operational database: `newsnexus_prod`
 - Expected worker test database: `newsnexus_test_worker_node`
 
 ## Scripts

@@ -53,12 +53,12 @@ psql postgres <<'SQL'
 CREATE ROLE newsnexus_app      WITH LOGIN PASSWORD 'newsnexus_app_dev';
 CREATE ROLE newsnexus_boot     WITH LOGIN PASSWORD 'newsnexus_boot_dev' CREATEDB;
 
-CREATE DATABASE newsnexus_dev             OWNER newsnexus_boot;
+CREATE DATABASE newsnexus_prod            OWNER newsnexus_boot;
 CREATE DATABASE newsnexus_test_api        OWNER newsnexus_boot;
 CREATE DATABASE newsnexus_test_db_manager OWNER newsnexus_boot;
 CREATE DATABASE newsnexus_test_worker_node OWNER newsnexus_boot;
 
-GRANT CONNECT ON DATABASE newsnexus_dev             TO newsnexus_app;
+GRANT CONNECT ON DATABASE newsnexus_prod            TO newsnexus_app;
 GRANT CONNECT ON DATABASE newsnexus_test_api        TO newsnexus_app;
 GRANT CONNECT ON DATABASE newsnexus_test_db_manager TO newsnexus_app;
 GRANT CONNECT ON DATABASE newsnexus_test_worker_node TO newsnexus_app;
@@ -68,7 +68,7 @@ SQL
 Then, inside each database, grant the bootstrap role DDL rights and the app role runtime access to the `public` schema:
 
 ```bash
-for DB in newsnexus_dev newsnexus_test_api newsnexus_test_db_manager newsnexus_test_worker_node; do
+for DB in newsnexus_prod newsnexus_test_api newsnexus_test_db_manager newsnexus_test_worker_node; do
   psql -d "$DB" <<SQL
     -- PG 15+ revokes CREATE on public from everyone by default; restore it for the bootstrap role.
     GRANT CREATE ON SCHEMA public TO newsnexus_boot;
@@ -81,26 +81,26 @@ SQL
 done
 ```
 
-## 3. Seed the dev database
+## 3. Seed the local operational database
 
 Use db-manager to restore from a CSV backup zip. This is the only supported path for getting real data into a fresh Postgres instance — we do not run SQLite → Postgres migration.
 
 ```bash
 cd db-manager
-# Ensure db-manager/.env points PG_* to newsnexus_dev using the bootstrap role
+# Ensure db-manager/.env points PG_* to newsnexus_prod using the bootstrap role
 npm run build
 
-# Optional: validate the zip in a scratch database before touching newsnexus_dev
+# Optional: validate the zip in a scratch database before touching newsnexus_prod
 node dist/index.js --dry_run --zip_file /absolute/path/to/db_backup_YYYYMMDDHHMMSS.zip
 
-# Restore into newsnexus_dev
+# Restore into newsnexus_prod
 node dist/index.js --zip_file /absolute/path/to/db_backup_YYYYMMDDHHMMSS.zip
 ```
 
 Important notes:
 
 1. The db-manager restore flag is `--zip_file`, with an underscore. `--zip-file` is not accepted.
-2. `--dry_run` is optional. It imports the same zip into a scratch database first so you can verify the backup before changing `newsnexus_dev`.
+2. `--dry_run` is optional. It imports the same zip into a scratch database first so you can verify the backup before changing `newsnexus_prod`.
 3. The real restore command rebuilds the target schema before loading the CSVs.
 
 db-manager will:
@@ -112,7 +112,7 @@ db-manager will:
 
 ## 4. Wire up each package's `.env`
 
-Each package keeps its own `.env`. Copy from `.env.example` and fill in the Postgres block. Example values below target the dev database and the app role.
+Each package keeps its own `.env`. Copy from `.env.example` and fill in the Postgres block. Example values below target the local operational database and the app role.
 
 ### api/.env
 
@@ -126,7 +126,7 @@ PATH_TO_UTILITIES_ANALYSIS_SPREADSHEETS=/absolute/path/to/analysis_spreadsheets
 
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=newsnexus_dev
+PG_DATABASE=newsnexus_prod
 PG_USER=newsnexus_app
 PG_PASSWORD=newsnexus_app_dev
 PG_SCHEMA=public
@@ -146,7 +146,7 @@ every replenish — required because `DROP SCHEMA CASCADE` wipes default privile
 ```
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=newsnexus_dev
+PG_DATABASE=newsnexus_prod
 PG_USER=newsnexus_boot
 PG_PASSWORD=newsnexus_boot_dev
 PG_SCHEMA=public
@@ -161,7 +161,7 @@ Same pattern as api, but lower pool size:
 ```
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=newsnexus_dev
+PG_DATABASE=newsnexus_prod
 PG_USER=newsnexus_app
 PG_PASSWORD=newsnexus_app_dev
 PG_SCHEMA=public
@@ -175,7 +175,7 @@ worker-python reads the same `PG_*` variables and builds a psycopg connection po
 ```
 PG_HOST=localhost
 PG_PORT=5432
-PG_DATABASE=newsnexus_dev
+PG_DATABASE=newsnexus_prod
 PG_USER=newsnexus_app
 PG_PASSWORD=newsnexus_app_dev
 PG_SCHEMA=public
@@ -202,15 +202,15 @@ cd ../api && npm run build && node dist/server.js   # Ctrl-C after it logs "List
 If connection fails, verify:
 
 - `pg_isready` returns green
-- `psql -h localhost -U newsnexus_app -d newsnexus_dev -c 'SELECT 1;'` succeeds
+- `psql -h localhost -U newsnexus_app -d newsnexus_prod -c 'SELECT 1;'` succeeds
 - `PG_HOST`, `PG_PORT`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD` all match what you set in step 2
 
 ## 6. Resetting a local database
 
 ```bash
 psql postgres <<'SQL'
-DROP DATABASE IF EXISTS newsnexus_dev;
-CREATE DATABASE newsnexus_dev OWNER newsnexus_boot;
+DROP DATABASE IF EXISTS newsnexus_prod;
+CREATE DATABASE newsnexus_prod OWNER newsnexus_boot;
 SQL
 ```
 
