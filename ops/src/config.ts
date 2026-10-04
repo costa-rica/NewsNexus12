@@ -6,6 +6,11 @@ export interface OpsConfig {
   nameApp: string;
   workerPythonBaseUrl: string;
   workerPythonRequestTimeoutSeconds: number;
+  workerNodeBaseUrl: string;
+  workerNodeRequestTimeoutSeconds: number;
+  rssStatusPollIntervalSeconds: number;
+  rssToleratedConsecutiveStatusFailures: number;
+  rssJobTimeoutHours: number;
   dbManagerBackupTimeoutSeconds: number;
   dbManagerDeleteArticlesTimeoutSeconds: number;
   pathToLogs: string;
@@ -69,6 +74,20 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
       env,
       'WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS'
     ),
+    workerNodeBaseUrl: requiredHttpUrl(env, 'URL_BASE_NEWS_NEXUS_WORKER_NODE'),
+    workerNodeRequestTimeoutSeconds: requiredPositiveInteger(
+      env,
+      'WORKER_NODE_REQUEST_TIMEOUT_SECONDS'
+    ),
+    rssStatusPollIntervalSeconds: requiredPositiveInteger(
+      env,
+      'RSS_STATUS_POLL_INTERVAL_SECONDS'
+    ),
+    rssToleratedConsecutiveStatusFailures: requiredPositiveInteger(
+      env,
+      'RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES'
+    ),
+    rssJobTimeoutHours: requiredPositiveInteger(env, 'RSS_JOB_TIMEOUT_HOURS'),
     dbManagerBackupTimeoutSeconds: requiredPositiveInteger(
       env,
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS'

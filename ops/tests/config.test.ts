@@ -10,6 +10,11 @@ const validEnvironment = (): NodeJS.ProcessEnv => ({
   NAME_APP: 'newsnexus12-weekly-pipeline',
   URL_BASE_NEWS_NEXUS_PYTHON_QUEUER: 'http://127.0.0.1:5000/',
   WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS: '90',
+  URL_BASE_NEWS_NEXUS_WORKER_NODE: 'http://127.0.0.1:3002/',
+  WORKER_NODE_REQUEST_TIMEOUT_SECONDS: '60',
+  RSS_STATUS_POLL_INTERVAL_SECONDS: '300',
+  RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES: '2',
+  RSS_JOB_TIMEOUT_HOURS: '24',
   DB_MANAGER_BACKUP_TIMEOUT_SECONDS: '1800',
   DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS: '1800',
   PATH_TO_LOGS: './logs'
@@ -23,6 +28,11 @@ describe('parseOpsConfig', () => {
     assert.equal(config.nameApp, 'newsnexus12-weekly-pipeline');
     assert.equal(config.workerPythonBaseUrl, 'http://127.0.0.1:5000/');
     assert.equal(config.workerPythonRequestTimeoutSeconds, 90);
+    assert.equal(config.workerNodeBaseUrl, 'http://127.0.0.1:3002/');
+    assert.equal(config.workerNodeRequestTimeoutSeconds, 60);
+    assert.equal(config.rssStatusPollIntervalSeconds, 300);
+    assert.equal(config.rssToleratedConsecutiveStatusFailures, 2);
+    assert.equal(config.rssJobTimeoutHours, 24);
     assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
     assert.equal(config.dbManagerDeleteArticlesTimeoutSeconds, 1800);
     assert.equal(config.pathToLogs, path.join(baseDirectory, 'logs'));
@@ -52,6 +62,11 @@ describe('parseOpsConfig', () => {
       'NAME_APP',
       'URL_BASE_NEWS_NEXUS_PYTHON_QUEUER',
       'WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS',
+      'URL_BASE_NEWS_NEXUS_WORKER_NODE',
+      'WORKER_NODE_REQUEST_TIMEOUT_SECONDS',
+      'RSS_STATUS_POLL_INTERVAL_SECONDS',
+      'RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      'RSS_JOB_TIMEOUT_HOURS',
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS',
       'DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS',
       'PATH_TO_LOGS'
@@ -96,6 +111,28 @@ describe('parseOpsConfig', () => {
         () => parseOpsConfig(env, baseDirectory),
         /WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS/
       );
+    }
+  });
+
+  it('validates the worker-node URL and Phase 4 numeric settings', () => {
+    const urlEnvironment = validEnvironment();
+    urlEnvironment.URL_BASE_NEWS_NEXUS_WORKER_NODE = 'file:///tmp/worker';
+    assert.throws(
+      () => parseOpsConfig(urlEnvironment, baseDirectory),
+      /URL_BASE_NEWS_NEXUS_WORKER_NODE/
+    );
+
+    for (const key of [
+      'WORKER_NODE_REQUEST_TIMEOUT_SECONDS',
+      'RSS_STATUS_POLL_INTERVAL_SECONDS',
+      'RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      'RSS_JOB_TIMEOUT_HOURS'
+    ]) {
+      for (const value of ['0', '-1', '1.5', 'not-a-number']) {
+        const env = validEnvironment();
+        env[key] = value;
+        assert.throws(() => parseOpsConfig(env, baseDirectory), new RegExp(key));
+      }
     }
   });
 

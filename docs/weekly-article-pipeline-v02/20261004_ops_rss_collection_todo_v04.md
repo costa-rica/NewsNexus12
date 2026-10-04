@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:18:42Z
+updated_at: 2026-10-04T19:21:32Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -53,36 +53,36 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 3: Build the Worker-Node RSS Client
 
-- [ ] Add the worker-node base URL and validated Phase 4 settings to `OpsConfig` and `ops/.env.example`.
-- [ ] Configure a 5-minute poll interval, 60-second per-request timeout, 2 tolerated consecutive transient status failures, and 24-hour per-job limit.
-- [ ] Add typed request and response parsing for `POST /request-google-rss/start-job`.
-- [ ] Omit `targetArticlesAddedCount` and use the worker's default 72-hour repeat window.
-- [ ] Add typed status parsing for `GET /queue-info/check-status/:jobId`.
-- [ ] Require the RSS endpoint name and valid `createdAt`; require valid `endedAt` for terminal jobs.
-- [ ] Reject a saved job created before Phase 4 started or belonging to another endpoint.
-- [ ] Add typed cancellation parsing for `POST /queue-info/cancel_job/:jobId`.
-- [ ] Accept only `canceled` and `cancel_requested` as successful cancellation responses.
-- [ ] When cancellation reports the job missing, perform one follow-up status lookup.
-- [ ] Treat follow-up status 404 as unavailable and replacement-eligible.
-- [ ] Treat a follow-up terminal status as confirmed inactive and replacement-eligible, but never trust its late result.
-- [ ] Treat an unverified follow-up lookup as a stop condition without replacement.
-- [ ] Distinguish transient failures, permanent failures, malformed responses, unsuccessful results, job timeouts, cancellation failures, and unverified outcomes.
-- [ ] Add deterministic clock and delay dependencies so polling and 24-hour behavior can be tested without real waiting.
-- [ ] Test non-overlapping polling and reset of the transient-failure counter after a valid response.
-- [ ] Test stopping on the third consecutive transient failure.
-- [ ] Test `queued`, `running`, `completed`, `failed`, and `canceled` statuses.
-- [ ] Test `queries_exhausted`, `error`, `rate_limited`, and invalid `target_articles_collected` results.
-- [ ] Test duration with `endedAt - createdAt` below, exactly at, and above 24 hours.
-- [ ] Test queued cancellation, active cancellation, verified terminal cancellation, and failed cancellation.
-- [ ] Test all three missing-job follow-up outcomes: 404, terminal status, and unverified lookup.
-- [ ] Confirm detailed worker `queryResults` are not returned for persistence.
-- [ ] Add every new compiled ops test file to the explicit test-file list in `ops/package.json`.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm -C worker-node run build` and `npm -C worker-node test` to verify the consumed contract remains valid.
-- [ ] Review the diff for unrelated changes.
-- [ ] Check off completed Phase 3 tasks and commit the RSS client changes using the repository commit-message guidance.
+- [x] Add the worker-node base URL and validated Phase 4 settings to `OpsConfig` and `ops/.env.example`.
+- [x] Configure a 5-minute poll interval, 60-second per-request timeout, 2 tolerated consecutive transient status failures, and 24-hour per-job limit.
+- [x] Add typed request and response parsing for `POST /request-google-rss/start-job`.
+- [x] Omit `targetArticlesAddedCount` and use the worker's default 72-hour repeat window.
+- [x] Add typed status parsing for `GET /queue-info/check-status/:jobId`.
+- [x] Require the RSS endpoint name and valid `createdAt`; require valid `endedAt` for terminal jobs.
+- [x] Reject a saved job created before Phase 4 started or belonging to another endpoint.
+- [x] Add typed cancellation parsing for `POST /queue-info/cancel_job/:jobId`.
+- [x] Accept only `canceled` and `cancel_requested` as successful cancellation responses.
+- [x] When cancellation reports the job missing, perform one follow-up status lookup.
+- [x] Treat follow-up status 404 as unavailable and replacement-eligible.
+- [x] Treat a follow-up terminal status as confirmed inactive and replacement-eligible, but never trust its late result.
+- [x] Treat an unverified follow-up lookup as a stop condition without replacement.
+- [x] Distinguish transient failures, permanent failures, malformed responses, unsuccessful results, job timeouts, cancellation failures, and unverified outcomes.
+- [x] Add deterministic clock and delay dependencies so polling and 24-hour behavior can be tested without real waiting.
+- [x] Test non-overlapping polling and reset of the transient-failure counter after a valid response.
+- [x] Test stopping on the third consecutive transient failure.
+- [x] Test `queued`, `running`, `completed`, `failed`, and `canceled` statuses.
+- [x] Test `queries_exhausted`, `error`, `rate_limited`, and invalid `target_articles_collected` results.
+- [x] Test duration with `endedAt - createdAt` below, exactly at, and above 24 hours.
+- [x] Test queued cancellation, active cancellation, verified terminal cancellation, and failed cancellation.
+- [x] Test all three missing-job follow-up outcomes: 404, terminal status, and unverified lookup.
+- [x] Confirm detailed worker `queryResults` are not returned for persistence.
+- [x] Add every new compiled ops test file to the explicit test-file list in `ops/package.json`.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm -C worker-node run build` and `npm -C worker-node test` to verify the consumed contract remains valid.
+- [x] Review the diff for unrelated changes.
+- [x] Check off completed Phase 3 tasks and commit the RSS client changes using the repository commit-message guidance.
 
 ## Phase 4: Implement the Independently Runnable Phase Module
 
