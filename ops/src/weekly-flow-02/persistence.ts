@@ -5,11 +5,97 @@ export type JsonRecord = Record<string, unknown>;
 export const GOOGLE_NEWS_RSS_SOURCE_NAME = 'Google News RSS';
 
 export class WeeklyFlowPersistenceError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'WeeklyFlowPersistenceError';
   }
 }
+
+const usersTableSqlPattern =
+  /(?:\bfrom|\bjoin|\bupdate|\binto|\breferences|\btable|\brelation)\s+(?:["'`]?public["'`]?\.)?["'`]?users["'`]?(?!\w)/i;
+
+const ownPropertyEntries = (value: object): Array<[string, unknown]> =>
+  Object.getOwnPropertyNames(value).map((property) => {
+    try {
+      return [property, (value as Record<string, unknown>)[property]];
+    } catch (error: unknown) {
+      return [
+        property,
+        `[property read failed: ${error instanceof Error ? error.message : String(error)}]`
+      ];
+    }
+  });
+
+const referencesUsersTable = (
+  value: unknown,
+  seen: Set<object> = new Set(),
+  key?: string
+): boolean => {
+  if (typeof value === 'string') {
+    if (
+      (key === 'table' || key === 'tableName' || key === 'relation') &&
+      /^(?:public\.)?users$/i.test(value)
+    ) {
+      return true;
+    }
+    return usersTableSqlPattern.test(value) || /relation\s+["'`]users["'`]/i.test(value);
+  }
+  if (typeof value !== 'object' || value === null || seen.has(value)) return false;
+  seen.add(value);
+  if (value instanceof Error) {
+    if (referencesUsersTable(value.message, seen, 'message')) return true;
+    if (referencesUsersTable(value.stack, seen, 'stack')) return true;
+  }
+  return ownPropertyEntries(value).some(([entryKey, entryValue]) =>
+    referencesUsersTable(entryValue, seen, entryKey)
+  );
+};
+
+const serializeDiagnosticValue = (
+  value: unknown,
+  seen: Set<object> = new Set()
+): unknown => {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (typeof value === 'bigint') return value.toString();
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object') return String(value);
+  if (seen.has(value)) return '[circular]';
+  seen.add(value);
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.map((item) => serializeDiagnosticValue(item, seen));
+  }
+  const serialized: Record<string, unknown> = {};
+  if (value instanceof Error) {
+    serialized.name = value.name;
+    serialized.message = value.message;
+    if (value.stack !== undefined) serialized.stack = value.stack;
+  }
+  for (const [entryKey, entryValue] of ownPropertyEntries(value)) {
+    serialized[entryKey] = serializeDiagnosticValue(entryValue, seen);
+  }
+  return serialized;
+};
+
+export const persistenceErrorDiagnostics = (
+  error: unknown
+): Record<string, unknown> => {
+  if (!(error instanceof WeeklyFlowPersistenceError) || error.cause === undefined) return {};
+  if (referencesUsersTable(error.cause)) {
+    return {
+      databaseErrorSuppressed: true,
+      databaseErrorSuppressionReason: 'Error references the Users table'
+    };
+  }
+  return { databaseError: serializeDiagnosticValue(error.cause) };
+};
 
 export interface WeeklyFlowRunRecord {
   id: number;

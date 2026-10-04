@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { OpsConfig } from '../../src/config';
 import type { CoordinatorLogger } from '../../src/weekly-flow-02/coordinator';
 import { executeWeeklyFlow02 } from '../../src/weekly-flow-02/entrypoint';
+import { WeeklyFlowPersistenceError } from '../../src/weekly-flow-02/persistence';
 import { createInMemoryPersistence } from './persistenceTestSupport';
 
 const config: OpsConfig = {
@@ -114,5 +115,44 @@ describe('executeWeeklyFlow02', () => {
       'close',
       'finish-log'
     ]);
+  });
+
+  it('logs database diagnostics when persistence initialization fails', async () => {
+    const entries: Array<{ message: string; metadata?: Record<string, unknown> }> = [];
+    const recordingLogger: CoordinatorLogger = {
+      info: () => undefined,
+      error: (message, metadata) => entries.push({ message, metadata })
+    };
+    const databaseError = Object.assign(new Error('connection refused'), {
+      code: 'ECONNREFUSED',
+      address: '127.0.0.1',
+      port: 5432
+    });
+    const persistenceError = new WeeklyFlowPersistenceError(
+      'Weekly flow persistence initialization failed',
+      { cause: databaseError }
+    );
+
+    await assert.rejects(
+      executeWeeklyFlow02([], {
+        loadConfiguration: () => config,
+        initializeLog: () => recordingLogger,
+        loadPersistence: async () => {
+          throw persistenceError;
+        },
+        finishLog: async () => undefined
+      }),
+      persistenceError
+    );
+
+    assert.equal(entries[0]?.message, 'Weekly pipeline persistence initialization failed');
+    assert.deepEqual(entries[0]?.metadata?.databaseError, {
+      name: 'Error',
+      message: 'connection refused',
+      stack: databaseError.stack,
+      code: 'ECONNREFUSED',
+      address: '127.0.0.1',
+      port: 5432
+    });
   });
 });

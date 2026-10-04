@@ -24,6 +24,7 @@ import {
   GOOGLE_NEWS_RSS_ENDPOINT_NAME,
   GoogleNewsRssClientError
 } from '../../src/weekly-flow-02/phases/04_googleNewsRssClient';
+import { WeeklyFlowPersistenceError } from '../../src/weekly-flow-02/persistence';
 import { createInMemoryPersistence, createRunRecord } from './persistenceTestSupport';
 
 interface LogEntry {
@@ -306,6 +307,41 @@ describe('requestClearDuplicateAnalyses', () => {
 });
 
 describe('runCoordinator', () => {
+  it('logs structured database details when latest-run selection fails', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence();
+    const databaseError = Object.assign(new Error('column does not exist'), {
+      code: '42703',
+      table: 'WeeklyArticleFlowRuns02',
+      column: 'articleIdHighWaterMark'
+    });
+    const persistenceError = new WeeklyFlowPersistenceError(
+      'Latest weekly flow run lookup failed',
+      { cause: databaseError }
+    );
+    memory.persistence.getLatestRun = async () => {
+      throw persistenceError;
+    };
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, { persistence: memory.persistence }),
+      persistenceError
+    );
+
+    const failure = entries.find((entry) =>
+      entry.message.startsWith('Weekly pipeline run selection failed')
+    );
+    assert.equal(failure?.metadata?.failureCategory, 'persistence');
+    assert.deepEqual(failure?.metadata?.databaseError, {
+      name: 'Error',
+      message: 'column does not exist',
+      stack: databaseError.stack,
+      code: '42703',
+      table: 'WeeklyArticleFlowRuns02',
+      column: 'articleIdHighWaterMark'
+    });
+  });
+
   it('runs Phases 1 through 4 in order and stops at the Phase 5 boundary', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));

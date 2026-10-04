@@ -7,6 +7,7 @@ import {
 import {
   GOOGLE_NEWS_RSS_SOURCE_NAME,
   WeeklyFlowPersistenceError,
+  persistenceErrorDiagnostics,
   type PhaseFourDataStore,
   type WeeklyFlowRunRecord
 } from '../../src/weekly-flow-02/persistence';
@@ -365,19 +366,58 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     assert.deepEqual(completed.lastError, failed.lastError);
   });
 
-  it('does not expose database error details through the adapter boundary', async () => {
+  it('keeps a concise adapter message while preserving the database error cause', async () => {
     const fixture = mockModel();
+    const databaseError = Object.assign(new Error('column does not exist'), {
+      code: '42703',
+      table: 'WeeklyArticleFlowRuns02',
+      column: 'articleIdHighWaterMark',
+      sql: 'SELECT "articleIdHighWaterMark" FROM "WeeklyArticleFlowRuns02"'
+    });
     fixture.model.findOne = async () => {
-      throw new Error('connection failed PG_PASSWORD=do-not-log');
+      throw databaseError;
     };
     const persistence = createSequelizeWeeklyFlowPersistence(fixture.model);
 
     await assert.rejects(persistence.getLatestRun(), (error: unknown) => {
       assert.ok(error instanceof WeeklyFlowPersistenceError);
       assert.equal(error.message, 'Latest weekly flow run lookup failed');
-      assert.doesNotMatch(error.message, /PG_PASSWORD|do-not-log/);
+      assert.equal(error.cause, databaseError);
+      assert.deepEqual(persistenceErrorDiagnostics(error).databaseError, {
+        name: 'Error',
+        message: 'column does not exist',
+        stack: databaseError.stack,
+        code: '42703',
+        table: 'WeeklyArticleFlowRuns02',
+        column: 'articleIdHighWaterMark',
+        sql: 'SELECT "articleIdHighWaterMark" FROM "WeeklyArticleFlowRuns02"'
+      });
       return true;
     });
+  });
+
+  it('suppresses all database details when an error references the Users table', () => {
+    for (const databaseError of [
+      Object.assign(new Error('duplicate key'), {
+        table: 'Users',
+        detail: 'Key (email)=(private@example.test) already exists'
+      }),
+      Object.assign(new Error('query failed'), {
+        sql: 'SELECT email, password FROM "public"."Users" WHERE id = 4',
+        parameters: ['private@example.test']
+      })
+    ]) {
+      const error = new WeeklyFlowPersistenceError('Database operation failed', {
+        cause: databaseError
+      });
+      const diagnostics = persistenceErrorDiagnostics(error);
+
+      assert.deepEqual(diagnostics, {
+        databaseErrorSuppressed: true,
+        databaseErrorSuppressionReason: 'Error references the Users table'
+      });
+      assert.doesNotMatch(JSON.stringify(diagnostics), /private@example\.test|password/i);
+    }
   });
 });
 

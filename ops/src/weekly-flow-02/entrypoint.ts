@@ -5,7 +5,10 @@ import {
   runCoordinator,
   type CoordinatorLogger
 } from './coordinator';
-import type { WeeklyFlowPersistence } from './persistence';
+import {
+  persistenceErrorDiagnostics,
+  type WeeklyFlowPersistence
+} from './persistence';
 import {
   loadWeeklyFlowPersistence,
   type LoadedWeeklyFlowPersistence
@@ -47,7 +50,15 @@ export async function executeWeeklyFlow02(
 
   try {
     const invocation = dependencies.parseInvocation(args);
-    loadedPersistence = await dependencies.loadPersistence();
+    try {
+      loadedPersistence = await dependencies.loadPersistence();
+    } catch (error: unknown) {
+      logger.error('Weekly pipeline persistence initialization failed', {
+        error: error instanceof Error ? error.message : String(error),
+        ...persistenceErrorDiagnostics(error)
+      });
+      throw error;
+    }
     await dependencies.run(logger, config, {
       persistence: loadedPersistence.persistence,
       invocation

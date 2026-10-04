@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-03T20:58:55Z
+updated_at: 2026-10-04T19:56:05Z
 created_by: codex (gpt-6) nicksmacbookair
-modified_by: codex (gpt-6) nicksmacbookair
+modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
 
 # NewsNexus12 Operations
@@ -167,6 +167,8 @@ Phase 4 is not implemented. Every current run remains incomplete after Phase 3. 
 - The backup reads tables sequentially. An Article inserted after its table is exported but before Phase 3 can be deleted without appearing in that backup.
 - A replacement run begins again at Phase 1 and creates another full backup before retrying Phase 3. There is no automatic retry.
 - A manual operator sees failure in terminal output, the nonzero process exit status, and the configured coordinator log.
+- Persistence failures keep a concise terminal message and write the complete nested Sequelize/PostgreSQL diagnostic to the protected coordinator log, including stack, SQL, parameters, and database metadata when supplied by the driver.
+- If any nested database error references the `Users` table through table metadata or SQL, the coordinator suppresses the entire database diagnostic. The log records that `Users` details were suppressed.
 - A Phase 1 timeout leaves the worker outcome unverified. Check worker and database state before rerunning.
 
 ### Safe verification

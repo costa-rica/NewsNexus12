@@ -26,6 +26,7 @@ import { GoogleNewsRssClientError } from './phases/04_googleNewsRssClient';
 import type { WeeklyFlowInvocation } from './cli';
 import {
   WeeklyFlowPersistenceError,
+  persistenceErrorDiagnostics,
   type JsonRecord,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
@@ -113,7 +114,8 @@ const recordFailure = async (
     logger.error('Weekly pipeline failure could not be persisted', {
       runId,
       phase,
-      error: failureMessage(persistenceError)
+      error: failureMessage(persistenceError),
+      ...persistenceErrorDiagnostics(persistenceError)
     });
     throw persistenceError;
   }
@@ -165,7 +167,17 @@ export async function runCoordinator(
   const rssWorker = dependencies.rssWorker ?? createGoogleNewsRssWorker(config, request);
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
-  const selection = await selectOrCreateRun(persistence, invocation, now);
+  let selection;
+  try {
+    selection = await selectOrCreateRun(persistence, invocation, now);
+  } catch (error: unknown) {
+    logger.error('Weekly pipeline run selection failed', {
+      failureCategory: error instanceof WeeklyFlowPersistenceError ? 'persistence' : 'unknown',
+      error: failureMessage(error),
+      ...persistenceErrorDiagnostics(error)
+    });
+    throw error;
+  }
   let activeRun = selection.run;
   const runId = activeRun.id;
   logger.info(selection.continued ? 'Continuing weekly pipeline run' : 'Starting new weekly pipeline run', {
@@ -200,7 +212,8 @@ export async function runCoordinator(
         phase: 1,
         failureCategory:
           error instanceof ClearDuplicateAnalysesError ? error.category : 'unknown',
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        ...persistenceErrorDiagnostics(error)
       });
       await recordFailure(persistence, logger, runId, 1, error, now);
       throw error;
@@ -236,7 +249,8 @@ export async function runCoordinator(
         phase: 2,
         failureCategory:
           error instanceof CreateDatabaseBackupError ? error.category : 'unknown',
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        ...persistenceErrorDiagnostics(error)
       });
       await recordFailure(persistence, logger, runId, 2, error, now);
       throw error;
@@ -269,7 +283,8 @@ export async function runCoordinator(
         phase: 3,
         failureCategory:
           error instanceof DeleteOldArticlesError ? error.category : 'unknown',
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        ...persistenceErrorDiagnostics(error)
       });
       await recordFailure(persistence, logger, runId, 3, error, now);
       throw error;
@@ -311,7 +326,8 @@ export async function runCoordinator(
       runId,
       phase: 4,
       failureCategory: phaseFailureCategory(4, error),
-      error: failureMessage(error)
+      error: failureMessage(error),
+      ...persistenceErrorDiagnostics(error)
     });
     await recordFailure(persistence, logger, runId, 4, error, now);
     throw error;

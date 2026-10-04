@@ -45,7 +45,7 @@ const performPersistenceOperation = async <Result>(
     return await operation();
   } catch (error: unknown) {
     if (error instanceof WeeklyFlowPersistenceError) throw error;
-    throw new WeeklyFlowPersistenceError(failureMessage);
+    throw new WeeklyFlowPersistenceError(failureMessage, { cause: error });
   }
 };
 
@@ -631,8 +631,10 @@ export async function loadWeeklyFlowPersistence(): Promise<LoadedWeeklyFlowPersi
     };
   } catch (error: unknown) {
     if (error instanceof Error && /^Missing required environment variable: PG_/.test(error.message)) {
-      throw new WeeklyFlowPersistenceError(error.message);
+      throw new WeeklyFlowPersistenceError(error.message, { cause: error });
     }
-    throw new WeeklyFlowPersistenceError('Weekly flow persistence initialization failed');
+    throw new WeeklyFlowPersistenceError('Weekly flow persistence initialization failed', {
+      cause: error
+    });
   }
 }
