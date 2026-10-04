@@ -275,6 +275,36 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     });
   });
 
+  it('preserves an earlier RSS-added count during zero-work completion', async () => {
+    const run = mockRun({
+      id: 11,
+      lastPhaseStarted: 4,
+      lastPhaseCompleted: 3,
+      newsApiRequestIdHighWaterMark: 20,
+      articleIdHighWaterMark: 40,
+      rssArticlesAddedCount: 8,
+      phaseData: { phase4: { status: 'started' } }
+    });
+    const fixture = mockModel([run]);
+    const persistence = createSequelizeWeeklyFlowPersistence(fixture.model);
+
+    const completed = await persistence.recordPhaseFourZeroWorkCompletion(
+      11,
+      new Date('2026-10-04T12:30:00.000Z'),
+      { endingReason: 'queries_exhausted' },
+      {
+        firstRssRequestId: null,
+        firstRssArticleId: null,
+        rssArticlesAddedCount: 0,
+        rssJobId: 'job-11'
+      }
+    );
+
+    assert.equal(completed.articleCount, 0);
+    assert.equal(completed.rssArticlesAddedCount, 8);
+    assert.equal(completed.runCompleted, true);
+  });
+
   it('leaves both Phase 4 and the run incomplete when zero-work update fails', async () => {
     const run = mockRun({
       id: 10,

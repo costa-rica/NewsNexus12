@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:21:32Z
+updated_at: 2026-10-04T19:24:05Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -86,29 +86,29 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 4: Implement the Independently Runnable Phase Module
 
-- [ ] Add the Phase 4 module under `ops/src/weekly-flow-02/phases/` with focused functions and descriptive types.
-- [ ] Accept selected run state, configuration, persistence operations, worker client, clock, and delay through explicit dependencies.
-- [ ] Reuse an existing saved job before starting another.
-- [ ] Monitor an on-time queued or running job.
-- [ ] Process only an on-time `completed` job with `endingReason = queries_exhausted` as verified success.
-- [ ] Treat individual query failures or empty results as nonfatal when the overall result is `queries_exhausted`.
-- [ ] Treat `error`, `rate_limited`, `failed`, `worker_restart`, and `canceled` as unsuccessful or unverified.
-- [ ] Cancel a queued or running job after it exceeds 24 hours.
-- [ ] After `cancel_requested`, wait one poll interval and verify the job is no longer active.
-- [ ] Never trust a timed-out job's result, including a late successful result.
-- [ ] Apply the missing-job follow-up branches from PRD V10 before deciding replacement eligibility.
-- [ ] Start one replacement only after the earlier job is confirmed inactive and the invocation has not already started an RSS job.
-- [ ] Stop after verified cancellation when the current invocation originally started the timed-out job.
-- [ ] Use existing repeat suppression for replacements; do not add coordinator deduplication or idempotency keys.
-- [ ] After verified success, recover RSS markers and calculate the broad Article count from PostgreSQL.
-- [ ] Return a typed zero-work or nonzero result without exposing detailed query history.
-- [ ] Add module tests for saved-job monitoring, result recovery, cancellation, every follow-up lookup branch, replacement eligibility, one-start enforcement, worker restart, zero-result replacement, and both count outcomes.
-- [ ] Add every new compiled module test file to the explicit test-file list in `ops/package.json`.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Review the diff for unrelated changes.
-- [ ] Check off completed Phase 4 tasks and commit the Phase 4 module using the repository commit-message guidance.
+- [x] Add the Phase 4 module under `ops/src/weekly-flow-02/phases/` with focused functions and descriptive types.
+- [x] Accept selected run state, configuration, persistence operations, worker client, clock, and delay through explicit dependencies.
+- [x] Reuse an existing saved job before starting another.
+- [x] Monitor an on-time queued or running job.
+- [x] Process only an on-time `completed` job with `endingReason = queries_exhausted` as verified success.
+- [x] Treat individual query failures or empty results as nonfatal when the overall result is `queries_exhausted`.
+- [x] Treat `error`, `rate_limited`, `failed`, `worker_restart`, and `canceled` as unsuccessful or unverified.
+- [x] Cancel a queued or running job after it exceeds 24 hours.
+- [x] After `cancel_requested`, wait one poll interval and verify the job is no longer active.
+- [x] Never trust a timed-out job's result, including a late successful result.
+- [x] Apply the missing-job follow-up branches from PRD V10 before deciding replacement eligibility.
+- [x] Start one replacement only after the earlier job is confirmed inactive and the invocation has not already started an RSS job.
+- [x] Stop after verified cancellation when the current invocation originally started the timed-out job.
+- [x] Use existing repeat suppression for replacements; do not add coordinator deduplication or idempotency keys.
+- [x] After verified success, recover RSS markers and calculate the broad Article count from PostgreSQL.
+- [x] Return a typed zero-work or nonzero result without exposing detailed query history.
+- [x] Add module tests for saved-job monitoring, result recovery, cancellation, every follow-up lookup branch, replacement eligibility, one-start enforcement, worker restart, zero-result replacement, and both count outcomes.
+- [x] Add every new compiled module test file to the explicit test-file list in `ops/package.json`.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Review the diff for unrelated changes.
+- [x] Check off completed Phase 4 tasks and commit the Phase 4 module using the repository commit-message guidance.
 
 ## Phase 5: Connect Phase 4 to the Coordinator
 

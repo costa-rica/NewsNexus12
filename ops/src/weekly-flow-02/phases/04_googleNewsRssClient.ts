@@ -86,6 +86,7 @@ export type GoogleNewsRssJobAssessment =
 
 export interface MonitorGoogleNewsRssJobOptions {
   getStatus: () => Promise<GoogleNewsRssJob>;
+  onStatus?: (job: GoogleNewsRssJob) => Promise<void>;
   pollIntervalMilliseconds: number;
   toleratedConsecutiveFailures: number;
   jobTimeoutMilliseconds: number;
@@ -425,6 +426,7 @@ export const monitorGoogleNewsRssJob = async (
     try {
       job = await options.getStatus();
       consecutiveFailures = 0;
+      await options.onStatus?.(job);
     } catch (error: unknown) {
       if (!(error instanceof GoogleNewsRssClientError) || error.category !== 'transient_request') {
         throw error;

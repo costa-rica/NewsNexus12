@@ -195,7 +195,10 @@ export const createInMemoryPersistence = (
       run.lastPhaseCompleted = 4;
       run.firstRssRequestId = fields.firstRssRequestId;
       run.firstRssArticleId = fields.firstRssArticleId;
-      run.rssArticlesAddedCount = fields.rssArticlesAddedCount;
+      run.rssArticlesAddedCount =
+        fields.rssArticlesAddedCount === null
+          ? run.rssArticlesAddedCount
+          : Math.max(run.rssArticlesAddedCount ?? 0, fields.rssArticlesAddedCount);
       run.articleCount = 0;
       run.rssJobId = fields.rssJobId;
       run.runCompleted = true;

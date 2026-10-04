@@ -546,15 +546,14 @@ export const createSequelizeWeeklyFlowPersistence = (
           'Zero-work completion cannot contain a first RSS Article ID'
         );
       }
-      const rssArticlesAddedCount = asNullableNonNegativeSafeInteger(
+      const reportedRssCount = asNullableNonNegativeSafeInteger(
         fields.rssArticlesAddedCount,
         'rssArticlesAddedCount'
       );
-      if ((rssArticlesAddedCount ?? 0) > 0) {
-        throw new WeeklyFlowPersistenceError(
-          'Zero-work completion cannot contain a positive RSS-added count'
-        );
-      }
+      const rssArticlesAddedCount =
+        reportedRssCount === null
+          ? run.rssArticlesAddedCount
+          : Math.max(run.rssArticlesAddedCount ?? 0, reportedRssCount);
       const rssJobId = requireNonEmptyString(fields.rssJobId ?? '', 'rssJobId');
       await run.update({
         firstRssRequestId,
