@@ -18,6 +18,9 @@ import {
   type PhaseFourProgress,
   type PhaseFiveProgress,
   type PhaseFiveCompletionFields,
+  type PhaseSixCompletionFields,
+  type PhaseSixIncompatibleContractRecovery,
+  type PhaseSixProgress,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
   WeeklyFlowPersistenceError,
@@ -112,6 +115,20 @@ const requireTimestampString = (value: string, fieldName: string): string => {
     throw new WeeklyFlowPersistenceError(`${fieldName} must be a valid timestamp`);
   }
   return timestamp;
+};
+
+const requirePositiveSafeInteger = (value: unknown, fieldName: string): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a positive safe integer`);
+  }
+  return value;
+};
+
+const requireNonnegativeSafeInteger = (value: unknown, fieldName: string): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a non-negative safe integer`);
+  }
+  return value;
 };
 
 export const createSequelizePhaseFourDataStore = (
@@ -266,6 +283,12 @@ const assertPhaseFiveInProgress = (run: WeeklyFlowRunInstance): void => {
   }
 };
 
+const assertPhaseSixInProgress = (run: WeeklyFlowRunInstance): void => {
+  if (run.runCompleted || run.lastPhaseStarted !== 6 || (run.lastPhaseCompleted ?? 0) !== 5) {
+    throw new WeeklyFlowPersistenceError('Phase 6 is not the active incomplete phase');
+  }
+};
+
 const phaseRecord = (phaseData: unknown, phase: WeeklyFlowPhase): JsonRecord => {
   const value = asJsonRecord(phaseData)[phaseKey(phase)];
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -286,6 +309,86 @@ const requirePhaseFourMarks = (run: WeeklyFlowRunInstance): PhaseFourHighWaterMa
     throw new WeeklyFlowPersistenceError('Phase 4 high-water marks are missing');
   }
   return { newsApiRequestIdHighWaterMark, articleIdHighWaterMark };
+};
+
+const requirePhaseSixInputs = (run: WeeklyFlowRunInstance): {
+  targetArticleStateReviewCount: number;
+  targetArticleThresholdDaysOld: number;
+} => {
+  const targetArticleStateReviewCount = requirePositiveSafeInteger(
+    run.articleCount,
+    'Phase 6 articleCount'
+  );
+  const targetArticleThresholdDaysOld = requirePositiveSafeInteger(
+    run.targetArticleThresholdDaysOld,
+    'Phase 6 targetArticleThresholdDaysOld'
+  );
+  const input = phaseRecord(run.phaseData, 6).input;
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new WeeklyFlowPersistenceError('Phase 6 input audit mirror is missing');
+  }
+  const mirror = input as JsonRecord;
+  if (
+    mirror.targetArticleStateReviewCount !== targetArticleStateReviewCount ||
+    mirror.targetArticleThresholdDaysOld !== targetArticleThresholdDaysOld
+  ) {
+    throw new WeeklyFlowPersistenceError('Phase 6 input audit mirror does not match its columns');
+  }
+  return { targetArticleStateReviewCount, targetArticleThresholdDaysOld };
+};
+
+const serializePhaseSixIncompatibleRecovery = (
+  recovery: PhaseSixIncompatibleContractRecovery
+): JsonRecord => {
+  requireValidDate(recovery.detectedAt, 'Phase 6 incompatible-contract detection time');
+  if (recovery.cancellationRequestedAt) {
+    requireValidDate(
+      recovery.cancellationRequestedAt,
+      'Phase 6 incompatible-contract cancellation time'
+    );
+  }
+  if (recovery.replacementStartedAt) {
+    requireValidDate(
+      recovery.replacementStartedAt,
+      'Phase 6 incompatible-contract replacement time'
+    );
+  }
+  if (
+    !Array.isArray(recovery.missingParameterFields) ||
+    recovery.missingParameterFields.length === 0 ||
+    recovery.missingParameterFields.some(
+      (field) => typeof field !== 'string' || field.trim() === ''
+    )
+  ) {
+    throw new WeeklyFlowPersistenceError(
+      'Phase 6 incompatible-contract missing fields must be non-empty strings'
+    );
+  }
+  return {
+    sourceJobId: requireNonEmptyString(recovery.sourceJobId, 'sourceJobId'),
+    sourceJobCreatedAt: requireTimestampString(
+      recovery.sourceJobCreatedAt,
+      'sourceJobCreatedAt'
+    ),
+    detectedAt: recovery.detectedAt.toISOString(),
+    missingParameterFields: [...recovery.missingParameterFields],
+    lastStatus: requireNonEmptyString(recovery.lastStatus, 'lastStatus'),
+    ...(recovery.cancellationRequestedAt
+      ? { cancellationRequestedAt: recovery.cancellationRequestedAt.toISOString() }
+      : {}),
+    ...(recovery.cancellationOutcome
+      ? { cancellationOutcome: requireNonEmptyString(recovery.cancellationOutcome, 'cancellationOutcome') }
+      : {}),
+    ...(recovery.verification
+      ? { verification: asJsonRecord(recovery.verification) }
+      : {}),
+    ...(recovery.replacementStartedAt
+      ? { replacementStartedAt: recovery.replacementStartedAt.toISOString() }
+      : {}),
+    ...(recovery.replacementJobId
+      ? { replacementJobId: requireNonEmptyString(recovery.replacementJobId, 'replacementJobId') }
+      : {})
+  };
 };
 
 const mergePhaseData = (
@@ -340,6 +443,12 @@ export const createSequelizeWeeklyFlowPersistence = (
     if (phase === 4) {
       throw new WeeklyFlowPersistenceError(
         'Phase 4 must start through recordPhaseFourStarted'
+      );
+    }
+
+    if (phase === 6) {
+      throw new WeeklyFlowPersistenceError(
+        'Phase 6 must start through its dedicated persistence operation recordPhaseSixStarted'
       );
     }
     return performPersistenceOperation(`Phase ${phase} start could not be persisted`, async () => {
@@ -476,7 +585,15 @@ export const createSequelizeWeeklyFlowPersistence = (
 
   async recordPhaseCompleted(runId, phase, completedAt, phaseResult, fields = {}) {
     if (phase === 5) {
-      throw new WeeklyFlowPersistenceError('Phase 5 must complete through recordPhaseFiveCompleted');
+      throw new WeeklyFlowPersistenceError(
+        'Phase 5 must complete through recordPhaseFiveCompleted'
+      );
+    }
+
+    if (phase === 6) {
+      throw new WeeklyFlowPersistenceError(
+        'Phase 6 must complete through its dedicated persistence operation recordPhaseSixCompleted'
+      );
     }
     return performPersistenceOperation(`Phase ${phase} completion could not be persisted`, async () => {
       const run = await requireRun(model, runId);
@@ -716,6 +833,233 @@ export const createSequelizeWeeklyFlowPersistence = (
           status: 'completed',
           completedAt: completedAt.toISOString(),
           result: asJsonRecord(phaseResult)
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSixStarted(runId, startedAt, targetArticleThresholdDaysOld) {
+    requireValidDate(startedAt, 'Phase 6 start time');
+    const threshold = requirePositiveSafeInteger(
+      targetArticleThresholdDaysOld,
+      'targetArticleThresholdDaysOld'
+    );
+    return performPersistenceOperation('Phase 6 start could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertCanStartPhase(run, 6);
+      const articleCount = requirePositiveSafeInteger(run.articleCount, 'Phase 6 articleCount');
+      if (
+        run.targetArticleThresholdDaysOld !== null ||
+        phaseRecord(run.phaseData, 6).startedAt !== undefined
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 6 has already started');
+      }
+      await run.update({
+        lastPhaseStarted: 6,
+        targetArticleThresholdDaysOld: threshold,
+        phaseData: mergePhaseData(run.phaseData, 6, {
+          status: 'started',
+          startedAt: startedAt.toISOString(),
+          input: {
+            targetArticleStateReviewCount: articleCount,
+            targetArticleThresholdDaysOld: threshold
+          }
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSixProgress(runId, progress: PhaseSixProgress) {
+    requireValidDate(progress.observedAt, 'Phase 6 progress time');
+    return performPersistenceOperation('Phase 6 progress could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSixInProgress(run);
+      requirePhaseSixInputs(run);
+      const existing = phaseRecord(run.phaseData, 6);
+      if (typeof existing.startedAt !== 'string') {
+        throw new WeeklyFlowPersistenceError('Phase 6 start timestamp is missing');
+      }
+      const jobId = progress.stateAssignerJobId === undefined
+        ? run.stateAssignerJobId
+        : requireNonEmptyString(progress.stateAssignerJobId, 'stateAssignerJobId');
+      const latestProgress: JsonRecord = { observedAt: progress.observedAt.toISOString() };
+      for (const [key, value] of Object.entries({
+        jobId,
+        status: progress.status === undefined
+          ? undefined
+          : requireNonEmptyString(progress.status, 'Phase 6 status'),
+        jobCreatedAt: progress.jobCreatedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.jobCreatedAt, 'jobCreatedAt'),
+        startedAt: progress.startedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.startedAt, 'startedAt'),
+        endedAt: progress.endedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.endedAt, 'endedAt'),
+        failureReason: progress.failureReason === undefined
+          ? undefined
+          : requireNonEmptyString(progress.failureReason, 'failureReason'),
+        selectedCount: progress.selectedCount === undefined
+          ? undefined
+          : requireNonnegativeSafeInteger(progress.selectedCount, 'selectedCount')
+      })) {
+        if (value !== undefined && value !== null) latestProgress[key] = value;
+      }
+      const additions: JsonRecord = { latestProgress };
+      if (progress.monitoringLimit) {
+        const limit = progress.monitoringLimit;
+        requireValidDate(limit.reachedAt, 'Phase 6 monitoring limit time');
+        if (limit.cancellationRequestedAt) {
+          requireValidDate(limit.cancellationRequestedAt, 'Phase 6 cancellation request time');
+        }
+        additions.monitoringLimit = {
+          jobId: requireNonEmptyString(limit.jobId, 'monitoringLimit.jobId'),
+          jobCreatedAt: requireTimestampString(
+            limit.jobCreatedAt,
+            'monitoringLimit.jobCreatedAt'
+          ),
+          reachedAt: limit.reachedAt.toISOString(),
+          ...(limit.cancellationRequestedAt
+            ? { cancellationRequestedAt: limit.cancellationRequestedAt.toISOString() }
+            : {}),
+          ...(limit.cancellationOutcome
+            ? { cancellationOutcome: limit.cancellationOutcome }
+            : {}),
+          ...(limit.verification
+            ? { verification: asJsonRecord(limit.verification) }
+            : {})
+        };
+      }
+      if (progress.incompatibleContractRecovery) {
+        additions.incompatibleContractRecovery = serializePhaseSixIncompatibleRecovery(
+          progress.incompatibleContractRecovery
+        );
+      }
+      await run.update({
+        stateAssignerJobId: jobId,
+        phaseData: mergePhaseData(run.phaseData, 6, additions)
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSixIncompatibleReplacementStarted(
+    runId,
+    replacementJobId,
+    replacementStartedAt
+  ) {
+    requireValidDate(replacementStartedAt, 'Phase 6 replacement start time');
+    return performPersistenceOperation(
+      'Phase 6 incompatible-contract replacement could not be persisted',
+      async () => {
+        const run = await requireRun(model, runId);
+        assertPhaseSixInProgress(run);
+        requirePhaseSixInputs(run);
+        const phase6 = phaseRecord(run.phaseData, 6);
+        const rawMarker = phase6.incompatibleContractRecovery;
+        if (typeof rawMarker !== 'object' || rawMarker === null || Array.isArray(rawMarker)) {
+          throw new WeeklyFlowPersistenceError(
+            'Phase 6 incompatible-contract recovery marker is missing'
+          );
+        }
+        const marker = rawMarker as JsonRecord;
+        if (marker.replacementJobId !== undefined) {
+          throw new WeeklyFlowPersistenceError(
+            'Phase 6 incompatible-contract replacement was already consumed'
+          );
+        }
+        const jobId = requireNonEmptyString(replacementJobId, 'replacementJobId');
+        await run.update({
+          stateAssignerJobId: jobId,
+          phaseData: mergePhaseData(run.phaseData, 6, {
+            incompatibleContractRecovery: {
+              ...marker,
+              replacementStartedAt: replacementStartedAt.toISOString(),
+              replacementJobId: jobId
+            },
+            latestProgress: {
+              observedAt: replacementStartedAt.toISOString(),
+              jobId,
+              status: 'replacement_started'
+            }
+          })
+        });
+        return toRunRecord(run);
+      }
+    );
+  },
+
+  async recordPhaseSixCompleted(
+    runId,
+    completedAt,
+    phaseResult,
+    fields: PhaseSixCompletionFields
+  ) {
+    requireValidDate(completedAt, 'Phase 6 completion time');
+    return performPersistenceOperation('Phase 6 completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSixInProgress(run);
+      const inputs = requirePhaseSixInputs(run);
+      const jobId = requireNonEmptyString(fields.stateAssignerJobId, 'stateAssignerJobId');
+      const jobCreatedAt = requireTimestampString(fields.jobCreatedAt, 'jobCreatedAt');
+      if (run.stateAssignerJobId !== jobId) {
+        throw new WeeklyFlowPersistenceError('Phase 6 completion job does not match the saved job');
+      }
+      const phase6 = phaseRecord(run.phaseData, 6);
+      const monitoringMarker = phase6.monitoringLimit;
+      if (
+        typeof monitoringMarker === 'object' &&
+        monitoringMarker !== null &&
+        !Array.isArray(monitoringMarker)
+      ) {
+        const marker = monitoringMarker as JsonRecord;
+        if (marker.jobId === jobId && marker.jobCreatedAt === jobCreatedAt) {
+          throw new WeeklyFlowPersistenceError('A monitoring-limited job cannot complete Phase 6');
+        }
+      }
+      const incompatibleMarker = phase6.incompatibleContractRecovery;
+      if (
+        typeof incompatibleMarker === 'object' &&
+        incompatibleMarker !== null &&
+        !Array.isArray(incompatibleMarker)
+      ) {
+        const marker = incompatibleMarker as JsonRecord;
+        if (marker.sourceJobId === jobId && marker.sourceJobCreatedAt === jobCreatedAt) {
+          throw new WeeklyFlowPersistenceError('An incompatible source job cannot complete Phase 6');
+        }
+        if (marker.replacementJobId !== undefined && marker.replacementJobId !== jobId) {
+          throw new WeeklyFlowPersistenceError(
+            'Phase 6 completion job does not match the incompatible-contract replacement'
+          );
+        }
+      }
+      const result = asJsonRecord(phaseResult);
+      const selectedCount = requireNonnegativeSafeInteger(result.selectedCount, 'selectedCount');
+      const completedCount = requireNonnegativeSafeInteger(result.completedCount, 'completedCount');
+      const skippedCount = requireNonnegativeSafeInteger(result.skippedCount, 'skippedCount');
+      const failedCount = requireNonnegativeSafeInteger(result.failedCount, 'failedCount');
+      if (selectedCount !== completedCount + skippedCount + failedCount) {
+        throw new WeeklyFlowPersistenceError('Phase 6 result counts are inconsistent');
+      }
+      if (selectedCount > inputs.targetArticleStateReviewCount) {
+        throw new WeeklyFlowPersistenceError('Phase 6 selectedCount exceeds articleCount');
+      }
+      if (
+        result.targetArticleStateReviewCount !== inputs.targetArticleStateReviewCount ||
+        result.targetArticleThresholdDaysOld !== inputs.targetArticleThresholdDaysOld
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 6 result inputs do not match persisted inputs');
+      }
+      await run.update({
+        stateAssignerJobId: jobId,
+        lastPhaseCompleted: 6,
+        phaseData: mergePhaseData(run.phaseData, 6, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          result
         })
       });
       return toRunRecord(run);

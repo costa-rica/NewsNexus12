@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:03:09Z
+updated_at: 2026-10-05T23:06:52Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -144,53 +144,53 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 3: Add Protected Phase 6 Persistence
 
-- [ ] Add typed Phase 6 start, progress, monitoring-limit, incompatible-contract recovery, and completion inputs to the persistence contract.
-- [ ] Add `recordPhaseSixStarted`.
-- [ ] Require an incomplete run, completed Phase 5, positive immutable `articleCount`, and Phase 6 as next.
-- [ ] Atomically write:
-  - [ ] `lastPhaseStarted = 6`
-  - [ ] `targetArticleThresholdDaysOld = 180`
-  - [ ] `phaseData.phase6.status`
-  - [ ] `phaseData.phase6.startedAt`
-  - [ ] `phaseData.phase6.input.targetArticleStateReviewCount`
-  - [ ] `phaseData.phase6.input.targetArticleThresholdDaysOld`
-- [ ] Treat the threshold column and `articleCount` column as authoritative.
-- [ ] Validate the `phaseData.phase6.input` audit mirror against both columns on every Phase 6 persistence operation.
-- [ ] Reject repeated Phase 6 start and preserve the original start and inputs.
-- [ ] Add `recordPhaseSixProgress`.
-- [ ] Require active incomplete Phase 6 and preserve original start and input state.
-- [ ] Save a nonempty `stateAssignerJobId` immediately after start.
-- [ ] Store ordinary observations only in `phaseData.phase6.latestProgress`.
-- [ ] Preserve `startedAt`, `input`, `monitoringLimit`, `incompatibleContractRecovery`, and result during ordinary progress and failure writes.
-- [ ] Add explicit monitoring-limit marker persistence tied to job ID and validated `createdAt`.
-- [ ] Add explicit incompatible-contract marker persistence containing source identity, missing fields, detection time, lifecycle status, and cancellation evidence.
-- [ ] Add an atomic incompatible-contract replacement operation that updates both:
-  - [ ] `stateAssignerJobId`
-  - [ ] `phaseData.phase6.incompatibleContractRecovery.replacementJobId`
-- [ ] Store replacement start time in the same update.
-- [ ] Preserve the source marker after replacement.
-- [ ] Prevent a second incompatible-contract replacement after `replacementJobId` is saved.
-- [ ] Add `recordPhaseSixCompleted`.
-- [ ] Require active incomplete Phase 6, matching saved job ID, valid job `createdAt`, exact inputs, and valid result counts.
-- [ ] Reject completion by the incompatible source job.
-- [ ] Reject completion by a job matching the monitoring-limit marker.
-- [ ] Permit the marked replacement to complete only after the full contract validates.
-- [ ] Atomically save the result, set `lastPhaseCompleted = 6`, preserve `articleCount`, and keep `runCompleted = false`.
-- [ ] Make generic `recordPhaseCompleted` reject Phase 6.
-- [ ] Use the existing `stateAssignerJobId` and `targetArticleThresholdDaysOld` columns; do not change the schema.
-- [ ] Update in-memory persistence support to match production behavior.
-- [ ] Add persistence tests for protected start, audit-mirror validation, job-ID persistence, sibling preservation, both marker types, atomic replacement consumption, and completion rules.
-- [ ] Add a persistence test where saving the replacement job ID fails after the worker start response.
-- [ ] Assert that this failure does not fabricate a saved replacement ID or silently continue in the same invocation.
-- [ ] Treat the later duplicate-start possibility as the accepted gap; do not add recovery infrastructure outside the plan.
-- [ ] Run the Phase 3 checkpoint:
+- [x] Add typed Phase 6 start, progress, monitoring-limit, incompatible-contract recovery, and completion inputs to the persistence contract.
+- [x] Add `recordPhaseSixStarted`.
+- [x] Require an incomplete run, completed Phase 5, positive immutable `articleCount`, and Phase 6 as next.
+- [x] Atomically write:
+  - [x] `lastPhaseStarted = 6`
+  - [x] `targetArticleThresholdDaysOld = 180`
+  - [x] `phaseData.phase6.status`
+  - [x] `phaseData.phase6.startedAt`
+  - [x] `phaseData.phase6.input.targetArticleStateReviewCount`
+  - [x] `phaseData.phase6.input.targetArticleThresholdDaysOld`
+- [x] Treat the threshold column and `articleCount` column as authoritative.
+- [x] Validate the `phaseData.phase6.input` audit mirror against both columns on every Phase 6 persistence operation.
+- [x] Reject repeated Phase 6 start and preserve the original start and inputs.
+- [x] Add `recordPhaseSixProgress`.
+- [x] Require active incomplete Phase 6 and preserve original start and input state.
+- [x] Save a nonempty `stateAssignerJobId` immediately after start.
+- [x] Store ordinary observations only in `phaseData.phase6.latestProgress`.
+- [x] Preserve `startedAt`, `input`, `monitoringLimit`, `incompatibleContractRecovery`, and result during ordinary progress and failure writes.
+- [x] Add explicit monitoring-limit marker persistence tied to job ID and validated `createdAt`.
+- [x] Add explicit incompatible-contract marker persistence containing source identity, missing fields, detection time, lifecycle status, and cancellation evidence.
+- [x] Add an atomic incompatible-contract replacement operation that updates both:
+  - [x] `stateAssignerJobId`
+  - [x] `phaseData.phase6.incompatibleContractRecovery.replacementJobId`
+- [x] Store replacement start time in the same update.
+- [x] Preserve the source marker after replacement.
+- [x] Prevent a second incompatible-contract replacement after `replacementJobId` is saved.
+- [x] Add `recordPhaseSixCompleted`.
+- [x] Require active incomplete Phase 6, matching saved job ID, valid job `createdAt`, exact inputs, and valid result counts.
+- [x] Reject completion by the incompatible source job.
+- [x] Reject completion by a job matching the monitoring-limit marker.
+- [x] Permit the marked replacement to complete only after the full contract validates.
+- [x] Atomically save the result, set `lastPhaseCompleted = 6`, preserve `articleCount`, and keep `runCompleted = false`.
+- [x] Make generic `recordPhaseCompleted` reject Phase 6.
+- [x] Use the existing `stateAssignerJobId` and `targetArticleThresholdDaysOld` columns; do not change the schema.
+- [x] Update in-memory persistence support to match production behavior.
+- [x] Add persistence tests for protected start, audit-mirror validation, job-ID persistence, sibling preservation, both marker types, atomic replacement consumption, and completion rules.
+- [x] Add a persistence test where saving the replacement job ID fails after the worker start response.
+- [x] Assert that this failure does not fabricate a saved replacement ID or silently continue in the same invocation.
+- [x] Treat the later duplicate-start possibility as the accepted gap; do not add recovery infrastructure outside the plan.
+- [x] Run the Phase 3 checkpoint:
   1. Build `db-models`.
   2. Run the ops type check.
   3. Run the complete ops test suite.
   4. Build ops.
   5. Fix failures and repeat all checks.
-- [ ] Check off completed Phase 3 tasks.
-- [ ] Commit only Phase 3 changes and reference Phase 3 of this todo in the commit body.
+- [x] Check off completed Phase 3 tasks.
+- [x] Commit only Phase 3 changes and reference Phase 3 of this todo in the commit body.
 
 ## Phase 4: Implement the Phase 6 Module
 

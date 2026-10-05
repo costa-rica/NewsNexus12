@@ -158,6 +158,7 @@ export const createInMemoryPersistence = (
     },
     async recordPhaseCompleted(runId, phase, completedAt, phaseResult, fields = {}) {
       calls.push(`complete:${phase}`);
+      if (phase === 6) throw new Error('Phase 6 requires dedicated completion');
       const run = requireRun(runId);
       run.lastPhaseCompleted = phase;
       Object.assign(run, fields);
@@ -274,6 +275,179 @@ export const createInMemoryPersistence = (
       run.lastPhaseCompleted = 5;
       run.phaseData.phase5 = {
         ...phase5,
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        result: structuredClone(phaseResult)
+      };
+      return touch(run, completedAt);
+    },
+    async recordPhaseSixStarted(runId, startedAt, targetArticleThresholdDaysOld) {
+      calls.push('start:6');
+      const run = requireRun(runId);
+      if (run.lastPhaseStarted === 6) throw new Error('Phase 6 has already started');
+      if (run.lastPhaseCompleted !== 5 || !run.articleCount || run.articleCount <= 0) {
+        throw new Error('Phase 6 requires completed Phase 5 and positive articleCount');
+      }
+      run.lastPhaseStarted = 6;
+      run.targetArticleThresholdDaysOld = targetArticleThresholdDaysOld;
+      run.phaseData.phase6 = {
+        status: 'started',
+        startedAt: startedAt.toISOString(),
+        input: {
+          targetArticleStateReviewCount: run.articleCount,
+          targetArticleThresholdDaysOld
+        }
+      };
+      return touch(run, startedAt);
+    },
+    async recordPhaseSixProgress(runId, progress) {
+      calls.push('progress:6');
+      const run = requireRun(runId);
+      if (progress.stateAssignerJobId !== undefined) {
+        run.stateAssignerJobId = progress.stateAssignerJobId;
+      }
+      const existing = (run.phaseData.phase6 as Record<string, unknown>) ?? {};
+      const latestProgress: Record<string, unknown> = {
+        observedAt: progress.observedAt.toISOString()
+      };
+      for (const [key, value] of Object.entries({
+        jobId: run.stateAssignerJobId,
+        status: progress.status,
+        jobCreatedAt: progress.jobCreatedAt,
+        startedAt: progress.startedAt,
+        endedAt: progress.endedAt,
+        failureReason: progress.failureReason,
+        selectedCount: progress.selectedCount
+      })) {
+        if (value !== undefined && value !== null) latestProgress[key] = value;
+      }
+      run.phaseData.phase6 = {
+        ...existing,
+        latestProgress,
+        ...(progress.monitoringLimit
+          ? {
+              monitoringLimit: {
+                jobId: progress.monitoringLimit.jobId,
+                jobCreatedAt: progress.monitoringLimit.jobCreatedAt,
+                reachedAt: progress.monitoringLimit.reachedAt.toISOString(),
+                ...(progress.monitoringLimit.cancellationRequestedAt
+                  ? {
+                      cancellationRequestedAt:
+                        progress.monitoringLimit.cancellationRequestedAt.toISOString()
+                    }
+                  : {}),
+                ...(progress.monitoringLimit.cancellationOutcome
+                  ? { cancellationOutcome: progress.monitoringLimit.cancellationOutcome }
+                  : {}),
+                ...(progress.monitoringLimit.verification
+                  ? { verification: structuredClone(progress.monitoringLimit.verification) }
+                  : {})
+              }
+            }
+          : {}),
+        ...(progress.incompatibleContractRecovery
+          ? {
+              incompatibleContractRecovery: {
+                sourceJobId: progress.incompatibleContractRecovery.sourceJobId,
+                sourceJobCreatedAt:
+                  progress.incompatibleContractRecovery.sourceJobCreatedAt,
+                detectedAt: progress.incompatibleContractRecovery.detectedAt.toISOString(),
+                missingParameterFields: [
+                  ...progress.incompatibleContractRecovery.missingParameterFields
+                ],
+                lastStatus: progress.incompatibleContractRecovery.lastStatus,
+                ...(progress.incompatibleContractRecovery.cancellationRequestedAt
+                  ? {
+                      cancellationRequestedAt:
+                        progress.incompatibleContractRecovery.cancellationRequestedAt.toISOString()
+                    }
+                  : {}),
+                ...(progress.incompatibleContractRecovery.cancellationOutcome
+                  ? {
+                      cancellationOutcome:
+                        progress.incompatibleContractRecovery.cancellationOutcome
+                    }
+                  : {}),
+                ...(progress.incompatibleContractRecovery.verification
+                  ? {
+                      verification: structuredClone(
+                        progress.incompatibleContractRecovery.verification
+                      )
+                    }
+                  : {}),
+                ...(progress.incompatibleContractRecovery.replacementStartedAt
+                  ? {
+                      replacementStartedAt:
+                        progress.incompatibleContractRecovery.replacementStartedAt.toISOString()
+                    }
+                  : {}),
+                ...(progress.incompatibleContractRecovery.replacementJobId
+                  ? {
+                      replacementJobId:
+                        progress.incompatibleContractRecovery.replacementJobId
+                    }
+                  : {})
+              }
+            }
+          : {})
+      };
+      return touch(run, progress.observedAt);
+    },
+    async recordPhaseSixIncompatibleReplacementStarted(
+      runId,
+      replacementJobId,
+      replacementStartedAt
+    ) {
+      calls.push('replacement:6');
+      const run = requireRun(runId);
+      const phase6 = (run.phaseData.phase6 as Record<string, unknown>) ?? {};
+      const marker = phase6.incompatibleContractRecovery as Record<string, unknown> | undefined;
+      if (!marker) throw new Error('Phase 6 incompatible-contract recovery marker is missing');
+      if (marker.replacementJobId !== undefined) {
+        throw new Error('Phase 6 incompatible-contract replacement was already consumed');
+      }
+      run.stateAssignerJobId = replacementJobId;
+      run.phaseData.phase6 = {
+        ...phase6,
+        incompatibleContractRecovery: {
+          ...marker,
+          replacementStartedAt: replacementStartedAt.toISOString(),
+          replacementJobId
+        },
+        latestProgress: {
+          observedAt: replacementStartedAt.toISOString(),
+          jobId: replacementJobId,
+          status: 'replacement_started'
+        }
+      };
+      return touch(run, replacementStartedAt);
+    },
+    async recordPhaseSixCompleted(runId, completedAt, phaseResult, fields) {
+      calls.push('complete:6');
+      const run = requireRun(runId);
+      if (run.stateAssignerJobId !== fields.stateAssignerJobId) {
+        throw new Error('Phase 6 completion job does not match the saved job');
+      }
+      const phase6 = (run.phaseData.phase6 as Record<string, unknown>) ?? {};
+      const monitoring = phase6.monitoringLimit as Record<string, unknown> | undefined;
+      if (
+        monitoring?.jobId === fields.stateAssignerJobId &&
+        monitoring.jobCreatedAt === fields.jobCreatedAt
+      ) {
+        throw new Error('A monitoring-limited job cannot complete Phase 6');
+      }
+      const incompatible = phase6.incompatibleContractRecovery as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        incompatible?.sourceJobId === fields.stateAssignerJobId &&
+        incompatible.sourceJobCreatedAt === fields.jobCreatedAt
+      ) {
+        throw new Error('An incompatible source job cannot complete Phase 6');
+      }
+      run.lastPhaseCompleted = 6;
+      run.phaseData.phase6 = {
+        ...phase6,
         status: 'completed',
         completedAt: completedAt.toISOString(),
         result: structuredClone(phaseResult)

@@ -249,6 +249,185 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
+  it('protects Phase 6 inputs, incompatible recovery, and dedicated completion', async () => {
+    const run = mockRun({
+      id: 60,
+      lastPhaseStarted: 5,
+      lastPhaseCompleted: 5,
+      articleCount: 3,
+      phaseData: { phase5: { status: 'completed' } }
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    const startedAt = new Date('2026-10-05T10:00:00Z');
+    const started = await persistence.recordPhaseSixStarted(60, startedAt, 180);
+    assert.equal(started.targetArticleThresholdDaysOld, 180);
+    assert.deepEqual((started.phaseData.phase6 as Record<string, unknown>).input, {
+      targetArticleStateReviewCount: 3,
+      targetArticleThresholdDaysOld: 180
+    });
+    await assert.rejects(
+      persistence.recordPhaseSixStarted(60, startedAt, 180),
+      /already started/
+    );
+    await assert.rejects(
+      persistence.recordPhaseCompleted(60, 6, new Date(), {}),
+      /dedicated persistence operation/
+    );
+
+    await persistence.recordPhaseSixProgress(60, {
+      observedAt: new Date('2026-10-05T10:01:00Z'),
+      stateAssignerJobId: 'state-old',
+      status: 'failed',
+      jobCreatedAt: '2026-10-05T10:00:01.000Z',
+      incompatibleContractRecovery: {
+        sourceJobId: 'state-old',
+        sourceJobCreatedAt: '2026-10-05T10:00:01.000Z',
+        detectedAt: new Date('2026-10-05T10:01:00Z'),
+        missingParameterFields: ['targetArticleStateReviewCount'],
+        lastStatus: 'failed'
+      }
+    });
+    const replacement = await persistence.recordPhaseSixIncompatibleReplacementStarted(
+      60,
+      'state-new',
+      new Date('2026-10-05T10:02:00Z')
+    );
+    assert.equal(replacement.stateAssignerJobId, 'state-new');
+    assert.equal(
+      ((replacement.phaseData.phase6 as Record<string, unknown>)
+        .incompatibleContractRecovery as Record<string, unknown>).replacementJobId,
+      'state-new'
+    );
+    await assert.rejects(
+      persistence.recordPhaseSixIncompatibleReplacementStarted(
+        60,
+        'state-third',
+        new Date('2026-10-05T10:03:00Z')
+      ),
+      /already consumed/
+    );
+
+    const completed = await persistence.recordPhaseSixCompleted(
+      60,
+      new Date('2026-10-05T10:04:00Z'),
+      {
+        selectedCount: 3,
+        completedCount: 2,
+        skippedCount: 1,
+        failedCount: 0,
+        targetArticleThresholdDaysOld: 180,
+        targetArticleStateReviewCount: 3
+      },
+      {
+        stateAssignerJobId: 'state-new',
+        jobCreatedAt: '2026-10-05T10:02:01.000Z'
+      }
+    );
+    assert.equal(completed.lastPhaseCompleted, 6);
+    assert.equal(completed.runCompleted, false);
+    assert.equal(completed.articleCount, 3);
+  });
+
+  it('rejects Phase 6 mirror drift and marked-job completion', async () => {
+    const run = mockRun({
+      id: 61,
+      lastPhaseStarted: 5,
+      lastPhaseCompleted: 5,
+      articleCount: 2
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await persistence.recordPhaseSixStarted(61, new Date('2026-10-05T11:00:00Z'), 180);
+    (run.phaseData.phase6 as Record<string, unknown>).input = {
+      targetArticleStateReviewCount: 99,
+      targetArticleThresholdDaysOld: 180
+    };
+    await assert.rejects(
+      persistence.recordPhaseSixProgress(61, {
+        observedAt: new Date('2026-10-05T11:01:00Z'),
+        status: 'running'
+      }),
+      /audit mirror/
+    );
+
+    (run.phaseData.phase6 as Record<string, unknown>).input = {
+      targetArticleStateReviewCount: 2,
+      targetArticleThresholdDaysOld: 180
+    };
+    await persistence.recordPhaseSixProgress(61, {
+      observedAt: new Date('2026-10-05T23:00:00Z'),
+      stateAssignerJobId: 'state-limited',
+      status: 'running',
+      jobCreatedAt: '2026-10-05T11:00:01.000Z',
+      monitoringLimit: {
+        jobId: 'state-limited',
+        jobCreatedAt: '2026-10-05T11:00:01.000Z',
+        reachedAt: new Date('2026-10-05T23:00:00Z')
+      }
+    });
+    await assert.rejects(
+      persistence.recordPhaseSixCompleted(
+        61,
+        new Date('2026-10-05T23:01:00Z'),
+        {
+          selectedCount: 2,
+          completedCount: 2,
+          skippedCount: 0,
+          failedCount: 0,
+          targetArticleThresholdDaysOld: 180,
+          targetArticleStateReviewCount: 2
+        },
+        {
+          stateAssignerJobId: 'state-limited',
+          jobCreatedAt: '2026-10-05T11:00:01.000Z'
+        }
+      ),
+      /monitoring-limited/
+    );
+  });
+
+  it('leaves the incompatible replacement marker unused when its atomic save fails', async () => {
+    const run = mockRun({
+      id: 62,
+      lastPhaseStarted: 5,
+      lastPhaseCompleted: 5,
+      articleCount: 1
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await persistence.recordPhaseSixStarted(62, new Date('2026-10-05T12:00:00Z'), 180);
+    await persistence.recordPhaseSixProgress(62, {
+      observedAt: new Date('2026-10-05T12:01:00Z'),
+      stateAssignerJobId: 'state-old',
+      status: 'failed',
+      incompatibleContractRecovery: {
+        sourceJobId: 'state-old',
+        sourceJobCreatedAt: '2026-10-05T12:00:01.000Z',
+        detectedAt: new Date('2026-10-05T12:01:00Z'),
+        missingParameterFields: ['targetArticleThresholdDaysOld'],
+        lastStatus: 'failed'
+      }
+    });
+    const priorUpdate = run.update;
+    run.update = async (values) => {
+      if (values.stateAssignerJobId === 'state-unsaved') throw new Error('write failed');
+      return priorUpdate(values);
+    };
+
+    await assert.rejects(
+      persistence.recordPhaseSixIncompatibleReplacementStarted(
+        62,
+        'state-unsaved',
+        new Date('2026-10-05T12:02:00Z')
+      ),
+      /could not be persisted/
+    );
+    assert.equal(run.stateAssignerJobId, 'state-old');
+    assert.equal(
+      ((run.phaseData.phase6 as Record<string, unknown>)
+        .incompatibleContractRecovery as Record<string, unknown>).replacementJobId,
+      undefined
+    );
+  });
+
   it('validates typed Phase 4 high-water marks when reading a run', async () => {
     const valid = mockRun({
       id: 5,

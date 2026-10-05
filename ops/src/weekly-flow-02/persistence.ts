@@ -192,6 +192,51 @@ export interface PhaseFiveCompletionFields {
   jobCreatedAt: string;
 }
 
+export interface PhaseSixInputs {
+  targetArticleThresholdDaysOld: number;
+  targetArticleStateReviewCount: number;
+}
+
+export interface PhaseSixMonitoringLimit {
+  jobId: string;
+  jobCreatedAt: string;
+  reachedAt: Date;
+  cancellationRequestedAt?: Date;
+  cancellationOutcome?: string;
+  verification?: JsonRecord;
+}
+
+export interface PhaseSixIncompatibleContractRecovery {
+  sourceJobId: string;
+  sourceJobCreatedAt: string;
+  detectedAt: Date;
+  missingParameterFields: string[];
+  lastStatus: string;
+  cancellationRequestedAt?: Date;
+  cancellationOutcome?: string;
+  verification?: JsonRecord;
+  replacementStartedAt?: Date;
+  replacementJobId?: string;
+}
+
+export interface PhaseSixProgress {
+  observedAt: Date;
+  stateAssignerJobId?: string;
+  status?: string;
+  jobCreatedAt?: string;
+  startedAt?: string;
+  endedAt?: string;
+  failureReason?: string;
+  selectedCount?: number;
+  monitoringLimit?: PhaseSixMonitoringLimit;
+  incompatibleContractRecovery?: PhaseSixIncompatibleContractRecovery;
+}
+
+export interface PhaseSixCompletionFields {
+  stateAssignerJobId: string;
+  jobCreatedAt: string;
+}
+
 export interface PhaseFourNonzeroCompletionFields extends PhaseFourCompletionFields {
   articleCount: number;
 }
@@ -252,6 +297,23 @@ export interface WeeklyFlowPersistence {
     completedAt: Date,
     phaseResult: JsonRecord,
     fields: PhaseFiveCompletionFields
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSixStarted(
+    runId: number,
+    startedAt: Date,
+    targetArticleThresholdDaysOld: number
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSixProgress(runId: number, progress: PhaseSixProgress): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSixIncompatibleReplacementStarted(
+    runId: number,
+    replacementJobId: string,
+    replacementStartedAt: Date
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSixCompleted(
+    runId: number,
+    completedAt: Date,
+    phaseResult: JsonRecord,
+    fields: PhaseSixCompletionFields
   ): Promise<WeeklyFlowRunRecord>;
   recordFailure(runId: number, failure: WeeklyFlowFailure): Promise<WeeklyFlowRunRecord>;
   recordRunCompleted(runId: number, completedAt: Date): Promise<WeeklyFlowRunRecord>;
