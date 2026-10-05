@@ -136,6 +136,25 @@ describe('parseOpsConfig', () => {
     }
   });
 
+  it('uses defaults and validates explicit Phase 5 monitoring settings', () => {
+    const defaults = parseOpsConfig(validEnvironment(), baseDirectory);
+    assert.equal(defaults.semanticScorerStatusPollIntervalSeconds, 300);
+    assert.equal(defaults.semanticScorerToleratedConsecutiveStatusFailures, 2);
+    assert.equal(defaults.semanticScorerMonitoringLimitHours, 6);
+
+    for (const key of [
+      'SEMANTIC_SCORER_STATUS_POLL_INTERVAL_SECONDS',
+      'SEMANTIC_SCORER_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      'SEMANTIC_SCORER_MONITORING_LIMIT_HOURS'
+    ]) {
+      for (const value of ['0', '-1', '1.5', 'not-a-number', '']) {
+        const env = validEnvironment();
+        env[key] = value;
+        assert.throws(() => parseOpsConfig(env, baseDirectory), new RegExp(key));
+      }
+    }
+  });
+
   it('requires a positive integer backup timeout', () => {
     for (const timeout of ['0', '-1', '1.5', 'not-a-number', '']) {
       const env = validEnvironment();

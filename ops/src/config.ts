@@ -11,6 +11,9 @@ export interface OpsConfig {
   rssStatusPollIntervalSeconds: number;
   rssToleratedConsecutiveStatusFailures: number;
   rssJobTimeoutHours: number;
+  semanticScorerStatusPollIntervalSeconds: number;
+  semanticScorerToleratedConsecutiveStatusFailures: number;
+  semanticScorerMonitoringLimitHours: number;
   dbManagerBackupTimeoutSeconds: number;
   dbManagerDeleteArticlesTimeoutSeconds: number;
   pathToLogs: string;
@@ -27,8 +30,13 @@ const required = (env: NodeJS.ProcessEnv, key: string): string => {
   return value;
 };
 
-const optionalPositiveInteger = (value: string | undefined, key: string): number => {
-  if (!value?.trim()) return 5;
+const optionalPositiveInteger = (
+  value: string | undefined,
+  key: string,
+  defaultValue: number
+): number => {
+  if (value === undefined) return defaultValue;
+  if (!value.trim()) throw new Error(`${key} must be a positive integer`);
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`${key} must be a positive integer`);
@@ -88,6 +96,21 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
       'RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES'
     ),
     rssJobTimeoutHours: requiredPositiveInteger(env, 'RSS_JOB_TIMEOUT_HOURS'),
+    semanticScorerStatusPollIntervalSeconds: optionalPositiveInteger(
+      env.SEMANTIC_SCORER_STATUS_POLL_INTERVAL_SECONDS,
+      'SEMANTIC_SCORER_STATUS_POLL_INTERVAL_SECONDS',
+      300
+    ),
+    semanticScorerToleratedConsecutiveStatusFailures: optionalPositiveInteger(
+      env.SEMANTIC_SCORER_TOLERATED_CONSECUTIVE_STATUS_FAILURES,
+      'SEMANTIC_SCORER_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      2
+    ),
+    semanticScorerMonitoringLimitHours: optionalPositiveInteger(
+      env.SEMANTIC_SCORER_MONITORING_LIMIT_HOURS,
+      'SEMANTIC_SCORER_MONITORING_LIMIT_HOURS',
+      6
+    ),
     dbManagerBackupTimeoutSeconds: requiredPositiveInteger(
       env,
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS'
@@ -97,8 +120,8 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
       'DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS'
     ),
     pathToLogs: path.resolve(baseDirectory, required(env, 'PATH_TO_LOGS')),
-    logMaxSizeMb: optionalPositiveInteger(env.LOG_MAX_SIZE, 'LOG_MAX_SIZE'),
-    logMaxFiles: optionalPositiveInteger(env.LOG_MAX_FILES, 'LOG_MAX_FILES')
+    logMaxSizeMb: optionalPositiveInteger(env.LOG_MAX_SIZE, 'LOG_MAX_SIZE', 5),
+    logMaxFiles: optionalPositiveInteger(env.LOG_MAX_FILES, 'LOG_MAX_FILES', 5)
   };
 };
 
