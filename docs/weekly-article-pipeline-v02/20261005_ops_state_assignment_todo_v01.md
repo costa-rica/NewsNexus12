@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:00:27Z
+updated_at: 2026-10-05T23:03:09Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -98,49 +98,49 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 2: Add Phase 6 Configuration and Client
 
-- [ ] Extend `OpsConfig` with:
-  - [ ] `stateAssignerTargetArticleThresholdDaysOld`, required and set to 180 in production configuration.
-  - [ ] `stateAssignerStatusPollIntervalSeconds`, optional default 300.
-  - [ ] `stateAssignerToleratedConsecutiveStatusFailures`, optional default 2.
-  - [ ] `stateAssignerMonitoringLimitHours`, optional default 12.
-- [ ] Reject explicit zero, negative, fractional, empty, and nonnumeric values.
-- [ ] Update every explicit `OpsConfig` fixture or construct it through configuration defaults.
-- [ ] Add `ops/src/weekly-flow-02/phases/06_stateAssignerClient.ts`.
-- [ ] Define typed request inputs, start result, lifecycle job, completed result, cancellation result, and error categories.
-- [ ] Start with `POST /state-assigner/start-job` and exactly the threshold and persisted Article count.
-- [ ] Require HTTP 202, nonempty job ID, `queued`, and `/state-assigner/start-job`.
-- [ ] Read status with `GET /queue-info/check-status/:jobId`.
-- [ ] Cancel with `POST /queue-info/cancel_job/:jobId` and accept only `canceled` or `cancel_requested`.
-- [ ] Expose cancellation 404 for one verification lookup.
-- [ ] Apply the shared worker-node request timeout.
-- [ ] Distinguish transient request, permanent request, malformed response, unavailable job, incompatible worker contract, and cancellation failure.
-- [ ] Validate job ID, endpoint, known lifecycle status, and `createdAt` at or after the original Phase 6 start.
-- [ ] Validate lifecycle timestamps:
-  - [ ] `queued` requires only `createdAt`.
-  - [ ] `running` requires chronological `startedAt`.
-  - [ ] `completed` requires chronological `startedAt` and `endedAt`.
-  - [ ] `failed` and `canceled` require chronological `endedAt`; validate `startedAt` only when present.
-- [ ] Parse identity, lifecycle, and timestamps before classifying missing queue parameters.
-- [ ] Return the otherwise validated job lifecycle with the incompatible-contract classification when parameters or required keys are missing.
-- [ ] Treat wrong parameter types as malformed and non-replaceable.
-- [ ] Treat present positive integers that differ from persisted inputs as unavailable job identity.
-- [ ] Require exact parameter values for a valid job.
-- [ ] Parse and require the completed result only for `status = completed`.
-- [ ] Validate nonnegative safe-integer counts, input echoes, count invariant, and `selectedCount <= articleCount`.
-- [ ] Keep canceled or failed partial results diagnostic and never sufficient for completion.
-- [ ] Add `ops/tests/weekly-flow-02/06_stateAssignerClient.test.ts`.
-- [ ] Cover exact start body, lifecycle shapes, timestamp ordering, endpoint and ID mismatches, old creation time, HTTP classifications, and cancellation responses.
-- [ ] Cover missing parameter object, each missing key, malformed types, different valid values, and exact matches.
-- [ ] Cover missing, negative, fractional, inconsistent, oversized, and input-mismatched results.
-- [ ] Add the compiled client test to the explicit `ops/package.json` test command.
-- [ ] Run the Phase 2 checkpoint:
+- [x] Extend `OpsConfig` with:
+  - [x] `stateAssignerTargetArticleThresholdDaysOld`, required and set to 180 in production configuration.
+  - [x] `stateAssignerStatusPollIntervalSeconds`, optional default 300.
+  - [x] `stateAssignerToleratedConsecutiveStatusFailures`, optional default 2.
+  - [x] `stateAssignerMonitoringLimitHours`, optional default 12.
+- [x] Reject explicit zero, negative, fractional, empty, and nonnumeric values.
+- [x] Update every explicit `OpsConfig` fixture or construct it through configuration defaults.
+- [x] Add `ops/src/weekly-flow-02/phases/06_stateAssignerClient.ts`.
+- [x] Define typed request inputs, start result, lifecycle job, completed result, cancellation result, and error categories.
+- [x] Start with `POST /state-assigner/start-job` and exactly the threshold and persisted Article count.
+- [x] Require HTTP 202, nonempty job ID, `queued`, and `/state-assigner/start-job`.
+- [x] Read status with `GET /queue-info/check-status/:jobId`.
+- [x] Cancel with `POST /queue-info/cancel_job/:jobId` and accept only `canceled` or `cancel_requested`.
+- [x] Expose cancellation 404 for one verification lookup.
+- [x] Apply the shared worker-node request timeout.
+- [x] Distinguish transient request, permanent request, malformed response, unavailable job, incompatible worker contract, and cancellation failure.
+- [x] Validate job ID, endpoint, known lifecycle status, and `createdAt` at or after the original Phase 6 start.
+- [x] Validate lifecycle timestamps:
+  - [x] `queued` requires only `createdAt`.
+  - [x] `running` requires chronological `startedAt`.
+  - [x] `completed` requires chronological `startedAt` and `endedAt`.
+  - [x] `failed` and `canceled` require chronological `endedAt`; validate `startedAt` only when present.
+- [x] Parse identity, lifecycle, and timestamps before classifying missing queue parameters.
+- [x] Return the otherwise validated job lifecycle with the incompatible-contract classification when parameters or required keys are missing.
+- [x] Treat wrong parameter types as malformed and non-replaceable.
+- [x] Treat present positive integers that differ from persisted inputs as unavailable job identity.
+- [x] Require exact parameter values for a valid job.
+- [x] Parse and require the completed result only for `status = completed`.
+- [x] Validate nonnegative safe-integer counts, input echoes, count invariant, and `selectedCount <= articleCount`.
+- [x] Keep canceled or failed partial results diagnostic and never sufficient for completion.
+- [x] Add `ops/tests/weekly-flow-02/06_stateAssignerClient.test.ts`.
+- [x] Cover exact start body, lifecycle shapes, timestamp ordering, endpoint and ID mismatches, old creation time, HTTP classifications, and cancellation responses.
+- [x] Cover missing parameter object, each missing key, malformed types, different valid values, and exact matches.
+- [x] Cover missing, negative, fractional, inconsistent, oversized, and input-mismatched results.
+- [x] Add the compiled client test to the explicit `ops/package.json` test command.
+- [x] Run the Phase 2 checkpoint:
   1. Build `db-models`.
   2. Run the ops type check.
   3. Run the complete ops test suite.
   4. Build ops.
   5. Fix failures and repeat all checks.
-- [ ] Check off completed Phase 2 tasks.
-- [ ] Commit only Phase 2 changes and reference Phase 2 of this todo in the commit body.
+- [x] Check off completed Phase 2 tasks.
+- [x] Commit only Phase 2 changes and reference Phase 2 of this todo in the commit body.
 
 ## Phase 3: Add Protected Phase 6 Persistence
 

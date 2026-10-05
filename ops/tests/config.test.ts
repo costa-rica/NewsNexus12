@@ -15,6 +15,7 @@ const validEnvironment = (): NodeJS.ProcessEnv => ({
   RSS_STATUS_POLL_INTERVAL_SECONDS: '300',
   RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES: '2',
   RSS_JOB_TIMEOUT_HOURS: '24',
+  STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD: '180',
   DB_MANAGER_BACKUP_TIMEOUT_SECONDS: '1800',
   DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS: '1800',
   PATH_TO_LOGS: './logs'
@@ -33,6 +34,10 @@ describe('parseOpsConfig', () => {
     assert.equal(config.rssStatusPollIntervalSeconds, 300);
     assert.equal(config.rssToleratedConsecutiveStatusFailures, 2);
     assert.equal(config.rssJobTimeoutHours, 24);
+    assert.equal(config.stateAssignerTargetArticleThresholdDaysOld, 180);
+    assert.equal(config.stateAssignerStatusPollIntervalSeconds, 300);
+    assert.equal(config.stateAssignerToleratedConsecutiveStatusFailures, 2);
+    assert.equal(config.stateAssignerMonitoringLimitHours, 12);
     assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
     assert.equal(config.dbManagerDeleteArticlesTimeoutSeconds, 1800);
     assert.equal(config.pathToLogs, path.join(baseDirectory, 'logs'));
@@ -67,6 +72,7 @@ describe('parseOpsConfig', () => {
       'RSS_STATUS_POLL_INTERVAL_SECONDS',
       'RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
       'RSS_JOB_TIMEOUT_HOURS',
+      'STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD',
       'DB_MANAGER_BACKUP_TIMEOUT_SECONDS',
       'DB_MANAGER_DELETE_ARTICLES_TIMEOUT_SECONDS',
       'PATH_TO_LOGS'
@@ -152,6 +158,36 @@ describe('parseOpsConfig', () => {
         env[key] = value;
         assert.throws(() => parseOpsConfig(env, baseDirectory), new RegExp(key));
       }
+    }
+  });
+
+  it('uses defaults and validates explicit Phase 6 monitoring settings', () => {
+    const defaults = parseOpsConfig(validEnvironment(), baseDirectory);
+    assert.equal(defaults.stateAssignerStatusPollIntervalSeconds, 300);
+    assert.equal(defaults.stateAssignerToleratedConsecutiveStatusFailures, 2);
+    assert.equal(defaults.stateAssignerMonitoringLimitHours, 12);
+
+    for (const key of [
+      'STATE_ASSIGNER_STATUS_POLL_INTERVAL_SECONDS',
+      'STATE_ASSIGNER_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      'STATE_ASSIGNER_MONITORING_LIMIT_HOURS'
+    ]) {
+      for (const value of ['0', '-1', '1.5', 'not-a-number', '']) {
+        const env = validEnvironment();
+        env[key] = value;
+        assert.throws(() => parseOpsConfig(env, baseDirectory), new RegExp(key));
+      }
+    }
+  });
+
+  it('requires a positive Phase 6 Article age threshold', () => {
+    for (const value of ['0', '-1', '1.5', 'not-a-number', '']) {
+      const env = validEnvironment();
+      env.STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD = value;
+      assert.throws(
+        () => parseOpsConfig(env, baseDirectory),
+        /STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD/
+      );
     }
   });
 

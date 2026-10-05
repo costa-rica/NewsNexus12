@@ -14,6 +14,10 @@ export interface OpsConfig {
   semanticScorerStatusPollIntervalSeconds: number;
   semanticScorerToleratedConsecutiveStatusFailures: number;
   semanticScorerMonitoringLimitHours: number;
+  stateAssignerTargetArticleThresholdDaysOld: number;
+  stateAssignerStatusPollIntervalSeconds: number;
+  stateAssignerToleratedConsecutiveStatusFailures: number;
+  stateAssignerMonitoringLimitHours: number;
   dbManagerBackupTimeoutSeconds: number;
   dbManagerDeleteArticlesTimeoutSeconds: number;
   pathToLogs: string;
@@ -110,6 +114,25 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
       env.SEMANTIC_SCORER_MONITORING_LIMIT_HOURS,
       'SEMANTIC_SCORER_MONITORING_LIMIT_HOURS',
       6
+    ),
+    stateAssignerTargetArticleThresholdDaysOld: requiredPositiveInteger(
+      env,
+      'STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD'
+    ),
+    stateAssignerStatusPollIntervalSeconds: optionalPositiveInteger(
+      env.STATE_ASSIGNER_STATUS_POLL_INTERVAL_SECONDS,
+      'STATE_ASSIGNER_STATUS_POLL_INTERVAL_SECONDS',
+      300
+    ),
+    stateAssignerToleratedConsecutiveStatusFailures: optionalPositiveInteger(
+      env.STATE_ASSIGNER_TOLERATED_CONSECUTIVE_STATUS_FAILURES,
+      'STATE_ASSIGNER_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      2
+    ),
+    stateAssignerMonitoringLimitHours: optionalPositiveInteger(
+      env.STATE_ASSIGNER_MONITORING_LIMIT_HOURS,
+      'STATE_ASSIGNER_MONITORING_LIMIT_HOURS',
+      12
     ),
     dbManagerBackupTimeoutSeconds: requiredPositiveInteger(
       env,
