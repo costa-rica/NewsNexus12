@@ -106,6 +106,14 @@ const requireNonEmptyString = (value: string, fieldName: string): string => {
   return trimmed;
 };
 
+const requireTimestampString = (value: string, fieldName: string): string => {
+  const timestamp = requireNonEmptyString(value, fieldName);
+  if (!Number.isFinite(Date.parse(timestamp))) {
+    throw new WeeklyFlowPersistenceError(`${fieldName} must be a valid timestamp`);
+  }
+  return timestamp;
+};
+
 export const createSequelizePhaseFourDataStore = (
   models: PhaseFourDataModels
 ): PhaseFourDataStore => ({
@@ -629,11 +637,21 @@ export const createSequelizeWeeklyFlowPersistence = (
       const latestProgress: JsonRecord = { observedAt: progress.observedAt.toISOString() };
       for (const [key, value] of Object.entries({
         jobId,
-        status: progress.status,
-        jobCreatedAt: progress.jobCreatedAt,
-        startedAt: progress.startedAt,
-        endedAt: progress.endedAt,
-        failureReason: progress.failureReason
+        status: progress.status === undefined
+          ? undefined
+          : requireNonEmptyString(progress.status, 'Phase 5 status'),
+        jobCreatedAt: progress.jobCreatedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.jobCreatedAt, 'jobCreatedAt'),
+        startedAt: progress.startedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.startedAt, 'startedAt'),
+        endedAt: progress.endedAt === undefined
+          ? undefined
+          : requireTimestampString(progress.endedAt, 'endedAt'),
+        failureReason: progress.failureReason === undefined
+          ? undefined
+          : requireNonEmptyString(progress.failureReason, 'failureReason')
       })) {
         if (value !== undefined && value !== null) latestProgress[key] = value;
       }
@@ -641,9 +659,18 @@ export const createSequelizeWeeklyFlowPersistence = (
       if (progress.monitoringLimit) {
         const limit = progress.monitoringLimit;
         requireValidDate(limit.reachedAt, 'Phase 5 monitoring limit time');
+        if (limit.cancellationRequestedAt) {
+          requireValidDate(
+            limit.cancellationRequestedAt,
+            'Phase 5 cancellation request time'
+          );
+        }
         additions.monitoringLimit = {
           jobId: requireNonEmptyString(limit.jobId, 'monitoringLimit.jobId'),
-          jobCreatedAt: requireNonEmptyString(limit.jobCreatedAt, 'monitoringLimit.jobCreatedAt'),
+          jobCreatedAt: requireTimestampString(
+            limit.jobCreatedAt,
+            'monitoringLimit.jobCreatedAt'
+          ),
           reachedAt: limit.reachedAt.toISOString(),
           ...(limit.cancellationRequestedAt
             ? { cancellationRequestedAt: limit.cancellationRequestedAt.toISOString() }
@@ -671,7 +698,7 @@ export const createSequelizeWeeklyFlowPersistence = (
       const run = await requireRun(model, runId);
       assertPhaseFiveInProgress(run);
       const jobId = requireNonEmptyString(fields.semanticScorerJobId, 'semanticScorerJobId');
-      const jobCreatedAt = requireNonEmptyString(fields.jobCreatedAt, 'jobCreatedAt');
+      const jobCreatedAt = requireTimestampString(fields.jobCreatedAt, 'jobCreatedAt');
       if (run.semanticScorerJobId !== jobId) {
         throw new WeeklyFlowPersistenceError('Phase 5 completion job does not match the saved job');
       }

@@ -214,6 +214,41 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     assert.equal(completed.lastPhaseCompleted, 5);
   });
 
+  it('rejects invalid Phase 5 job and marker timestamps', async () => {
+    const run = mockRun({
+      id: 52,
+      lastPhaseStarted: 4,
+      lastPhaseCompleted: 4,
+      articleCount: 2
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await persistence.recordPhaseFiveStarted(52, new Date('2026-10-05T10:00:00Z'));
+
+    await assert.rejects(
+      persistence.recordPhaseFiveProgress(52, {
+        observedAt: new Date('2026-10-05T10:01:00Z'),
+        semanticScorerJobId: 'semantic-invalid',
+        status: 'running',
+        jobCreatedAt: 'not-a-timestamp'
+      }),
+      /jobCreatedAt must be a valid timestamp/
+    );
+    await assert.rejects(
+      persistence.recordPhaseFiveProgress(52, {
+        observedAt: new Date('2026-10-05T10:01:00Z'),
+        semanticScorerJobId: 'semantic-invalid',
+        status: 'running',
+        jobCreatedAt: '2026-10-05T10:00:01.000Z',
+        monitoringLimit: {
+          jobId: 'semantic-invalid',
+          jobCreatedAt: 'invalid-marker-time',
+          reachedAt: new Date('2026-10-05T16:00:00Z')
+        }
+      }),
+      /monitoringLimit.jobCreatedAt must be a valid timestamp/
+    );
+  });
+
   it('validates typed Phase 4 high-water marks when reading a run', async () => {
     const valid = mockRun({
       id: 5,
