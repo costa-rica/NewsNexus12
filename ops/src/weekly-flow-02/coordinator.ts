@@ -32,6 +32,15 @@ import {
   type SemanticScorerWorker
 } from './phases/05_runSemanticScoring';
 import { SemanticScorerClientError } from './phases/05_semanticScorerClient';
+import {
+  RunStateAssignmentError,
+  createStateAssignerWorker,
+  runStateAssignment,
+  type RunStateAssignmentDependencies,
+  type RunStateAssignmentResult,
+  type StateAssignerWorker
+} from './phases/06_runStateAssignment';
+import { StateAssignerClientError } from './phases/06_stateAssignerClient';
 import type { WeeklyFlowInvocation } from './cli';
 import {
   WeeklyFlowPersistenceError,
@@ -69,14 +78,22 @@ type RunSemantic = (
   dependencies: RunSemanticScoringDependencies
 ) => Promise<RunSemanticScoringResult>;
 
+type RunState = (
+  run: WeeklyFlowRunRecord,
+  config: OpsConfig,
+  dependencies: RunStateAssignmentDependencies
+) => Promise<RunStateAssignmentResult>;
+
 export interface CoordinatorDependencies {
   request: WorkerRequest;
   createBackup: CreateBackup;
   deleteArticles: DeleteArticles;
   collectRss: CollectRss;
   runSemantic: RunSemantic;
+  runState: RunState;
   rssWorker: GoogleNewsRssWorker;
   semanticWorker: SemanticScorerWorker;
+  stateWorker: StateAssignerWorker;
   delay: (milliseconds: number) => Promise<void>;
   persistence: WeeklyFlowPersistence;
   invocation: WeeklyFlowInvocation;
@@ -106,6 +123,8 @@ const phaseFailureCategory = (phase: WeeklyFlowPhase, error: unknown): string =>
   if (phase === 4 && error instanceof GoogleNewsRssClientError) return error.category;
   if (phase === 5 && error instanceof RunSemanticScoringError) return error.category;
   if (phase === 5 && error instanceof SemanticScorerClientError) return error.category;
+  if (phase === 6 && error instanceof RunStateAssignmentError) return error.category;
+  if (phase === 6 && error instanceof StateAssignerClientError) return error.category;
   if (error instanceof WeeklyFlowPersistenceError) return 'persistence';
   return 'unknown';
 };
@@ -180,6 +199,7 @@ export async function runCoordinator(
   const deleteArticles = dependencies.deleteArticles ?? productionPhaseDependencies.deleteArticles;
   const collectRss = dependencies.collectRss ?? collectGoogleNewsRss;
   const runSemantic = dependencies.runSemantic ?? runSemanticScoring;
+  const runState = dependencies.runState ?? runStateAssignment;
   const persistence = dependencies.persistence;
   const invocation = dependencies.invocation ?? defaultInvocation;
   const now = dependencies.now ?? currentTime;
@@ -187,6 +207,7 @@ export async function runCoordinator(
   const rssWorker = dependencies.rssWorker ?? createGoogleNewsRssWorker(config, request);
   const semanticWorker =
     dependencies.semanticWorker ?? createSemanticScorerWorker(config, request);
+  const stateWorker = dependencies.stateWorker ?? createStateAssignerWorker(config, request);
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
   let selection;
@@ -399,6 +420,11 @@ export async function runCoordinator(
         jobCreatedAt: result.jobCreatedAt,
         completedAt: result.completedAt
       });
+      const refreshed = await persistence.getRunById(runId);
+      if (refreshed === null) {
+        throw new WeeklyFlowPersistenceError(`Weekly flow run ${runId} was not found`);
+      }
+      activeRun = refreshed;
     } catch (error: unknown) {
       logger.error('Phase 5 stopped without verified semantic scoring completion', {
         runId,
@@ -418,9 +444,67 @@ export async function runCoordinator(
     });
   }
 
-  logger.info('Weekly pipeline stopped at the Phase 6 boundary', {
+  if ((activeRun.lastPhaseCompleted ?? 0) < 6) {
+    if (activeRun.lastPhaseCompleted !== 5 || (activeRun.articleCount ?? 0) <= 0) {
+      const error = new RunStateAssignmentError(
+        'invalid_run_state',
+        'Phase 6 requires completed Phase 5 with a positive articleCount'
+      );
+      await recordFailure(persistence, logger, runId, 6, error, now);
+      throw error;
+    }
+    try {
+      logger.info('Phase 6 started or continued: monitoring state assignment', {
+        runId,
+        phase: 6,
+        savedJobId: activeRun.stateAssignerJobId,
+        articleCount: activeRun.articleCount,
+        targetArticleThresholdDaysOld: activeRun.targetArticleThresholdDaysOld
+      });
+      const result = await runState(activeRun, config, {
+        persistence,
+        worker: stateWorker,
+        now,
+        delay: wait,
+        onEvent: (event) => {
+          logger.info('Phase 6 state assigner event', { runId, phase: 6, ...event });
+        }
+      });
+      logger.info('Phase 6 completed: state assignment verified', {
+        runId,
+        phase: 6,
+        stateAssignerJobId: result.stateAssignerJobId,
+        jobCreatedAt: result.jobCreatedAt,
+        completedAt: result.completedAt,
+        selectedCount: result.selectedCount,
+        completedCount: result.completedCount,
+        skippedCount: result.skippedCount,
+        failedCount: result.failedCount
+      });
+    } catch (error: unknown) {
+      logger.error('Phase 6 stopped without verified state assignment completion', {
+        runId,
+        phase: 6,
+        failureCategory: phaseFailureCategory(6, error),
+        error: failureMessage(error),
+        ...persistenceErrorDiagnostics(error)
+      });
+      await recordFailure(persistence, logger, runId, 6, error, now);
+      throw error;
+    }
+  } else {
+    logger.info('Phase 6 already completed; reusing persisted result', {
+      runId,
+      phase: 6,
+      stateAssignerJobId: activeRun.stateAssignerJobId,
+      articleCount: activeRun.articleCount,
+      targetArticleThresholdDaysOld: activeRun.targetArticleThresholdDaysOld
+    });
+  }
+
+  logger.info('Weekly pipeline stopped at the Phase 7 boundary', {
     runId,
-    lastPhaseCompleted: 5,
+    lastPhaseCompleted: 6,
     runCompleted: false
   });
 }

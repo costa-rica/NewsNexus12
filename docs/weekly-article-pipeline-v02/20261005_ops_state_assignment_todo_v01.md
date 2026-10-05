@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:11:48Z
+updated_at: 2026-10-05T23:14:59Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -264,48 +264,48 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 5: Connect Phase 6 to the Coordinator
 
-- [ ] Extend coordinator dependencies with the Phase 6 runner and worker client through the existing injection pattern.
-- [ ] Add Phase 6 client and orchestration error-category mapping without changing earlier categories.
-- [ ] Refresh the persisted run after executing Phase 5 before evaluating Phase 6.
-- [ ] Require completed Phase 5, positive immutable `articleCount`, and incomplete run before Phase 6.
-- [ ] Gate Phase 6 on `lastPhaseCompleted < 6`.
-- [ ] Run or continue Phase 6 with the persisted inputs.
-- [ ] Record Phase 6 failures with `phase: 6` while preserving completed Phase 5.
-- [ ] After Phase 6 completion, leave the run incomplete and log the Phase 7 boundary.
-- [ ] Skip Phases 4, 5, and 6 when Phase 6 is already complete.
+- [x] Extend coordinator dependencies with the Phase 6 runner and worker client through the existing injection pattern.
+- [x] Add Phase 6 client and orchestration error-category mapping without changing earlier categories.
+- [x] Refresh the persisted run after executing Phase 5 before evaluating Phase 6.
+- [x] Require completed Phase 5, positive immutable `articleCount`, and incomplete run before Phase 6.
+- [x] Gate Phase 6 on `lastPhaseCompleted < 6`.
+- [x] Run or continue Phase 6 with the persisted inputs.
+- [x] Record Phase 6 failures with `phase: 6` while preserving completed Phase 5.
+- [x] After Phase 6 completion, leave the run incomplete and log the Phase 7 boundary.
+- [x] Skip Phases 4, 5, and 6 when Phase 6 is already complete.
 
 ### Existing Coordinator Test Location
 
-- [ ] Add and update coordinator tests inside the existing `describe('runCoordinator')` block in `ops/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.ts`.
-- [ ] Do not create an unlisted coordinator test file.
-- [ ] If a separate coordinator test file becomes necessary, add its compiled path to `ops/package.json` in this phase.
-- [ ] Add controlled successful and failing Phase 6 dependencies that never call real `fetch`.
-- [ ] Audit every `runCoordinator` test that reaches completed Phase 5 and inject a controlled Phase 6 dependency.
-- [ ] Confirm earlier failure and zero-work branches cannot reach the default Phase 6 client.
+- [x] Add and update coordinator tests inside the existing `describe('runCoordinator')` block in `ops/tests/weekly-flow-02/01_clearDuplicateAnalyses.test.ts`.
+- [x] Do not create an unlisted coordinator test file.
+- [x] If a separate coordinator test file becomes necessary, add its compiled path to `ops/package.json` in this phase.
+- [x] Add controlled successful and failing Phase 6 dependencies that never call real `fetch`.
+- [x] Audit every `runCoordinator` test that reaches completed Phase 5 and inject a controlled Phase 6 dependency.
+- [x] Confirm earlier failure and zero-work branches cannot reach the default Phase 6 client.
 
 ### Coordinator Test Updates
 
-- [ ] Update the successful end-to-end coordinator case to run Phases 1–6 in order and stop at the Phase 7 boundary.
-- [ ] Assert `lastPhaseCompleted = 6` and `runCompleted = false`.
-- [ ] Update continuation cases at the Phase 4, Phase 5, and Phase 6 boundaries.
-- [ ] Preserve Phase 4 zero-Article completion as a branch that never calls Phases 5 or 6.
-- [ ] Preserve Phase 1–5 failure branches as paths that never call Phase 6.
-- [ ] Add a controlled Phase 6 failure proving:
-  - [ ] Phase 5 remains completed.
-  - [ ] Phase 6 does not complete.
-  - [ ] `recordFailure` receives `phase: 6`.
-  - [ ] The coordinator rejects and does not log the Phase 7 boundary.
-- [ ] Add or retain focused cases for completed Phase 6 skipping all worker phases and saved active or completed Phase 6 recovery.
-- [ ] Update `coordinatorConfig` and entrypoint fixtures with all Phase 6 fields.
-- [ ] Assert no coordinator test reaches the default state-assigner client or opens a network connection.
-- [ ] Run the Phase 5 checkpoint:
+- [x] Update the successful end-to-end coordinator case to run Phases 1–6 in order and stop at the Phase 7 boundary.
+- [x] Assert `lastPhaseCompleted = 6` and `runCompleted = false`.
+- [x] Update continuation cases at the Phase 4, Phase 5, and Phase 6 boundaries.
+- [x] Preserve Phase 4 zero-Article completion as a branch that never calls Phases 5 or 6.
+- [x] Preserve Phase 1–5 failure branches as paths that never call Phase 6.
+- [x] Add a controlled Phase 6 failure proving:
+  - [x] Phase 5 remains completed.
+  - [x] Phase 6 does not complete.
+  - [x] `recordFailure` receives `phase: 6`.
+  - [x] The coordinator rejects and does not log the Phase 7 boundary.
+- [x] Add or retain focused cases for completed Phase 6 skipping all worker phases and saved active or completed Phase 6 recovery.
+- [x] Update `coordinatorConfig` and entrypoint fixtures with all Phase 6 fields.
+- [x] Assert no coordinator test reaches the default state-assigner client or opens a network connection.
+- [x] Run the Phase 5 checkpoint:
   1. Build `db-models`.
   2. Run the ops type check.
   3. Run the complete ops test suite, including the coordinator and both Phase 6 test files.
   4. Build ops.
   5. Fix failures and repeat all checks.
-- [ ] Check off completed Phase 5 tasks.
-- [ ] Commit only Phase 5 changes and reference Phase 5 of this todo in the commit body.
+- [x] Check off completed Phase 5 tasks.
+- [x] Commit only Phase 5 changes and reference Phase 5 of this todo in the commit body.
 
 ## Phase 6: Update Operator Documentation
 

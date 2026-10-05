@@ -26,6 +26,7 @@ import {
   GoogleNewsRssClientError
 } from '../../src/weekly-flow-02/phases/04_googleNewsRssClient';
 import { RunSemanticScoringError } from '../../src/weekly-flow-02/phases/05_runSemanticScoring';
+import { RunStateAssignmentError } from '../../src/weekly-flow-02/phases/06_runStateAssignment';
 import { WeeklyFlowPersistenceError } from '../../src/weekly-flow-02/persistence';
 import { createInMemoryPersistence, createRunRecord } from './persistenceTestSupport';
 
@@ -145,6 +146,54 @@ const successfulSemanticRunner: CoordinatorDependencies['runSemantic'] = async (
     semanticScorerJobId: jobId,
     jobCreatedAt,
     completedAt: completedAt.toISOString()
+  };
+};
+
+const successfulStateRunner: CoordinatorDependencies['runState'] = async (
+  run,
+  config,
+  dependencies
+) => {
+  const started = run.lastPhaseStarted === 6
+    ? run
+    : await dependencies.persistence.recordPhaseSixStarted(
+        run.id,
+        dependencies.now(),
+        config.stateAssignerTargetArticleThresholdDaysOld
+      );
+  const jobId = started.stateAssignerJobId ?? 'state-job-1';
+  const jobCreatedAt = dependencies.now().toISOString();
+  const articleCount = started.articleCount ?? 0;
+  await dependencies.persistence.recordPhaseSixProgress(run.id, {
+    observedAt: dependencies.now(),
+    stateAssignerJobId: jobId,
+    status: 'completed',
+    jobCreatedAt,
+    selectedCount: articleCount
+  });
+  const completedAt = dependencies.now();
+  await dependencies.persistence.recordPhaseSixCompleted(
+    run.id,
+    completedAt,
+    {
+      selectedCount: articleCount,
+      completedCount: articleCount,
+      skippedCount: 0,
+      failedCount: 0,
+      targetArticleThresholdDaysOld: config.stateAssignerTargetArticleThresholdDaysOld,
+      targetArticleStateReviewCount: articleCount
+    },
+    { stateAssignerJobId: jobId, jobCreatedAt }
+  );
+  return {
+    kind: 'ready_for_phase_7',
+    stateAssignerJobId: jobId,
+    jobCreatedAt,
+    completedAt: completedAt.toISOString(),
+    selectedCount: articleCount,
+    completedCount: articleCount,
+    skippedCount: 0,
+    failedCount: 0
   };
 };
 
@@ -382,7 +431,7 @@ describe('runCoordinator', () => {
     });
   });
 
-  it('runs Phases 1 through 5 in order and stops at the Phase 6 boundary', async () => {
+  it('runs Phases 1 through 6 in order and stops at the Phase 7 boundary', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
     const calls: string[] = [];
@@ -392,6 +441,7 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       request: async (...args) => {
         calls.push('phase-1');
         return request(...args);
@@ -453,7 +503,7 @@ describe('runCoordinator', () => {
         }
       }
     );
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 6 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
     assert.deepEqual(memory.calls, [
       'get-latest',
@@ -472,10 +522,14 @@ describe('runCoordinator', () => {
       'get:1',
       'start:5',
       'progress:5',
-      'complete:5'
+      'complete:5',
+      'get:1',
+      'start:6',
+      'progress:6',
+      'complete:6'
     ]);
-    assert.equal(memory.runs[0].lastPhaseStarted, 5);
-    assert.equal(memory.runs[0].lastPhaseCompleted, 5);
+    assert.equal(memory.runs[0].lastPhaseStarted, 6);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
     assert.equal(memory.runs[0].runCompleted, false);
     assert.equal(memory.runs[0].backupPath, successfulBackup.backupPath);
     assert.equal(memory.runs[0].backupByteSize, '2048');
@@ -607,6 +661,7 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => ({
@@ -621,7 +676,7 @@ describe('runCoordinator', () => {
     assert.equal(completion?.metadata?.eligibleCount, 0);
     assert.equal(completion?.metadata?.processedCount, 0);
     assert.equal(completion?.metadata?.deletedCount, 0);
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 6 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
   });
 
   it('continues a recent run at the Phase 4 boundary without rerunning Phases 1 through 3', async () => {
@@ -665,6 +720,7 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       now: () => new Date('2026-10-03T12:00:00.000Z'),
       request: async () => {
         phaseCalls += 1;
@@ -691,10 +747,14 @@ describe('runCoordinator', () => {
       'get:12',
       'start:5',
       'progress:5',
-      'complete:5'
+      'complete:5',
+      'get:12',
+      'start:6',
+      'progress:6',
+      'complete:6'
     ]);
     assert.equal(memory.runs.length, 1);
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 6 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
   });
 
   it('does not invoke Phase 1 when recording its start fails', async () => {
@@ -762,6 +822,7 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => successfulDeletion
@@ -771,7 +832,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].id, 7);
     assert.equal(memory.runs[0].lastPhaseCompleted, 1);
     assert.equal(memory.runs[1].id, 8);
-    assert.equal(memory.runs[1].lastPhaseCompleted, 5);
+    assert.equal(memory.runs[1].lastPhaseCompleted, 6);
   });
 
   it('continues only the explicit run ID and never searches for a substitute', async () => {
@@ -793,6 +854,7 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       invocation: { mode: 'continue', runId: 4 },
       now: () => new Date('2026-10-03T12:00:00.000Z')
     });
@@ -807,7 +869,11 @@ describe('runCoordinator', () => {
       'get:4',
       'start:5',
       'progress:5',
-      'complete:5'
+      'complete:5',
+      'get:4',
+      'start:6',
+      'progress:6',
+      'complete:6'
     ]);
     assert.equal(memory.runs.length, 2);
   });
@@ -985,13 +1051,14 @@ describe('runCoordinator', () => {
       persistence: memory.persistence,
       rssWorker: worker,
       runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner,
       now: () => new Date('2026-10-05T10:00:00.000Z'),
       delay: async () => undefined
     });
 
     assert.equal(starts, 1);
     assert.equal(memory.runs[0].rssJobId, 'replacement-job');
-    assert.equal(memory.runs[0].lastPhaseCompleted, 5);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
     assert.equal(memory.calls.some((call) => call.startsWith('start:1')), false);
   });
 
@@ -1025,7 +1092,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].lastPhaseCompleted, 4);
     assert.equal(memory.runs[0].lastError?.phase, 5);
     assert.equal(memory.calls.includes('failure:5'), true);
-    assert.equal(entries.some((entry) => entry.message.includes('Phase 6 boundary')), false);
+    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 boundary')), false);
   });
 
   it('skips completed Phase 4 and runs Phase 5 from persisted state', async () => {
@@ -1048,15 +1115,16 @@ describe('runCoordinator', () => {
         rssCalls += 1;
         throw new Error('RSS should be skipped');
       },
-      runSemantic: successfulSemanticRunner
+      runSemantic: successfulSemanticRunner,
+      runState: successfulStateRunner
     });
 
     assert.equal(rssCalls, 0);
-    assert.equal(memory.runs[0].lastPhaseCompleted, 5);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
     assert.ok(entries.some((entry) => entry.message.includes('Phase 4 already completed')));
   });
 
-  it('skips both worker phases when Phase 5 is already complete', async () => {
+  it('skips Phases 4 and 5 and runs Phase 6 when Phase 5 is already complete', async () => {
     const { logger, entries } = recordingLogger();
     const memory = createInMemoryPersistence([
       createRunRecord({
@@ -1083,12 +1151,135 @@ describe('runCoordinator', () => {
       runSemantic: async () => {
         workerCalls += 1;
         throw new Error('semantic scoring should be skipped');
-      }
+      },
+      runState: successfulStateRunner
     });
 
     assert.equal(workerCalls, 0);
     assert.ok(entries.some((entry) => entry.message.includes('Phase 5 already completed')));
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 6 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+  });
+
+  it('records a Phase 6 failure while preserving completed Phase 5', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 24,
+        lastPhaseStarted: 5,
+        lastPhaseCompleted: 5,
+        articleCount: 5,
+        rssJobId: 'rss-complete',
+        semanticScorerJobId: 'semantic-complete',
+        phaseData: {
+          phase4: { status: 'completed' },
+          phase5: { status: 'completed', startedAt: '2026-10-05T09:00:00.000Z' }
+        }
+      })
+    ]);
+    const failure = new RunStateAssignmentError(
+      'incompatible_contract',
+      'state assigner parameters are missing'
+    );
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        runState: async () => {
+          throw failure;
+        }
+      }),
+      failure
+    );
+
+    assert.equal(memory.runs[0].lastPhaseCompleted, 5);
+    assert.equal(memory.runs[0].lastError?.phase, 6);
+    assert.equal(memory.runs[0].lastError?.category, 'incompatible_contract');
+    assert.equal(memory.calls.includes('failure:6'), true);
+    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 boundary')), false);
+  });
+
+  it('continues a saved Phase 6 job through the injected state runner', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 25,
+        lastPhaseStarted: 6,
+        lastPhaseCompleted: 5,
+        articleCount: 5,
+        rssJobId: 'rss-complete',
+        semanticScorerJobId: 'semantic-complete',
+        stateAssignerJobId: 'saved-state-job',
+        targetArticleThresholdDaysOld: 180,
+        phaseData: {
+          phase4: { status: 'completed' },
+          phase5: { status: 'completed', startedAt: '2026-10-05T09:00:00.000Z' },
+          phase6: {
+            status: 'started',
+            startedAt: '2026-10-05T10:00:00.000Z',
+            input: {
+              targetArticleThresholdDaysOld: 180,
+              targetArticleStateReviewCount: 5
+            }
+          }
+        }
+      })
+    ]);
+    let receivedJobId: string | null = null;
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      runState: async (run, stateConfig, stateDependencies) => {
+        receivedJobId = run.stateAssignerJobId;
+        return successfulStateRunner(run, stateConfig, stateDependencies);
+      }
+    });
+
+    assert.equal(receivedJobId, 'saved-state-job');
+    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
+    assert.equal(memory.runs[0].runCompleted, false);
+  });
+
+  it('skips all worker phases when Phase 6 is already complete', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 26,
+        lastPhaseStarted: 6,
+        lastPhaseCompleted: 6,
+        articleCount: 5,
+        rssJobId: 'rss-complete',
+        semanticScorerJobId: 'semantic-complete',
+        stateAssignerJobId: 'state-complete',
+        targetArticleThresholdDaysOld: 180,
+        phaseData: {
+          phase4: { status: 'completed' },
+          phase5: { status: 'completed' },
+          phase6: { status: 'completed' }
+        }
+      })
+    ]);
+    let workerCalls = 0;
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      collectRss: async () => {
+        workerCalls += 1;
+        throw new Error('RSS should be skipped');
+      },
+      runSemantic: async () => {
+        workerCalls += 1;
+        throw new Error('semantic scoring should be skipped');
+      },
+      runState: async () => {
+        workerCalls += 1;
+        throw new Error('state assignment should be skipped');
+      }
+    });
+
+    assert.equal(workerCalls, 0);
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 6 already completed')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+    assert.equal(memory.runs[0].runCompleted, false);
   });
 
   it('rejects an ineligible explicit run without writing or starting a phase', async () => {
