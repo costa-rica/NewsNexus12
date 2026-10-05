@@ -167,16 +167,37 @@ Optional:
 
 The article-content scraper uses Playwright, which requires a Chromium binary in the runtime environment.
 
-Typical setup:
+Install Chromium after the initial dependency installation and whenever the installed Playwright package version changes. Playwright browser revisions must match the package version used by worker-node.
+
+Typical local setup:
 
 1. `npm install`
 2. `npm run build`
 3. `npm run playwright:browsers:install`
 
-On Ubuntu servers, install the browser as the same user that runs `worker-node`. For example:
+On the Ubuntu servers, install the browser as `limited_user`, which is the account that runs worker-node. Use its home directory so Playwright installs into the same cache that the service reads:
 
 ```bash
-sudo -u limited_user npm run playwright:browsers:install
+sudo -u limited_user -H env \
+  HOME=/home/limited_user \
+  PLAYWRIGHT_SKIP_BROWSER_GC=1 \
+  bash -lc '
+    cd /home/limited_user/applications/NewsNexus12
+    ./node_modules/.bin/playwright install chromium
+  '
+```
+
+Do not install the browser only as `nick` or `root`; those accounts use different Playwright caches. After installation, restart worker-node so subsequent jobs use the verified deployment environment.
+
+To list the browser revisions available to the service account:
+
+```bash
+sudo -u limited_user -H env \
+  HOME=/home/limited_user \
+  bash -lc '
+    cd /home/limited_user/applications/NewsNexus12
+    ./node_modules/.bin/playwright install --list
+  '
 ```
 
 ## Documentation
