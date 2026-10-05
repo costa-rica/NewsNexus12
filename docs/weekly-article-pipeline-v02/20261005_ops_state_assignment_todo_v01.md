@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:14:59Z
+updated_at: 2026-10-05T23:16:50Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -309,30 +309,30 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 6: Update Operator Documentation
 
-- [ ] Add all four Phase 6 settings and defaults to `ops/.env.example`.
-- [ ] Set or document the production threshold as 180 days and the monitoring limit as 12 hours.
-- [ ] Update `ops/README.md` so weekly-flow-02 runs Phases 1–6 and stops at the Phase 7 boundary.
-- [ ] Document the exact start body and that `articleCount` remains unchanged for Phase 7.
-- [ ] Document result-count meanings and accepted partial outcomes.
-- [ ] Document immediate first polling, later five-minute polling, request timeout, transient failures, and the 12-hour limit.
-- [ ] Document monitoring-limit cancellation, nonzero exit, marker identity, and later replacement.
-- [ ] Document incompatible-worker detection, active cancellation, one marked replacement, and permanent stop after a second incompatible job.
-- [ ] Document that compatible worker-node must be deployed and restarted before the Phase 6 ops build is run.
-- [ ] Document that replacement starts a new full newest-first selection rather than resuming only unfinished Articles.
-- [ ] Document potential additional AI work and older-Article selection for monitoring, incompatible-contract, and persistence-gap replacements.
-- [ ] Document the accepted unsaved replacement-ID gap without adding unsupported recovery commands.
-- [ ] Document correlation through `stateAssignerJobId`, worker parameters, and coordinator logs.
-- [ ] Update `ops/AGENTS.md` with the implemented Phase 6 contract, recovery rules, safety limits, and Phase 7 boundary.
-- [ ] Keep destructive-run warnings and database-free verification commands accurate.
-- [ ] Run the Phase 6 checkpoint:
+- [x] Add all four Phase 6 settings and defaults to `ops/.env.example`.
+- [x] Set or document the production threshold as 180 days and the monitoring limit as 12 hours.
+- [x] Update `ops/README.md` so weekly-flow-02 runs Phases 1–6 and stops at the Phase 7 boundary.
+- [x] Document the exact start body and that `articleCount` remains unchanged for Phase 7.
+- [x] Document result-count meanings and accepted partial outcomes.
+- [x] Document immediate first polling, later five-minute polling, request timeout, transient failures, and the 12-hour limit.
+- [x] Document monitoring-limit cancellation, nonzero exit, marker identity, and later replacement.
+- [x] Document incompatible-worker detection, active cancellation, one marked replacement, and permanent stop after a second incompatible job.
+- [x] Document that compatible worker-node must be deployed and restarted before the Phase 6 ops build is run.
+- [x] Document that replacement starts a new full newest-first selection rather than resuming only unfinished Articles.
+- [x] Document potential additional AI work and older-Article selection for monitoring, incompatible-contract, and persistence-gap replacements.
+- [x] Document the accepted unsaved replacement-ID gap without adding unsupported recovery commands.
+- [x] Document correlation through `stateAssignerJobId`, worker parameters, and coordinator logs.
+- [x] Update `ops/AGENTS.md` with the implemented Phase 6 contract, recovery rules, safety limits, and Phase 7 boundary.
+- [x] Keep destructive-run warnings and database-free verification commands accurate.
+- [x] Run the Phase 6 checkpoint:
   1. Build `db-models`.
   2. Build and test worker-node.
   3. Run the ops type check.
   4. Run the complete ops test suite.
   5. Build ops.
   6. Fix failures and repeat all checks.
-- [ ] Check off completed Phase 6 tasks.
-- [ ] Commit only Phase 6 documentation and example-configuration changes.
+- [x] Check off completed Phase 6 tasks.
+- [x] Commit only Phase 6 documentation and example-configuration changes.
 
 ## Phase 7: Final Regression and Handoff
 

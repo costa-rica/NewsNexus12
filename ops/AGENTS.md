@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:11:53Z
-updated_at: 2026-10-05T22:11:53Z
+updated_at: 2026-10-05T23:14:59Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -62,11 +62,12 @@ Weekly-flow-02 currently implements:
 3. Delete old, unprotected Articles through db-manager.
 4. Collect Google News RSS Articles through worker-node.
 5. Run semantic scoring through worker-node.
-6. Stop at the Phase 6 boundary without marking a positive-work run complete.
+6. Run state assignment through worker-node.
+7. Stop at the Phase 7 boundary without marking a positive-work run complete.
 
 - Phase 4 zero work atomically completes the run.
 - A positive Phase 4 `articleCount` is immutable and is not sent to the semantic scorer.
-- Phases 6 and 7 are not implemented.
+- Phase 7 is not implemented.
 
 ## Run Selection and Continuation
 
@@ -76,7 +77,7 @@ Weekly-flow-02 currently implements:
 - `--continue-run ID` targets that exact eligible run.
 - Runs stopped during Phases 1–3 are replaced rather than continued.
 - Runs past Phase 3 can continue through exactly 72 hours from the original `runStartedAt`.
-- Completed Phase 4 and Phase 5 results are reused without restarting their worker jobs.
+- Completed Phase 4, Phase 5, and Phase 6 results are reused without restarting their worker jobs.
 - Preserve the original run ID, start time, Phase 4 high-water marks, first RSS IDs, and finalized `articleCount` during continuation.
 
 ## Single-Execution Guard
@@ -133,20 +134,67 @@ Monitoring-limit rules:
 
 Ops cannot infer semantic zero work or prove per-Article scoring coverage. A validated queue-level `completed` record is the Phase 5 success contract.
 
+## Phase 6 Worker Contract
+
+- Start with `POST /state-assigner/start-job` and exactly the persisted threshold and Article count.
+- The production threshold is 180 days and the monitoring limit is 12 hours.
+- Preserve the Phase 4 `articleCount`; do not recalculate, reduce, or overwrite it.
+- Do not send Article IDs, ID ranges, `includeArticlesThatMightHaveBeenStateAssigned`, AI keys, prompt text, Article content, or filesystem paths.
+- Poll immediately, then every configured interval without overlapping requests.
+- Validate worker endpoint identity, job ID, lifecycle timestamps, exact queue parameters, result inputs, nonnegative counts, and the count invariant.
+- A completed result may select zero Articles or contain skipped and failed Articles.
+- Stop on the third consecutive transient status failure and reset the counter after a valid response.
+- Stop immediately on permanent or malformed responses.
+- Start no more than one state-assigner job per coordinator invocation.
+
+Phase 6 replacement rules:
+
+1. A failed, canceled, unavailable, or inactive monitoring-limited saved job can be replaced once in an invocation.
+2. A saved active job is monitored rather than replaced.
+3. A job started or canceled during the current invocation is not replaced in that invocation.
+4. A Phase 6 start without a saved job ID is an accepted persistence gap eligible for one start.
+5. Replacements perform a new full newest-first selection and can spend additional AI work on older eligible Articles.
+
+Phase 6 monitoring-limit rules:
+
+1. Persist a marker tied to job ID and validated `createdAt` before cancellation.
+2. After `cancel_requested`, wait one interval and perform one final lookup.
+3. After cancellation 404, perform one lookup and classify the result.
+4. Never trust or complete Phase 6 from a matching marked job.
+5. Exit nonzero on every monitoring-limit branch.
+6. On continuation, re-cancel a matching active job or replace it only after verified inactivity.
+
+Phase 6 incompatible-contract rules:
+
+1. Missing required queue parameters use the dedicated incompatible-contract path.
+2. Persist the source identity and missing fields before canceling an active job.
+3. Never trust the incompatible source result.
+4. Permit one marked replacement after the source is inactive or unavailable.
+5. Save the replacement job ID and consumed marker atomically.
+6. Stop immediately if that persistence write fails. A later duplicate start remains an accepted gap.
+7. Cancel an incompatible marked replacement when active and never start a second recovery replacement.
+8. Allow a compatible marked replacement to complete only after the full contract validates.
+
 ## Persistence Rules
 
 - Use `WeeklyArticleFlowRuns02` for durable progress and recovery state.
-- Use the dedicated Phase 4 and Phase 5 persistence operations.
-- Generic `recordPhaseCompleted` must not complete Phase 5.
+- Use the dedicated Phase 4, Phase 5, and Phase 6 persistence operations.
+- Generic `recordPhaseCompleted` must not complete Phase 5 or Phase 6.
 - Persist `semanticScorerJobId` immediately after a successful start.
 - Store ordinary Phase 5 observations under `phaseData.phase5.latestProgress`.
 - Update `phaseData.phase5.monitoringLimit` only through the explicit monitoring-limit input.
 - Preserve sibling start, marker, result, and failure data during progress writes.
 - Record Phase 5 failures with `phase: 5` and leave Phase 4 complete.
+- Persist immutable Phase 6 inputs before starting worker-node and validate the audit mirror on every Phase 6 write.
+- Persist `stateAssignerJobId` immediately after a successful start response.
+- Store ordinary Phase 6 observations under `phaseData.phase6.latestProgress`.
+- Preserve Phase 6 monitoring and incompatible-contract markers through ordinary progress writes.
+- Record Phase 6 failures with `phase: 6` and leave Phase 5 complete.
 
 ## Schema Rollout
 
 - Phase 5 uses the existing `semanticScorerJobId` column and JSON phase data. It adds no schema fields.
+- Phase 6 uses the existing `stateAssignerJobId` and `targetArticleThresholdDaysOld` columns and JSON phase data. It adds no schema fields.
 - Phase 4 requires `newsApiRequestIdHighWaterMark` and `articleIdHighWaterMark` on `WeeklyArticleFlowRuns02`.
 - Before a real run, verify that both columns exist and that the application role has access.
 - If the model changes require rebuild and replenish, take the replenish backup with the old model build before deploying the new model.
@@ -159,6 +207,8 @@ Ops cannot infer semantic zero work or prove per-Article scoring coverage. A val
 - Do not delete a possible backup artifact after a Phase 2 timeout.
 - Phase 3 can partially delete before a timeout or process failure; do not retry or restore automatically.
 - If repeated Phase 5 attempts cannot stop a marked job, inspect worker-node logs and queue state. Tell the operator that a manual worker-node restart may be necessary.
+- If repeated Phase 6 attempts cannot stop a marked job, inspect worker-node logs and queue state. Tell the operator that a manual worker-node restart may be necessary.
+- Deploy and restart compatible worker-node code before running the Phase 6 ops build.
 - Never log credentials, environment secrets, Article text, keyword contents, or database connection secrets.
 - Suppress nested database diagnostics when an error references the `Users` table, following the persistence adapter's existing policy.
 
@@ -168,3 +218,5 @@ Ops cannot infer semantic zero work or prove per-Article scoring coverage. A val
 - `docs/weekly-article-pipeline-v02/20261003_weekly_flow_02_persistence_plan_v03.md`
 - `docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_plan_v03.md`
 - `docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_todo_v02.md`
+- `docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_plan_v04.md`
+- `docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_todo_v01.md`
