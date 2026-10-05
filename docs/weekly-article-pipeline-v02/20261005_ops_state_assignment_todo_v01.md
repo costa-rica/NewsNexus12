@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:16:50Z
+updated_at: 2026-10-05T23:18:42Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -336,45 +336,45 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 7: Final Regression and Handoff
 
-- [ ] Confirm every accepted V04 plan requirement and final-review decision is implemented.
-- [ ] Confirm the dedicated missing-contract recovery path overrides the conflicting generic wording noted in final review.
-- [ ] Confirm the replacement-ID persistence failure remains an accepted gap and did not cause new lookup or deduplication scope.
-- [ ] Confirm no db-models schema change was introduced.
-- [ ] Confirm no archive file was modified.
-- [ ] Confirm `ops/package.json` executes both new Phase 6 test files.
-- [ ] Confirm every coordinator test that can reach Phase 6 injects controlled dependencies.
-- [ ] Confirm default tests do not open network or PostgreSQL connections or start real AI processes.
-- [ ] Build `db-models`.
-- [ ] Build worker-node.
-- [ ] Run the complete worker-node test suite.
-- [ ] Run the ops type check.
-- [ ] Run the complete ops test suite.
-- [ ] Build ops.
-- [ ] Run `git diff --check`.
-- [ ] Review the diff for accidental Phase 7, systemd, schema, real-environment, or generic-framework scope.
-- [ ] Fix failures and repeat the full sequence.
-- [ ] Check off completed Phase 7 tasks.
-- [ ] Commit verification fixes if any; do not create an empty commit.
-- [ ] Demonstrate the database-free worker and ops Phase 6 tests to the operator.
+- [x] Confirm every accepted V04 plan requirement and final-review decision is implemented.
+- [x] Confirm the dedicated missing-contract recovery path overrides the conflicting generic wording noted in final review.
+- [x] Confirm the replacement-ID persistence failure remains an accepted gap and did not cause new lookup or deduplication scope.
+- [x] Confirm no db-models schema change was introduced.
+- [x] Confirm no archive file was modified.
+- [x] Confirm `ops/package.json` executes both new Phase 6 test files.
+- [x] Confirm every coordinator test that can reach Phase 6 injects controlled dependencies.
+- [x] Confirm default tests do not open network or PostgreSQL connections or start real AI processes.
+- [x] Build `db-models`.
+- [x] Build worker-node.
+- [x] Run the complete worker-node test suite.
+- [x] Run the ops type check.
+- [x] Run the complete ops test suite.
+- [x] Build ops.
+- [x] Run `git diff --check`.
+- [x] Review the diff for accidental Phase 7, systemd, schema, real-environment, or generic-framework scope.
+- [x] Fix failures and repeat the full sequence.
+- [x] Check off completed Phase 7 tasks.
+- [x] Commit verification fixes if any; do not create an empty commit.
+- [x] Demonstrate the database-free worker and ops Phase 6 tests to the operator.
 
 ## Completion Criteria
 
-- [ ] Worker queue records persist the two non-secret state-assigner targeting parameters.
-- [ ] Worker completed results contain valid selected, completed, skipped, and failed counts.
-- [ ] Abort-like text cannot end an active job early or create a malformed completed result.
-- [ ] Phase 6 starts with the persisted 180-day threshold and unchanged `articleCount`.
-- [ ] Original Phase 6 start and inputs remain immutable through continuation.
-- [ ] Queue identity, parameters, timestamps, lifecycle, and completed result all validate before completion.
-- [ ] Missing parameters use the durable incompatible-contract recovery path.
-- [ ] An active incompatible job is canceled and never trusted.
-- [ ] One inactive incompatible job can receive one compatible replacement.
-- [ ] A second incompatible job cannot create another replacement.
-- [ ] The accepted unsaved replacement-ID gap is tested and documented.
-- [ ] Twelve hours triggers marking, cancellation, Phase 6 failure, nonzero exit, and lock release.
-- [ ] Completed zero-work and partial Article outcomes advance to Phase 7 without completing the run.
-- [ ] `articleCount` remains unchanged for AI Approver V02.
-- [ ] Generic Phase completion cannot bypass Phase 6 persistence protections.
-- [ ] Completed Phase 6 is skipped correctly during continuation.
-- [ ] Phase 6 failure leaves Phase 5 complete.
-- [ ] Successful Phase 6 leaves the run incomplete at the Phase 7 boundary.
-- [ ] Worker-node and ops type checks, tests, builds, and diff checks pass.
+- [x] Worker queue records persist the two non-secret state-assigner targeting parameters.
+- [x] Worker completed results contain valid selected, completed, skipped, and failed counts.
+- [x] Abort-like text cannot end an active job early or create a malformed completed result.
+- [x] Phase 6 starts with the persisted 180-day threshold and unchanged `articleCount`.
+- [x] Original Phase 6 start and inputs remain immutable through continuation.
+- [x] Queue identity, parameters, timestamps, lifecycle, and completed result all validate before completion.
+- [x] Missing parameters use the durable incompatible-contract recovery path.
+- [x] An active incompatible job is canceled and never trusted.
+- [x] One inactive incompatible job can receive one compatible replacement.
+- [x] A second incompatible job cannot create another replacement.
+- [x] The accepted unsaved replacement-ID gap is tested and documented.
+- [x] Twelve hours triggers marking, cancellation, Phase 6 failure, nonzero exit, and lock release.
+- [x] Completed zero-work and partial Article outcomes advance to Phase 7 without completing the run.
+- [x] `articleCount` remains unchanged for AI Approver V02.
+- [x] Generic Phase completion cannot bypass Phase 6 persistence protections.
+- [x] Completed Phase 6 is skipped correctly during continuation.
+- [x] Phase 6 failure leaves Phase 5 complete.
+- [x] Successful Phase 6 leaves the run incomplete at the Phase 7 boundary.
+- [x] Worker-node and ops type checks, tests, builds, and diff checks pass.
