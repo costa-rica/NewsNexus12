@@ -16,6 +16,8 @@ import {
   type PhaseFourHighWaterMarks,
   type PhaseFourNonzeroCompletionFields,
   type PhaseFourProgress,
+  type PhaseFiveProgress,
+  type PhaseFiveCompletionFields,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
   WeeklyFlowPersistenceError,
@@ -250,6 +252,19 @@ const assertPhaseFourInProgress = (run: WeeklyFlowRunInstance): void => {
   }
 };
 
+const assertPhaseFiveInProgress = (run: WeeklyFlowRunInstance): void => {
+  if (run.runCompleted || run.lastPhaseStarted !== 5 || (run.lastPhaseCompleted ?? 0) !== 4) {
+    throw new WeeklyFlowPersistenceError('Phase 5 is not the active incomplete phase');
+  }
+};
+
+const phaseRecord = (phaseData: unknown, phase: WeeklyFlowPhase): JsonRecord => {
+  const value = asJsonRecord(phaseData)[phaseKey(phase)];
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : {};
+};
+
 const requirePhaseFourMarks = (run: WeeklyFlowRunInstance): PhaseFourHighWaterMarks => {
   const newsApiRequestIdHighWaterMark = asNullableNonNegativeSafeInteger(
     run.newsApiRequestIdHighWaterMark,
@@ -452,6 +467,9 @@ export const createSequelizeWeeklyFlowPersistence = (
   },
 
   async recordPhaseCompleted(runId, phase, completedAt, phaseResult, fields = {}) {
+    if (phase === 5) {
+      throw new WeeklyFlowPersistenceError('Phase 5 must complete through recordPhaseFiveCompleted');
+    }
     return performPersistenceOperation(`Phase ${phase} completion could not be persisted`, async () => {
       const run = await requireRun(model, runId);
       assertCanCompletePhase(run, phase);
@@ -569,6 +587,109 @@ export const createSequelizeWeeklyFlowPersistence = (
         }),
         runCompleted: true,
         runCompletedAt: completedAt
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFiveStarted(runId, startedAt) {
+    requireValidDate(startedAt, 'Phase 5 start time');
+    return performPersistenceOperation('Phase 5 start could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertCanStartPhase(run, 5);
+      if (run.articleCount === null || run.articleCount <= 0) {
+        throw new WeeklyFlowPersistenceError('Phase 5 requires a positive articleCount');
+      }
+      if (run.lastPhaseStarted === 5 || phaseRecord(run.phaseData, 5).startedAt !== undefined) {
+        throw new WeeklyFlowPersistenceError('Phase 5 has already started');
+      }
+      await run.update({
+        lastPhaseStarted: 5,
+        phaseData: mergePhaseData(run.phaseData, 5, {
+          status: 'started',
+          startedAt: startedAt.toISOString()
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFiveProgress(runId, progress: PhaseFiveProgress) {
+    requireValidDate(progress.observedAt, 'Phase 5 progress time');
+    return performPersistenceOperation('Phase 5 progress could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseFiveInProgress(run);
+      const existing = phaseRecord(run.phaseData, 5);
+      if (typeof existing.startedAt !== 'string') {
+        throw new WeeklyFlowPersistenceError('Phase 5 start timestamp is missing');
+      }
+      const jobId = progress.semanticScorerJobId === undefined
+        ? run.semanticScorerJobId
+        : requireNonEmptyString(progress.semanticScorerJobId, 'semanticScorerJobId');
+      const latestProgress: JsonRecord = { observedAt: progress.observedAt.toISOString() };
+      for (const [key, value] of Object.entries({
+        jobId,
+        status: progress.status,
+        jobCreatedAt: progress.jobCreatedAt,
+        startedAt: progress.startedAt,
+        endedAt: progress.endedAt,
+        failureReason: progress.failureReason
+      })) {
+        if (value !== undefined && value !== null) latestProgress[key] = value;
+      }
+      const additions: JsonRecord = { latestProgress };
+      if (progress.monitoringLimit) {
+        const limit = progress.monitoringLimit;
+        requireValidDate(limit.reachedAt, 'Phase 5 monitoring limit time');
+        additions.monitoringLimit = {
+          jobId: requireNonEmptyString(limit.jobId, 'monitoringLimit.jobId'),
+          jobCreatedAt: requireNonEmptyString(limit.jobCreatedAt, 'monitoringLimit.jobCreatedAt'),
+          reachedAt: limit.reachedAt.toISOString(),
+          ...(limit.cancellationRequestedAt
+            ? { cancellationRequestedAt: limit.cancellationRequestedAt.toISOString() }
+            : {}),
+          ...(limit.cancellationOutcome ? { cancellationOutcome: limit.cancellationOutcome } : {}),
+          ...(limit.verification ? { verification: asJsonRecord(limit.verification) } : {})
+        };
+      }
+      await run.update({
+        semanticScorerJobId: jobId,
+        phaseData: mergePhaseData(run.phaseData, 5, additions)
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseFiveCompleted(
+    runId,
+    completedAt,
+    phaseResult,
+    fields: PhaseFiveCompletionFields
+  ) {
+    requireValidDate(completedAt, 'Phase 5 completion time');
+    return performPersistenceOperation('Phase 5 completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseFiveInProgress(run);
+      const jobId = requireNonEmptyString(fields.semanticScorerJobId, 'semanticScorerJobId');
+      const jobCreatedAt = requireNonEmptyString(fields.jobCreatedAt, 'jobCreatedAt');
+      if (run.semanticScorerJobId !== jobId) {
+        throw new WeeklyFlowPersistenceError('Phase 5 completion job does not match the saved job');
+      }
+      const marker = phaseRecord(run.phaseData, 5).monitoringLimit;
+      if (typeof marker === 'object' && marker !== null && !Array.isArray(marker)) {
+        const value = marker as JsonRecord;
+        if (value.jobId === jobId && value.jobCreatedAt === jobCreatedAt) {
+          throw new WeeklyFlowPersistenceError('A monitoring-limited job cannot complete Phase 5');
+        }
+      }
+      await run.update({
+        semanticScorerJobId: jobId,
+        lastPhaseCompleted: 5,
+        phaseData: mergePhaseData(run.phaseData, 5, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          result: asJsonRecord(phaseResult)
+        })
       });
       return toRunRecord(run);
     });

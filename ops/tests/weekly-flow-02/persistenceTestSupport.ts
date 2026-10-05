@@ -211,6 +211,75 @@ export const createInMemoryPersistence = (
       };
       return touch(run, completedAt);
     },
+    async recordPhaseFiveStarted(runId, startedAt) {
+      calls.push('start:5');
+      const run = requireRun(runId);
+      if (run.lastPhaseStarted === 5) throw new Error('Phase 5 has already started');
+      run.lastPhaseStarted = 5;
+      run.phaseData.phase5 = { status: 'started', startedAt: startedAt.toISOString() };
+      return touch(run, startedAt);
+    },
+    async recordPhaseFiveProgress(runId, progress) {
+      calls.push('progress:5');
+      const run = requireRun(runId);
+      if (progress.semanticScorerJobId !== undefined) {
+        run.semanticScorerJobId = progress.semanticScorerJobId;
+      }
+      const existing = (run.phaseData.phase5 as Record<string, unknown>) ?? {};
+      const latestProgress: Record<string, unknown> = { observedAt: progress.observedAt.toISOString() };
+      for (const [key, value] of Object.entries({
+        jobId: run.semanticScorerJobId,
+        status: progress.status,
+        jobCreatedAt: progress.jobCreatedAt,
+        startedAt: progress.startedAt,
+        endedAt: progress.endedAt,
+        failureReason: progress.failureReason
+      })) if (value !== undefined && value !== null) latestProgress[key] = value;
+      run.phaseData.phase5 = {
+        ...existing,
+        latestProgress,
+        ...(progress.monitoringLimit
+          ? {
+              monitoringLimit: {
+                jobId: progress.monitoringLimit.jobId,
+                jobCreatedAt: progress.monitoringLimit.jobCreatedAt,
+                reachedAt: progress.monitoringLimit.reachedAt.toISOString(),
+                ...(progress.monitoringLimit.cancellationRequestedAt
+                  ? {
+                      cancellationRequestedAt:
+                        progress.monitoringLimit.cancellationRequestedAt.toISOString()
+                    }
+                  : {}),
+                ...(progress.monitoringLimit.cancellationOutcome
+                  ? { cancellationOutcome: progress.monitoringLimit.cancellationOutcome }
+                  : {}),
+                ...(progress.monitoringLimit.verification
+                  ? { verification: structuredClone(progress.monitoringLimit.verification) }
+                  : {})
+              }
+            }
+          : {})
+      };
+      return touch(run, progress.observedAt);
+    },
+    async recordPhaseFiveCompleted(runId, completedAt, phaseResult, fields) {
+      calls.push('complete:5');
+      const run = requireRun(runId);
+      const phase5 = (run.phaseData.phase5 as Record<string, unknown>) ?? {};
+      const marker = phase5.monitoringLimit as Record<string, unknown> | undefined;
+      if (marker?.jobId === fields.semanticScorerJobId && marker.jobCreatedAt === fields.jobCreatedAt) {
+        throw new Error('A monitoring-limited job cannot complete Phase 5');
+      }
+      run.semanticScorerJobId = fields.semanticScorerJobId;
+      run.lastPhaseCompleted = 5;
+      run.phaseData.phase5 = {
+        ...phase5,
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        result: structuredClone(phaseResult)
+      };
+      return touch(run, completedAt);
+    },
     async recordFailure(runId, failure) {
       calls.push(`failure:${failure.phase ?? 'run'}`);
       const run = requireRun(runId);

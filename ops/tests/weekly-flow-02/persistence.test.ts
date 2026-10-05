@@ -119,6 +119,101 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
+  it('protects Phase 5 start, marker state, and dedicated completion', async () => {
+    const run = mockRun({
+      id: 50,
+      lastPhaseStarted: 4,
+      lastPhaseCompleted: 4,
+      articleCount: 3,
+      phaseData: { phase4: { status: 'completed' } }
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    const phaseStartedAt = new Date('2026-10-05T09:00:00Z');
+    await persistence.recordPhaseFiveStarted(50, phaseStartedAt);
+    await assert.rejects(persistence.recordPhaseFiveStarted(50, new Date()), /already started/);
+    await persistence.recordPhaseFiveProgress(50, {
+      observedAt: new Date('2026-10-05T09:01:00Z'),
+      semanticScorerJobId: 'semantic-1',
+      status: 'running',
+      jobCreatedAt: '2026-10-05T09:00:01.000Z',
+      monitoringLimit: {
+        jobId: 'semantic-1',
+        jobCreatedAt: '2026-10-05T09:00:01.000Z',
+        reachedAt: new Date('2026-10-05T15:00:00Z')
+      }
+    });
+    await persistence.recordPhaseFiveProgress(50, {
+      observedAt: new Date('2026-10-05T15:01:00Z'),
+      status: 'canceled'
+    });
+    assert.equal(
+      (run.phaseData.phase5 as Record<string, unknown>).monitoringLimit !== undefined,
+      true
+    );
+    await assert.rejects(
+      persistence.recordPhaseFiveCompleted(50, new Date(), {}, {
+        semanticScorerJobId: 'semantic-1',
+        jobCreatedAt: '2026-10-05T09:00:01.000Z'
+      }),
+      /monitoring-limited/
+    );
+    await assert.rejects(
+      persistence.recordPhaseCompleted(50, 5, new Date(), {}),
+      /recordPhaseFiveCompleted/
+    );
+    await persistence.recordPhaseFiveProgress(50, {
+      observedAt: new Date('2026-10-05T15:02:00Z'),
+      semanticScorerJobId: 'semantic-2',
+      status: 'completed',
+      jobCreatedAt: '2026-10-05T15:01:00.000Z'
+    });
+    const completed = await persistence.recordPhaseFiveCompleted(50, new Date(), { status: 'completed' }, {
+      semanticScorerJobId: 'semantic-2',
+      jobCreatedAt: '2026-10-05T15:01:00.000Z'
+    });
+    assert.equal(completed.lastPhaseCompleted, 5);
+    assert.equal(completed.runCompleted, false);
+    assert.equal(completed.articleCount, 3);
+  });
+
+  it('allows a reused Phase 5 job ID only when its creation time differs from the marker', async () => {
+    const run = mockRun({
+      id: 51,
+      lastPhaseStarted: 4,
+      lastPhaseCompleted: 4,
+      articleCount: 2
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await persistence.recordPhaseFiveStarted(51, new Date('2026-10-05T10:00:00Z'));
+    await persistence.recordPhaseFiveProgress(51, {
+      observedAt: new Date('2026-10-05T16:00:00Z'),
+      semanticScorerJobId: 'reused-semantic-id',
+      status: 'running',
+      jobCreatedAt: '2026-10-05T10:00:01.000Z',
+      monitoringLimit: {
+        jobId: 'reused-semantic-id',
+        jobCreatedAt: '2026-10-05T10:00:01.000Z',
+        reachedAt: new Date('2026-10-05T16:00:00Z')
+      }
+    });
+    await persistence.recordPhaseFiveProgress(51, {
+      observedAt: new Date('2026-10-05T16:01:00Z'),
+      status: 'completed',
+      jobCreatedAt: '2026-10-05T16:00:30.000Z'
+    });
+
+    const completed = await persistence.recordPhaseFiveCompleted(
+      51,
+      new Date('2026-10-05T16:01:00Z'),
+      { status: 'completed' },
+      {
+        semanticScorerJobId: 'reused-semantic-id',
+        jobCreatedAt: '2026-10-05T16:00:30.000Z'
+      }
+    );
+    assert.equal(completed.lastPhaseCompleted, 5);
+  });
+
   it('validates typed Phase 4 high-water marks when reading a run', async () => {
     const valid = mockRun({
       id: 5,

@@ -167,6 +167,31 @@ export interface PhaseFourCompletionFields {
   rssJobId: string | null;
 }
 
+export interface PhaseFiveMonitoringLimit {
+  jobId: string;
+  jobCreatedAt: string;
+  reachedAt: Date;
+  cancellationRequestedAt?: Date;
+  cancellationOutcome?: string;
+  verification?: JsonRecord;
+}
+
+export interface PhaseFiveProgress {
+  observedAt: Date;
+  semanticScorerJobId?: string;
+  status?: string;
+  jobCreatedAt?: string;
+  startedAt?: string;
+  endedAt?: string;
+  failureReason?: string;
+  monitoringLimit?: PhaseFiveMonitoringLimit;
+}
+
+export interface PhaseFiveCompletionFields {
+  semanticScorerJobId: string;
+  jobCreatedAt: string;
+}
+
 export interface PhaseFourNonzeroCompletionFields extends PhaseFourCompletionFields {
   articleCount: number;
 }
@@ -219,6 +244,14 @@ export interface WeeklyFlowPersistence {
     completedAt: Date,
     phaseResult: JsonRecord,
     fields: PhaseFourCompletionFields
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFiveStarted(runId: number, startedAt: Date): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFiveProgress(runId: number, progress: PhaseFiveProgress): Promise<WeeklyFlowRunRecord>;
+  recordPhaseFiveCompleted(
+    runId: number,
+    completedAt: Date,
+    phaseResult: JsonRecord,
+    fields: PhaseFiveCompletionFields
   ): Promise<WeeklyFlowRunRecord>;
   recordFailure(runId: number, failure: WeeklyFlowFailure): Promise<WeeklyFlowRunRecord>;
   recordRunCompleted(runId: number, completedAt: Date): Promise<WeeklyFlowRunRecord>;
