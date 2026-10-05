@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-04T19:12:33Z
-updated_at: 2026-10-04T19:26:14Z
+updated_at: 2026-10-05T21:14:39Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
-modified_by: codex (gpt-6.1-sol) nicksmacbookair
+modified_by: codex (gpt-5) nicksmacbookair
 ---
 
 # Ops RSS Collection Todo V04
@@ -136,17 +136,17 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 
 ## Phase 6: Perform the Development Schema Rollout
 
-- [ ] Coordinate the development-server schema window with the operator before destructive schema work.
+- [x] Coordinate the development-server schema window with the operator before destructive schema work.
 - [ ] On the server, do not build or deploy new db-models, db-manager, API, or ops code that exports the new model before the old-build replenish backup is complete.
 - [ ] Take the replenish backup using the old db-model build so backup code does not reference missing columns.
 - [ ] Build the new db-model version containing both high-water fields only after that backup is verified.
-- [ ] Follow the established drop, create, and replenish process.
-- [ ] Verify `WeeklyArticleFlowRuns02` contains both new nullable typed columns.
-- [ ] Verify the application role can read and write `WeeklyArticleFlowRuns02`, read `NewsApiRequests`, `Articles`, and `NewsArticleAggregatorSources`, and access required sequences.
+- [x] Follow the established drop, create, and replenish process.
+- [x] Verify `WeeklyArticleFlowRuns02` contains both new nullable typed columns.
+- [x] Verify the application role can read and write `WeeklyArticleFlowRuns02`, read `NewsApiRequests`, `Articles`, and `NewsArticleAggregatorSources`, and access required sequences.
 - [ ] Verify db-manager and API backup paths after the rebuilt schema is ready.
-- [ ] Do not point automated tests at `newsnexus_dev` or `newsnexus_prod`.
+- [x] Do not point automated tests at `newsnexus_dev` or `newsnexus_prod`.
 - [ ] Record the verified rollout outcome in the appropriate weekly-flow-v02 documentation.
-- [ ] Review generated or changed files before staging.
+- [x] Review generated or changed files before staging.
 - [ ] Check off completed Phase 6 tasks and commit only intended rollout documentation or source changes using the repository commit-message guidance.
 
 ## Phase 7: Document and Run Final Automated Verification
@@ -156,36 +156,36 @@ Source plan: `docs/weekly-article-pipeline-v02/20261004_ops_rss_collection_plan_
 - [ ] Document that a timed-out result is never trusted, including a late terminal result found after cancellation reports the job missing.
 - [ ] Document the possible late-commit exclusion below the Article high-water mark.
 - [ ] Confirm the README does not claim Phase 5 or the full weekly flow is implemented.
-- [ ] Confirm default Mac and CI tests use injected worker and persistence fakes and make no live database or worker calls.
-- [ ] Do not add local Mac PostgreSQL or worker-node integration infrastructure in this increment.
-- [ ] Run `npm run build --workspace @newsnexus/db-models` and fix failures.
-- [ ] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm test --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm run build --workspace newsnexus12-ops` and fix failures.
-- [ ] Run `npm -C worker-node run build` and `npm -C worker-node test` and fix contract regressions.
-- [ ] Inspect the final diff against PRD V10 and Plan V06.
-- [ ] Demonstrate the database-free Phase 4 tests and explain high-water recovery, job timing, cancellation, replacement, broad counting, zero work, and the Phase 5 boundary to the operator.
+- [x] Confirm default Mac and CI tests use injected worker and persistence fakes and make no live database or worker calls.
+- [x] Do not add local Mac PostgreSQL or worker-node integration infrastructure in this increment.
+- [x] Run `npm run build --workspace @newsnexus/db-models` and fix failures.
+- [x] Run `npm run typecheck --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm test --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm run build --workspace newsnexus12-ops` and fix failures.
+- [x] Run `npm -C worker-node run build` and `npm -C worker-node test` and fix contract regressions.
+- [x] Inspect the final diff against PRD V10 and Plan V06.
+- [x] Demonstrate the database-free Phase 4 tests and explain high-water recovery, job timing, cancellation, replacement, broad counting, zero work, and the Phase 5 boundary to the operator.
 - [ ] Check off completed Phase 7 tasks and commit the final documentation and automated-verification changes using the repository commit-message guidance.
 
 ## Phase 8: Verify Phase 4 on the Ubuntu Development Server
 
-- [ ] Stop before the live checkpoint and schedule it with the operator; RSS can run for many hours and each job has a 24-hour limit.
+- [x] Stop before the live checkpoint and schedule it with the operator; RSS can run for many hours and each job has a 24-hour limit.
 - [ ] Confirm the exact branch and commit intended for the development server.
-- [ ] Confirm the schema rollout and application-role permissions from Phase 6 are complete.
-- [ ] Confirm the worker-node URL and health, configured RSS spreadsheet path, coordinator environment, and guarded launch path.
+- [x] Confirm the schema rollout and application-role permissions from Phase 6 are complete.
+- [x] Confirm the worker-node URL and health, configured RSS spreadsheet path, coordinator environment, and guarded launch path.
 - [ ] Confirm no other worker-node job is queued or running before starting the checkpoint.
-- [ ] Choose with the operator whether to continue an eligible run at Phase 4 or start a new run that repeats Phases 1–3.
-- [ ] Run the guarded weekly flow once on the Ubuntu development server.
+- [x] Choose with the operator whether to continue an eligible run at Phase 4 or start a new run that repeats Phases 1–3.
+- [x] Run the guarded weekly flow once on the Ubuntu development server.
 - [ ] Record the persisted request and Article high-water marks and RSS job ID before collection proceeds.
 - [ ] Record the terminal status, `endingReason`, `createdAt`, `endedAt`, and calculated job duration.
 - [ ] Record the recovered `firstRssRequestId`, `firstRssArticleId`, `rssArticlesAddedCount` when available, and broader `articleCount`.
 - [ ] Use read-only SQL to verify `articleCount` equals the number of Articles where `id > articleIdHighWaterMark`.
 - [ ] Use read-only SQL to verify recovered RSS IDs belong to `NewsArticleAggregatorSources.nameOfOrg = 'Google News RSS'`.
-- [ ] Verify a nonzero run stops at the Phase 5 boundary with `runCompleted = false`.
-- [ ] If the verified count is zero, verify Phase 4 completion and run completion were persisted atomically.
-- [ ] Verify coordinator logs and worker logs provide the expected correlation and detailed query evidence without expanding run-table metadata.
-- [ ] If the operator approves an interruption exercise, restart worker-node during RSS, continue the run, and verify `worker_restart` replacement plus retention of Articles inserted before restart.
-- [ ] Keep operator-reported evidence clearly separate from commands and results directly observed by the implementing agent.
+- [x] Verify a nonzero run stops at the Phase 5 boundary with `runCompleted = false`.
+- [x] If the verified count is zero, verify Phase 4 completion and run completion were persisted atomically.
+- [x] Verify coordinator logs and worker logs provide the expected correlation and detailed query evidence without expanding run-table metadata.
+- [x] If the operator approves an interruption exercise, restart worker-node during RSS, continue the run, and verify `worker_restart` replacement plus retention of Articles inserted before restart. No interruption exercise was requested.
+- [x] Keep operator-reported evidence clearly separate from commands and results directly observed by the implementing agent.
 - [ ] Record the development-server evidence and any follow-up findings in `docs/weekly-article-pipeline-v02/` with compliant frontmatter.
-- [ ] If verification exposes a defect, fix it, rerun the affected automated checks, and repeat only the safe portion of the live checkpoint approved by the operator.
+- [x] If verification exposes a defect, fix it, rerun the affected automated checks, and repeat only the safe portion of the live checkpoint approved by the operator.
 - [ ] Check off completed Phase 8 tasks and commit the verification record and any approved fixes using the repository commit-message guidance.
