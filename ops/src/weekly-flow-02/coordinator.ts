@@ -23,6 +23,15 @@ import {
   type GoogleNewsRssWorker
 } from './phases/04_collectGoogleNewsRss';
 import { GoogleNewsRssClientError } from './phases/04_googleNewsRssClient';
+import {
+  RunSemanticScoringError,
+  createSemanticScorerWorker,
+  runSemanticScoring,
+  type RunSemanticScoringDependencies,
+  type RunSemanticScoringResult,
+  type SemanticScorerWorker
+} from './phases/05_runSemanticScoring';
+import { SemanticScorerClientError } from './phases/05_semanticScorerClient';
 import type { WeeklyFlowInvocation } from './cli';
 import {
   WeeklyFlowPersistenceError,
@@ -54,12 +63,20 @@ type CollectRss = (
   dependencies: CollectGoogleNewsRssDependencies
 ) => Promise<CollectGoogleNewsRssResult>;
 
+type RunSemantic = (
+  run: WeeklyFlowRunRecord,
+  config: OpsConfig,
+  dependencies: RunSemanticScoringDependencies
+) => Promise<RunSemanticScoringResult>;
+
 export interface CoordinatorDependencies {
   request: WorkerRequest;
   createBackup: CreateBackup;
   deleteArticles: DeleteArticles;
   collectRss: CollectRss;
+  runSemantic: RunSemantic;
   rssWorker: GoogleNewsRssWorker;
+  semanticWorker: SemanticScorerWorker;
   delay: (milliseconds: number) => Promise<void>;
   persistence: WeeklyFlowPersistence;
   invocation: WeeklyFlowInvocation;
@@ -87,6 +104,8 @@ const phaseFailureCategory = (phase: WeeklyFlowPhase, error: unknown): string =>
   if (phase === 3 && error instanceof DeleteOldArticlesError) return error.category;
   if (phase === 4 && error instanceof CollectGoogleNewsRssError) return error.category;
   if (phase === 4 && error instanceof GoogleNewsRssClientError) return error.category;
+  if (phase === 5 && error instanceof RunSemanticScoringError) return error.category;
+  if (phase === 5 && error instanceof SemanticScorerClientError) return error.category;
   if (error instanceof WeeklyFlowPersistenceError) return 'persistence';
   return 'unknown';
 };
@@ -160,11 +179,14 @@ export async function runCoordinator(
   const createBackup = dependencies.createBackup ?? productionPhaseDependencies.createBackup;
   const deleteArticles = dependencies.deleteArticles ?? productionPhaseDependencies.deleteArticles;
   const collectRss = dependencies.collectRss ?? collectGoogleNewsRss;
+  const runSemantic = dependencies.runSemantic ?? runSemanticScoring;
   const persistence = dependencies.persistence;
   const invocation = dependencies.invocation ?? defaultInvocation;
   const now = dependencies.now ?? currentTime;
   const wait = dependencies.delay ?? delay;
   const rssWorker = dependencies.rssWorker ?? createGoogleNewsRssWorker(config, request);
+  const semanticWorker =
+    dependencies.semanticWorker ?? createSemanticScorerWorker(config, request);
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
   let selection;
@@ -291,45 +313,114 @@ export async function runCoordinator(
     }
   }
 
-  try {
-    logger.info('Phase 4 started or continued: collecting Google News RSS Articles', {
-      runId,
-      phase: 4,
-      savedJobId: activeRun.rssJobId
-    });
-    const result = await collectRss(activeRun, config, {
-      persistence,
-      worker: rssWorker,
-      now,
-      delay: wait,
-      onEvent: (event) => {
-        logger.info('Phase 4 RSS job event', { runId, phase: 4, ...event });
-      }
-    });
-    logger.info(
-      result.kind === 'zero_work'
-        ? 'Phase 4 completed with no downstream Articles; weekly run completed'
-        : 'Phase 4 completed; weekly pipeline stopped at the Phase 5 boundary',
-      {
+  if ((activeRun.lastPhaseCompleted ?? 0) < 4) {
+    try {
+      logger.info('Phase 4 started or continued: collecting Google News RSS Articles', {
         runId,
         phase: 4,
-        rssJobId: result.rssJobId,
-        firstRssRequestId: result.firstRssRequestId,
-        firstRssArticleId: result.firstRssArticleId,
-        rssArticlesAddedCount: result.rssArticlesAddedCount,
-        articleCount: result.articleCount,
-        runCompleted: result.kind === 'zero_work'
-      }
-    );
-  } catch (error: unknown) {
-    logger.error('Phase 4 stopped without a verified RSS completion', {
+        savedJobId: activeRun.rssJobId
+      });
+      const result = await collectRss(activeRun, config, {
+        persistence,
+        worker: rssWorker,
+        now,
+        delay: wait,
+        onEvent: (event) => {
+          logger.info('Phase 4 RSS job event', { runId, phase: 4, ...event });
+        }
+      });
+      logger.info(
+        result.kind === 'zero_work'
+          ? 'Phase 4 completed with no downstream Articles; weekly run completed'
+          : 'Phase 4 completed with downstream Articles',
+        {
+          runId,
+          phase: 4,
+          rssJobId: result.rssJobId,
+          firstRssRequestId: result.firstRssRequestId,
+          firstRssArticleId: result.firstRssArticleId,
+          rssArticlesAddedCount: result.rssArticlesAddedCount,
+          articleCount: result.articleCount,
+          runCompleted: result.kind === 'zero_work'
+        }
+      );
+      const refreshed = await persistence.getRunById(runId);
+      if (refreshed === null) throw new WeeklyFlowPersistenceError(`Weekly flow run ${runId} was not found`);
+      activeRun = refreshed;
+    } catch (error: unknown) {
+      logger.error('Phase 4 stopped without a verified RSS completion', {
+        runId,
+        phase: 4,
+        failureCategory: phaseFailureCategory(4, error),
+        error: failureMessage(error),
+        ...persistenceErrorDiagnostics(error)
+      });
+      await recordFailure(persistence, logger, runId, 4, error, now);
+      throw error;
+    }
+  } else {
+    logger.info('Phase 4 already completed; reusing persisted result', {
       runId,
       phase: 4,
-      failureCategory: phaseFailureCategory(4, error),
-      error: failureMessage(error),
-      ...persistenceErrorDiagnostics(error)
+      rssJobId: activeRun.rssJobId,
+      articleCount: activeRun.articleCount
     });
-    await recordFailure(persistence, logger, runId, 4, error, now);
-    throw error;
   }
+
+  if (activeRun.runCompleted) return;
+  if ((activeRun.lastPhaseCompleted ?? 0) < 5) {
+    if (activeRun.lastPhaseCompleted !== 4 || (activeRun.articleCount ?? 0) <= 0) {
+      const error = new RunSemanticScoringError(
+        'invalid_run_state',
+        'Phase 5 requires completed Phase 4 with a positive articleCount'
+      );
+      await recordFailure(persistence, logger, runId, 5, error, now);
+      throw error;
+    }
+    try {
+      logger.info('Phase 5 started or continued: monitoring semantic scoring', {
+        runId,
+        phase: 5,
+        savedJobId: activeRun.semanticScorerJobId
+      });
+      const result = await runSemantic(activeRun, config, {
+        persistence,
+        worker: semanticWorker,
+        now,
+        delay: wait,
+        onEvent: (event) => {
+          logger.info('Phase 5 semantic scorer event', { runId, phase: 5, ...event });
+        }
+      });
+      logger.info('Phase 5 completed: semantic scoring verified', {
+        runId,
+        phase: 5,
+        semanticScorerJobId: result.semanticScorerJobId,
+        jobCreatedAt: result.jobCreatedAt,
+        completedAt: result.completedAt
+      });
+    } catch (error: unknown) {
+      logger.error('Phase 5 stopped without verified semantic scoring completion', {
+        runId,
+        phase: 5,
+        failureCategory: phaseFailureCategory(5, error),
+        error: failureMessage(error),
+        ...persistenceErrorDiagnostics(error)
+      });
+      await recordFailure(persistence, logger, runId, 5, error, now);
+      throw error;
+    }
+  } else {
+    logger.info('Phase 5 already completed; reusing persisted result', {
+      runId,
+      phase: 5,
+      semanticScorerJobId: activeRun.semanticScorerJobId
+    });
+  }
+
+  logger.info('Weekly pipeline stopped at the Phase 6 boundary', {
+    runId,
+    lastPhaseCompleted: 5,
+    runCompleted: false
+  });
 }
