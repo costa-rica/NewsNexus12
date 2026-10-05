@@ -50,6 +50,21 @@ export interface StateAssignerJobContext extends StateAssignerJobInput {
   registerCancelableProcess: (handle: CancelableProcessHandle) => void;
 }
 
+export interface StateAssignerJobResult {
+  selectedCount: number;
+  completedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  targetArticleThresholdDaysOld: number;
+  targetArticleStateReviewCount: number;
+}
+
+export interface StateAssignerProcessingCounts {
+  completedCount: number;
+  skippedCount: number;
+  failedCount: number;
+}
+
 type AnalyzeStateAssignerArticle = (
   aiConfig: StateAssignerAiConfig,
   stateAssignerDirectories: StateAssignerDirectories,
@@ -83,13 +98,15 @@ interface ProcessStateAssignmentsOptions {
 }
 
 export interface StateAssignerJobDependencies {
-  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<void>;
+  runLegacyWorkflow?: (context: StateAssignerJobContext) => Promise<StateAssignerJobResult>;
   selectArticles?: typeof selectTargetArticles;
   enrichContent02?: typeof enrichArticleContent02;
   getCanonicalContent02Row?: typeof getCanonicalArticleContent02Row;
   analyzeWithOpenAi?: AnalyzeStateAssignerArticle;
   analyzeWithCodexCli?: AnalyzeStateAssignerArticle;
-  processAssignments?: (options: ProcessStateAssignmentsOptions) => Promise<void>;
+  processAssignments?: (
+    options: ProcessStateAssignmentsOptions
+  ) => Promise<StateAssignerProcessingCounts>;
   ensureDb?: typeof ensureDbReady;
   ensureDirectories?: typeof ensureStateAssignerDirectories;
   syncPrompts?: (promptsDir: string) => Promise<void>;
@@ -99,9 +116,6 @@ export interface StateAssignerJobDependencies {
 
 const LEGACY_AI_NAME = 'NewsNexusLlmStateAssigner01';
 const DEFAULT_ITERATION_TIMEOUT_MS = 10_000;
-
-const isAbortError = (error: unknown): boolean =>
-  error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'));
 
 const resolveEntityWhoCategorizesId = async (): Promise<number> => {
   const aiEntity = await ArtificialIntelligence.findOne({
@@ -278,10 +292,16 @@ export const processStateAssignmentsWithTimeout = async ({
   analyzeArticle,
   persistAssignment,
   log
-}: ProcessStateAssignmentsOptions): Promise<void> => {
+}: ProcessStateAssignmentsOptions): Promise<StateAssignerProcessingCounts> => {
+  const counts: StateAssignerProcessingCounts = {
+    completedCount: 0,
+    skippedCount: 0,
+    failedCount: 0
+  };
+
   for (let index = 0; index < articles.length; index += 1) {
     if (signal.aborted) {
-      return;
+      return counts;
     }
 
     const article = articles[index];
@@ -303,6 +323,7 @@ export const processStateAssignmentsWithTimeout = async ({
       );
 
       if (result.timedOut) {
+        counts.skippedCount += 1;
         log.warn(
           `State assigner timeout for article ${article.id} after ${iterationTimeoutMs}ms. Skipping iteration.`
         );
@@ -310,23 +331,27 @@ export const processStateAssignmentsWithTimeout = async ({
       }
 
       await persistAssignment(article.id, result.value!, prompt.id, entityWhoCategorizesId);
+      counts.completedCount += 1;
       log.info(`Successfully processed article ${article.id}`);
     } catch (error) {
-      if (signal.aborted || isAbortError(error)) {
-        return;
+      if (signal.aborted) {
+        return counts;
       }
 
+      counts.failedCount += 1;
       const message = error instanceof Error ? error.message : 'Unknown state assigner error';
       log.error(`Failed to process article ${article.id}: ${message}`);
       log.warn(`Skipping article ${article.id} and continuing with next article`);
     }
   }
+
+  return counts;
 };
 
 const runLegacyWorkflow = async (
   context: StateAssignerJobContext,
   dependencies: StateAssignerJobDependencies = {}
-): Promise<void> => {
+): Promise<StateAssignerJobResult> => {
   logWorkflowStart('State Assigner', {
     jobId: context.jobId,
     targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
@@ -363,9 +388,20 @@ const runLegacyWorkflow = async (
     articleIdMaxInclusive: context.articleIdMaxInclusive
   });
 
+  const buildResult = (
+    counts: StateAssignerProcessingCounts
+  ): StateAssignerJobResult => ({
+    selectedCount: candidateArticles.length,
+    completedCount: counts.completedCount,
+    skippedCount: counts.skippedCount,
+    failedCount: counts.failedCount,
+    targetArticleThresholdDaysOld: context.targetArticleThresholdDaysOld,
+    targetArticleStateReviewCount: context.targetArticleStateReviewCount
+  });
+
   if (candidateArticles.length === 0) {
     logger.info('No articles to process');
-    return;
+    return buildResult({ completedCount: 0, skippedCount: 0, failedCount: 0 });
   }
 
   logger.info('State assigner selected candidate articles for pre-scrape enrichment', {
@@ -380,8 +416,8 @@ const runLegacyWorkflow = async (
 
     logger.info('State assigner pre-scrape enrichment summary', scrapeSummary);
   } catch (error) {
-    if (context.signal.aborted || isAbortError(error)) {
-      return;
+    if (context.signal.aborted) {
+      return buildResult({ completedCount: 0, skippedCount: 0, failedCount: 0 });
     }
 
     logger.warn('State assigner pre-scrape enrichment failed. Continuing with assignment.', {
@@ -407,7 +443,7 @@ const runLegacyWorkflow = async (
   });
   logger.info(`Starting to process ${articles.length} articles`);
 
-  await processAssignments({
+  const counts = await processAssignments({
     articles,
     prompt,
     entityWhoCategorizesId,
@@ -420,6 +456,8 @@ const runLegacyWorkflow = async (
     persistAssignment: saveArticleStateContract,
     log: logger
   });
+
+  return buildResult(counts);
 };
 
 export const createStateAssignerJobHandler = (
@@ -431,7 +469,7 @@ export const createStateAssignerJobHandler = (
     ((context: StateAssignerJobContext) => runLegacyWorkflow(context, dependencies));
 
   return async (queueContext: QueueExecutionContext): Promise<void> => {
-    await workflowRunner({
+    const result = await workflowRunner({
       jobId: queueContext.jobId,
       signal: queueContext.signal,
       registerCancelableProcess: queueContext.registerCancelableProcess,
@@ -444,5 +482,6 @@ export const createStateAssignerJobHandler = (
       articleIdMinExclusive: input.articleIdMinExclusive,
       articleIdMaxInclusive: input.articleIdMaxInclusive
     });
+    await queueContext.updateResult(result as unknown as Record<string, unknown>);
   };
 };

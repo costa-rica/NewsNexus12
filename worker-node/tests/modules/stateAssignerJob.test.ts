@@ -1,6 +1,7 @@
 import {
   createStateAssignerJobHandler,
-  processStateAssignmentsWithTimeout
+  processStateAssignmentsWithTimeout,
+  StateAssignerJobResult
 } from '../../src/modules/jobs/stateAssignerJob';
 import { StateAssignerAiConfig } from '../../src/modules/state-assigner/config';
 import { QueueExecutionContext } from '../../src/modules/queue/queueEngine';
@@ -35,14 +36,25 @@ const codexConfig: StateAssignerAiConfig = {
   codexTimeoutMs: 180_000
 };
 
+const completedResult: StateAssignerJobResult = {
+  selectedCount: 1,
+  completedCount: 1,
+  skippedCount: 0,
+  failedCount: 0,
+  targetArticleThresholdDaysOld: 15,
+  targetArticleStateReviewCount: 25
+};
+
 const createQueueContext = (
-  registerCancelableProcess = jest.fn()
+  registerCancelableProcess = jest.fn(),
+  updateResult = jest.fn(async () => undefined),
+  signal: AbortSignal = new AbortController().signal
 ): QueueExecutionContext => ({
   jobId: 'job-1',
   endpointName: '/state-assigner/start-job',
-  signal: new AbortController().signal,
+  signal,
   registerCancelableProcess,
-  updateResult: () => Promise.resolve()
+  updateResult
 });
 
 const createAnalyzer = (): jest.MockedFunction<AnalyzeArticle> =>
@@ -53,8 +65,11 @@ const createAnalyzer = (): jest.MockedFunction<AnalyzeArticle> =>
 const runWorkflowWithConfig = async (aiConfig: StateAssignerAiConfig) => {
   const analyzeWithOpenAi = createAnalyzer();
   const analyzeWithCodexCli = createAnalyzer();
-  const processAssignments = jest.fn<Promise<void>, [ProcessStateAssignmentsOptions]>(
-    async () => undefined
+  const processAssignments = jest.fn<
+    Promise<{ completedCount: number; skippedCount: number; failedCount: number }>,
+    [ProcessStateAssignmentsOptions]
+  >(
+    async () => ({ completedCount: 1, skippedCount: 0, failedCount: 0 })
   );
   const registerCancelableProcess = jest.fn();
 
@@ -101,8 +116,9 @@ const runWorkflowWithConfig = async (aiConfig: StateAssignerAiConfig) => {
 
 describe('stateAssigner job handler', () => {
   it('passes request parameters to legacy workflow dependency', async () => {
-    const runLegacyWorkflow = jest.fn(async () => undefined);
+    const runLegacyWorkflow = jest.fn(async () => completedResult);
     const registerCancelableProcess = jest.fn();
+    const updateResult = jest.fn(async () => undefined);
 
     const handler = createStateAssignerJobHandler(
       {
@@ -114,7 +130,7 @@ describe('stateAssigner job handler', () => {
       { runLegacyWorkflow }
     );
 
-    await handler(createQueueContext(registerCancelableProcess));
+    await handler(createQueueContext(registerCancelableProcess, updateResult));
 
     expect(runLegacyWorkflow).toHaveBeenCalledWith({
       jobId: 'job-1',
@@ -125,6 +141,7 @@ describe('stateAssigner job handler', () => {
       aiConfig: openAiConfig,
       pathToStateAssignerFiles: '/tmp/state-assigner-files'
     });
+    expect(updateResult).toHaveBeenCalledWith(completedResult);
   });
 
   it('times out one iteration, logs it, and continues processing next article', async () => {
@@ -132,7 +149,7 @@ describe('stateAssigner job handler', () => {
     const persisted: number[] = [];
     const registerCancelableProcess = jest.fn();
 
-    await processStateAssignmentsWithTimeout({
+    const counts = await processStateAssignmentsWithTimeout({
       articles: [
         { id: 1, title: 'a', content: 'c1' },
         { id: 2, title: 'b', content: 'c2' }
@@ -176,6 +193,145 @@ describe('stateAssigner job handler', () => {
 
     expect(warnings.some((entry) => entry.includes('timeout for article 1'))).toBe(true);
     expect(persisted).toEqual([2]);
+    expect(counts).toEqual({ completedCount: 1, skippedCount: 1, failedCount: 0 });
+  });
+
+  it('counts abort-like persistence errors as failures when the queue signal is active', async () => {
+    const persisted: number[] = [];
+    const counts = await processStateAssignmentsWithTimeout({
+      articles: [
+        { id: 1, title: 'a', content: 'c1' },
+        { id: 2, title: 'b', content: 'c2' }
+      ],
+      prompt: { id: 7, content: 'test prompt' },
+      entityWhoCategorizesId: 11,
+      aiConfig: openAiConfig,
+      stateAssignerDirectories,
+      iterationTimeoutMs: 100,
+      signal: new AbortController().signal,
+      registerCancelableProcess: jest.fn(),
+      analyzeArticle: createAnalyzer(),
+      persistAssignment: async (articleId) => {
+        if (articleId === 1) throw new Error('current transaction is aborted');
+        persisted.push(articleId);
+      },
+      log: { info: () => undefined, warn: () => undefined, error: () => undefined }
+    });
+
+    expect(persisted).toEqual([2]);
+    expect(counts).toEqual({ completedCount: 1, skippedCount: 0, failedCount: 1 });
+  });
+
+  it('returns partial counters when the queue signal is canceled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const counts = await processStateAssignmentsWithTimeout({
+      articles: [{ id: 1, title: 'a', content: 'c1' }],
+      prompt: { id: 7, content: 'test prompt' },
+      entityWhoCategorizesId: 11,
+      aiConfig: openAiConfig,
+      stateAssignerDirectories,
+      iterationTimeoutMs: 100,
+      signal: controller.signal,
+      registerCancelableProcess: jest.fn(),
+      analyzeArticle: createAnalyzer(),
+      persistAssignment: async () => undefined,
+      log: { info: () => undefined, warn: () => undefined, error: () => undefined }
+    });
+
+    expect(counts).toEqual({ completedCount: 0, skippedCount: 0, failedCount: 0 });
+  });
+
+  it('saves a valid zero-work result', async () => {
+    const updateResult = jest.fn(async () => undefined);
+    const handler = createStateAssignerJobHandler(
+      {
+        targetArticleThresholdDaysOld: 15,
+        targetArticleStateReviewCount: 25,
+        aiConfig: openAiConfig,
+        pathToStateAssignerFiles: '/tmp/state-assigner-files'
+      },
+      {
+        ensureDb: async () => undefined,
+        ensureDirectories: async () => stateAssignerDirectories,
+        syncPrompts: async () => undefined,
+        resolveEntityWhoCategorizes: async () => 11,
+        loadPrompt: async () => ({ id: 7, content: 'test prompt' }),
+        selectArticles: async () => []
+      }
+    );
+
+    await handler(createQueueContext(jest.fn(), updateResult));
+
+    expect(updateResult).toHaveBeenCalledWith({
+      selectedCount: 0,
+      completedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      targetArticleThresholdDaysOld: 15,
+      targetArticleStateReviewCount: 25
+    });
+  });
+
+  it('continues assignment after an abort-like enrichment error', async () => {
+    const updateResult = jest.fn(async () => undefined);
+    const handler = createStateAssignerJobHandler(
+      {
+        targetArticleThresholdDaysOld: 15,
+        targetArticleStateReviewCount: 25,
+        aiConfig: openAiConfig,
+        pathToStateAssignerFiles: '/tmp/state-assigner-files'
+      },
+      {
+        ensureDb: async () => undefined,
+        ensureDirectories: async () => stateAssignerDirectories,
+        syncPrompts: async () => undefined,
+        resolveEntityWhoCategorizes: async () => 11,
+        loadPrompt: async () => ({ id: 7, content: 'test prompt' }),
+        selectArticles: async () => [
+          {
+            id: 1,
+            title: 'test',
+            description: 'description',
+            url: null,
+            publishedDate: '2026-07-10'
+          }
+        ],
+        enrichContent02: async () => {
+          throw new Error('navigation aborted unexpectedly');
+        },
+        getCanonicalContent02Row: async () => null,
+        analyzeWithOpenAi: createAnalyzer(),
+        processAssignments: async () => ({
+          completedCount: 1,
+          skippedCount: 0,
+          failedCount: 0
+        })
+      }
+    );
+
+    await handler(createQueueContext(jest.fn(), updateResult));
+
+    expect(updateResult).toHaveBeenCalledWith(completedResult);
+  });
+
+  it('does not save a completed result after a fatal setup failure', async () => {
+    const updateResult = jest.fn(async () => undefined);
+    const handler = createStateAssignerJobHandler(
+      {
+        targetArticleThresholdDaysOld: 15,
+        targetArticleStateReviewCount: 25,
+        aiConfig: openAiConfig,
+        pathToStateAssignerFiles: '/tmp/state-assigner-files'
+      },
+      { ensureDb: async () => { throw new Error('database unavailable'); } }
+    );
+
+    await expect(handler(createQueueContext(jest.fn(), updateResult))).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(updateResult).not.toHaveBeenCalled();
   });
 
   it('uses the OpenAI analyzer and default timeout for the openai backend', async () => {

@@ -107,6 +107,10 @@ describe('stateAssigner routes', () => {
     await queueEngine.onIdle();
     const queuedJob = await queueStore.getJobById('job-1');
     expect(queuedJob?.status).toBe('completed');
+    expect(queuedJob?.parameters).toEqual({
+      targetArticleThresholdDaysOld: 30,
+      targetArticleStateReviewCount: 50
+    });
   });
 
   it('returns validation error when request body fields are invalid', async () => {

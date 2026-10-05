@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T22:52:17Z
+updated_at: 2026-10-05T23:00:27Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -53,48 +53,48 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 1: Add the Worker Queue Contract
 
-- [ ] Review the accepted plan V04, worker-node queue engine and store, state-assigner route, state-assigner job, startup queue maintenance, and their tests.
-- [ ] Extend `EnqueueJobInput` with optional non-secret `parameters`.
-- [ ] Persist supplied parameters on the queue record when the job is created.
-- [ ] Preserve existing queue behavior when parameters are omitted.
-- [ ] Ensure queue-store validation continues to require a plain object when parameters are present.
-- [ ] Update `/state-assigner/start-job` to enqueue exactly these parameters:
-  - [ ] `targetArticleThresholdDaysOld`
-  - [ ] `targetArticleStateReviewCount`
-- [ ] Keep AI configuration, keys, model input, prompt text, filesystem paths, and Article content out of queue parameters.
-- [ ] Add a `StateAssignerJobResult` type containing:
-  - [ ] `selectedCount`
-  - [ ] `completedCount`
-  - [ ] `skippedCount`
-  - [ ] `failedCount`
-  - [ ] `targetArticleThresholdDaysOld`
-  - [ ] `targetArticleStateReviewCount`
-- [ ] Refactor `processStateAssignmentsWithTimeout` to return counters rather than `void`.
-- [ ] Count a persisted `ArticleStateContract02` as completed.
-- [ ] Count an individual AI timeout as skipped and continue.
-- [ ] Count an individual analysis or persistence exception as failed and continue when the queue signal is not aborted.
-- [ ] Treat only the actual queue signal as authoritative cancellation.
-- [ ] Remove error-name or message matching as an independent reason to return early.
-- [ ] Count an error containing `AbortError` or `aborted` as failed when the queue signal is not aborted.
-- [ ] Continue to assignment after enrichment failure when the queue signal is not aborted.
-- [ ] Stop after enrichment failure only when the queue signal is actually aborted.
-- [ ] Return zero counts when no candidates are selected.
-- [ ] Fail the queue job for fatal setup or pre-selection errors instead of saving a completed zero result.
-- [ ] Save the final result with `queueContext.updateResult` before every non-canceled normal return.
-- [ ] Permit a canceled job to save diagnostic partial counters, while relying on queue status to prevent those counters from being trusted.
-- [ ] Enforce the completed-result invariant:
-  - [ ] `selectedCount = completedCount + skippedCount + failedCount`
-- [ ] Extend queue-engine tests for parameter persistence and omission.
-- [ ] Extend state-assigner route tests for the exact non-secret parameters.
-- [ ] Extend state-assigner job tests for zero work, completion, timeout, Article failure, enrichment failure, cancellation, fatal setup failure, and saved results.
-- [ ] Add explicit tests for persistence and enrichment errors whose messages contain `aborted` while the queue signal remains active.
-- [ ] Run the Phase 1 checkpoint:
+- [x] Review the accepted plan V04, worker-node queue engine and store, state-assigner route, state-assigner job, startup queue maintenance, and their tests.
+- [x] Extend `EnqueueJobInput` with optional non-secret `parameters`.
+- [x] Persist supplied parameters on the queue record when the job is created.
+- [x] Preserve existing queue behavior when parameters are omitted.
+- [x] Ensure queue-store validation continues to require a plain object when parameters are present.
+- [x] Update `/state-assigner/start-job` to enqueue exactly these parameters:
+  - [x] `targetArticleThresholdDaysOld`
+  - [x] `targetArticleStateReviewCount`
+- [x] Keep AI configuration, keys, model input, prompt text, filesystem paths, and Article content out of queue parameters.
+- [x] Add a `StateAssignerJobResult` type containing:
+  - [x] `selectedCount`
+  - [x] `completedCount`
+  - [x] `skippedCount`
+  - [x] `failedCount`
+  - [x] `targetArticleThresholdDaysOld`
+  - [x] `targetArticleStateReviewCount`
+- [x] Refactor `processStateAssignmentsWithTimeout` to return counters rather than `void`.
+- [x] Count a persisted `ArticleStateContract02` as completed.
+- [x] Count an individual AI timeout as skipped and continue.
+- [x] Count an individual analysis or persistence exception as failed and continue when the queue signal is not aborted.
+- [x] Treat only the actual queue signal as authoritative cancellation.
+- [x] Remove error-name or message matching as an independent reason to return early.
+- [x] Count an error containing `AbortError` or `aborted` as failed when the queue signal is not aborted.
+- [x] Continue to assignment after enrichment failure when the queue signal is not aborted.
+- [x] Stop after enrichment failure only when the queue signal is actually aborted.
+- [x] Return zero counts when no candidates are selected.
+- [x] Fail the queue job for fatal setup or pre-selection errors instead of saving a completed zero result.
+- [x] Save the final result with `queueContext.updateResult` before every non-canceled normal return.
+- [x] Permit a canceled job to save diagnostic partial counters, while relying on queue status to prevent those counters from being trusted.
+- [x] Enforce the completed-result invariant:
+  - [x] `selectedCount = completedCount + skippedCount + failedCount`
+- [x] Extend queue-engine tests for parameter persistence and omission.
+- [x] Extend state-assigner route tests for the exact non-secret parameters.
+- [x] Extend state-assigner job tests for zero work, completion, timeout, Article failure, enrichment failure, cancellation, fatal setup failure, and saved results.
+- [x] Add explicit tests for persistence and enrichment errors whose messages contain `aborted` while the queue signal remains active.
+- [x] Run the Phase 1 checkpoint:
   1. Build `db-models`.
   2. Build worker-node.
   3. Run the complete worker-node test suite.
   4. Fix failures and repeat the build and tests.
-- [ ] Check off completed Phase 1 tasks.
-- [ ] Commit only Phase 1 changes using the repository commit guidance and `co-authored-by: codex (gpt-6.1-sol)`.
+- [x] Check off completed Phase 1 tasks.
+- [x] Commit only Phase 1 changes using the repository commit guidance and `co-authored-by: codex (gpt-6.1-sol)`.
 
 ## Phase 2: Add Phase 6 Configuration and Client
 

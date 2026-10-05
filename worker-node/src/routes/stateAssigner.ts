@@ -75,6 +75,10 @@ export const createStateAssignerRouter = (
 
       const enqueueResult = await queueEngine.enqueueJob({
         endpointName,
+        parameters: {
+          targetArticleThresholdDaysOld: body.targetArticleThresholdDaysOld,
+          targetArticleStateReviewCount: body.targetArticleStateReviewCount
+        },
         run: buildJobHandler({
           ...body,
           aiConfig,

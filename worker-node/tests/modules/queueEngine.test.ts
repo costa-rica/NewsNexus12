@@ -77,6 +77,41 @@ describe('GlobalQueueEngine', () => {
     expect((await store.getJobById('job-2'))?.status).toBe('completed');
   });
 
+  it('persists optional non-secret job parameters', async () => {
+    const engine = new GlobalQueueEngine(store, {
+      createJobId: nextJobId
+    });
+
+    await engine.enqueueJob({
+      endpointName: '/state-assigner/start-job',
+      parameters: {
+        targetArticleThresholdDaysOld: 180,
+        targetArticleStateReviewCount: 25
+      },
+      run: async () => undefined
+    });
+    await engine.onIdle();
+
+    expect((await store.getJobById('job-1'))?.parameters).toEqual({
+      targetArticleThresholdDaysOld: 180,
+      targetArticleStateReviewCount: 25
+    });
+  });
+
+  it('omits parameters when an enqueue caller does not supply them', async () => {
+    const engine = new GlobalQueueEngine(store, {
+      createJobId: nextJobId
+    });
+
+    await engine.enqueueJob({
+      endpointName: '/semantic-scorer/start-job',
+      run: async () => undefined
+    });
+    await engine.onIdle();
+
+    expect((await store.getJobById('job-1'))?.parameters).toBeUndefined();
+  });
+
   it('cancels a queued job immediately', async () => {
     let releaseFirst: (() => void) | undefined;
     const firstGate = new Promise<void>((resolve) => {
