@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:52:17Z
-updated_at: 2026-10-05T23:06:52Z
+updated_at: 2026-10-05T23:11:48Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -194,73 +194,73 @@ This todo does not implement AI Approver V02, systemd scheduling, a new state-as
 
 ## Phase 4: Implement the Phase 6 Module
 
-- [ ] Add `ops/src/weekly-flow-02/phases/06_runStateAssignment.ts`.
-- [ ] Keep Phase 6 worker responses, monitoring state, and recovery decisions inside this module.
-- [ ] Persist Phase 6 start before the worker request and job ID before monitoring.
-- [ ] Use only the persisted 180-day threshold and immutable `articleCount` when starting any attempt.
-- [ ] Poll immediately, then wait one configured interval after each active response.
-- [ ] Prevent overlapping requests and cap delay at the remaining 12-hour budget.
-- [ ] Allow two consecutive transient status failures and stop on the third.
-- [ ] Reset the failure count after every valid status response.
-- [ ] Stop immediately on permanent request failures and malformed responses.
-- [ ] Persist compact latest progress without secrets or Article content.
-- [ ] Complete only a validated `completed` job through `recordPhaseSixCompleted`.
-- [ ] Accept valid completed outcomes with zero selected Articles or nonzero skipped and failed counts.
-- [ ] Monitor a valid active saved job rather than replacing it.
-- [ ] Allow one ordinary replacement for an unavailable, failed, canceled, or inactive monitoring-limited job from an earlier invocation.
-- [ ] Enforce one start per invocation across fresh starts, persistence-gap recovery, ordinary replacement, and incompatible-contract replacement.
-- [ ] Treat a Phase 6 start without a saved job ID as an accepted persistence gap eligible for one start.
-- [ ] Do not replace a job started during the current invocation.
-- [ ] At the 12-hour monitoring limit:
-  - [ ] Persist the marker before cancellation.
-  - [ ] Send one cancellation request.
-  - [ ] Persist `canceled` or `cancel_requested`.
-  - [ ] After `cancel_requested`, wait one interval and perform one final lookup.
-  - [ ] After cancellation 404, perform one lookup and classify inactive, active, or unverified.
-  - [ ] Never trust the marked job's late result.
-  - [ ] Never replace it in the same invocation.
-  - [ ] Raise a Phase 6 error and exit nonzero.
-- [ ] On continuation, re-cancel a matching active monitoring-limited job before replacement.
-- [ ] Allow one later replacement after a matching marked job is verified inactive.
-- [ ] Log elapsed monitoring time, requested `articleCount`, and diagnostic `selectedCount` when present.
+- [x] Add `ops/src/weekly-flow-02/phases/06_runStateAssignment.ts`.
+- [x] Keep Phase 6 worker responses, monitoring state, and recovery decisions inside this module.
+- [x] Persist Phase 6 start before the worker request and job ID before monitoring.
+- [x] Use only the persisted 180-day threshold and immutable `articleCount` when starting any attempt.
+- [x] Poll immediately, then wait one configured interval after each active response.
+- [x] Prevent overlapping requests and cap delay at the remaining 12-hour budget.
+- [x] Allow two consecutive transient status failures and stop on the third.
+- [x] Reset the failure count after every valid status response.
+- [x] Stop immediately on permanent request failures and malformed responses.
+- [x] Persist compact latest progress without secrets or Article content.
+- [x] Complete only a validated `completed` job through `recordPhaseSixCompleted`.
+- [x] Accept valid completed outcomes with zero selected Articles or nonzero skipped and failed counts.
+- [x] Monitor a valid active saved job rather than replacing it.
+- [x] Allow one ordinary replacement for an unavailable, failed, canceled, or inactive monitoring-limited job from an earlier invocation.
+- [x] Enforce one start per invocation across fresh starts, persistence-gap recovery, ordinary replacement, and incompatible-contract replacement.
+- [x] Treat a Phase 6 start without a saved job ID as an accepted persistence gap eligible for one start.
+- [x] Do not replace a job started during the current invocation.
+- [x] At the 12-hour monitoring limit:
+  - [x] Persist the marker before cancellation.
+  - [x] Send one cancellation request.
+  - [x] Persist `canceled` or `cancel_requested`.
+  - [x] After `cancel_requested`, wait one interval and perform one final lookup.
+  - [x] After cancellation 404, perform one lookup and classify inactive, active, or unverified.
+  - [x] Never trust the marked job's late result.
+  - [x] Never replace it in the same invocation.
+  - [x] Raise a Phase 6 error and exit nonzero.
+- [x] On continuation, re-cancel a matching active monitoring-limited job before replacement.
+- [x] Allow one later replacement after a matching marked job is verified inactive.
+- [x] Log elapsed monitoring time, requested `articleCount`, and diagnostic `selectedCount` when present.
 
 ### Incompatible-Contract Recovery
 
-- [ ] Follow this section instead of the generic invalid-response wording when required parameters are missing.
-- [ ] Persist the incompatible-contract source marker before canceling an active incompatible job.
-- [ ] Cancel an incompatible `queued` or `running` job and verify inactivity or unavailability.
-- [ ] Stop without replacement when cancellation or verification is ambiguous.
-- [ ] Never trust a completed incompatible job result.
-- [ ] Do not replace an incompatible job in the invocation that started or canceled it.
-- [ ] On later continuation, permit one replacement after the source job is verified inactive.
-- [ ] Save the replacement job ID and consumed marker atomically after the start response.
-- [ ] If that persistence operation fails, throw immediately and start nothing else in that invocation.
-- [ ] Accept that a later continuation may retry because the replacement ID was not saved.
-- [ ] If the saved replacement also lacks required parameters, mark it as the replacement, cancel it when active, verify inactivity, and stop permanently without another recovery start.
-- [ ] Allow a compatible marked replacement to monitor and complete normally.
+- [x] Follow this section instead of the generic invalid-response wording when required parameters are missing.
+- [x] Persist the incompatible-contract source marker before canceling an active incompatible job.
+- [x] Cancel an incompatible `queued` or `running` job and verify inactivity or unavailability.
+- [x] Stop without replacement when cancellation or verification is ambiguous.
+- [x] Never trust a completed incompatible job result.
+- [x] Do not replace an incompatible job in the invocation that started or canceled it.
+- [x] On later continuation, permit one replacement after the source job is verified inactive.
+- [x] Save the replacement job ID and consumed marker atomically after the start response.
+- [x] If that persistence operation fails, throw immediately and start nothing else in that invocation.
+- [x] Accept that a later continuation may retry because the replacement ID was not saved.
+- [x] If the saved replacement also lacks required parameters, mark it as the replacement, cancel it when active, verify inactivity, and stop permanently without another recovery start.
+- [x] Allow a compatible marked replacement to monitor and complete normally.
 
 ### Phase Module Tests
 
-- [ ] Add `ops/tests/weekly-flow-02/06_runStateAssignment.test.ts`.
-- [ ] Cover fresh start, immediate polling, active polling, transient failures, verified completion, partial outcome, zero selection, and one-start enforcement.
-- [ ] Cover failed, canceled, unavailable, persistence-gap, and monitoring-limit recovery.
-- [ ] Cover exact 12-hour timing, capped delay, queued and running cancellation, cancellation 404, cancellation failure, and unverified cancellation.
-- [ ] Cover an active missing-contract job being marked and canceled without same-invocation replacement.
-- [ ] Cover continuation after `failureReason = worker_restart` starting one compatible replacement and completing Phase 6.
-- [ ] Cover a completed incompatible source job followed by one compatible replacement.
-- [ ] Cover a marked replacement that also lacks parameters, is canceled when active, and never causes a second replacement.
-- [ ] Cover the replacement start response followed by persistence failure, nonzero exit, and no second start in the same invocation.
-- [ ] Cover a later continuation after that accepted unsaved-ID gap without adding new lookup behavior.
-- [ ] Cover preservation of threshold, Article count, source marker, and monitoring marker through recovery.
-- [ ] Add the compiled phase-module test to the explicit `ops/package.json` test command.
-- [ ] Run the Phase 4 checkpoint:
+- [x] Add `ops/tests/weekly-flow-02/06_runStateAssignment.test.ts`.
+- [x] Cover fresh start, immediate polling, active polling, transient failures, verified completion, partial outcome, zero selection, and one-start enforcement.
+- [x] Cover failed, canceled, unavailable, persistence-gap, and monitoring-limit recovery.
+- [x] Cover exact 12-hour timing, capped delay, queued and running cancellation, cancellation 404, cancellation failure, and unverified cancellation.
+- [x] Cover an active missing-contract job being marked and canceled without same-invocation replacement.
+- [x] Cover continuation after `failureReason = worker_restart` starting one compatible replacement and completing Phase 6.
+- [x] Cover a completed incompatible source job followed by one compatible replacement.
+- [x] Cover a marked replacement that also lacks parameters, is canceled when active, and never causes a second replacement.
+- [x] Cover the replacement start response followed by persistence failure, nonzero exit, and no second start in the same invocation.
+- [x] Cover a later continuation after that accepted unsaved-ID gap without adding new lookup behavior.
+- [x] Cover preservation of threshold, Article count, source marker, and monitoring marker through recovery.
+- [x] Add the compiled phase-module test to the explicit `ops/package.json` test command.
+- [x] Run the Phase 4 checkpoint:
   1. Build `db-models`.
   2. Run the ops type check.
   3. Run the complete ops test suite.
   4. Build ops.
   5. Fix failures and repeat all checks.
-- [ ] Check off completed Phase 4 tasks.
-- [ ] Commit only Phase 4 changes and reference Phase 4 of this todo in the commit body.
+- [x] Check off completed Phase 4 tasks.
+- [x] Commit only Phase 4 changes and reference Phase 4 of this todo in the commit body.
 
 ## Phase 5: Connect Phase 6 to the Coordinator
 
