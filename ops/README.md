@@ -1,25 +1,27 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-04T19:56:05Z
+updated_at: 2026-10-05T21:58:42Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
 
 # NewsNexus12 Operations
 
-This workspace holds operational processes for NewsNexus12. Weekly-flow-02 records durable progress, clears duplicate analyses, creates and verifies a database backup, deletes old unprotected articles, and stops before Phase 4.
+This workspace holds operational processes for NewsNexus12. Weekly-flow-02 records durable progress, clears duplicate analyses, creates and verifies a database backup, deletes old unprotected articles, collects Google News RSS Articles, runs semantic scoring, and stops at the Phase 6 boundary.
 
 ---
 
 ## Project Overview
 
-- Available now: a guarded coordinator, durable run selection, console/file logging, and the first three weekly-flow-02 phases.
+- Available now: a guarded coordinator, durable run selection, console/file logging, and weekly-flow-02 Phases 1–5.
 - Phase 1 calls `DELETE /deduper/clear-db-table` and continues only after validating the success response.
 - Phase 2 starts only after Phase 1 succeeds. It runs the fixed compiled entry point at `db-manager/dist/index.js --create_backup` with Node and verifies the reported ZIP size and SHA-256.
 - Phase 3 starts only after Phase 2 succeeds. It runs the fixed compiled entry point at `db-manager/dist/index.js --delete_articles` with Node.
+- Phase 4 starts an untargeted Google News RSS queue job, verifies its database result, and completes the run immediately when no downstream Articles exist.
+- Phase 5 starts an untargeted semantic scorer queue job, monitors it for up to six hours per invocation, and leaves the run incomplete at the Phase 6 boundary.
 - `WeeklyArticleFlowRuns02` stores run identity, phase progress, validated outputs, and errors. It does not determine whether a process is active.
 - Ubuntu execution uses a non-blocking kernel file lock. A second trigger exits immediately instead of queueing.
-- Pending: later phases and scheduled execution.
+- Pending: Phases 6–7 and scheduled execution.
 
 Stack: Node.js, TypeScript, dotenv, Winston, npm workspaces.
 
@@ -66,10 +68,24 @@ Required worker settings:
 
 - `URL_BASE_NEWS_NEXUS_PYTHON_QUEUER`: worker-python base URL using HTTP or HTTPS.
 - `WORKER_PYTHON_REQUEST_TIMEOUT_SECONDS`: positive integer overall request timeout in seconds.
+- `URL_BASE_NEWS_NEXUS_WORKER_NODE`: worker-node base URL using HTTP or HTTPS.
+- `WORKER_NODE_REQUEST_TIMEOUT_SECONDS`: positive integer request timeout shared by the Phase 4 and Phase 5 worker-node calls.
 
 The example timeout is 90 seconds. Keep it longer than worker-python's `DEDUPER_CLEAR_CANCEL_TIMEOUT_SECONDS`, which defaults to 30 seconds, plus expected database deletion and response time.
 
 Phase 1 uses these values for its DELETE request. The request has no body or query parameters.
+
+Phase 4 monitoring settings:
+
+- `RSS_STATUS_POLL_INTERVAL_SECONDS`: delay between active RSS status observations.
+- `RSS_TOLERATED_CONSECUTIVE_STATUS_FAILURES`: transient failures tolerated before the result becomes unverified.
+- `RSS_JOB_TIMEOUT_HOURS`: maximum accepted RSS job lifetime.
+
+Phase 5 monitoring settings:
+
+- `SEMANTIC_SCORER_STATUS_POLL_INTERVAL_SECONDS`: delay after each active status. The default is 300 seconds.
+- `SEMANTIC_SCORER_TOLERATED_CONSECUTIVE_STATUS_FAILURES`: transient status failures tolerated before stopping. The default is 2.
+- `SEMANTIC_SCORER_MONITORING_LIMIT_HOURS`: monitoring budget for one ops invocation. The default is 6 hours.
 
 Required backup setting:
 
@@ -136,7 +152,11 @@ npm run weekly-flow-02:start --workspace newsnexus12-ops -- --continue-run 5
 
 Runs stopped during Phases 1–3 are replaced by a new run. A run that completed Phase 3 can continue for 72 hours from `runStartedAt`; exactly 72 hours remains eligible. Explicit continuation cannot resume a run stopped during Phases 1–3.
 
-Phase 4 is not implemented. Every current run remains incomplete after Phase 3. A repeat within 72 hours reaches the Phase 4 boundary without rerunning Phases 1–3 and exits 0. A default trigger after 72 hours creates a new run and repeats the destructive phases.
+Completed Phase 4 state is reused without starting another RSS job. Completed Phase 5 state is also reused, and execution exits successfully at the Phase 6 boundary.
+
+A Phase 4 zero-Article result completes the weekly run. A positive Phase 4 `articleCount` is retained for later phases, but it is not sent to semantic scoring and is never recalculated by Phase 5.
+
+Phase 5 calls `POST /semantic-scorer/start-job` with exactly `{}`. It does not send `articleCount`, an Article ID range, or another targeting field. Worker-node selects its normal semantic backlog.
 
 ### Single-execution behavior
 
@@ -147,7 +167,7 @@ Phase 4 is not implemented. Every current run remains incomplete after Phase 3. 
 - A future systemd service must use `SuccessExitStatus=75` and process-group termination.
 - After forcibly terminating a manual run, confirm its db-manager child has ended before triggering another run.
 
-- Expected sequence: startup header, Phase 1 completion, Phase 2 completion, Phase 3 completion, and a message that execution stopped before unimplemented Phase 4.
+- Expected sequence: startup header, verified completion through Phase 5, and a message that execution stopped at the Phase 6 boundary.
 - The named commands run only weekly-flow-02; future processes can have separate commands in this workspace.
 - Each command runs once and exits. The persisted run decision determines whether it starts at Phase 1 or continues at the Phase 4 boundary.
 - The example configuration logs to the console in development. Testing writes to console and file; production writes to file only.
@@ -171,6 +191,33 @@ Phase 4 is not implemented. Every current run remains incomplete after Phase 3. 
 - If any nested database error references the `Users` table through table metadata or SQL, the coordinator suppresses the entire database diagnostic. The log records that `Users` details were suppressed.
 - A Phase 1 timeout leaves the worker outcome unverified. Check worker and database state before rerunning.
 
+### Phase 4 and Phase 5 worker behavior
+
+- Phase 4 starts with `POST /request-google-rss/start-job`, reads `GET /queue-info/check-status/:jobId`, and cancels with `POST /queue-info/cancel_job/:jobId`.
+- Phase 5 uses the same status and cancellation routes after starting with `POST /semantic-scorer/start-job`.
+- Both phases poll immediately. Later Phase 5 polls normally occur every five minutes, and requests use the shared 60-second example timeout.
+- A valid status resets the consecutive transient-failure count. Permanent and malformed responses stop immediately.
+- `queued` needs only `createdAt`. `running` needs `startedAt`. `completed` needs `startedAt` and `endedAt`.
+- `failed` and `canceled` require `endedAt`; they may omit `startedAt` when the job ended before execution, including cancellation before start or worker restart.
+- `semanticScorerJobId` correlates the coordinator run with worker-node queue status and logs.
+- Ops cannot infer semantic zero work or prove complete per-Article coverage. A valid queue-level `completed` result is the Phase 5 success contract.
+
+Phase 5 applies one replacement at most per invocation:
+
+1. A saved failed or canceled job can be replaced once.
+2. A status 404 means the saved job is unavailable and follows the same replacement rule.
+3. A verified active saved job is monitored rather than replaced.
+4. A job started by the current invocation is never replaced if it fails, is canceled, or becomes unavailable.
+5. If Phase 5 started but its job ID was not persisted, ops logs the persistence gap and starts at most one recovery job.
+
+At the six-hour monitoring limit, ops persists a marker containing the job ID and its `createdAt` before requesting cancellation. A matching marked job can never complete Phase 5, including if it reports late completion.
+
+After `cancel_requested`, ops waits one poll interval and performs one final status lookup. Cancellation 404 receives one lookup as well. Every monitoring-limit path exits nonzero and releases the launcher lock when the process ends.
+
+On a later invocation, a matching marked active job is canceled again immediately. A matching inactive job can be replaced once. An old marker does not block a replacement with a different job ID or `createdAt`.
+
+Repeated cancellation failure leaves Phase 5 incomplete. Inspect worker-node queue state and the persisted marker before retrying. A manual worker-node restart may be necessary, but ops never restarts it automatically.
+
 ### Safe verification
 
 Use the automated tests for local verification. Their injected request, backup artifact, and deletion command do not contact worker-python, PostgreSQL, or package `.env` files.
@@ -180,7 +227,7 @@ npm test --workspace newsnexus12-ops
 ```
 
 - Do not use the development or compiled entry point as a smoke test unless clearing the configured database and creating a real backup are intended.
-- Runtime fixture checks must supply every configuration value explicitly and inject controlled Phase 1, Phase 2, and Phase 3 dependencies. They must not fall back to package `.env` files.
+- Runtime fixture checks must supply every configuration value explicitly and inject controlled dependencies through Phase 5. They must not fall back to package `.env` files or real network calls.
 - Default tests inject persistence and never connect to PostgreSQL.
 - Future systemd execution must expose guard rejection, actual failure, journal, and application-log behavior before unattended rollout.
 - This increment does not add systemd units or notification behavior.
@@ -207,6 +254,10 @@ ops/
 │       ├── 01_clearDuplicateAnalyses.test.ts # Request and coordinator tests
 │       ├── 02_createDatabaseBackup.test.ts # Process and artifact tests
 │       ├── 03_deleteOldArticles.test.ts # Deletion command and result tests
+│       ├── 04_collectGoogleNewsRss.test.ts # Phase 4 recovery tests
+│       ├── 04_googleNewsRssClient.test.ts # Phase 4 worker contract tests
+│       ├── 05_runSemanticScoring.test.ts # Phase 5 recovery and limit tests
+│       ├── 05_semanticScorerClient.test.ts # Phase 5 worker contract tests
 │       ├── entrypoint.test.ts # Configuration-before-database loading tests
 │       ├── launcher.test.ts # Portable launcher branch tests
 │       ├── persistence.test.ts # Mocked Sequelize adapter tests
@@ -218,7 +269,7 @@ ops/
         ├── index.ts       # Weekly flow executable entry
         ├── entrypoint.ts  # Configuration and persistence lifecycle
         ├── cli.ts         # Explicit run-selection arguments
-        ├── coordinator.ts # Selects a run and executes Phases 1–3
+        ├── coordinator.ts # Selects a run and executes Phases 1–5
         ├── dbManagerCommandRunner.ts # Shared child-process runner
         ├── persistence.ts # Database-free persistence contracts
         ├── runSelection.ts # Pure recovery decision table
@@ -229,7 +280,11 @@ ops/
             ├── 02_createDatabaseBackup.ts # Phase 2 entry
             ├── 02_createDatabaseBackupCommand.ts # Backup result and artifact verification
             ├── 03_deleteOldArticles.ts # Phase 3 entry
-            └── 03_deleteOldArticlesCommand.ts # Deletion command and result validation
+            ├── 03_deleteOldArticlesCommand.ts # Deletion command and result validation
+            ├── 04_collectGoogleNewsRss.ts # Phase 4 recovery and completion
+            ├── 04_googleNewsRssClient.ts # Phase 4 worker contract
+            ├── 05_runSemanticScoring.ts # Phase 5 recovery and completion
+            └── 05_semanticScorerClient.ts # Phase 5 worker contract
 ```
 
 ---
@@ -246,4 +301,6 @@ ops/
 - [Phase 2 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_2_todo_v01.md)
 - [Phase 3 plan](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_3_plan_v02.md)
 - [Phase 3 implementation todo](../docs/weekly-article-pipeline-v02/20261002_weekly_flow_02_phase_3_todo_v01.md)
+- [Phase 5 semantic scoring plan](../docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_plan_v03.md)
+- [Phase 5 semantic scoring todo](../docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_todo_v02.md)
 - [Archived coordinator scaffold checklist](../docs/archive/202610/20261001_ops_coordinator_scaffold_todo_v01.md)
