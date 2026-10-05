@@ -55,6 +55,7 @@ describe('executeWeeklyFlow02', () => {
     await assert.rejects(
       executeWeeklyFlow02(['--unknown-option'], {
         loadConfiguration: () => config,
+        registerProcessExitMarker: () => undefined,
         initializeLog: () => logger,
         loadPersistence: async () => {
           persistenceLoaded = true;
@@ -83,8 +84,12 @@ describe('executeWeeklyFlow02', () => {
       },
       initializeLog: () => {
         calls.push('logger');
-        return logger;
+        return {
+          info: (message) => calls.push(`log:${message}`),
+          error: () => undefined
+        };
       },
+      registerProcessExitMarker: () => calls.push('exit-marker'),
       parseInvocation: (args) => {
         calls.push(`arguments:${args.join(',')}`);
         return { mode: 'new' };
@@ -108,11 +113,14 @@ describe('executeWeeklyFlow02', () => {
 
     assert.deepEqual(calls, [
       'config',
+      'exit-marker',
       'logger',
       'arguments:--new-run',
       'persistence',
       'run:new',
+      'log:Shutdown: closing database',
       'close',
+      'log:Shutdown: closing logger',
       'finish-log'
     ]);
   });
@@ -136,6 +144,7 @@ describe('executeWeeklyFlow02', () => {
     await assert.rejects(
       executeWeeklyFlow02([], {
         loadConfiguration: () => config,
+        registerProcessExitMarker: () => undefined,
         initializeLog: () => recordingLogger,
         loadPersistence: async () => {
           throw persistenceError;

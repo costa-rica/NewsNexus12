@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadConfig, type OpsConfig } from '../config';
 import { finishLogging, initializeLogger } from '../logger';
 import { parseWeeklyFlowInvocation, type WeeklyFlowInvocation } from './cli';
@@ -16,6 +18,7 @@ import {
 
 interface EntryPointDependencies {
   loadConfiguration(): OpsConfig;
+  registerProcessExitMarker(config: OpsConfig): void;
   initializeLog(config: OpsConfig): CoordinatorLogger;
   parseInvocation(args: readonly string[]): WeeklyFlowInvocation;
   loadPersistence(): Promise<LoadedWeeklyFlowPersistence>;
@@ -30,8 +33,33 @@ interface EntryPointDependencies {
   finishLog(logger: CoordinatorLogger): Promise<void>;
 }
 
+let processExitMarkerRegistered = false;
+
+const registerProcessExitMarker = (config: OpsConfig): void => {
+  if (processExitMarkerRegistered) return;
+  processExitMarkerRegistered = true;
+
+  // TEMP shutdown diagnostic — remove after clean runs are confirmed.
+  process.once('exit', (code) => {
+    const line = `${new Date().toISOString()} [INFO] Process exiting pid=${process.pid} exitCode=${code}\n`;
+    if (config.nodeEnv !== 'development') {
+      try {
+        fs.appendFileSync(path.join(config.pathToLogs, `${config.nameApp}.log`), line);
+      } catch {
+        // Exit diagnostics must never replace the process outcome.
+      }
+    }
+    try {
+      process.stderr.write(line);
+    } catch {
+      // The invoking terminal may already be disconnected.
+    }
+  });
+};
+
 const defaultDependencies: EntryPointDependencies = {
   loadConfiguration: loadConfig,
+  registerProcessExitMarker,
   initializeLog: initializeLogger,
   parseInvocation: parseWeeklyFlowInvocation,
   loadPersistence: loadWeeklyFlowPersistence,
@@ -45,6 +73,7 @@ export async function executeWeeklyFlow02(
 ): Promise<void> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const config = dependencies.loadConfiguration();
+  dependencies.registerProcessExitMarker(config);
   const logger = dependencies.initializeLog(config);
   let loadedPersistence: LoadedWeeklyFlowPersistence | undefined;
 
@@ -65,8 +94,12 @@ export async function executeWeeklyFlow02(
     });
   } finally {
     try {
-      if (loadedPersistence) await loadedPersistence.close();
+      if (loadedPersistence) {
+        logger.info('Shutdown: closing database');
+        await loadedPersistence.close();
+      }
     } finally {
+      logger.info('Shutdown: closing logger');
       await dependencies.finishLog(logger);
     }
   }
