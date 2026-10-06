@@ -266,3 +266,81 @@ def test_clear_all_analysis_data(repo: DeduperRepository) -> None:
     assert remaining[0]["c"] == 0
     assert repo.clear_all_analysis_data() == 0
     assert repo.execute_query('SELECT COUNT(*) AS c FROM "Articles"') == articles_before
+
+
+def _insert_pairs(repo: DeduperRepository, count: int) -> list[int]:
+    repo.insert_article_duplicate_analysis_batch(
+        [
+            {"articleIdNew": 1, "articleIdApproved": index + 2, "sameArticleIdFlag": 0}
+            for index in range(count)
+        ]
+    )
+    rows = repo.execute_query('SELECT id FROM "ArticleDuplicateAnalyses" ORDER BY id')
+    return [row["id"] for row in rows]
+
+
+def _scores(repo: DeduperRepository) -> dict[int, float]:
+    rows = repo.execute_query('SELECT id, "embeddingSearch" FROM "ArticleDuplicateAnalyses"')
+    return {row["id"]: row["embeddingSearch"] for row in rows}
+
+
+@pytest.mark.unit
+def test_execute_statement_runs_one_bulk_update(repo: DeduperRepository) -> None:
+    ids = _insert_pairs(repo, 3)
+
+    updated = repo.execute_statement(
+        """
+        UPDATE "ArticleDuplicateAnalyses" AS a
+        SET "embeddingSearch" = v.score
+        FROM (VALUES (%s::integer, %s::double precision), (%s::integer, %s::double precision)) AS v(id, score)
+        WHERE a.id = v.id
+        """,
+        (ids[0], 0.25, ids[2], 0.75),
+    )
+
+    assert updated == 2
+    assert _scores(repo) == {ids[0]: 0.25, ids[1]: 0.0, ids[2]: 0.75}
+
+
+@pytest.mark.unit
+def test_update_analysis_embedding_batch_full_partial_and_empty(repo: DeduperRepository) -> None:
+    ids = _insert_pairs(repo, 5)
+
+    full = repo.update_analysis_embedding_batch(
+        [{"id": row_id, "embeddingSearch": 0.1 * (i + 1)} for i, row_id in enumerate(ids[:3])]
+    )
+    partial = repo.update_analysis_embedding_batch([{"id": ids[3], "embeddingSearch": 0.9}])
+
+    assert full == 3
+    assert partial == 1
+    scores = _scores(repo)
+    assert scores[ids[0]] == pytest.approx(0.1)
+    assert scores[ids[2]] == pytest.approx(0.3)
+    assert scores[ids[3]] == pytest.approx(0.9)
+    assert scores[ids[4]] == 0.0
+
+
+@pytest.mark.unit
+def test_update_analysis_embedding_batch_empty_sends_no_query(
+    repo: DeduperRepository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _fail(*args, **kwargs):
+        raise AssertionError("no query expected")
+
+    monkeypatch.setattr(repo, "execute_statement", _fail)
+
+    assert repo.update_analysis_embedding_batch([]) == 0
+
+
+@pytest.mark.unit
+def test_embedding_update_page_is_id_ordered_after_cursor(repo: DeduperRepository) -> None:
+    ids = _insert_pairs(repo, 5)
+
+    first = repo.get_analysis_records_for_embedding_update_page(after_id=0, limit=2)
+    second = repo.get_analysis_records_for_embedding_update_page(after_id=first[-1]["id"], limit=2)
+    third = repo.get_analysis_records_for_embedding_update_page(after_id=second[-1]["id"], limit=2)
+
+    assert [row["id"] for row in first] == ids[:2]
+    assert [row["id"] for row in second] == ids[2:4]
+    assert [row["id"] for row in third] == ids[4:]
+    assert repo.get_analysis_article_ids() == [1, 2, 3, 4, 5, 6]

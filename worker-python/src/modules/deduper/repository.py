@@ -88,6 +88,21 @@ class DeduperRepository:
         except psycopg.Error as exc:
             raise DeduperDatabaseError(f"Batch execution failed: {exc}") from exc
 
+    def execute_statement(self, query: str, params: tuple = ()) -> int:
+        """Execute one statement, commit, and return the affected row count.
+
+        Unlike execute_insert, this never fetches a row, so it is safe for
+        UPDATE or DELETE statements without RETURNING.
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            conn.commit()
+            return cursor.rowcount
+        except psycopg.Error as exc:
+            raise DeduperDatabaseError(f"Statement execution failed: {exc}") from exc
+
     def get_article_ids_from_csv_list(self, article_ids: list[int]) -> list[dict[str, Any]]:
         if not article_ids:
             return []
@@ -348,17 +363,47 @@ class DeduperRepository:
             """
         )
 
+    def get_analysis_records_for_embedding_update_page(
+        self, after_id: int, limit: int
+    ) -> list[dict[str, Any]]:
+        # Keyset paging by id: rows that legitimately score 0 are not read again.
+        return self.execute_query(
+            """
+            SELECT id, "articleIdNew", "articleIdApproved"
+            FROM "ArticleDuplicateAnalyses"
+            WHERE "embeddingSearch" = 0 AND id > %s
+            ORDER BY id
+            LIMIT %s
+            """,
+            (after_id, limit),
+        )
+
+    def get_analysis_article_ids(self) -> list[int]:
+        rows = self.execute_query(
+            """
+            SELECT "articleIdNew" AS "articleId" FROM "ArticleDuplicateAnalyses"
+            UNION
+            SELECT "articleIdApproved" AS "articleId" FROM "ArticleDuplicateAnalyses"
+            """
+        )
+        return sorted(int(row["articleId"]) for row in rows if row["articleId"] is not None)
+
     def update_analysis_embedding_batch(self, updates: list[dict[str, Any]]) -> int:
+        """Write a batch of embedding scores with one bulk UPDATE ... FROM (VALUES ...)."""
         if not updates:
             return 0
 
-        query = """
-        UPDATE "ArticleDuplicateAnalyses"
-        SET "embeddingSearch" = %s, "updatedAt" = CURRENT_TIMESTAMP
-        WHERE id = %s
+        values_sql = ", ".join(["(%s::integer, %s::double precision)"] * len(updates))
+        query = f"""
+        UPDATE "ArticleDuplicateAnalyses" AS a
+        SET "embeddingSearch" = v.score, "updatedAt" = CURRENT_TIMESTAMP
+        FROM (VALUES {values_sql}) AS v(id, score)
+        WHERE a.id = v.id
         """
-        params_list = [(float(update["embeddingSearch"]), update["id"]) for update in updates]
-        return self.execute_many(query, params_list)
+        params: list[Any] = []
+        for update in updates:
+            params.extend((int(update["id"]), float(update["embeddingSearch"])))
+        return self.execute_statement(query, tuple(params))
 
     def get_embedding_processing_stats(self) -> dict[str, int]:
         queries = {

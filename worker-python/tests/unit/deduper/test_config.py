@@ -94,3 +94,16 @@ def test_startup_env_validation(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(DeduperConfigError, match="Missing required startup env vars"):
         validate_startup_env()
+
+
+@pytest.mark.unit
+def test_embedding_batch_size_defaults_to_5000(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PG_HOST", "localhost")
+    monkeypatch.setenv("PG_PORT", "5432")
+    monkeypatch.setenv("PG_DATABASE", "news.db")
+    monkeypatch.setenv("PG_USER", "nick")
+    monkeypatch.delenv("DEDUPER_BATCH_SIZE_EMBEDDING", raising=False)
+
+    config = DeduperConfig.from_env()
+
+    assert config.batch_size_embedding == 5000

@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:52:40Z
+updated_at: 2026-10-06T22:55:01Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -138,22 +138,22 @@ Plan: Component 3.
 
 Plan: Component 4, "Bulk score writes" and "Scoring, page by page".
 
-- [ ] Add `DeduperRepository.execute_statement(query, params)`: execute once, commit, return `cursor.rowcount`, never fetch. Wrap `psycopg.Error` in `DeduperDatabaseError`, like `execute_many`.
-- [ ] Rewrite `update_analysis_embedding_batch` to build one `UPDATE ... FROM (VALUES (%s::integer, %s::double precision), ...) AS v(id, score)` per call:
-  - [ ] Values go in as parameters only.
-  - [ ] Return the row count from `execute_statement`.
-  - [ ] An empty list returns 0 without querying.
-  - [ ] Keep the signature and input shape.
-- [ ] Add `get_analysis_records_for_embedding_update_page(after_id, limit)`: `WHERE "embeddingSearch" = 0 AND id > %s ORDER BY id LIMIT %s`.
-- [ ] Add `get_analysis_article_ids()`: the distinct union of `articleIdNew` and `articleIdApproved`.
-- [ ] Raise the `DEDUPER_BATCH_SIZE_EMBEDDING` default from 100 to 5000 in `deduper/config.py`.
-- [ ] Tests, `tests/unit/deduper/test_repository.py`:
-  - [ ] `execute_statement` runs one bulk update and returns the updated row count.
-  - [ ] `update_analysis_embedding_batch` handles a full batch, a partial batch and an empty batch.
-  - [ ] Paging returns rows in id order, starting after `after_id`.
-- [ ] Update `test_config.py` if it asserts the old default of 100.
-- [ ] End-of-phase checks for worker-python.
-- [ ] Check off tasks and commit.
+- [x] Add `DeduperRepository.execute_statement(query, params)`: execute once, commit, return `cursor.rowcount`, never fetch. Wrap `psycopg.Error` in `DeduperDatabaseError`, like `execute_many`.
+- [x] Rewrite `update_analysis_embedding_batch` to build one `UPDATE ... FROM (VALUES (%s::integer, %s::double precision), ...) AS v(id, score)` per call:
+  - [x] Values go in as parameters only.
+  - [x] Return the row count from `execute_statement`.
+  - [x] An empty list returns 0 without querying.
+  - [x] Keep the signature and input shape.
+- [x] Add `get_analysis_records_for_embedding_update_page(after_id, limit)`: `WHERE "embeddingSearch" = 0 AND id > %s ORDER BY id LIMIT %s`.
+- [x] Add `get_analysis_article_ids()`: the distinct union of `articleIdNew` and `articleIdApproved`.
+- [x] Raise the `DEDUPER_BATCH_SIZE_EMBEDDING` default from 100 to 5000 in `deduper/config.py`.
+- [x] Tests, `tests/unit/deduper/test_repository.py`:
+  - [x] `execute_statement` runs one bulk update and returns the updated row count.
+  - [x] `update_analysis_embedding_batch` handles a full batch, a partial batch and an empty batch.
+  - [x] Paging returns rows in id order, starting after `after_id`.
+- [x] Update `test_config.py` if it asserts the old default of 100.
+- [x] End-of-phase checks for worker-python.
+- [x] Check off tasks and commit.
 
 ## Phase 5: Deduper Pipeline Integration
 

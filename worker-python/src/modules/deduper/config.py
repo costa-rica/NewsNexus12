@@ -106,7 +106,7 @@ class DeduperConfig:
                 "DEDUPER_BATCH_SIZE_CONTENT_HASH",
             ),
             batch_size_embedding=_parse_positive_int(
-                os.getenv("DEDUPER_BATCH_SIZE_EMBEDDING", "100"),
+                os.getenv("DEDUPER_BATCH_SIZE_EMBEDDING", "5000"),
                 "DEDUPER_BATCH_SIZE_EMBEDDING",
             ),
             cache_max_entries=_parse_positive_int(
