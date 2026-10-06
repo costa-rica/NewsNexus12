@@ -56,6 +56,7 @@ const continuedRun = (overrides = {}) =>
     stateAssignerJobId: 'saved-job',
     targetArticleThresholdDaysOld: 180,
     phaseData: {
+      phase5: { status: 'completed' },
       phase6: {
         status: 'started',
         startedAt: phaseStartedAt,
@@ -721,6 +722,102 @@ describe('runStateAssignment', () => {
 
     assert.equal(completed.stateAssignerJobId, 'job-c');
     assert.deepEqual(starts, ['job-b', 'job-c']);
+    assert.equal(memory.runs[0].articleCount, 12);
+    assert.equal(memory.runs[0].targetArticleThresholdDaysOld, 180);
+    assert.equal(
+      (memory.runs[0].phaseData.phase6 as Record<string, unknown>).startedAt,
+      phaseStartedAt
+    );
+    assert.deepEqual(memory.runs[0].phaseData.phase5, { status: 'completed' });
+  });
+
+  it('replaces failed jobs across three separate continuation invocations', async () => {
+    const memory = createInMemoryPersistence([continuedRun()]);
+    let invocation = 1;
+    const starts: string[] = [];
+    const worker: StateAssignerWorker = {
+      start: async () => {
+        const jobId = `replacement-${invocation}`;
+        starts.push(jobId);
+        return startResult(jobId);
+      },
+      getStatus: async (jobId) => {
+        if (jobId === 'replacement-3') {
+          return compatible(jobId, 'completed', {
+            createdAt: '2026-10-05T09:40:01.000Z'
+          });
+        }
+        return compatible(jobId, 'failed', {
+          createdAt: `2026-10-05T09:${10 + invocation}:01.000Z`,
+          failureReason: 'assignment_failed'
+        });
+      },
+      cancel: async () => 'canceled'
+    };
+
+    for (invocation = 1; invocation <= 2; invocation += 1) {
+      await assert.rejects(
+        runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+        (error: unknown) =>
+          error instanceof RunStateAssignmentError && error.category === 'unsuccessful_result'
+      );
+    }
+    invocation = 3;
+    const completed = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+
+    assert.equal(completed.stateAssignerJobId, 'replacement-3');
+    assert.deepEqual(starts, ['replacement-1', 'replacement-2', 'replacement-3']);
+  });
+
+  it('continues after a newly started canceled or unavailable job on a later invocation', async () => {
+    for (const outcome of ['canceled', 'unavailable'] as const) {
+      const memory = createInMemoryPersistence([continuedRun()]);
+      let invocation = 1;
+      const starts: string[] = [];
+      const worker: StateAssignerWorker = {
+        start: async () => {
+          const jobId = invocation === 1 ? `first-${outcome}` : `second-${outcome}`;
+          starts.push(jobId);
+          return startResult(jobId);
+        },
+        getStatus: async (jobId) => {
+          if (jobId === 'saved-job' || jobId === `first-${outcome}`) {
+            if (outcome === 'unavailable' && jobId !== 'saved-job') {
+              throw new StateAssignerClientError('unavailable_job', 'missing', 404);
+            }
+            return compatible(jobId, 'canceled', {
+              createdAt: '2026-10-05T09:20:01.000Z'
+            });
+          }
+          return compatible(jobId, 'completed', {
+            createdAt: '2026-10-05T09:30:01.000Z'
+          });
+        },
+        cancel: async () => 'canceled'
+      };
+
+      await assert.rejects(
+        runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+        (error: unknown) =>
+          error instanceof RunStateAssignmentError &&
+          (outcome === 'unavailable'
+            ? error.category === 'unverified_outcome'
+            : error.category === 'unsuccessful_result')
+      );
+      invocation = 2;
+      const completed = await runStateAssignment(
+        memory.runs[0],
+        config,
+        dependencies(memory.persistence, worker)
+      );
+
+      assert.equal(completed.stateAssignerJobId, `second-${outcome}`);
+      assert.deepEqual(starts, [`first-${outcome}`, `second-${outcome}`]);
+    }
   });
 
   it('continues after two incompatible attempts and completes a third job', async () => {
@@ -759,6 +856,50 @@ describe('runStateAssignment', () => {
       (recovery.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
       ['saved-job', 'job-b']
     );
+  });
+
+  it('ends each active incompatible invocation before a third continuation succeeds', async () => {
+    const memory = createInMemoryPersistence([continuedRun()]);
+    let invocation = 1;
+    const starts: string[] = [];
+    const worker: StateAssignerWorker = {
+      start: async () => {
+        const jobId = invocation === 2 ? 'job-b' : 'job-c';
+        starts.push(jobId);
+        return startResult(jobId);
+      },
+      getStatus: async (jobId) => {
+        if (invocation === 1) return incompatible('saved-job', 'running');
+        if (invocation === 2) {
+          return jobId === 'saved-job'
+            ? incompatible('saved-job', 'canceled')
+            : incompatible('job-b', 'running', '2026-10-05T09:20:01.000Z');
+        }
+        return jobId === 'job-b'
+          ? incompatible('job-b', 'canceled', '2026-10-05T09:20:01.000Z')
+          : compatible('job-c', 'completed', {
+              createdAt: '2026-10-05T09:30:01.000Z'
+            });
+      },
+      cancel: async () => 'canceled'
+    };
+
+    for (invocation = 1; invocation <= 2; invocation += 1) {
+      await assert.rejects(
+        runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+        (error: unknown) =>
+          error instanceof RunStateAssignmentError && error.category === 'incompatible_contract'
+      );
+    }
+    invocation = 3;
+    const completed = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+
+    assert.equal(completed.stateAssignerJobId, 'job-c');
+    assert.deepEqual(starts, ['job-b', 'job-c']);
   });
 
   it('allows a reused job ID to complete when createdAt differs from its attempt', async () => {

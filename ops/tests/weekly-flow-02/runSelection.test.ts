@@ -88,6 +88,26 @@ describe('selectWeeklyFlowRun', () => {
     );
   });
 
+  it('does not consume continuation eligibility across repeated invocations', () => {
+    const run = createRunRecord({
+      id: 42,
+      runStartedAt: new Date('2026-10-02T12:00:00.000Z'),
+      lastPhaseStarted: 6,
+      lastPhaseCompleted: 5
+    });
+    for (const invocation of [
+      { mode: 'default' } as const,
+      { mode: 'continue', runId: null } as const,
+      { mode: 'continue', runId: 42 } as const
+    ]) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const selection = selectWeeklyFlowRun(invocation, run, now);
+        assert.equal(selection.action, 'continue');
+        if (selection.action === 'continue') assert.equal(selection.run.id, 42);
+      }
+    }
+  });
+
   it('rejects unavailable, complete, early, future, and invalid continuation candidates', () => {
     assert.throws(
       () => selectWeeklyFlowRun({ mode: 'continue', runId: null }, null, now),

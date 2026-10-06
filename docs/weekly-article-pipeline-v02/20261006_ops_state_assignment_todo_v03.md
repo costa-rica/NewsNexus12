@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T16:58:40Z
-updated_at: 2026-10-06T17:11:10Z
+updated_at: 2026-10-06T17:13:15Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -192,39 +192,39 @@ Complete the persistence and runner changes in one phase. Do not stop at an inte
 6. [x] Confirm no transitional wrapper or legacy live type remains unintentionally.
 7. [x] Check off completed Phase 2 tasks.
 8. [x] Stage only Phase 2 changes.
-9. [ ] Commit using repository guidance and reference Phase 2 of this todo in the commit body.
+9. [x] Commit using repository guidance and reference Phase 2 of this todo in the commit body.
 
 ## Phase 3: Prove Repeated Continuation Boundaries
 
-- [ ] Add a multi-invocation test that replaces a failed job across at least three separate invocations.
-- [ ] Add equivalent later-invocation coverage for canceled and unavailable jobs where not already proven.
-- [ ] Verify an inactive monitoring-limited job can be replaced on a later invocation.
-- [ ] Verify an incompatible job is recorded, canceled when active, and ends the invocation.
-- [ ] Verify a second incompatible job becomes a separate attempt and ends its invocation.
-- [ ] Verify a third continuation may start another job.
-- [ ] Verify a valid later job completes regardless of earlier attempt count.
-- [ ] Verify repeated observations update one attempt rather than append duplicates.
-- [ ] Verify malformed or ambiguously active jobs never become replacement eligible.
-- [ ] Verify Article count, threshold, original Phase 6 start, and completed Phase 5 remain unchanged.
-- [ ] Confirm the coordinator records failure and exits without reinvoking itself.
-- [ ] Confirm Phase 7 is reached only after validated Phase 6 completion.
-- [ ] Confirm repeated no-argument continuation remains possible while the run is within 72 hours.
-- [ ] Confirm repeated `--continue-run` invocations revisit incomplete Phase 6.
-- [ ] Confirm repeated `--continue-run ID` invocations revisit the selected eligible run.
-- [ ] Confirm explicit continuation retains existing deliberate older-run behavior.
-- [ ] Add coordinator or run-selection tests only when existing coverage does not prove these boundaries.
-- [ ] Do not add multiple new job starts to one invocation.
-- [ ] Do not add process self-restart or internal command reinvocation.
+- [x] Add a multi-invocation test that replaces a failed job across at least three separate invocations.
+- [x] Add equivalent later-invocation coverage for canceled and unavailable jobs where not already proven.
+- [x] Verify an inactive monitoring-limited job can be replaced on a later invocation.
+- [x] Verify an incompatible job is recorded, canceled when active, and ends the invocation.
+- [x] Verify a second incompatible job becomes a separate attempt and ends its invocation.
+- [x] Verify a third continuation may start another job.
+- [x] Verify a valid later job completes regardless of earlier attempt count.
+- [x] Verify repeated observations update one attempt rather than append duplicates.
+- [x] Verify malformed or ambiguously active jobs never become replacement eligible.
+- [x] Verify Article count, threshold, original Phase 6 start, and completed Phase 5 remain unchanged.
+- [x] Confirm the coordinator records failure and exits without reinvoking itself.
+- [x] Confirm Phase 7 is reached only after validated Phase 6 completion.
+- [x] Confirm repeated no-argument continuation remains possible while the run is within 72 hours.
+- [x] Confirm repeated `--continue-run` invocations revisit incomplete Phase 6.
+- [x] Confirm repeated `--continue-run ID` invocations revisit the selected eligible run.
+- [x] Confirm explicit continuation retains existing deliberate older-run behavior.
+- [x] Add coordinator or run-selection tests only when existing coverage does not prove these boundaries.
+- [x] Do not add multiple new job starts to one invocation.
+- [x] Do not add process self-restart or internal command reinvocation.
 
 ### Phase 3 Checkpoint
 
-1. [ ] Build `db-models`.
-2. [ ] Run the ops type check.
-3. [ ] Run the complete ops test suite.
-4. [ ] Build ops.
-5. [ ] Fix failures and repeat all checks.
-6. [ ] Check off completed Phase 3 tasks.
-7. [ ] Stage only Phase 3 changes.
+1. [x] Build `db-models`.
+2. [x] Run the ops type check.
+3. [x] Run the complete ops test suite.
+4. [x] Build ops.
+5. [x] Fix failures and repeat all checks.
+6. [x] Check off completed Phase 3 tasks.
+7. [x] Stage only Phase 3 changes.
 8. [ ] Commit only when Phase 3 produced code or test changes; do not create an empty commit.
 
 ## Phase 4: Update Operator Documentation
