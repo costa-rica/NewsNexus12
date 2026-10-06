@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:46:55Z
+updated_at: 2026-10-06T22:52:40Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -78,61 +78,61 @@ Plan: Component 2.
 
 Plan: Component 3.
 
-- [ ] Create `worker-python/src/modules/article_embeddings/` with `__init__.py`, `errors.py`, `types.py`, `config.py`, `text.py`, `encoder.py`, `repository.py` and `service.py`.
-- [ ] `errors.py`: `ArticleEmbeddingsError` (base), `ArticleEmbeddingsCancelledError` and `ArticleEmbeddingsDatabaseError`. Import nothing from `deduper` or `queue`.
-- [ ] `types.py`:
-  - [ ] `EmbeddingSyncMode` (`StrEnum`: `incremental`, `rebuild`).
-  - [ ] `EmbeddingSyncSummary` dataclass: mode, approved articles, missing, stale, encoded, upserted, deleted, elapsed seconds.
-  - [ ] `to_dict()` returns those fields plus `processed` (equal to encoded).
-- [ ] `config.py`: read `ARTICLE_EMBEDDINGS_BATCH_SIZE` (default 64) and `ARTICLE_EMBEDDINGS_MODEL_NAME` (default `sentence-transformers/all-MiniLM-L6-v2`). Reuse the `PG_*` settings, following `deduper/config.py` validation style.
-- [ ] `text.py`:
-  - [ ] Move `_preprocess_text` from `EmbeddingProcessor` as `preprocess_text(text)`, with identical behavior.
-  - [ ] Add `text_hash(text)`, the sha256 hex digest of the preprocessed text.
-- [ ] `encoder.py`:
-  - [ ] Lazy, process-wide `SentenceTransformer` loader with `max_seq_length = 256`.
-  - [ ] `encode_batch(texts)` with `normalize_embeddings=True`, returning float32 arrays.
-  - [ ] Empty text yields a zero vector of the model dimension.
-  - [ ] Raise a clear error if `sentence-transformers` or `numpy` is missing.
-- [ ] `repository.py`, `ArticleEmbeddingRepository`. Connection ownership:
-  - [ ] The constructor takes a `connection_provider: Callable[[], psycopg.Connection]` and an `owns_connection: bool`.
-  - [ ] Borrowed mode, used inside deduper jobs: the provider is `DeduperRepository.get_connection`, `owns_connection=False`, and `close()` does nothing. It never closes or returns the borrowed connection.
-  - [ ] Owned mode, used by the standalone runner: the classmethod `from_config(config)` creates its own `ConnectionPool`, following the `DeduperRepository` pool pattern, with `owns_connection=True`. `close()` returns the connection and closes the pool.
-  - [ ] The repository commits after each write on whichever connection it uses, matching `DeduperRepository`.
-- [ ] `repository.py` queries. All SQL here:
-  - [ ] `get_approved_article_texts()`: newest approved row per article (`DISTINCT ON ("articleId") ... ORDER BY "articleId", id DESC`).
-  - [ ] `get_selected_texts(article_ids)`: the same selection for the given IDs.
-  - [ ] `get_embedding_hashes(model_name)`.
-  - [ ] `get_embeddings(article_ids, model_name)`.
-  - [ ] `upsert_embeddings(rows)`: batched `INSERT ... ON CONFLICT ("articleId", "modelName") DO UPDATE`. Store embeddings as float32 little-endian bytes.
-  - [ ] `delete_embeddings_without_current_text(model_name)`.
-  - [ ] `delete_embeddings(article_ids, model_name)`.
-  - [ ] Raise `ArticleEmbeddingsDatabaseError` with a clear message if the `ArticleEmbeddings` table does not exist.
-  - [ ] Empty input: `get_selected_texts([])` and `get_embeddings([], ...)` return `{}`, and `upsert_embeddings([])` and `delete_embeddings([], ...)` return 0. None of them sends a query. Never build an empty `IN ()` or `ANY` list.
-- [ ] `service.py`, `ArticleEmbeddingService`:
-  - [ ] `sync(mode, should_cancel)` implements incremental and rebuild as in the plan. No truncate. Cleanup always runs through `delete_embeddings_without_current_text`.
-  - [ ] `load_embeddings(article_ids)`: read only.
-  - [ ] `ensure_embeddings(article_ids, should_cancel)`: follow the five steps in the plan. Never return a stored row without checking the current text.
-  - [ ] Check `should_cancel` between encode batches and raise `ArticleEmbeddingsCancelledError`.
-  - [ ] `ensure_embeddings([])` returns `{}` without querying.
-  - [ ] `sync()` with nothing to encode completes without loading the model.
-  - [ ] The service takes an `ArticleEmbeddingRepository` and never creates or closes connections itself.
-- [ ] Add the `ArticleEmbeddings` DDL to a shared worker-python test schema helper, or to each new test file's schema setup, matching the db-models table.
-- [ ] Tests, new `tests/unit/article_embeddings/`, using a fake encoder like `_FakeSentenceTransformer`:
-  - [ ] `preprocess_text` matches the old `_preprocess_text` output for HTML, whitespace and over-1000-character inputs. `text_hash` is stable.
-  - [ ] Incremental mode encodes only missing and changed articles, and encodes nothing when every hash matches.
-  - [ ] Rebuild overwrites rows and removes rows for articles no longer approved.
-  - [ ] Text changing from non-null to null: sync deletes the row.
-  - [ ] The newest approved row is used when an article has two approved rows.
-  - [ ] Empty text is stored as a zero vector, and null text gets no row.
-  - [ ] Cancellation stops between batches and raises `ArticleEmbeddingsCancelledError`.
-  - [ ] `to_dict()` includes `processed`.
-  - [ ] `ensure_embeddings` returns stored rows without encoding when hashes match, and encodes only missing or changed IDs.
-  - [ ] `ensure_embeddings` with text changed to null deletes the row and leaves the ID out.
-  - [ ] Embedding bytes round-trip: what is stored loads back as an equal float32 array.
-  - [ ] Empty input: each list-taking repository method and `ensure_embeddings([])` return empty results, sending no query and loading no model. Use a spy or fake connection to check that no query is sent.
-  - [ ] Ownership: in borrowed mode, `close()` leaves the provided connection open and usable. In owned mode, `close()` closes the pool.
-- [ ] End-of-phase checks for worker-python.
-- [ ] Check off tasks and commit.
+- [x] Create `worker-python/src/modules/article_embeddings/` with `__init__.py`, `errors.py`, `types.py`, `config.py`, `text.py`, `encoder.py`, `repository.py` and `service.py`.
+- [x] `errors.py`: `ArticleEmbeddingsError` (base), `ArticleEmbeddingsCancelledError` and `ArticleEmbeddingsDatabaseError`. Import nothing from `deduper` or `queue`.
+- [x] `types.py`:
+  - [x] `EmbeddingSyncMode` (`StrEnum`: `incremental`, `rebuild`).
+  - [x] `EmbeddingSyncSummary` dataclass: mode, approved articles, missing, stale, encoded, upserted, deleted, elapsed seconds.
+  - [x] `to_dict()` returns those fields plus `processed` (equal to encoded).
+- [x] `config.py`: read `ARTICLE_EMBEDDINGS_BATCH_SIZE` (default 64) and `ARTICLE_EMBEDDINGS_MODEL_NAME` (default `sentence-transformers/all-MiniLM-L6-v2`). Reuse the `PG_*` settings, following `deduper/config.py` validation style.
+- [x] `text.py`:
+  - [x] Move `_preprocess_text` from `EmbeddingProcessor` as `preprocess_text(text)`, with identical behavior.
+  - [x] Add `text_hash(text)`, the sha256 hex digest of the preprocessed text.
+- [x] `encoder.py`:
+  - [x] Lazy, process-wide `SentenceTransformer` loader with `max_seq_length = 256`.
+  - [x] `encode_batch(texts)` with `normalize_embeddings=True`, returning float32 arrays.
+  - [x] Empty text yields a zero vector of the model dimension.
+  - [x] Raise a clear error if `sentence-transformers` or `numpy` is missing.
+- [x] `repository.py`, `ArticleEmbeddingRepository`. Connection ownership:
+  - [x] The constructor takes a `connection_provider: Callable[[], psycopg.Connection]` and an `owns_connection: bool`.
+  - [x] Borrowed mode, used inside deduper jobs: the provider is `DeduperRepository.get_connection`, `owns_connection=False`, and `close()` does nothing. It never closes or returns the borrowed connection.
+  - [x] Owned mode, used by the standalone runner: the classmethod `from_config(config)` creates its own `ConnectionPool`, following the `DeduperRepository` pool pattern, with `owns_connection=True`. `close()` returns the connection and closes the pool.
+  - [x] The repository commits after each write on whichever connection it uses, matching `DeduperRepository`.
+- [x] `repository.py` queries. All SQL here:
+  - [x] `get_approved_article_texts()`: newest approved row per article (`DISTINCT ON ("articleId") ... ORDER BY "articleId", id DESC`).
+  - [x] `get_selected_texts(article_ids)`: the same selection for the given IDs.
+  - [x] `get_embedding_hashes(model_name)`.
+  - [x] `get_embeddings(article_ids, model_name)`.
+  - [x] `upsert_embeddings(rows)`: batched `INSERT ... ON CONFLICT ("articleId", "modelName") DO UPDATE`. Store embeddings as float32 little-endian bytes.
+  - [x] `delete_embeddings_without_current_text(model_name)`.
+  - [x] `delete_embeddings(article_ids, model_name)`.
+  - [x] Raise `ArticleEmbeddingsDatabaseError` with a clear message if the `ArticleEmbeddings` table does not exist.
+  - [x] Empty input: `get_selected_texts([])` and `get_embeddings([], ...)` return `{}`, and `upsert_embeddings([])` and `delete_embeddings([], ...)` return 0. None of them sends a query. Never build an empty `IN ()` or `ANY` list.
+- [x] `service.py`, `ArticleEmbeddingService`:
+  - [x] `sync(mode, should_cancel)` implements incremental and rebuild as in the plan. No truncate. Cleanup always runs through `delete_embeddings_without_current_text`.
+  - [x] `load_embeddings(article_ids)`: read only.
+  - [x] `ensure_embeddings(article_ids, should_cancel)`: follow the five steps in the plan. Never return a stored row without checking the current text.
+  - [x] Check `should_cancel` between encode batches and raise `ArticleEmbeddingsCancelledError`.
+  - [x] `ensure_embeddings([])` returns `{}` without querying.
+  - [x] `sync()` with nothing to encode completes without loading the model.
+  - [x] The service takes an `ArticleEmbeddingRepository` and never creates or closes connections itself.
+- [x] Add the `ArticleEmbeddings` DDL to a shared worker-python test schema helper, or to each new test file's schema setup, matching the db-models table.
+- [x] Tests, new `tests/unit/article_embeddings/`, using a fake encoder like `_FakeSentenceTransformer`:
+  - [x] `preprocess_text` matches the old `_preprocess_text` output for HTML, whitespace and over-1000-character inputs. `text_hash` is stable.
+  - [x] Incremental mode encodes only missing and changed articles, and encodes nothing when every hash matches.
+  - [x] Rebuild overwrites rows and removes rows for articles no longer approved.
+  - [x] Text changing from non-null to null: sync deletes the row.
+  - [x] The newest approved row is used when an article has two approved rows.
+  - [x] Empty text is stored as a zero vector, and null text gets no row.
+  - [x] Cancellation stops between batches and raises `ArticleEmbeddingsCancelledError`.
+  - [x] `to_dict()` includes `processed`.
+  - [x] `ensure_embeddings` returns stored rows without encoding when hashes match, and encodes only missing or changed IDs.
+  - [x] `ensure_embeddings` with text changed to null deletes the row and leaves the ID out.
+  - [x] Embedding bytes round-trip: what is stored loads back as an equal float32 array.
+  - [x] Empty input: each list-taking repository method and `ensure_embeddings([])` return empty results, sending no query and loading no model. Use a spy or fake connection to check that no query is sent.
+  - [x] Ownership: in borrowed mode, `close()` leaves the provided connection open and usable. In owned mode, `close()` closes the pool.
+- [x] End-of-phase checks for worker-python.
+- [x] Check off tasks and commit.
 
 ## Phase 4: Deduper Repository Bulk Writes and Paging
 

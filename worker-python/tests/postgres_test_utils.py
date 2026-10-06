@@ -47,3 +47,23 @@ def execute_many(statement: str, rows: list[tuple]) -> None:
             cursor.execute("SET search_path TO public")
             cursor.executemany(statement, rows)
         conn.commit()
+
+
+# Mirrors db-models ArticleEmbedding (table "ArticleEmbeddings").
+ARTICLE_EMBEDDINGS_DDL = """
+CREATE TABLE "ArticleEmbeddings" (
+    id SERIAL PRIMARY KEY,
+    "articleId" INTEGER NOT NULL,
+    "modelName" VARCHAR(255) NOT NULL,
+    "embeddingDimension" INTEGER NOT NULL,
+    "textHash" VARCHAR(64) NOT NULL,
+    "embedding" BYTEA NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL,
+    "updatedAt" TIMESTAMPTZ NOT NULL
+)
+"""
+
+ARTICLE_EMBEDDINGS_INDEX_DDL = """
+CREATE UNIQUE INDEX "idx_article_embeddings_article_id_model_name"
+ON "ArticleEmbeddings" ("articleId", "modelName")
+"""
