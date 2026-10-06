@@ -8,6 +8,7 @@ This file is the top-level reference index for engineers and service consumers.
 
 - [index](./endpoints/index.md)
 - [deduper](./endpoints/deduper.md)
+- [article-embeddings](./endpoints/article-embeddings.md)
 - [location-scorer](./endpoints/location-scorer.md)
 - [queue-info](./endpoints/queue-info.md)
 
@@ -20,9 +21,11 @@ This file is the top-level reference index for engineers and service consumers.
 - `GET /deduper/jobs/{job_id}`
 4. Use `GET /deduper/jobs/list` to inspect active and recent jobs.
 5. Use `GET /deduper/health` for runtime and environment checks.
-6. Create location scorer job:
+6. Fill or refresh stored article embeddings without running the deduper:
+- `POST /article-embeddings/jobs` with optional body `{"mode": "incremental" | "rebuild"}`
+7. Create location scorer job:
 - `POST /location-scorer/start-job`
-7. Poll latest location scorer job by endpoint name:
+8. Poll latest location scorer job by endpoint name:
 - `GET /queue-info/latest-job?endpointName=/location-scorer/start-job`
 
 ## Documentation conventions

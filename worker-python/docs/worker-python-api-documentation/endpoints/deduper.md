@@ -1,13 +1,15 @@
 ---
 created_at: 2026-10-01T23:18:45Z
-updated_at: 2026-10-01T23:18:45Z
+updated_at: 2026-10-06T23:03:56Z
 created_by: codex (gpt-6) nicksmacbookair
-modified_by: codex (gpt-6) nicksmacbookair
+modified_by: claude (opus-5.5) nicksmacbookair
 ---
 
 # Deduper endpoints
 
 These endpoints manage deduper job lifecycle operations including create, status, cancel, list, health checks, and table clear operations.
+
+Every deduper job runs an `embedding_sync` step before the `embedding` step. By default it embeds approved articles that have no stored embedding in `ArticleEmbeddings`, or whose text changed. The POST create routes can request a full rebuild instead. See [article-embeddings](./article-embeddings.md).
 
 ## GET /deduper/jobs
 
@@ -64,6 +66,70 @@ curl --location 'http://localhost:5000/deduper/jobs/reportId/125'
 ### Error responses
 
 - `422`: Invalid `report_id` type
+- `409`: A deduper submission or clear operation already holds the operation guard
+- `500`: Internal server error
+
+## POST /deduper/jobs
+
+Creates a new deduper job, with options in an optional JSON body. With no body it behaves the same as `GET /deduper/jobs`.
+
+### parameters
+
+- Body (optional): `rebuildEmbeddings` (boolean, default `false`). When `true`, the job re-encodes every approved article's embedding before scoring. This takes an estimated 5–15 minutes on CPU.
+
+### Sample Request
+
+```bash
+curl --location --request POST 'http://localhost:5000/deduper/jobs' \
+--header 'Content-Type: application/json' \
+--data '{"rebuildEmbeddings": true}'
+```
+
+### Sample Response
+
+```json
+{
+  "jobId": "0007",
+  "status": "queued"
+}
+```
+
+### Error responses
+
+- `422`: Invalid body, for example a non-boolean `rebuildEmbeddings` or an unknown field
+- `409`: A deduper submission or clear operation already holds the operation guard
+- `500`: Internal server error
+
+## POST /deduper/jobs/reportId/{report_id}
+
+Creates a new deduper job scoped to a specific report ID, with options in an optional JSON body. With no body it behaves the same as `GET /deduper/jobs/reportId/{report_id}`.
+
+### parameters
+
+- Path: `report_id` (integer)
+- Body (optional): `rebuildEmbeddings` (boolean, default `false`)
+
+### Sample Request
+
+```bash
+curl --location --request POST 'http://localhost:5000/deduper/jobs/reportId/125' \
+--header 'Content-Type: application/json' \
+--data '{"rebuildEmbeddings": false}'
+```
+
+### Sample Response
+
+```json
+{
+  "jobId": "0008",
+  "reportId": 125,
+  "status": "queued"
+}
+```
+
+### Error responses
+
+- `422`: Invalid `report_id` type or invalid body
 - `409`: A deduper submission or clear operation already holds the operation guard
 - `500`: Internal server error
 

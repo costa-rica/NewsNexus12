@@ -92,9 +92,10 @@ Create a complete database backup as a ZIP file.
 
 - Requires authentication (JWT token)
 - Rate limited (databaseOperationLimiter)
-- Exports all database tables to CSV files
+- Exports all database tables to CSV files, except models in `BACKUP_EXCLUDED_MODELS` from `@newsnexus/db-models`
 - Bundles CSVs into timestamped ZIP archive
 - Saves to PATH_DB_BACKUPS directory
+- `ArticleEmbeddings` is excluded. It holds binary embeddings that do not round-trip through CSV, and it can be regenerated from approved article text.
 
 ### Parameters
 
@@ -354,6 +355,7 @@ Import database data from a backup ZIP file.
 - Extracts CSV files from backup ZIP
 - Appends data to existing database tables
 - Does not overwrite existing records
+- Leaves `ArticleEmbeddings` empty, because backups do not include it. Regenerate it with worker-python `POST /article-embeddings/jobs`, or let the next deduper job fill it.
 
 ### Parameters
 

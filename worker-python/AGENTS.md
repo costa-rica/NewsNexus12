@@ -9,8 +9,9 @@ Worker-python is the FastAPI execution service for AI Approver V02, deduplicatio
 1. Application bootstrap: `src/main.py`
 2. AI Approver V02: `src/routes/ai_approver_v02.py` and `src/modules/ai_approver_v02/`
 3. Deduper: `src/routes/deduper.py`, `src/services/job_manager.py`, and `src/modules/deduper/`
-4. Location scorer: `src/routes/location_scorer.py` and `src/modules/location_scorer/`
-5. Shared queue: `src/routes/queue_info.py` and `src/modules/queue/`
+4. Article embeddings: `src/routes/article_embeddings.py` and `src/modules/article_embeddings/`. Shared by the deduper's `embedding_sync` and `embedding` steps.
+5. Location scorer: `src/routes/location_scorer.py` and `src/modules/location_scorer/`
+6. Shared queue: `src/routes/queue_info.py` and `src/modules/queue/`
 
 The old product feature formerly named orchestrator is removed. Files named `orchestrator.py` inside retained workflow packages are internal single-workflow coordinators, not a shared scheduler or public product feature.
 

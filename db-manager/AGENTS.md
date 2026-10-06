@@ -88,6 +88,7 @@ stdout/stderr are discarded because the app logs to its own Winston log file. Us
 - **Date sanitization:** Invalid dates in imported CSVs are normalized to NULL with warnings.
 - **Boolean coercion:** SQLite-style `"0"`/`"1"` boolean values are converted to Postgres booleans on import.
 - **Sequence reset:** After import, all serial `id` sequences are reset to `MAX(id)` so new inserts do not collide.
+- **Backup exclusions:** `--create_backup` skips models in `BACKUP_EXCLUDED_MODELS` from `@newsnexus/db-models` (currently `ArticleEmbedding`): no CSV and no manifest entry. After `--zip_file`, `ArticleEmbeddings` is empty. Regenerate it with worker-python `POST /article-embeddings/jobs`, or let the next deduper job fill it.
 - **Schema rebuild:** `--zip_file` and `--drop_db` both use `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public` + `sequelize.sync()` to guarantee a clean state, then re-grant `PG_APP_ROLE` if configured.
 - **Dry-run isolation:** `--dry_run` spawns a child process with `PG_DATABASE` overridden to a scratch DB name (`newsnexus_dry_run_<timestamp>`), so the parent process connection is never used for destructive operations. The scratch DB is dropped even if the import fails.
 - **No-state dry run:** `--delete_articles_no_state --dry_run` is read-only against the configured database and logs candidate counts, protection exclusions, reason-code breakdown, and sample rows.

@@ -46,12 +46,15 @@ The FastAPI worker runs AI Approver V02, deduplication, location scoring, and sh
 2. Deduper:
    - `GET /deduper/jobs`
    - `GET /deduper/jobs/reportId/{report_id}`
+   - `POST /deduper/jobs` and `POST /deduper/jobs/reportId/{report_id}` (optional body `{"rebuildEmbeddings": true}`)
    - `GET /deduper/jobs/{job_id}`
    - `POST /deduper/jobs/{job_id}/cancel`
    - `DELETE /deduper/clear-db-table`
-3. Location scorer:
+3. Article embeddings:
+   - `POST /article-embeddings/jobs` (optional body `{"mode": "incremental" | "rebuild"}`)
+4. Location scorer:
    - `POST /location-scorer/start-job`
-4. Shared queue:
+5. Shared queue:
    - `GET /queue-info/check-status/{job_id}`
    - `GET /queue-info/latest-job`
    - `GET /queue-info/queue-status`
@@ -60,6 +63,12 @@ The FastAPI worker runs AI Approver V02, deduplication, location scoring, and sh
 AI Approver V01 and the former cross-worker weekly workflow are not live features.
 
 AI Approver V02 is used by weekly-flow-02 Phase 7 as well as operator-facing clients. Worker-python provides preview, execution, detail, and cancellation contracts; ops owns weekly scheduling and continuation policy.
+
+## Stored article embeddings
+
+- Each deduper job runs an `embedding_sync` step before scoring. It embeds approved articles that are missing from `ArticleEmbeddings`, or whose text changed. The `embedding` step then scores pairs from the stored vectors.
+- `POST /article-embeddings/jobs` runs the same sync on its own. Use it to fill the table ahead of a weekly run, or after a database import, since `ArticleEmbeddings` is excluded from backups.
+- Settings: `ARTICLE_EMBEDDINGS_MODEL_NAME`, `ARTICLE_EMBEDDINGS_BATCH_SIZE` (default 64) and `DEDUPER_BATCH_SIZE_EMBEDDING` (default 5000, the scores written per bulk update).
 
 ## Clearing deduper analysis
 

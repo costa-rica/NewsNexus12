@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T23:03:20Z
+updated_at: 2026-10-06T23:05:56Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -239,15 +239,15 @@ Plan: Component 5, plus "Cancellation mapping".
 
 Plan: Component 7.
 
-- [ ] `worker-python/docs/worker-python-api-documentation/`: document `POST /deduper/jobs`, `POST /deduper/jobs/reportId/{report_id}` and `POST /article-embeddings/jobs`, following the existing endpoint doc format.
-- [ ] `worker-python/AGENTS.md`: add `src/routes/article_embeddings.py` and `src/modules/article_embeddings/` to the runtime entry points.
-- [ ] `worker-python/README.md`: mention the embedding sync step and the standalone route where the deduper is described.
-- [ ] `worker-python/.env.example`: add `ARTICLE_EMBEDDINGS_BATCH_SIZE`, `ARTICLE_EMBEDDINGS_MODEL_NAME` and `DEDUPER_BATCH_SIZE_EMBEDDING=5000`, without real values for secrets.
-- [ ] `docs/api-documentation/endpoints/admin-db.md`: note under create-database-backup and import-db-backup that `ArticleEmbeddings` is excluded and is regenerated after an import.
-- [ ] `db-manager/AGENTS.md`: the same note for `--create_backup` and `--zip_file`.
-- [ ] Update `updated_at` and `modified_by` frontmatter on any edited doc that has it.
-- [ ] End-of-phase checks: run the full worker-python, db-manager and api test suites once more.
-- [ ] Check off tasks and commit.
+- [x] `worker-python/docs/worker-python-api-documentation/`: document `POST /deduper/jobs`, `POST /deduper/jobs/reportId/{report_id}` and `POST /article-embeddings/jobs`, following the existing endpoint doc format.
+- [x] `worker-python/AGENTS.md`: add `src/routes/article_embeddings.py` and `src/modules/article_embeddings/` to the runtime entry points.
+- [x] `worker-python/README.md`: mention the embedding sync step and the standalone route where the deduper is described.
+- [x] `worker-python/.env.example`: add `ARTICLE_EMBEDDINGS_BATCH_SIZE`, `ARTICLE_EMBEDDINGS_MODEL_NAME` and `DEDUPER_BATCH_SIZE_EMBEDDING=5000`, without real values for secrets.
+- [x] `docs/api-documentation/endpoints/admin-db.md`: note under create-database-backup and import-db-backup that `ArticleEmbeddings` is excluded and is regenerated after an import.
+- [x] `db-manager/AGENTS.md`: the same note for `--create_backup` and `--zip_file`.
+- [x] Update `updated_at` and `modified_by` frontmatter on any edited doc that has it.
+- [x] End-of-phase checks: run the full worker-python, db-manager and api test suites once more.
+- [x] Check off tasks and commit.
 
 ## Phase 8: Operator Verification
 
