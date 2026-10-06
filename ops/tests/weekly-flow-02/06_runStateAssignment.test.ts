@@ -523,7 +523,7 @@ describe('runStateAssignment', () => {
     assert.equal(starts, 1);
   });
 
-  it('starts one compatible marked replacement for a completed incompatible source', async () => {
+  it('starts one compatible continuation for a completed incompatible source', async () => {
     const memory = createInMemoryPersistence([continuedRun()]);
     let starts = 0;
     const worker: StateAssignerWorker = {
@@ -550,12 +550,14 @@ describe('runStateAssignment', () => {
     const marker = (memory.runs[0].phaseData.phase6 as Record<string, unknown>)
       .incompatibleContractRecovery as Record<string, unknown>;
     assert.equal(phaseResult.stateAssignerJobId, 'replacement');
-    assert.equal(marker.sourceJobId, 'saved-job');
-    assert.equal(marker.replacementJobId, 'replacement');
+    assert.deepEqual(
+      (marker.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['saved-job']
+    );
     assert.equal(memory.runs[0].articleCount, 12);
     assert.equal(memory.runs[0].targetArticleThresholdDaysOld, 180);
     assert.equal(starts, 1);
-    assert.ok(memory.calls.includes('replacement:6'));
+    assert.ok(memory.calls.includes('continuation:6'));
   });
 
   it('replaces an inactive worker-restart incompatible source', async () => {
@@ -584,7 +586,52 @@ describe('runStateAssignment', () => {
     assert.equal(phaseResult.stateAssignerJobId, 'restart-replacement');
   });
 
-  it('cancels an incompatible marked replacement and never starts another', async () => {
+  it('completes a compatible legacy V04 replacement and normalizes its source', async () => {
+    const run = continuedRun({
+      stateAssignerJobId: 'legacy-replacement',
+      phaseData: {
+        phase6: {
+          status: 'started',
+          startedAt: phaseStartedAt,
+          input: inputs,
+          incompatibleContractRecovery: {
+            sourceJobId: 'legacy-source',
+            sourceJobCreatedAt: '2026-10-05T09:00:01.000Z',
+            detectedAt: '2026-10-05T09:10:00.000Z',
+            missingParameterFields: ['targetArticleThresholdDaysOld'],
+            lastStatus: 'completed',
+            replacementStartedAt: '2026-10-05T09:20:00.000Z',
+            replacementJobId: 'legacy-replacement'
+          }
+        }
+      }
+    });
+    const memory = createInMemoryPersistence([run]);
+    const worker: StateAssignerWorker = {
+      start: async () => startResult('unexpected'),
+      getStatus: async () =>
+        compatible('legacy-replacement', 'completed', {
+          createdAt: '2026-10-05T09:20:01.000Z'
+        }),
+      cancel: async () => 'canceled'
+    };
+
+    const phaseResult = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+
+    const recovery = (memory.runs[0].phaseData.phase6 as Record<string, unknown>)
+      .incompatibleContractRecovery as Record<string, unknown>;
+    assert.equal(phaseResult.stateAssignerJobId, 'legacy-replacement');
+    assert.deepEqual(
+      (recovery.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['legacy-source']
+    );
+  });
+
+  it('cancels an incompatible legacy replacement and ends its invocation', async () => {
     const run = continuedRun({
       stateAssignerJobId: 'replacement',
       phaseData: {
@@ -627,12 +674,133 @@ describe('runStateAssignment', () => {
     );
     assert.equal(cancellations, 1);
     assert.equal(starts, 0);
+    const recovery = (memory.runs[0].phaseData.phase6 as Record<string, unknown>)
+      .incompatibleContractRecovery as Record<string, unknown>;
+    assert.deepEqual(
+      (recovery.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['source-job', 'replacement']
+    );
   });
 
-  it('stops after an incompatible replacement ID persistence failure', async () => {
+  it('continues after an incompatible attempt and a later compatible failure', async () => {
     const memory = createInMemoryPersistence([continuedRun()]);
-    const original = memory.persistence.recordPhaseSixIncompatibleReplacementStarted;
-    memory.persistence.recordPhaseSixIncompatibleReplacementStarted = async () => {
+    let invocation = 1;
+    const starts: string[] = [];
+    const worker: StateAssignerWorker = {
+      start: async () => {
+        const jobId = invocation === 1 ? 'job-b' : 'job-c';
+        starts.push(jobId);
+        return startResult(jobId);
+      },
+      getStatus: async (jobId) => {
+        if (jobId === 'saved-job') return incompatible(jobId, 'completed');
+        if (jobId === 'job-b') {
+          return compatible(jobId, 'failed', {
+            createdAt: '2026-10-05T09:20:01.000Z',
+            failureReason: 'assignment_failed'
+          });
+        }
+        return compatible(jobId, 'completed', {
+          createdAt: '2026-10-05T09:30:01.000Z'
+        });
+      },
+      cancel: async () => 'canceled'
+    };
+
+    await assert.rejects(
+      runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+      (error: unknown) =>
+        error instanceof RunStateAssignmentError && error.category === 'unsuccessful_result'
+    );
+    invocation = 2;
+    const completed = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+
+    assert.equal(completed.stateAssignerJobId, 'job-c');
+    assert.deepEqual(starts, ['job-b', 'job-c']);
+  });
+
+  it('continues after two incompatible attempts and completes a third job', async () => {
+    const memory = createInMemoryPersistence([continuedRun()]);
+    let invocation = 1;
+    const worker: StateAssignerWorker = {
+      start: async () => startResult(invocation === 1 ? 'job-b' : 'job-c'),
+      getStatus: async (jobId) => {
+        if (jobId === 'saved-job') return incompatible(jobId, 'completed');
+        if (jobId === 'job-b') {
+          return incompatible(jobId, 'failed', '2026-10-05T09:20:01.000Z');
+        }
+        return compatible(jobId, 'completed', {
+          createdAt: '2026-10-05T09:30:01.000Z'
+        });
+      },
+      cancel: async () => 'canceled'
+    };
+
+    await assert.rejects(
+      runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+      (error: unknown) =>
+        error instanceof RunStateAssignmentError && error.category === 'incompatible_contract'
+    );
+    invocation = 2;
+    const completed = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+    const recovery = (memory.runs[0].phaseData.phase6 as Record<string, unknown>)
+      .incompatibleContractRecovery as Record<string, unknown>;
+
+    assert.equal(completed.stateAssignerJobId, 'job-c');
+    assert.deepEqual(
+      (recovery.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['saved-job', 'job-b']
+    );
+  });
+
+  it('allows a reused job ID to complete when createdAt differs from its attempt', async () => {
+    const run = continuedRun({
+      phaseData: {
+        phase6: {
+          status: 'started',
+          startedAt: phaseStartedAt,
+          input: inputs,
+          incompatibleContractRecovery: {
+            attempts: [{
+              jobId: 'saved-job',
+              jobCreatedAt: '2026-10-05T08:00:01.000Z',
+              detectedAt: '2026-10-05T08:01:00.000Z',
+              missingParameterFields: ['targetArticleThresholdDaysOld']
+            }]
+          }
+        }
+      }
+    });
+    const memory = createInMemoryPersistence([run]);
+    const worker: StateAssignerWorker = {
+      start: async () => startResult('unexpected'),
+      getStatus: async () =>
+        compatible('saved-job', 'completed', {
+          createdAt: '2026-10-05T09:00:01.000Z'
+        }),
+      cancel: async () => 'canceled'
+    };
+
+    const completed = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+    assert.equal(completed.stateAssignerJobId, 'saved-job');
+  });
+
+  it('stops after a continuation job ID persistence failure', async () => {
+    const memory = createInMemoryPersistence([continuedRun()]);
+    const original = memory.persistence.recordPhaseSixContinuationJobStarted;
+    memory.persistence.recordPhaseSixContinuationJobStarted = async () => {
       throw new Error('write failed');
     };
     let starts = 0;
@@ -654,9 +822,12 @@ describe('runStateAssignment', () => {
     assert.equal(memory.runs[0].stateAssignerJobId, 'saved-job');
     const marker = (memory.runs[0].phaseData.phase6 as Record<string, unknown>)
       .incompatibleContractRecovery as Record<string, unknown>;
-    assert.equal(marker.replacementJobId, undefined);
+    assert.deepEqual(
+      (marker.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['saved-job']
+    );
 
-    memory.persistence.recordPhaseSixIncompatibleReplacementStarted = original;
+    memory.persistence.recordPhaseSixContinuationJobStarted = original;
     const retryWorker: StateAssignerWorker = {
       start: async () => startResult('later-replacement'),
       getStatus: async (jobId) =>

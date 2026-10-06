@@ -206,19 +206,6 @@ export interface PhaseSixMonitoringLimit {
   verification?: JsonRecord;
 }
 
-export interface PhaseSixIncompatibleContractRecovery {
-  sourceJobId: string;
-  sourceJobCreatedAt: string;
-  detectedAt: Date;
-  missingParameterFields: string[];
-  lastStatus: string;
-  cancellationRequestedAt?: Date;
-  cancellationOutcome?: string;
-  verification?: JsonRecord;
-  replacementStartedAt?: Date;
-  replacementJobId?: string;
-}
-
 export interface PhaseSixProgress {
   observedAt: Date;
   stateAssignerJobId?: string;
@@ -229,8 +216,15 @@ export interface PhaseSixProgress {
   failureReason?: string;
   selectedCount?: number;
   monitoringLimit?: PhaseSixMonitoringLimit;
-  incompatibleContractRecovery?: PhaseSixIncompatibleContractRecovery;
+  incompatibleContractRecovery?: PhaseSixIncompatibleRecoveryV06;
 }
+
+export type PhaseSixContinuationReason =
+  | 'saved_job_failed'
+  | 'saved_job_canceled'
+  | 'saved_job_unavailable'
+  | 'monitoring_limited'
+  | 'incompatible_contract';
 
 export interface PhaseSixCompletionFields {
   stateAssignerJobId: string;
@@ -304,10 +298,12 @@ export interface WeeklyFlowPersistence {
     targetArticleThresholdDaysOld: number
   ): Promise<WeeklyFlowRunRecord>;
   recordPhaseSixProgress(runId: number, progress: PhaseSixProgress): Promise<WeeklyFlowRunRecord>;
-  recordPhaseSixIncompatibleReplacementStarted(
+  recordPhaseSixContinuationJobStarted(
     runId: number,
-    replacementJobId: string,
-    replacementStartedAt: Date
+    expectedPriorJobId: string,
+    continuationJobId: string,
+    continuationStartedAt: Date,
+    reason: PhaseSixContinuationReason
   ): Promise<WeeklyFlowRunRecord>;
   recordPhaseSixCompleted(
     runId: number,
@@ -321,3 +317,4 @@ export interface WeeklyFlowPersistence {
 
 export const isWeeklyFlowPhase = (value: number): value is WeeklyFlowPhase =>
   Number.isInteger(value) && value >= 1 && value <= 7;
+import type { PhaseSixIncompatibleRecoveryV06 } from './phaseSixRecoveryState';

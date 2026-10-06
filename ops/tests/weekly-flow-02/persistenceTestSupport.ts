@@ -4,6 +4,27 @@ import type {
   WeeklyFlowPersistence,
   WeeklyFlowRunRecord
 } from '../../src/weekly-flow-02/persistence';
+import {
+  parsePhaseSixIncompatibleRecovery,
+  serializePhaseSixIncompatibleRecovery,
+  upsertPhaseSixIncompatibleAttempt,
+  type PhaseSixIncompatibleRecoveryV06
+} from '../../src/weekly-flow-02/phaseSixRecoveryState';
+
+const mergePhaseSixRecovery = (
+  existing: unknown,
+  incoming?: PhaseSixIncompatibleRecoveryV06
+): PhaseSixIncompatibleRecoveryV06 | null => {
+  let recovery = parsePhaseSixIncompatibleRecovery(existing);
+  if (incoming === undefined) return recovery;
+  const validated = parsePhaseSixIncompatibleRecovery(
+    serializePhaseSixIncompatibleRecovery(incoming)
+  );
+  for (const attempt of validated?.attempts ?? []) {
+    recovery = upsertPhaseSixIncompatibleAttempt(recovery, attempt);
+  }
+  return recovery;
+};
 
 const cloneRun = (run: WeeklyFlowRunRecord): WeeklyFlowRunRecord => ({
   ...run,
@@ -321,6 +342,10 @@ export const createInMemoryPersistence = (
       })) {
         if (value !== undefined && value !== null) latestProgress[key] = value;
       }
+      const recovery = mergePhaseSixRecovery(
+        existing.incompatibleContractRecovery,
+        progress.incompatibleContractRecovery
+      );
       run.phaseData.phase6 = {
         ...existing,
         latestProgress,
@@ -345,82 +370,65 @@ export const createInMemoryPersistence = (
               }
             }
           : {}),
-        ...(progress.incompatibleContractRecovery
+        ...(recovery
           ? {
-              incompatibleContractRecovery: {
-                sourceJobId: progress.incompatibleContractRecovery.sourceJobId,
-                sourceJobCreatedAt:
-                  progress.incompatibleContractRecovery.sourceJobCreatedAt,
-                detectedAt: progress.incompatibleContractRecovery.detectedAt.toISOString(),
-                missingParameterFields: [
-                  ...progress.incompatibleContractRecovery.missingParameterFields
-                ],
-                lastStatus: progress.incompatibleContractRecovery.lastStatus,
-                ...(progress.incompatibleContractRecovery.cancellationRequestedAt
-                  ? {
-                      cancellationRequestedAt:
-                        progress.incompatibleContractRecovery.cancellationRequestedAt.toISOString()
-                    }
-                  : {}),
-                ...(progress.incompatibleContractRecovery.cancellationOutcome
-                  ? {
-                      cancellationOutcome:
-                        progress.incompatibleContractRecovery.cancellationOutcome
-                    }
-                  : {}),
-                ...(progress.incompatibleContractRecovery.verification
-                  ? {
-                      verification: structuredClone(
-                        progress.incompatibleContractRecovery.verification
-                      )
-                    }
-                  : {}),
-                ...(progress.incompatibleContractRecovery.replacementStartedAt
-                  ? {
-                      replacementStartedAt:
-                        progress.incompatibleContractRecovery.replacementStartedAt.toISOString()
-                    }
-                  : {}),
-                ...(progress.incompatibleContractRecovery.replacementJobId
-                  ? {
-                      replacementJobId:
-                        progress.incompatibleContractRecovery.replacementJobId
-                    }
-                  : {})
-              }
+              incompatibleContractRecovery: serializePhaseSixIncompatibleRecovery(recovery)
             }
           : {})
       };
       return touch(run, progress.observedAt);
     },
-    async recordPhaseSixIncompatibleReplacementStarted(
+    async recordPhaseSixContinuationJobStarted(
       runId,
-      replacementJobId,
-      replacementStartedAt
+      expectedPriorJobId,
+      continuationJobId,
+      continuationStartedAt,
+      reason
     ) {
-      calls.push('replacement:6');
+      calls.push('continuation:6');
       const run = requireRun(runId);
-      const phase6 = (run.phaseData.phase6 as Record<string, unknown>) ?? {};
-      const marker = phase6.incompatibleContractRecovery as Record<string, unknown> | undefined;
-      if (!marker) throw new Error('Phase 6 incompatible-contract recovery marker is missing');
-      if (marker.replacementJobId !== undefined) {
-        throw new Error('Phase 6 incompatible-contract replacement was already consumed');
+      if (run.lastPhaseStarted !== 6 || run.lastPhaseCompleted !== 5) {
+        throw new Error('Phase 6 is not active');
       }
-      run.stateAssignerJobId = replacementJobId;
+      if (run.stateAssignerJobId !== expectedPriorJobId) {
+        throw new Error('Phase 6 continuation prior job does not match the saved job');
+      }
+      const phase6 = (run.phaseData.phase6 as Record<string, unknown>) ?? {};
+      const input = phase6.input as Record<string, unknown> | undefined;
+      if (
+        !input ||
+        input.targetArticleStateReviewCount !== run.articleCount ||
+        input.targetArticleThresholdDaysOld !== run.targetArticleThresholdDaysOld
+      ) {
+        throw new Error('Phase 6 input audit mirror does not match its columns');
+      }
+      if (![
+        'saved_job_failed',
+        'saved_job_canceled',
+        'saved_job_unavailable',
+        'monitoring_limited',
+        'incompatible_contract'
+      ].includes(reason)) {
+        throw new Error('Phase 6 continuation reason is invalid');
+      }
+      const recovery = parsePhaseSixIncompatibleRecovery(
+        phase6.incompatibleContractRecovery
+      );
+      run.stateAssignerJobId = continuationJobId;
       run.phaseData.phase6 = {
         ...phase6,
-        incompatibleContractRecovery: {
-          ...marker,
-          replacementStartedAt: replacementStartedAt.toISOString(),
-          replacementJobId
-        },
+        ...(recovery
+          ? { incompatibleContractRecovery: serializePhaseSixIncompatibleRecovery(recovery) }
+          : {}),
         latestProgress: {
-          observedAt: replacementStartedAt.toISOString(),
-          jobId: replacementJobId,
-          status: 'replacement_started'
+          observedAt: continuationStartedAt.toISOString(),
+          jobId: continuationJobId,
+          status: 'continuation_started',
+          priorJobId: expectedPriorJobId,
+          reason
         }
       };
-      return touch(run, replacementStartedAt);
+      return touch(run, continuationStartedAt);
     },
     async recordPhaseSixCompleted(runId, completedAt, phaseResult, fields) {
       calls.push('complete:6');
@@ -436,21 +444,27 @@ export const createInMemoryPersistence = (
       ) {
         throw new Error('A monitoring-limited job cannot complete Phase 6');
       }
-      const incompatible = phase6.incompatibleContractRecovery as
-        | Record<string, unknown>
-        | undefined;
+      const incompatible = parsePhaseSixIncompatibleRecovery(
+        phase6.incompatibleContractRecovery
+      );
       if (
-        incompatible?.sourceJobId === fields.stateAssignerJobId &&
-        incompatible.sourceJobCreatedAt === fields.jobCreatedAt
+        incompatible?.attempts.some(
+          (attempt) =>
+            attempt.jobId === fields.stateAssignerJobId &&
+            attempt.jobCreatedAt === fields.jobCreatedAt
+        )
       ) {
-        throw new Error('An incompatible source job cannot complete Phase 6');
+        throw new Error('An incompatible job cannot complete Phase 6');
       }
       run.lastPhaseCompleted = 6;
       run.phaseData.phase6 = {
         ...phase6,
         status: 'completed',
         completedAt: completedAt.toISOString(),
-        result: structuredClone(phaseResult)
+        result: structuredClone(phaseResult),
+        ...(incompatible
+          ? { incompatibleContractRecovery: serializePhaseSixIncompatibleRecovery(incompatible) }
+          : {})
       };
       return touch(run, completedAt);
     },

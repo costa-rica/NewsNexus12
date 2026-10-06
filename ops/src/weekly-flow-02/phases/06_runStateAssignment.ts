@@ -1,11 +1,18 @@
 import type { OpsConfig } from '../../config';
 import type {
   JsonRecord,
-  PhaseSixIncompatibleContractRecovery,
+  PhaseSixContinuationReason,
   PhaseSixMonitoringLimit,
   WeeklyFlowPersistence,
   WeeklyFlowRunRecord
 } from '../persistence';
+import {
+  findPhaseSixIncompatibleAttempt,
+  parsePhaseSixIncompatibleRecovery,
+  upsertPhaseSixIncompatibleAttempt,
+  type PhaseSixIncompatibleAttempt,
+  type PhaseSixIncompatibleRecoveryV06
+} from '../phaseSixRecoveryState';
 import {
   StateAssignerClientError,
   cancelStateAssignerJob,
@@ -192,121 +199,19 @@ const monitoringMarker = (run: WeeklyFlowRunRecord): PersistedMonitoringMarker |
   };
 };
 
-interface PersistedIncompatibleMarker {
-  sourceJobId: string;
-  sourceJobCreatedAt: string;
-  detectedAt: Date;
-  missingParameterFields: string[];
-  lastStatus: string;
-  cancellationRequestedAt?: Date;
-  cancellationOutcome?: string;
-  verification?: JsonRecord;
-  replacementJobId?: string;
-  replacementStartedAt?: Date;
-}
-
-const incompatibleMarker = (run: WeeklyFlowRunRecord): PersistedIncompatibleMarker | null => {
+const incompatibleRecovery = (
+  run: WeeklyFlowRunRecord
+): PhaseSixIncompatibleRecoveryV06 | null => {
   const marker = phaseSixData(run).incompatibleContractRecovery;
-  if (marker === undefined) return null;
-  if (typeof marker !== 'object' || marker === null || Array.isArray(marker)) {
+  try {
+    return parsePhaseSixIncompatibleRecovery(marker);
+  } catch (error: unknown) {
     throw new RunStateAssignmentError(
       'invalid_run_state',
-      'Phase 6 incompatible-contract marker is invalid'
+      'Phase 6 incompatible-contract recovery state is invalid',
+      { cause: error }
     );
   }
-  const candidate = marker as JsonRecord;
-  if (
-    typeof candidate.sourceJobId !== 'string' ||
-    candidate.sourceJobId.trim() === '' ||
-    typeof candidate.sourceJobCreatedAt !== 'string' ||
-    !Number.isFinite(Date.parse(candidate.sourceJobCreatedAt)) ||
-    typeof candidate.detectedAt !== 'string' ||
-    !Number.isFinite(Date.parse(candidate.detectedAt)) ||
-    !Array.isArray(candidate.missingParameterFields) ||
-    candidate.missingParameterFields.length === 0 ||
-    !candidate.missingParameterFields.every(
-      (field) => typeof field === 'string' && field.trim() !== ''
-    ) ||
-    typeof candidate.lastStatus !== 'string' ||
-    candidate.lastStatus.trim() === ''
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible-contract marker identity is invalid'
-    );
-  }
-  if (
-    candidate.replacementJobId !== undefined &&
-    (typeof candidate.replacementJobId !== 'string' || candidate.replacementJobId.trim() === '')
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible replacement job ID is invalid'
-    );
-  }
-  if (
-    candidate.replacementStartedAt !== undefined &&
-    (typeof candidate.replacementStartedAt !== 'string' ||
-      !Number.isFinite(Date.parse(candidate.replacementStartedAt)))
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible replacement start time is invalid'
-    );
-  }
-  if (
-    candidate.cancellationRequestedAt !== undefined &&
-    (typeof candidate.cancellationRequestedAt !== 'string' ||
-      !Number.isFinite(Date.parse(candidate.cancellationRequestedAt)))
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible cancellation time is invalid'
-    );
-  }
-  if (
-    candidate.cancellationOutcome !== undefined &&
-    (typeof candidate.cancellationOutcome !== 'string' ||
-      candidate.cancellationOutcome.trim() === '')
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible cancellation outcome is invalid'
-    );
-  }
-  if (
-    candidate.verification !== undefined &&
-    (typeof candidate.verification !== 'object' ||
-      candidate.verification === null ||
-      Array.isArray(candidate.verification))
-  ) {
-    throw new RunStateAssignmentError(
-      'invalid_run_state',
-      'Phase 6 incompatible cancellation verification is invalid'
-    );
-  }
-  return {
-    sourceJobId: candidate.sourceJobId,
-    sourceJobCreatedAt: candidate.sourceJobCreatedAt,
-    detectedAt: new Date(candidate.detectedAt),
-    missingParameterFields: [...candidate.missingParameterFields] as string[],
-    lastStatus: candidate.lastStatus,
-    ...(candidate.cancellationRequestedAt === undefined
-      ? {}
-      : { cancellationRequestedAt: new Date(candidate.cancellationRequestedAt as string) }),
-    ...(candidate.cancellationOutcome === undefined
-      ? {}
-      : { cancellationOutcome: candidate.cancellationOutcome as string }),
-    ...(candidate.verification === undefined
-      ? {}
-      : { verification: { ...(candidate.verification as JsonRecord) } }),
-    ...(candidate.replacementJobId === undefined
-      ? {}
-      : { replacementJobId: candidate.replacementJobId as string }),
-    ...(candidate.replacementStartedAt === undefined
-      ? {}
-      : { replacementStartedAt: new Date(candidate.replacementStartedAt as string) })
-  };
 };
 
 const matchesMonitoringMarker = (
@@ -314,16 +219,6 @@ const matchesMonitoringMarker = (
   marker: PersistedMonitoringMarker | null
 ): boolean => marker !== null && marker.jobId === job.jobId && marker.jobCreatedAt === job.createdAt;
 
-const markerRole = (
-  job: StateAssignerJob,
-  marker: PersistedIncompatibleMarker | null
-): 'source' | 'replacement' | null => {
-  if (marker === null) return null;
-  if (marker.sourceJobId === job.jobId && marker.sourceJobCreatedAt === job.createdAt) {
-    return 'source';
-  }
-  return marker.replacementJobId === job.jobId ? 'replacement' : null;
-};
 
 const ensurePhaseSixStarted = async (
   selectedRun: WeeklyFlowRunRecord,
@@ -391,29 +286,6 @@ const progressFromJob = (job: StateAssignerJob, observedAt: Date) => ({
 
 const asPhaseError = (message: string, cause?: unknown): RunStateAssignmentError =>
   new RunStateAssignmentError('unverified_outcome', message, { cause });
-
-const markerInput = (
-  marker: PersistedIncompatibleMarker,
-  additions: Partial<PhaseSixIncompatibleContractRecovery> = {}
-): PhaseSixIncompatibleContractRecovery => ({
-  sourceJobId: marker.sourceJobId,
-  sourceJobCreatedAt: marker.sourceJobCreatedAt,
-  detectedAt: marker.detectedAt,
-  missingParameterFields: marker.missingParameterFields,
-  lastStatus: marker.lastStatus,
-  ...(marker.cancellationRequestedAt === undefined
-    ? {}
-    : { cancellationRequestedAt: marker.cancellationRequestedAt }),
-  ...(marker.cancellationOutcome === undefined
-    ? {}
-    : { cancellationOutcome: marker.cancellationOutcome }),
-  ...(marker.verification === undefined ? {} : { verification: marker.verification }),
-  ...(marker.replacementStartedAt === undefined
-    ? {}
-    : { replacementStartedAt: marker.replacementStartedAt }),
-  ...(marker.replacementJobId === undefined ? {} : { replacementJobId: marker.replacementJobId }),
-  ...additions
-});
 
 const cancelMonitoringLimitedJob = async (
   runId: number,
@@ -503,7 +375,8 @@ const cancelMonitoringLimitedJob = async (
 const cancelIncompatibleJob = async (
   runId: number,
   job: StateAssignerJob,
-  marker: PersistedIncompatibleMarker,
+  recovery: PhaseSixIncompatibleRecoveryV06,
+  attempt: PhaseSixIncompatibleAttempt,
   phaseStartedAt: Date,
   inputs: StateAssignerInputs,
   pollIntervalMilliseconds: number,
@@ -517,17 +390,19 @@ const cancelIncompatibleJob = async (
   }
   const cancellationRequestedAt = dependencies.now();
   const persistCancellation = async (verification?: JsonRecord): Promise<void> => {
+    const updatedRecovery = upsertPhaseSixIncompatibleAttempt(recovery, {
+      ...attempt,
+      lastStatus: job.status,
+      cancellationRequestedAt,
+      cancellationOutcome: outcome,
+      ...(verification === undefined ? {} : { verification })
+    });
     await dependencies.persistence.recordPhaseSixProgress(runId, {
       observedAt: dependencies.now(),
       stateAssignerJobId: job.jobId,
       status: `incompatible_contract_${outcome}`,
       jobCreatedAt: job.createdAt,
-      incompatibleContractRecovery: markerInput(marker, {
-        lastStatus: job.status,
-        cancellationRequestedAt,
-        cancellationOutcome: outcome,
-        ...(verification === undefined ? {} : { verification })
-      })
+      incompatibleContractRecovery: updatedRecovery
     });
   };
   await persistCancellation();
@@ -584,7 +459,7 @@ export const runStateAssignment = async (
   const startedAt = phaseSixStartedAt(run);
   const inputs = phaseSixInputs(run);
   const limitMarker = monitoringMarker(run);
-  let contractMarker = incompatibleMarker(run);
+  let contractRecovery = incompatibleRecovery(run);
   const pollIntervalMilliseconds = toPositiveMilliseconds(
     config.stateAssignerStatusPollIntervalSeconds,
     1_000,
@@ -597,7 +472,10 @@ export const runStateAssignment = async (
   );
   let jobId = run.stateAssignerJobId;
   let startedThisInvocation = false;
-  let nextStartIsIncompatibleReplacement = false;
+  let pendingContinuation: {
+    priorJobId: string;
+    reason: PhaseSixContinuationReason;
+  } | null = null;
   let consecutiveTransientFailures = 0;
   let lastActiveJob: StateAssignerJob | null = null;
 
@@ -623,25 +501,20 @@ export const runStateAssignment = async (
       jobId = started.jobId;
       startedThisInvocation = true;
       const startedObservedAt = dependencies.now();
-      if (nextStartIsIncompatibleReplacement) {
+      if (pendingContinuation !== null) {
         try {
-          await dependencies.persistence.recordPhaseSixIncompatibleReplacementStarted(
+          await dependencies.persistence.recordPhaseSixContinuationJobStarted(
             run.id,
+            pendingContinuation.priorJobId,
             jobId,
-            startedObservedAt
+            startedObservedAt,
+            pendingContinuation.reason
           );
         } catch (error: unknown) {
           throw asPhaseError(
-            'State assigner incompatible replacement started but its job ID could not be saved',
+            'State assigner continuation job started but its job ID could not be saved',
             error
           );
-        }
-        if (contractMarker !== null) {
-          contractMarker = {
-            ...contractMarker,
-            replacementJobId: jobId,
-            replacementStartedAt: startedObservedAt
-          };
         }
       } else {
         await dependencies.persistence.recordPhaseSixProgress(run.id, {
@@ -654,12 +527,10 @@ export const runStateAssignment = async (
         action: 'job_started',
         jobId,
         status: started.status,
-        recoveryAction: nextStartIsIncompatibleReplacement
-          ? 'incompatible_contract_replacement'
-          : undefined,
+        recoveryAction: pendingContinuation?.reason,
         requestedArticleCount: inputs.targetArticleStateReviewCount
       });
-      nextStartIsIncompatibleReplacement = false;
+      pendingContinuation = null;
     }
 
     let statusResult: StateAssignerStatusResult;
@@ -696,34 +567,17 @@ export const runStateAssignment = async (
       const unavailable =
         error instanceof StateAssignerClientError && error.category === 'unavailable_job';
       if (unavailable && !startedThisInvocation) {
-        if (contractMarker?.replacementJobId === jobId) {
-          throw new RunStateAssignmentError(
-            'incompatible_contract',
-            'The marked incompatible-contract replacement is unavailable; no second replacement is allowed',
-            { cause: error }
-          );
-        }
-        if (contractMarker?.sourceJobId === jobId) {
-          if (contractMarker.replacementJobId !== undefined) {
-            throw new RunStateAssignmentError(
-              'invalid_run_state',
-              'The saved Phase 6 job does not match its incompatible-contract replacement'
-            );
-          }
-          dependencies.onEvent?.({
-            action: 'replacement_eligible',
-            jobId,
-            recoveryAction: 'incompatible_source_unavailable'
-          });
-          nextStartIsIncompatibleReplacement = true;
-          jobId = null;
-          continue;
-        }
         dependencies.onEvent?.({
           action: 'replacement_eligible',
           jobId,
           recoveryAction: 'saved_job_unavailable'
         });
+        pendingContinuation = {
+          priorJobId: jobId,
+          reason: limitMarker?.jobId === jobId
+            ? 'monitoring_limited'
+            : 'saved_job_unavailable'
+        };
         jobId = null;
         continue;
       }
@@ -745,87 +599,87 @@ export const runStateAssignment = async (
     });
 
     const monitoringLimited = matchesMonitoringMarker(job, limitMarker);
-    const role = markerRole(job, contractMarker);
+    let incompatibleAttempt = findPhaseSixIncompatibleAttempt(
+      contractRecovery,
+      job.jobId,
+      job.createdAt
+    );
 
     if (statusResult.kind === 'incompatible_contract') {
-      if (contractMarker !== null && role === null) {
-        throw new RunStateAssignmentError(
-          'invalid_run_state',
-          'Incompatible state assigner job does not match the persisted recovery marker'
-        );
-      }
-      if (contractMarker === null) {
-        contractMarker = {
-          sourceJobId: job.jobId,
-          sourceJobCreatedAt: job.createdAt,
+      incompatibleAttempt = {
+        ...(incompatibleAttempt ?? {
+          jobId: job.jobId,
+          jobCreatedAt: job.createdAt,
           detectedAt: dependencies.now(),
-          missingParameterFields: statusResult.missingParameterFields,
-          lastStatus: job.status
-        };
-      }
+          missingParameterFields: statusResult.missingParameterFields
+        }),
+        missingParameterFields: statusResult.missingParameterFields,
+        lastStatus: job.status
+      };
+      contractRecovery = upsertPhaseSixIncompatibleAttempt(
+        contractRecovery,
+        incompatibleAttempt
+      );
       await dependencies.persistence.recordPhaseSixProgress(run.id, {
         ...progressFromJob(job, dependencies.now()),
-        incompatibleContractRecovery: markerInput(contractMarker, {
-          lastStatus: job.status,
-          missingParameterFields: statusResult.missingParameterFields
-        })
+        incompatibleContractRecovery: contractRecovery
       });
       dependencies.onEvent?.({
         action: 'incompatible_contract',
         jobId: job.jobId,
         status: job.status,
-        recoveryAction: role === 'replacement' ? 'replacement_incompatible' : 'source_incompatible'
+        recoveryAction: 'attempt_recorded'
       });
 
       if (activeStatuses.has(job.status)) {
         return cancelIncompatibleJob(
           run.id,
           job,
-          contractMarker,
+          contractRecovery,
+          incompatibleAttempt,
           startedAt,
           inputs,
           pollIntervalMilliseconds,
           dependencies
         );
       }
-      if (startedThisInvocation || role === 'replacement') {
+      if (startedThisInvocation) {
         throw new RunStateAssignmentError(
           'incompatible_contract',
-          role === 'replacement'
-            ? 'The marked replacement is also incompatible; no second replacement is allowed'
-            : 'The current invocation started an incompatible state assigner job'
+          'The current invocation started an incompatible state assigner job'
         );
       }
-      if (contractMarker.replacementJobId !== undefined) {
-        throw new RunStateAssignmentError(
-          'incompatible_contract',
-          'The incompatible-contract replacement has already been consumed'
-        );
-      }
-      nextStartIsIncompatibleReplacement = true;
+      pendingContinuation = {
+        priorJobId: job.jobId,
+        reason: 'incompatible_contract'
+      };
       jobId = null;
       continue;
     }
 
-    if (role === 'source') {
+    if (incompatibleAttempt !== null) {
       if (activeStatuses.has(job.status)) {
         return cancelIncompatibleJob(
           run.id,
           job,
-          contractMarker as PersistedIncompatibleMarker,
+          contractRecovery as PhaseSixIncompatibleRecoveryV06,
+          incompatibleAttempt,
           startedAt,
           inputs,
           pollIntervalMilliseconds,
           dependencies
         );
       }
-      if (startedThisInvocation || contractMarker?.replacementJobId !== undefined) {
+      if (startedThisInvocation) {
         throw new RunStateAssignmentError(
           'incompatible_contract',
-          'A persisted incompatible source job can never complete Phase 6'
+          'The current invocation started a job with an incompatible recorded identity'
         );
       }
-      nextStartIsIncompatibleReplacement = true;
+      pendingContinuation = {
+        priorJobId: job.jobId,
+        reason: 'incompatible_contract'
+      };
       jobId = null;
       continue;
     }
@@ -844,6 +698,10 @@ export const runStateAssignment = async (
           status: job.status,
           recoveryAction: 'marked_terminal_job'
         });
+        pendingContinuation = {
+          priorJobId: job.jobId,
+          reason: 'monitoring_limited'
+        };
         jobId = null;
         continue;
       }
@@ -881,12 +739,10 @@ export const runStateAssignment = async (
     }
 
     if (job.status === 'failed' || job.status === 'canceled') {
-      if (startedThisInvocation || role === 'replacement') {
+      if (startedThisInvocation) {
         throw new RunStateAssignmentError(
-          role === 'replacement' ? 'incompatible_contract' : 'unsuccessful_result',
-          role === 'replacement'
-            ? 'The marked incompatible-contract replacement ended unsuccessfully'
-            : `State assigner job ended with status ${job.status}`
+          'unsuccessful_result',
+          `State assigner job ended with status ${job.status}`
         );
       }
       dependencies.onEvent?.({
@@ -895,6 +751,14 @@ export const runStateAssignment = async (
         status: job.status,
         recoveryAction: monitoringLimited ? 'marked_terminal_job' : 'saved_terminal_job'
       });
+      pendingContinuation = {
+        priorJobId: job.jobId,
+        reason: monitoringLimited
+          ? 'monitoring_limited'
+          : job.status === 'failed'
+            ? 'saved_job_failed'
+            : 'saved_job_canceled'
+      };
       jobId = null;
       continue;
     }

@@ -19,7 +19,6 @@ import {
   type PhaseFiveProgress,
   type PhaseFiveCompletionFields,
   type PhaseSixCompletionFields,
-  type PhaseSixIncompatibleContractRecovery,
   type PhaseSixProgress,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
@@ -27,6 +26,12 @@ import {
   type WeeklyFlowPhase,
   type WeeklyFlowRunRecord
 } from './persistence';
+import {
+  parsePhaseSixIncompatibleRecovery,
+  serializePhaseSixIncompatibleRecovery,
+  upsertPhaseSixIncompatibleAttempt,
+  type PhaseSixIncompatibleRecoveryV06
+} from './phaseSixRecoveryState';
 
 type WeeklyFlowRunModel = typeof WeeklyArticleFlowRun02;
 type WeeklyFlowRunInstance = InstanceType<WeeklyFlowRunModel>;
@@ -337,58 +342,22 @@ const requirePhaseSixInputs = (run: WeeklyFlowRunInstance): {
   return { targetArticleStateReviewCount, targetArticleThresholdDaysOld };
 };
 
-const serializePhaseSixIncompatibleRecovery = (
-  recovery: PhaseSixIncompatibleContractRecovery
-): JsonRecord => {
-  requireValidDate(recovery.detectedAt, 'Phase 6 incompatible-contract detection time');
-  if (recovery.cancellationRequestedAt) {
-    requireValidDate(
-      recovery.cancellationRequestedAt,
-      'Phase 6 incompatible-contract cancellation time'
-    );
+const normalizedPhaseSixRecovery = (value: unknown): PhaseSixIncompatibleRecoveryV06 | null =>
+  parsePhaseSixIncompatibleRecovery(value);
+
+const mergePhaseSixRecovery = (
+  existing: unknown,
+  incoming?: PhaseSixIncompatibleRecoveryV06
+): PhaseSixIncompatibleRecoveryV06 | null => {
+  let recovery = normalizedPhaseSixRecovery(existing);
+  if (incoming === undefined) return recovery;
+  const validatedIncoming = normalizedPhaseSixRecovery(
+    serializePhaseSixIncompatibleRecovery(incoming)
+  );
+  for (const attempt of validatedIncoming?.attempts ?? []) {
+    recovery = upsertPhaseSixIncompatibleAttempt(recovery, attempt);
   }
-  if (recovery.replacementStartedAt) {
-    requireValidDate(
-      recovery.replacementStartedAt,
-      'Phase 6 incompatible-contract replacement time'
-    );
-  }
-  if (
-    !Array.isArray(recovery.missingParameterFields) ||
-    recovery.missingParameterFields.length === 0 ||
-    recovery.missingParameterFields.some(
-      (field) => typeof field !== 'string' || field.trim() === ''
-    )
-  ) {
-    throw new WeeklyFlowPersistenceError(
-      'Phase 6 incompatible-contract missing fields must be non-empty strings'
-    );
-  }
-  return {
-    sourceJobId: requireNonEmptyString(recovery.sourceJobId, 'sourceJobId'),
-    sourceJobCreatedAt: requireTimestampString(
-      recovery.sourceJobCreatedAt,
-      'sourceJobCreatedAt'
-    ),
-    detectedAt: recovery.detectedAt.toISOString(),
-    missingParameterFields: [...recovery.missingParameterFields],
-    lastStatus: requireNonEmptyString(recovery.lastStatus, 'lastStatus'),
-    ...(recovery.cancellationRequestedAt
-      ? { cancellationRequestedAt: recovery.cancellationRequestedAt.toISOString() }
-      : {}),
-    ...(recovery.cancellationOutcome
-      ? { cancellationOutcome: requireNonEmptyString(recovery.cancellationOutcome, 'cancellationOutcome') }
-      : {}),
-    ...(recovery.verification
-      ? { verification: asJsonRecord(recovery.verification) }
-      : {}),
-    ...(recovery.replacementStartedAt
-      ? { replacementStartedAt: recovery.replacementStartedAt.toISOString() }
-      : {}),
-    ...(recovery.replacementJobId
-      ? { replacementJobId: requireNonEmptyString(recovery.replacementJobId, 'replacementJobId') }
-      : {})
-  };
+  return recovery;
 };
 
 const mergePhaseData = (
@@ -933,10 +902,12 @@ export const createSequelizeWeeklyFlowPersistence = (
             : {})
         };
       }
-      if (progress.incompatibleContractRecovery) {
-        additions.incompatibleContractRecovery = serializePhaseSixIncompatibleRecovery(
-          progress.incompatibleContractRecovery
-        );
+      const recovery = mergePhaseSixRecovery(
+        existing.incompatibleContractRecovery,
+        progress.incompatibleContractRecovery
+      );
+      if (recovery !== null) {
+        additions.incompatibleContractRecovery = serializePhaseSixIncompatibleRecovery(recovery);
       }
       await run.update({
         stateAssignerJobId: jobId,
@@ -946,46 +917,54 @@ export const createSequelizeWeeklyFlowPersistence = (
     });
   },
 
-  async recordPhaseSixIncompatibleReplacementStarted(
+  async recordPhaseSixContinuationJobStarted(
     runId,
-    replacementJobId,
-    replacementStartedAt
+    expectedPriorJobId,
+    continuationJobId,
+    continuationStartedAt,
+    reason
   ) {
-    requireValidDate(replacementStartedAt, 'Phase 6 replacement start time');
+    requireValidDate(continuationStartedAt, 'Phase 6 continuation start time');
     return performPersistenceOperation(
-      'Phase 6 incompatible-contract replacement could not be persisted',
+      'Phase 6 continuation job could not be persisted',
       async () => {
         const run = await requireRun(model, runId);
         assertPhaseSixInProgress(run);
         requirePhaseSixInputs(run);
+        const priorJobId = requireNonEmptyString(expectedPriorJobId, 'expectedPriorJobId');
+        if (run.stateAssignerJobId !== priorJobId) {
+          throw new WeeklyFlowPersistenceError(
+            'Phase 6 continuation prior job does not match the saved job'
+          );
+        }
+        const allowedReasons = new Set([
+          'saved_job_failed',
+          'saved_job_canceled',
+          'saved_job_unavailable',
+          'monitoring_limited',
+          'incompatible_contract'
+        ]);
+        if (!allowedReasons.has(reason)) {
+          throw new WeeklyFlowPersistenceError('Phase 6 continuation reason is invalid');
+        }
         const phase6 = phaseRecord(run.phaseData, 6);
-        const rawMarker = phase6.incompatibleContractRecovery;
-        if (typeof rawMarker !== 'object' || rawMarker === null || Array.isArray(rawMarker)) {
-          throw new WeeklyFlowPersistenceError(
-            'Phase 6 incompatible-contract recovery marker is missing'
-          );
+        const recovery = normalizedPhaseSixRecovery(phase6.incompatibleContractRecovery);
+        const jobId = requireNonEmptyString(continuationJobId, 'continuationJobId');
+        const additions: JsonRecord = {
+          latestProgress: {
+            observedAt: continuationStartedAt.toISOString(),
+            jobId,
+            status: 'continuation_started',
+            priorJobId,
+            reason
+          }
+        };
+        if (recovery !== null) {
+          additions.incompatibleContractRecovery = serializePhaseSixIncompatibleRecovery(recovery);
         }
-        const marker = rawMarker as JsonRecord;
-        if (marker.replacementJobId !== undefined) {
-          throw new WeeklyFlowPersistenceError(
-            'Phase 6 incompatible-contract replacement was already consumed'
-          );
-        }
-        const jobId = requireNonEmptyString(replacementJobId, 'replacementJobId');
         await run.update({
           stateAssignerJobId: jobId,
-          phaseData: mergePhaseData(run.phaseData, 6, {
-            incompatibleContractRecovery: {
-              ...marker,
-              replacementStartedAt: replacementStartedAt.toISOString(),
-              replacementJobId: jobId
-            },
-            latestProgress: {
-              observedAt: replacementStartedAt.toISOString(),
-              jobId,
-              status: 'replacement_started'
-            }
-          })
+          phaseData: mergePhaseData(run.phaseData, 6, additions)
         });
         return toRunRecord(run);
       }
@@ -1009,6 +988,7 @@ export const createSequelizeWeeklyFlowPersistence = (
         throw new WeeklyFlowPersistenceError('Phase 6 completion job does not match the saved job');
       }
       const phase6 = phaseRecord(run.phaseData, 6);
+      const recovery = normalizedPhaseSixRecovery(phase6.incompatibleContractRecovery);
       const monitoringMarker = phase6.monitoringLimit;
       if (
         typeof monitoringMarker === 'object' &&
@@ -1020,21 +1000,12 @@ export const createSequelizeWeeklyFlowPersistence = (
           throw new WeeklyFlowPersistenceError('A monitoring-limited job cannot complete Phase 6');
         }
       }
-      const incompatibleMarker = phase6.incompatibleContractRecovery;
       if (
-        typeof incompatibleMarker === 'object' &&
-        incompatibleMarker !== null &&
-        !Array.isArray(incompatibleMarker)
+        recovery?.attempts.some(
+          (attempt) => attempt.jobId === jobId && attempt.jobCreatedAt === jobCreatedAt
+        )
       ) {
-        const marker = incompatibleMarker as JsonRecord;
-        if (marker.sourceJobId === jobId && marker.sourceJobCreatedAt === jobCreatedAt) {
-          throw new WeeklyFlowPersistenceError('An incompatible source job cannot complete Phase 6');
-        }
-        if (marker.replacementJobId !== undefined && marker.replacementJobId !== jobId) {
-          throw new WeeklyFlowPersistenceError(
-            'Phase 6 completion job does not match the incompatible-contract replacement'
-          );
-        }
+        throw new WeeklyFlowPersistenceError('An incompatible job cannot complete Phase 6');
       }
       const result = asJsonRecord(phaseResult);
       const selectedCount = requireNonnegativeSafeInteger(result.selectedCount, 'selectedCount');
@@ -1053,14 +1024,19 @@ export const createSequelizeWeeklyFlowPersistence = (
       ) {
         throw new WeeklyFlowPersistenceError('Phase 6 result inputs do not match persisted inputs');
       }
+      const completionAdditions: JsonRecord = {
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        result
+      };
+      if (recovery !== null) {
+        completionAdditions.incompatibleContractRecovery =
+          serializePhaseSixIncompatibleRecovery(recovery);
+      }
       await run.update({
         stateAssignerJobId: jobId,
         lastPhaseCompleted: 6,
-        phaseData: mergePhaseData(run.phaseData, 6, {
-          status: 'completed',
-          completedAt: completedAt.toISOString(),
-          result
-        })
+        phaseData: mergePhaseData(run.phaseData, 6, completionAdditions)
       });
       return toRunRecord(run);
     });

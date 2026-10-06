@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T16:58:40Z
-updated_at: 2026-10-06T17:04:59Z
+updated_at: 2026-10-06T17:11:10Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -93,8 +93,8 @@ V03 resolves `20261006_ops_state_assignment_todo_v02_assessment_claude.md`:
 4. [x] Build ops.
 5. [x] Fix failures and repeat all checks.
 6. [x] Check off completed Phase 1 tasks.
-7. [ ] Stage only Phase 1 changes.
-8. [ ] Commit using repository guidance and reference Phase 1 of this todo in the commit body.
+7. [x] Stage only Phase 1 changes.
+8. [x] Commit using repository guidance and reference Phase 1 of this todo in the commit body.
 
 ## Phase 2: Atomically Cut Over Persistence and Runner
 
@@ -102,96 +102,96 @@ Complete the persistence and runner changes in one phase. Do not stop at an inte
 
 ### Persistence Contract
 
-- [ ] Replace the live V04 recovery type with `PhaseSixIncompatibleRecoveryV06` after all Phase 2 consumers are ready.
-- [ ] Replace `recordPhaseSixIncompatibleReplacementStarted` with `recordPhaseSixContinuationJobStarted` or an equally clear protected operation.
-- [ ] Use the operation for replacements of:
-  - [ ] Failed saved jobs.
-  - [ ] Canceled saved jobs.
-  - [ ] Unavailable saved jobs.
-  - [ ] Inactive monitoring-limited jobs.
-  - [ ] Inactive incompatible jobs.
-- [ ] Keep initial Phase 6 start and no-job-ID persistence-gap handling on their existing paths when no prior saved job exists.
-- [ ] Require continuation start to atomically:
-  - [ ] Validate active Phase 6 and immutable inputs.
-  - [ ] Confirm the expected prior job equals `stateAssignerJobId`.
-  - [ ] Save the new job ID.
-  - [ ] Record start time and reason.
-  - [ ] Preserve monitoring and incompatible-attempt history.
-- [ ] Ensure a failed atomic save leaves prior state unchanged.
+- [x] Replace the live V04 recovery type with `PhaseSixIncompatibleRecoveryV06` after all Phase 2 consumers are ready.
+- [x] Replace `recordPhaseSixIncompatibleReplacementStarted` with `recordPhaseSixContinuationJobStarted` or an equally clear protected operation.
+- [x] Use the operation for replacements of:
+  - [x] Failed saved jobs.
+  - [x] Canceled saved jobs.
+  - [x] Unavailable saved jobs.
+  - [x] Inactive monitoring-limited jobs.
+  - [x] Inactive incompatible jobs.
+- [x] Keep initial Phase 6 start and no-job-ID persistence-gap handling on their existing paths when no prior saved job exists.
+- [x] Require continuation start to atomically:
+  - [x] Validate active Phase 6 and immutable inputs.
+  - [x] Confirm the expected prior job equals `stateAssignerJobId`.
+  - [x] Save the new job ID.
+  - [x] Record start time and reason.
+  - [x] Preserve monitoring and incompatible-attempt history.
+- [x] Ensure a failed atomic save leaves prior state unchanged.
 
 ### Shared Normalization Use
 
-- [ ] Make `sequelizePersistence.ts` read recovery data only through `phaseSixRecoveryState.ts`.
-- [ ] Make `persistenceTestSupport.ts` read recovery data only through the shared module.
-- [ ] Make `06_runStateAssignment.ts` read recovery data only through the shared module.
-- [ ] Remove duplicate V04 parsing and normalization logic from those files.
-- [ ] Ensure `recordPhaseSixProgress` normalizes recovery state before merging an attempt.
-- [ ] Ensure `recordPhaseSixCompleted` normalizes recovery state before checking incompatibility.
-- [ ] Ensure the runner normalizes recovery state before making a recovery decision.
-- [ ] Persist V06 recovery history on any Phase 6 write that receives or preserves recovery state after cutover.
-- [ ] Cover the case where completion is the first persistence operation after loading a V04 marker.
+- [x] Make `sequelizePersistence.ts` read recovery data only through `phaseSixRecoveryState.ts`.
+- [x] Make `persistenceTestSupport.ts` read recovery data only through the shared module.
+- [x] Make `06_runStateAssignment.ts` read recovery data only through the shared module.
+- [x] Remove duplicate V04 parsing and normalization logic from those files.
+- [x] Ensure `recordPhaseSixProgress` normalizes recovery state before merging an attempt.
+- [x] Ensure `recordPhaseSixCompleted` normalizes recovery state before checking incompatibility.
+- [x] Ensure the runner normalizes recovery state before making a recovery decision.
+- [x] Persist V06 recovery history on any Phase 6 write that receives or preserves recovery state after cutover.
+- [x] Cover the case where completion is the first persistence operation after loading a V04 marker.
 
 ### Progress and Completion
 
-- [ ] Merge repeated incompatible observations by exact `jobId + jobCreatedAt`.
-- [ ] Preserve start time, input mirror, all other attempts, monitoring marker, result, and sibling data.
-- [ ] Require completion job ID to equal `stateAssignerJobId`.
-- [ ] Reject completion only when exact job ID and `createdAt` match:
-  - [ ] The monitoring-limit marker.
-  - [ ] An incompatible attempt.
-- [ ] Remove the V04 completion check tied to `replacementJobId`.
-- [ ] Do not replace it with attempt order, latest attempt, or history length.
-- [ ] Preserve all input and result-count validation.
+- [x] Merge repeated incompatible observations by exact `jobId + jobCreatedAt`.
+- [x] Preserve start time, input mirror, all other attempts, monitoring marker, result, and sibling data.
+- [x] Require completion job ID to equal `stateAssignerJobId`.
+- [x] Reject completion only when exact job ID and `createdAt` match:
+  - [x] The monitoring-limit marker.
+  - [x] An incompatible attempt.
+- [x] Remove the V04 completion check tied to `replacementJobId`.
+- [x] Do not replace it with attempt order, latest attempt, or history length.
+- [x] Preserve all input and result-count validation.
 
 ### Runner Recovery
 
-- [ ] Remove `markerRole` and the singular source-versus-replacement model.
-- [ ] Remove branches that stop because:
-  - [ ] No second replacement is allowed.
-  - [ ] A replacement was already consumed.
-  - [ ] A marked replacement ended unsuccessfully.
-  - [ ] Completion does not match the obsolete replacement slot.
-- [ ] Preserve `startedThisInvocation` and one new job per invocation.
-- [ ] Monitor valid active saved jobs and accept valid completed saved jobs.
-- [ ] Use the protected continuation-start operation for every replacement reason.
-- [ ] Add or update an incompatible attempt before cancellation or terminal exit.
-- [ ] Cancel active incompatible jobs and verify inactivity or unavailability.
-- [ ] Exit after a new job is found incompatible.
-- [ ] Permit a later continuation after verified inactivity regardless of history length.
-- [ ] Preserve permanent stops for malformed parameters, identity mismatch, invalid timestamps, and ambiguous cancellation.
-- [ ] Preserve monitoring-limit cancellation and exact-identity late-result rejection.
-- [ ] Keep counts separate across attempts.
-- [ ] Remove the transitional V04 type, old persistence method, and any wrapper only after all Phase 2 callers compile.
+- [x] Remove `markerRole` and the singular source-versus-replacement model.
+- [x] Remove branches that stop because:
+  - [x] No second replacement is allowed.
+  - [x] A replacement was already consumed.
+  - [x] A marked replacement ended unsuccessfully.
+  - [x] Completion does not match the obsolete replacement slot.
+- [x] Preserve `startedThisInvocation` and one new job per invocation.
+- [x] Monitor valid active saved jobs and accept valid completed saved jobs.
+- [x] Use the protected continuation-start operation for every replacement reason.
+- [x] Add or update an incompatible attempt before cancellation or terminal exit.
+- [x] Cancel active incompatible jobs and verify inactivity or unavailability.
+- [x] Exit after a new job is found incompatible.
+- [x] Permit a later continuation after verified inactivity regardless of history length.
+- [x] Preserve permanent stops for malformed parameters, identity mismatch, invalid timestamps, and ambiguous cancellation.
+- [x] Preserve monitoring-limit cancellation and exact-identity late-result rejection.
+- [x] Keep counts separate across attempts.
+- [x] Remove the transitional V04 type, old persistence method, and any wrapper only after all Phase 2 callers compile.
 
 ### Phase 2 Tests
 
-- [ ] Update production and in-memory persistence tests together.
-- [ ] Verify V04 without replacement normalizes with attributable details.
-- [ ] Verify V04 with replacement normalizes only the proven source and omits ambiguous details.
-- [ ] Verify a legacy compatible replacement completes with no earlier recovery write.
-- [ ] Verify a legacy replacement found incompatible becomes a new V06 attempt.
-- [ ] Verify incompatible A followed by compatible B completed.
-- [ ] Verify incompatible A followed by failed compatible B and completed C.
-- [ ] Verify incompatible A followed by incompatible B and completed C.
-- [ ] Verify exact incompatible identity cannot complete.
-- [ ] Verify a reused job ID with different `createdAt` can complete.
-- [ ] Verify attempt merge deduplicates exact identities.
-- [ ] Verify continuation start is atomic for every replacement reason.
-- [ ] Verify persistence failure leaves prior state unchanged.
-- [ ] Replace tests expecting permanent exhaustion after a second incompatible job.
-- [ ] Verify an incompatible replacement exits its invocation and a later invocation may continue.
-- [ ] Verify no invocation starts a second new job.
+- [x] Update production and in-memory persistence tests together.
+- [x] Verify V04 without replacement normalizes with attributable details.
+- [x] Verify V04 with replacement normalizes only the proven source and omits ambiguous details.
+- [x] Verify a legacy compatible replacement completes with no earlier recovery write.
+- [x] Verify a legacy replacement found incompatible becomes a new V06 attempt.
+- [x] Verify incompatible A followed by compatible B completed.
+- [x] Verify incompatible A followed by failed compatible B and completed C.
+- [x] Verify incompatible A followed by incompatible B and completed C.
+- [x] Verify exact incompatible identity cannot complete.
+- [x] Verify a reused job ID with different `createdAt` can complete.
+- [x] Verify attempt merge deduplicates exact identities.
+- [x] Verify continuation start is atomic for every replacement reason.
+- [x] Verify persistence failure leaves prior state unchanged.
+- [x] Replace tests expecting permanent exhaustion after a second incompatible job.
+- [x] Verify an incompatible replacement exits its invocation and a later invocation may continue.
+- [x] Verify no invocation starts a second new job.
 
 ### Phase 2 Checkpoint
 
-1. [ ] Build `db-models`.
-2. [ ] Run the ops type check.
-3. [ ] Run the complete ops test suite.
-4. [ ] Build ops.
-5. [ ] Fix failures and repeat all checks.
-6. [ ] Confirm no transitional wrapper or legacy live type remains unintentionally.
-7. [ ] Check off completed Phase 2 tasks.
-8. [ ] Stage only Phase 2 changes.
+1. [x] Build `db-models`.
+2. [x] Run the ops type check.
+3. [x] Run the complete ops test suite.
+4. [x] Build ops.
+5. [x] Fix failures and repeat all checks.
+6. [x] Confirm no transitional wrapper or legacy live type remains unintentionally.
+7. [x] Check off completed Phase 2 tasks.
+8. [x] Stage only Phase 2 changes.
 9. [ ] Commit using repository guidance and reference Phase 2 of this todo in the commit body.
 
 ## Phase 3: Prove Repeated Continuation Boundaries

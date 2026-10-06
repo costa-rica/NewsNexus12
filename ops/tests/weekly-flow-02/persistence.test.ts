@@ -280,31 +280,38 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
       status: 'failed',
       jobCreatedAt: '2026-10-05T10:00:01.000Z',
       incompatibleContractRecovery: {
-        sourceJobId: 'state-old',
-        sourceJobCreatedAt: '2026-10-05T10:00:01.000Z',
-        detectedAt: new Date('2026-10-05T10:01:00Z'),
-        missingParameterFields: ['targetArticleStateReviewCount'],
-        lastStatus: 'failed'
+        attempts: [{
+          jobId: 'state-old',
+          jobCreatedAt: '2026-10-05T10:00:01.000Z',
+          detectedAt: new Date('2026-10-05T10:01:00Z'),
+          missingParameterFields: ['targetArticleStateReviewCount'],
+          lastStatus: 'failed'
+        }]
       }
     });
-    const replacement = await persistence.recordPhaseSixIncompatibleReplacementStarted(
+    const replacement = await persistence.recordPhaseSixContinuationJobStarted(
       60,
+      'state-old',
       'state-new',
-      new Date('2026-10-05T10:02:00Z')
+      new Date('2026-10-05T10:02:00Z'),
+      'incompatible_contract'
     );
     assert.equal(replacement.stateAssignerJobId, 'state-new');
-    assert.equal(
-      ((replacement.phaseData.phase6 as Record<string, unknown>)
-        .incompatibleContractRecovery as Record<string, unknown>).replacementJobId,
-      'state-new'
+    assert.deepEqual(
+      (((replacement.phaseData.phase6 as Record<string, unknown>)
+        .incompatibleContractRecovery as Record<string, unknown>)
+        .attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['state-old']
     );
     await assert.rejects(
-      persistence.recordPhaseSixIncompatibleReplacementStarted(
+      persistence.recordPhaseSixContinuationJobStarted(
         60,
+        'wrong-prior',
         'state-third',
-        new Date('2026-10-05T10:03:00Z')
+        new Date('2026-10-05T10:03:00Z'),
+        'saved_job_failed'
       ),
-      /already consumed/
+      /prior job does not match/
     );
 
     const completed = await persistence.recordPhaseSixCompleted(
@@ -326,6 +333,62 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     assert.equal(completed.lastPhaseCompleted, 6);
     assert.equal(completed.runCompleted, false);
     assert.equal(completed.articleCount, 3);
+  });
+
+  it('normalizes V04 recovery when a compatible legacy replacement completes directly', async () => {
+    const run = mockRun({
+      id: 63,
+      lastPhaseStarted: 6,
+      lastPhaseCompleted: 5,
+      articleCount: 2,
+      stateAssignerJobId: 'legacy-replacement',
+      targetArticleThresholdDaysOld: 180,
+      phaseData: {
+        phase6: {
+          status: 'started',
+          startedAt: '2026-10-05T10:00:00.000Z',
+          input: {
+            targetArticleStateReviewCount: 2,
+            targetArticleThresholdDaysOld: 180
+          },
+          incompatibleContractRecovery: {
+            sourceJobId: 'legacy-source',
+            sourceJobCreatedAt: '2026-10-05T10:00:01.000Z',
+            detectedAt: '2026-10-05T10:01:00.000Z',
+            missingParameterFields: ['targetArticleThresholdDaysOld'],
+            lastStatus: 'completed',
+            replacementJobId: 'legacy-replacement',
+            replacementStartedAt: '2026-10-05T10:02:00.000Z'
+          }
+        }
+      }
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+
+    const completed = await persistence.recordPhaseSixCompleted(
+      63,
+      new Date('2026-10-05T10:04:00.000Z'),
+      {
+        selectedCount: 2,
+        completedCount: 2,
+        skippedCount: 0,
+        failedCount: 0,
+        targetArticleThresholdDaysOld: 180,
+        targetArticleStateReviewCount: 2
+      },
+      {
+        stateAssignerJobId: 'legacy-replacement',
+        jobCreatedAt: '2026-10-05T10:02:01.000Z'
+      }
+    );
+    const recovery = (completed.phaseData.phase6 as Record<string, unknown>)
+      .incompatibleContractRecovery as Record<string, unknown>;
+
+    assert.equal(completed.lastPhaseCompleted, 6);
+    assert.deepEqual(
+      (recovery.attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['legacy-source']
+    );
   });
 
   it('rejects Phase 6 mirror drift and marked-job completion', async () => {
@@ -385,7 +448,7 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
-  it('leaves the incompatible replacement marker unused when its atomic save fails', async () => {
+  it('leaves the prior job and recovery history unchanged when continuation save fails', async () => {
     const run = mockRun({
       id: 62,
       lastPhaseStarted: 5,
@@ -399,11 +462,13 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
       stateAssignerJobId: 'state-old',
       status: 'failed',
       incompatibleContractRecovery: {
-        sourceJobId: 'state-old',
-        sourceJobCreatedAt: '2026-10-05T12:00:01.000Z',
-        detectedAt: new Date('2026-10-05T12:01:00Z'),
-        missingParameterFields: ['targetArticleThresholdDaysOld'],
-        lastStatus: 'failed'
+        attempts: [{
+          jobId: 'state-old',
+          jobCreatedAt: '2026-10-05T12:00:01.000Z',
+          detectedAt: new Date('2026-10-05T12:01:00Z'),
+          missingParameterFields: ['targetArticleThresholdDaysOld'],
+          lastStatus: 'failed'
+        }]
       }
     });
     const priorUpdate = run.update;
@@ -413,18 +478,21 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     };
 
     await assert.rejects(
-      persistence.recordPhaseSixIncompatibleReplacementStarted(
+      persistence.recordPhaseSixContinuationJobStarted(
         62,
+        'state-old',
         'state-unsaved',
-        new Date('2026-10-05T12:02:00Z')
+        new Date('2026-10-05T12:02:00Z'),
+        'incompatible_contract'
       ),
       /could not be persisted/
     );
     assert.equal(run.stateAssignerJobId, 'state-old');
-    assert.equal(
-      ((run.phaseData.phase6 as Record<string, unknown>)
-        .incompatibleContractRecovery as Record<string, unknown>).replacementJobId,
-      undefined
+    assert.deepEqual(
+      (((run.phaseData.phase6 as Record<string, unknown>)
+        .incompatibleContractRecovery as Record<string, unknown>)
+        .attempts as Array<Record<string, unknown>>).map((attempt) => attempt.jobId),
+      ['state-old']
     );
   });
 
