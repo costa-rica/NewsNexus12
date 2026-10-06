@@ -59,6 +59,8 @@ The FastAPI worker runs AI Approver V02, deduplication, location scoring, and sh
 
 AI Approver V01 and the former cross-worker weekly workflow are not live features.
 
+AI Approver V02 is used by weekly-flow-02 Phase 7 as well as operator-facing clients. Worker-python provides preview, execution, detail, and cancellation contracts; ops owns weekly scheduling and continuation policy.
+
 ## Clearing deduper analysis
 
 - `DELETE /deduper/clear-db-table` cancels only queued/running deduper jobs, waits for running deduper execution to exit, and then clears `ArticleDuplicateAnalyses`. Other workflows and the worker service remain running.

@@ -30,6 +30,7 @@ The old product feature formerly named orchestrator is removed. Files named `orc
 4. Start commits the preview and enqueues only the database run ID.
 5. Prompt, run, and prediction persistence belongs in `src/modules/ai_approver_v02/repository.py`.
 6. Keep V02 isolated from removed V01 routes, tables, settings, and prompt assets.
+7. V02 may be started by weekly-flow-02 or by an operator-facing client. Worker-python owns execution and durable V02 state, not scheduling policy.
 
 ## Design rules
 
