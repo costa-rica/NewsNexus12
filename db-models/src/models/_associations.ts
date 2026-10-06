@@ -5,6 +5,7 @@ import { Article } from "./Article";
 import { ArticleApproved } from "./ArticleApproved";
 import { ArticleContents02 } from "./ArticleContents02";
 import { ArticleDuplicateAnalysis } from "./ArticleDuplicateAnalysis";
+import { ArticleEmbedding } from "./ArticleEmbedding";
 import { ArticleEntityWhoCategorizedArticleContract } from "./ArticleEntityWhoCategorizedArticleContract";
 import { ArticleEntityWhoCategorizedArticleContracts02 } from "./ArticleEntityWhoCategorizedArticleContracts02";
 import { ArticleIsRelevant } from "./ArticleIsRelevant";
@@ -180,6 +181,16 @@ export function applyAssociations(): void {
 	ArticleDuplicateAnalysis.belongsTo(Article, {
 		foreignKey: "articleIdApproved",
 		as: "approvedArticle"
+	});
+
+	// --- ArticleEmbedding associations ---
+	Article.hasMany(ArticleEmbedding, {
+		foreignKey: "articleId",
+		onDelete: "CASCADE",
+	});
+	ArticleEmbedding.belongsTo(Article, {
+		foreignKey: "articleId",
+		onDelete: "CASCADE",
 	});
 
 	// --- EntityWhoFoundArticle associations ---

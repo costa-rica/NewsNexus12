@@ -29,6 +29,7 @@ export const MODEL_LOAD_ORDER: string[] = [
   "ArticleStateContract02",
   "AiApproverArticlePredictionV02",
   "ArticleDuplicateAnalysis",
+  "ArticleEmbedding",
   "WeeklyArticleFlowRun02",
 ];
 

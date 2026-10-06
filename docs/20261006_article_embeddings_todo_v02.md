@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:42:41Z
+updated_at: 2026-10-06T22:45:13Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -49,17 +49,17 @@ Run these for every package changed in the phase:
 
 Plan: Component 1.
 
-- [ ] Create `db-models/src/models/ArticleEmbedding.ts` following the `ArticleDuplicateAnalysis.ts` pattern:
-  - [ ] Columns `id`, `articleId`, `modelName`, `embeddingDimension`, `textHash` (`STRING(64)`), `embedding` (`DataTypes.BLOB`), all not null except `id`.
-  - [ ] `modelName: "ArticleEmbedding"`, `tableName: "ArticleEmbeddings"`, `timestamps: true`.
-  - [ ] Unique index `idx_article_embeddings_article_id_model_name` on (`articleId`, `modelName`).
-- [ ] Register in `db-models/src/models/_index.ts`: import, call `initArticleEmbedding()` in `initModels()`, and export the model.
-- [ ] Add associations in `_associations.ts`: `Article.hasMany(ArticleEmbedding, { foreignKey: "articleId", onDelete: "CASCADE" })` and the matching `belongsTo`.
-- [ ] Add `"ArticleEmbedding"` to `MODEL_LOAD_ORDER` in `_loadOrder.ts`, after `"ArticleDuplicateAnalysis"`.
-- [ ] Add and export `BACKUP_EXCLUDED_MODELS: string[] = ["ArticleEmbedding"]`, in a new `_backupPolicy.ts` or next to `MODEL_LOAD_ORDER`. Make sure the package entry point exports it.
-- [ ] Verify against a local dev database: run the api's normal startup, or a short script calling `initModels()` and `sequelize.sync()`. Confirm `ArticleEmbeddings` exists with a `bytea` `embedding` column and the unique index.
-- [ ] End-of-phase checks for db-models. Then rebuild so db-manager and api pick up the new `dist/`.
-- [ ] Check off tasks and commit.
+- [x] Create `db-models/src/models/ArticleEmbedding.ts` following the `ArticleDuplicateAnalysis.ts` pattern:
+  - [x] Columns `id`, `articleId`, `modelName`, `embeddingDimension`, `textHash` (`STRING(64)`), `embedding` (`DataTypes.BLOB`), all not null except `id`.
+  - [x] `modelName: "ArticleEmbedding"`, `tableName: "ArticleEmbeddings"`, `timestamps: true`.
+  - [x] Unique index `idx_article_embeddings_article_id_model_name` on (`articleId`, `modelName`).
+- [x] Register in `db-models/src/models/_index.ts`: import, call `initArticleEmbedding()` in `initModels()`, and export the model.
+- [x] Add associations in `_associations.ts`: `Article.hasMany(ArticleEmbedding, { foreignKey: "articleId", onDelete: "CASCADE" })` and the matching `belongsTo`.
+- [x] Add `"ArticleEmbedding"` to `MODEL_LOAD_ORDER` in `_loadOrder.ts`, after `"ArticleDuplicateAnalysis"`.
+- [x] Add and export `BACKUP_EXCLUDED_MODELS: string[] = ["ArticleEmbedding"]`, in a new `_backupPolicy.ts` or next to `MODEL_LOAD_ORDER`. Make sure the package entry point exports it.
+- [x] Verify against a local dev database: run the api's normal startup, or a short script calling `initModels()` and `sequelize.sync()`. Confirm `ArticleEmbeddings` exists with a `bytea` `embedding` column and the unique index.
+- [x] End-of-phase checks for db-models. Then rebuild so db-manager and api pick up the new `dist/`.
+- [x] Check off tasks and commit.
 
 ## Phase 2: Backup Exclusion
 

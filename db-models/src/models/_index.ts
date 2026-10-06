@@ -32,6 +32,7 @@ import {
 	initArticleDuplicateAnalysis,
 	ArticleDuplicateAnalysis,
 } from "./ArticleDuplicateAnalysis";
+import { initArticleEmbedding, ArticleEmbedding } from "./ArticleEmbedding";
 import {
 	initArticleEntityWhoCategorizedArticleContract,
 	ArticleEntityWhoCategorizedArticleContract,
@@ -106,6 +107,7 @@ import type {
 
 import { applyAssociations } from "./_associations";
 import { MODEL_LOAD_ORDER } from "./_loadOrder";
+import { BACKUP_EXCLUDED_MODELS } from "./_backupPolicy";
 import { ensureSchemaReady } from "../utils/ensureSchemaReady";
 import { resetAllSequences } from "../utils/resetSequences";
 
@@ -117,6 +119,7 @@ export function initModels() {
 	initArticleApproved();
 	initArticleContents02();
 	initArticleDuplicateAnalysis();
+	initArticleEmbedding();
 	initArticleEntityWhoCategorizedArticleContract();
 	initArticleEntityWhoCategorizedArticleContracts02();
 	initArticleIsRelevant();
@@ -153,6 +156,7 @@ export function initModels() {
 		ArticleApproved,
 		ArticleContents02,
 		ArticleDuplicateAnalysis,
+		ArticleEmbedding,
 		ArticleEntityWhoCategorizedArticleContract,
 		ArticleEntityWhoCategorizedArticleContracts02,
 		ArticleIsRelevant,
@@ -198,6 +202,7 @@ export type {
 export {
 	sequelize,
 	MODEL_LOAD_ORDER,
+	BACKUP_EXCLUDED_MODELS,
 	ensureSchemaReady,
 	resetAllSequences,
 	AiApproverPromptVersionV02,
@@ -207,6 +212,7 @@ export {
 	ArticleApproved,
 	ArticleContents02,
 	ArticleDuplicateAnalysis,
+	ArticleEmbedding,
 	ArticleEntityWhoCategorizedArticleContract,
 	ArticleEntityWhoCategorizedArticleContracts02,
 	ArticleIsRelevant,
