@@ -38,6 +38,10 @@ describe('parseOpsConfig', () => {
     assert.equal(config.stateAssignerStatusPollIntervalSeconds, 300);
     assert.equal(config.stateAssignerToleratedConsecutiveStatusFailures, 2);
     assert.equal(config.stateAssignerMonitoringLimitHours, 12);
+    assert.equal(config.aiApproverV02RequestTimeoutSeconds, 60);
+    assert.equal(config.aiApproverV02StatusPollIntervalSeconds, 300);
+    assert.equal(config.aiApproverV02ToleratedConsecutiveStatusFailures, 2);
+    assert.equal(config.aiApproverV02MonitoringLimitHours, 12);
     assert.equal(config.dbManagerBackupTimeoutSeconds, 1800);
     assert.equal(config.dbManagerDeleteArticlesTimeoutSeconds, 1800);
     assert.equal(config.pathToLogs, path.join(baseDirectory, 'logs'));
@@ -188,6 +192,27 @@ describe('parseOpsConfig', () => {
         () => parseOpsConfig(env, baseDirectory),
         /STATE_ASSIGNER_TARGET_ARTICLE_THRESHOLD_DAYS_OLD/
       );
+    }
+  });
+
+  it('uses defaults and validates explicit Phase 7 settings', () => {
+    const defaults = parseOpsConfig(validEnvironment(), baseDirectory);
+    assert.equal(defaults.aiApproverV02RequestTimeoutSeconds, 60);
+    assert.equal(defaults.aiApproverV02StatusPollIntervalSeconds, 300);
+    assert.equal(defaults.aiApproverV02ToleratedConsecutiveStatusFailures, 2);
+    assert.equal(defaults.aiApproverV02MonitoringLimitHours, 12);
+
+    for (const key of [
+      'AI_APPROVER_V02_REQUEST_TIMEOUT_SECONDS',
+      'AI_APPROVER_V02_STATUS_POLL_INTERVAL_SECONDS',
+      'AI_APPROVER_V02_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      'AI_APPROVER_V02_MONITORING_LIMIT_HOURS'
+    ]) {
+      for (const value of ['0', '-1', '1.5', 'not-a-number', '']) {
+        const env = validEnvironment();
+        env[key] = value;
+        assert.throws(() => parseOpsConfig(env, baseDirectory), new RegExp(key));
+      }
     }
   });
 

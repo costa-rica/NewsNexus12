@@ -18,6 +18,10 @@ export interface OpsConfig {
   stateAssignerStatusPollIntervalSeconds: number;
   stateAssignerToleratedConsecutiveStatusFailures: number;
   stateAssignerMonitoringLimitHours: number;
+  aiApproverV02RequestTimeoutSeconds: number;
+  aiApproverV02StatusPollIntervalSeconds: number;
+  aiApproverV02ToleratedConsecutiveStatusFailures: number;
+  aiApproverV02MonitoringLimitHours: number;
   dbManagerBackupTimeoutSeconds: number;
   dbManagerDeleteArticlesTimeoutSeconds: number;
   pathToLogs: string;
@@ -132,6 +136,26 @@ export const parseOpsConfig = (env: NodeJS.ProcessEnv, baseDirectory: string): O
     stateAssignerMonitoringLimitHours: optionalPositiveInteger(
       env.STATE_ASSIGNER_MONITORING_LIMIT_HOURS,
       'STATE_ASSIGNER_MONITORING_LIMIT_HOURS',
+      12
+    ),
+    aiApproverV02RequestTimeoutSeconds: optionalPositiveInteger(
+      env.AI_APPROVER_V02_REQUEST_TIMEOUT_SECONDS,
+      'AI_APPROVER_V02_REQUEST_TIMEOUT_SECONDS',
+      60
+    ),
+    aiApproverV02StatusPollIntervalSeconds: optionalPositiveInteger(
+      env.AI_APPROVER_V02_STATUS_POLL_INTERVAL_SECONDS,
+      'AI_APPROVER_V02_STATUS_POLL_INTERVAL_SECONDS',
+      300
+    ),
+    aiApproverV02ToleratedConsecutiveStatusFailures: optionalPositiveInteger(
+      env.AI_APPROVER_V02_TOLERATED_CONSECUTIVE_STATUS_FAILURES,
+      'AI_APPROVER_V02_TOLERATED_CONSECUTIVE_STATUS_FAILURES',
+      2
+    ),
+    aiApproverV02MonitoringLimitHours: optionalPositiveInteger(
+      env.AI_APPROVER_V02_MONITORING_LIMIT_HOURS,
+      'AI_APPROVER_V02_MONITORING_LIMIT_HOURS',
       12
     ),
     dbManagerBackupTimeoutSeconds: requiredPositiveInteger(
