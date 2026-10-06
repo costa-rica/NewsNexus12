@@ -231,6 +231,52 @@ export interface PhaseSixCompletionFields {
   jobCreatedAt: string;
 }
 
+export interface PhaseSevenInputs {
+  selectionMode: 'article_position_count';
+  requestedArticleCount: number;
+  allowPastApprovedBoundary: true;
+  allowDescriptionFallback: true;
+}
+
+export interface PhaseSevenAttempt {
+  v02RunId: number;
+  previewCreatedAt: string;
+  previewExpiresAt: string;
+  plannedEligibleCount: number;
+  continuationReason: string;
+  acceptedObservedAt?: string;
+  acceptedStatus?: string;
+  jobId?: string;
+  queueCreatedAt?: string;
+  lastObservedStatus?: string;
+  endingReason?: string;
+  counts?: JsonRecord;
+  monitoringLimitedAt?: string;
+  cancellationRequestedAt?: string;
+  cancellationOutcome?: string;
+  inactiveVerifiedAt?: string;
+}
+
+export interface PhaseSevenPreviewFields {
+  v02RunId: number;
+  previewCreatedAt: string;
+  previewExpiresAt: string;
+  plannedEligibleCount: number;
+  continuationReason: string;
+}
+
+export interface PhaseSevenProgress {
+  observedAt: Date;
+  status?: string;
+  queueCreatedAt?: string;
+  endingReason?: string;
+  counts?: JsonRecord;
+  monitoringLimitedAt?: Date;
+  cancellationRequestedAt?: Date;
+  cancellationOutcome?: string;
+  inactiveVerifiedAt?: Date;
+}
+
 export interface PhaseFourNonzeroCompletionFields extends PhaseFourCompletionFields {
   articleCount: number;
 }
@@ -310,6 +356,42 @@ export interface WeeklyFlowPersistence {
     completedAt: Date,
     phaseResult: JsonRecord,
     fields: PhaseSixCompletionFields
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenStarted(
+    runId: number,
+    startedAt: Date,
+    inputs: PhaseSevenInputs
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenPreview(
+    runId: number,
+    preview: PhaseSevenPreviewFields,
+    expectedCurrentV02RunId: number | null,
+    expectedCurrentJobId: string | null
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenJobBound(
+    runId: number,
+    v02RunId: number,
+    jobId: string,
+    observedAt: Date,
+    acceptedStatus: string
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenProgress(
+    runId: number,
+    v02RunId: number,
+    progress: PhaseSevenProgress
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenZeroWorkCompleted(
+    runId: number,
+    completedAt: Date,
+    expectedCurrentV02RunId: number | null,
+    zeroWorkAfterPriorAttempts: boolean
+  ): Promise<WeeklyFlowRunRecord>;
+  recordPhaseSevenCompleted(
+    runId: number,
+    completedAt: Date,
+    v02RunId: number,
+    jobId: string,
+    phaseResult: JsonRecord
   ): Promise<WeeklyFlowRunRecord>;
   recordFailure(runId: number, failure: WeeklyFlowFailure): Promise<WeeklyFlowRunRecord>;
   recordRunCompleted(runId: number, completedAt: Date): Promise<WeeklyFlowRunRecord>;

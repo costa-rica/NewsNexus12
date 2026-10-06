@@ -20,6 +20,9 @@ import {
   type PhaseFiveCompletionFields,
   type PhaseSixCompletionFields,
   type PhaseSixProgress,
+  type PhaseSevenAttempt,
+  type PhaseSevenInputs,
+  type PhaseSevenProgress,
   type WeeklyFlowFailure,
   type WeeklyFlowPersistence,
   WeeklyFlowPersistenceError,
@@ -294,6 +297,12 @@ const assertPhaseSixInProgress = (run: WeeklyFlowRunInstance): void => {
   }
 };
 
+const assertPhaseSevenInProgress = (run: WeeklyFlowRunInstance): void => {
+  if (run.runCompleted || run.lastPhaseStarted !== 7 || (run.lastPhaseCompleted ?? 0) !== 6) {
+    throw new WeeklyFlowPersistenceError('Phase 7 is not the active incomplete phase');
+  }
+};
+
 const phaseRecord = (phaseData: unknown, phase: WeeklyFlowPhase): JsonRecord => {
   const value = asJsonRecord(phaseData)[phaseKey(phase)];
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -340,6 +349,81 @@ const requirePhaseSixInputs = (run: WeeklyFlowRunInstance): {
     throw new WeeklyFlowPersistenceError('Phase 6 input audit mirror does not match its columns');
   }
   return { targetArticleStateReviewCount, targetArticleThresholdDaysOld };
+};
+
+const requirePhaseSevenInputs = (run: WeeklyFlowRunInstance): PhaseSevenInputs => {
+  const articleCount = requirePositiveSafeInteger(run.articleCount, 'Phase 7 articleCount');
+  const input = phaseRecord(run.phaseData, 7).input;
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new WeeklyFlowPersistenceError('Phase 7 input audit mirror is missing');
+  }
+  const mirror = input as JsonRecord;
+  if (
+    mirror.selectionMode !== 'article_position_count' ||
+    mirror.requestedArticleCount !== articleCount ||
+    mirror.allowPastApprovedBoundary !== true ||
+    mirror.allowDescriptionFallback !== true
+  ) {
+    throw new WeeklyFlowPersistenceError('Phase 7 input audit mirror does not match its columns');
+  }
+  return {
+    selectionMode: 'article_position_count',
+    requestedArticleCount: articleCount,
+    allowPastApprovedBoundary: true,
+    allowDescriptionFallback: true
+  };
+};
+
+const phaseSevenAttempts = (run: WeeklyFlowRunInstance): PhaseSevenAttempt[] => {
+  const raw = phaseRecord(run.phaseData, 7).attempts;
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    throw new WeeklyFlowPersistenceError('Phase 7 attempts must be an array');
+  }
+  return raw.map((entry, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new WeeklyFlowPersistenceError(`Phase 7 attempt ${index} must be an object`);
+    }
+    const value = entry as JsonRecord;
+    return {
+      ...(structuredClone(value) as unknown as PhaseSevenAttempt),
+      v02RunId: requirePositiveSafeInteger(value.v02RunId, `attempts[${index}].v02RunId`),
+      previewCreatedAt: requireTimestampString(
+        String(value.previewCreatedAt ?? ''),
+        `attempts[${index}].previewCreatedAt`
+      ),
+      previewExpiresAt: requireTimestampString(
+        String(value.previewExpiresAt ?? ''),
+        `attempts[${index}].previewExpiresAt`
+      ),
+      plannedEligibleCount: requirePositiveSafeInteger(
+        value.plannedEligibleCount,
+        `attempts[${index}].plannedEligibleCount`
+      ),
+      continuationReason: requireNonEmptyString(
+        String(value.continuationReason ?? ''),
+        `attempts[${index}].continuationReason`
+      )
+    };
+  });
+};
+
+const currentPhaseSevenAttempt = (
+  run: WeeklyFlowRunInstance,
+  expectedV02RunId?: number
+): { attempts: PhaseSevenAttempt[]; attempt: PhaseSevenAttempt; index: number } => {
+  const phase7 = phaseRecord(run.phaseData, 7);
+  const currentV02RunId = requirePositiveSafeInteger(
+    phase7.currentV02RunId,
+    'Phase 7 currentV02RunId'
+  );
+  if (expectedV02RunId !== undefined && currentV02RunId !== expectedV02RunId) {
+    throw new WeeklyFlowPersistenceError('Phase 7 current V02 run does not match');
+  }
+  const attempts = phaseSevenAttempts(run);
+  const index = attempts.findIndex((attempt) => attempt.v02RunId === currentV02RunId);
+  if (index < 0) throw new WeeklyFlowPersistenceError('Phase 7 current attempt is missing');
+  return { attempts, attempt: attempts[index], index };
 };
 
 const normalizedPhaseSixRecovery = (value: unknown): PhaseSixIncompatibleRecoveryV06 | null =>
@@ -418,6 +502,11 @@ export const createSequelizeWeeklyFlowPersistence = (
     if (phase === 6) {
       throw new WeeklyFlowPersistenceError(
         'Phase 6 must start through its dedicated persistence operation recordPhaseSixStarted'
+      );
+    }
+    if (phase === 7) {
+      throw new WeeklyFlowPersistenceError(
+        'Phase 7 must start through its dedicated persistence operation recordPhaseSevenStarted'
       );
     }
     return performPersistenceOperation(`Phase ${phase} start could not be persisted`, async () => {
@@ -562,6 +651,11 @@ export const createSequelizeWeeklyFlowPersistence = (
     if (phase === 6) {
       throw new WeeklyFlowPersistenceError(
         'Phase 6 must complete through its dedicated persistence operation recordPhaseSixCompleted'
+      );
+    }
+    if (phase === 7) {
+      throw new WeeklyFlowPersistenceError(
+        'Phase 7 must complete through a dedicated atomic completion operation'
       );
     }
     return performPersistenceOperation(`Phase ${phase} completion could not be persisted`, async () => {
@@ -1042,6 +1136,266 @@ export const createSequelizeWeeklyFlowPersistence = (
     });
   },
 
+  async recordPhaseSevenStarted(runId, startedAt, inputs: PhaseSevenInputs) {
+    requireValidDate(startedAt, 'Phase 7 start time');
+    return performPersistenceOperation('Phase 7 start could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertCanStartPhase(run, 7);
+      const articleCount = requirePositiveSafeInteger(run.articleCount, 'Phase 7 articleCount');
+      if (
+        inputs.selectionMode !== 'article_position_count' ||
+        inputs.requestedArticleCount !== articleCount ||
+        inputs.allowPastApprovedBoundary !== true ||
+        inputs.allowDescriptionFallback !== true
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 7 inputs do not match the required contract');
+      }
+      if (phaseRecord(run.phaseData, 7).startedAt !== undefined) {
+        throw new WeeklyFlowPersistenceError('Phase 7 has already started');
+      }
+      await run.update({
+        lastPhaseStarted: 7,
+        aiApproverV02JobId: null,
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          status: 'started',
+          startedAt: startedAt.toISOString(),
+          input: { ...inputs },
+          attempts: []
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSevenPreview(
+    runId,
+    preview,
+    expectedCurrentV02RunId,
+    expectedCurrentJobId
+  ) {
+    return performPersistenceOperation('Phase 7 preview could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSevenInProgress(run);
+      const inputs = requirePhaseSevenInputs(run);
+      const phase7 = phaseRecord(run.phaseData, 7);
+      const currentRunId = phase7.currentV02RunId ?? null;
+      if (currentRunId !== expectedCurrentV02RunId || run.aiApproverV02JobId !== expectedCurrentJobId) {
+        throw new WeeklyFlowPersistenceError('Phase 7 preview expected identity does not match');
+      }
+      const v02RunId = requirePositiveSafeInteger(preview.v02RunId, 'preview.v02RunId');
+      const previewCreatedAt = requireTimestampString(
+        preview.previewCreatedAt,
+        'preview.previewCreatedAt'
+      );
+      const previewExpiresAt = requireTimestampString(
+        preview.previewExpiresAt,
+        'preview.previewExpiresAt'
+      );
+      if (Date.parse(previewExpiresAt) <= Date.parse(previewCreatedAt)) {
+        throw new WeeklyFlowPersistenceError('Phase 7 preview expiration is invalid');
+      }
+      const plannedEligibleCount = requirePositiveSafeInteger(
+        preview.plannedEligibleCount,
+        'preview.plannedEligibleCount'
+      );
+      if (plannedEligibleCount > inputs.requestedArticleCount) {
+        throw new WeeklyFlowPersistenceError('Phase 7 preview count exceeds articleCount');
+      }
+      const attempts = phaseSevenAttempts(run);
+      if (attempts.some((attempt) => attempt.v02RunId === v02RunId)) {
+        throw new WeeklyFlowPersistenceError('Phase 7 preview run ID is already recorded');
+      }
+      attempts.push({
+        v02RunId,
+        previewCreatedAt,
+        previewExpiresAt,
+        plannedEligibleCount,
+        continuationReason: requireNonEmptyString(
+          preview.continuationReason,
+          'preview.continuationReason'
+        )
+      });
+      await run.update({
+        aiApproverV02JobId: null,
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          attempts,
+          currentV02RunId: v02RunId,
+          latestProgress: {
+            observedAt: previewCreatedAt,
+            status: 'preview_created',
+            v02RunId
+          }
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSevenJobBound(runId, v02RunId, jobId, observedAt, acceptedStatus) {
+    requireValidDate(observedAt, 'Phase 7 job observation time');
+    return performPersistenceOperation('Phase 7 job identity could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSevenInProgress(run);
+      requirePhaseSevenInputs(run);
+      const current = currentPhaseSevenAttempt(run, v02RunId);
+      const normalizedJobId = requireNonEmptyString(jobId, 'aiApproverV02JobId');
+      if (
+        (current.attempt.jobId !== undefined && current.attempt.jobId !== normalizedJobId) ||
+        (run.aiApproverV02JobId !== null && run.aiApproverV02JobId !== normalizedJobId)
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 7 job identity conflicts with current state');
+      }
+      current.attempt.jobId = normalizedJobId;
+      current.attempt.acceptedObservedAt = observedAt.toISOString();
+      current.attempt.acceptedStatus = requireNonEmptyString(acceptedStatus, 'acceptedStatus');
+      current.attempt.lastObservedStatus = current.attempt.acceptedStatus;
+      current.attempts[current.index] = current.attempt;
+      await run.update({
+        aiApproverV02JobId: normalizedJobId,
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          attempts: current.attempts,
+          latestProgress: {
+            observedAt: observedAt.toISOString(),
+            status: current.attempt.acceptedStatus,
+            v02RunId,
+            jobId: normalizedJobId
+          }
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSevenProgress(runId, v02RunId, progress: PhaseSevenProgress) {
+    requireValidDate(progress.observedAt, 'Phase 7 progress time');
+    return performPersistenceOperation('Phase 7 progress could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSevenInProgress(run);
+      requirePhaseSevenInputs(run);
+      const current = currentPhaseSevenAttempt(run, v02RunId);
+      if (current.attempt.jobId !== undefined && run.aiApproverV02JobId !== current.attempt.jobId) {
+        throw new WeeklyFlowPersistenceError('Phase 7 current job mirror does not match');
+      }
+      if (progress.status !== undefined) {
+        current.attempt.lastObservedStatus = requireNonEmptyString(progress.status, 'status');
+      }
+      if (progress.queueCreatedAt !== undefined) {
+        current.attempt.queueCreatedAt = requireTimestampString(
+          progress.queueCreatedAt,
+          'queueCreatedAt'
+        );
+      }
+      if (progress.endingReason !== undefined) {
+        current.attempt.endingReason = requireNonEmptyString(progress.endingReason, 'endingReason');
+      }
+      if (progress.counts !== undefined) current.attempt.counts = asJsonRecord(progress.counts);
+      if (progress.monitoringLimitedAt) {
+        requireValidDate(progress.monitoringLimitedAt, 'monitoringLimitedAt');
+        current.attempt.monitoringLimitedAt = progress.monitoringLimitedAt.toISOString();
+      }
+      if (progress.cancellationRequestedAt) {
+        requireValidDate(progress.cancellationRequestedAt, 'cancellationRequestedAt');
+        current.attempt.cancellationRequestedAt = progress.cancellationRequestedAt.toISOString();
+      }
+      if (progress.cancellationOutcome !== undefined) {
+        current.attempt.cancellationOutcome = requireNonEmptyString(
+          progress.cancellationOutcome,
+          'cancellationOutcome'
+        );
+      }
+      if (progress.inactiveVerifiedAt) {
+        requireValidDate(progress.inactiveVerifiedAt, 'inactiveVerifiedAt');
+        current.attempt.inactiveVerifiedAt = progress.inactiveVerifiedAt.toISOString();
+      }
+      current.attempts[current.index] = current.attempt;
+      await run.update({
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          attempts: current.attempts,
+          latestProgress: {
+            observedAt: progress.observedAt.toISOString(),
+            v02RunId,
+            ...(run.aiApproverV02JobId ? { jobId: run.aiApproverV02JobId } : {}),
+            ...(progress.status ? { status: progress.status } : {})
+          }
+        })
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSevenZeroWorkCompleted(
+    runId,
+    completedAt,
+    expectedCurrentV02RunId,
+    zeroWorkAfterPriorAttempts
+  ) {
+    requireValidDate(completedAt, 'Phase 7 zero-work completion time');
+    return performPersistenceOperation('Phase 7 zero-work completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSevenInProgress(run);
+      requirePhaseSevenInputs(run);
+      const phase7 = phaseRecord(run.phaseData, 7);
+      if ((phase7.currentV02RunId ?? null) !== expectedCurrentV02RunId) {
+        throw new WeeklyFlowPersistenceError('Phase 7 zero-work expected run does not match');
+      }
+      const attempts = phaseSevenAttempts(run);
+      const startedEarlier = attempts.some((attempt) => attempt.jobId !== undefined);
+      if (zeroWorkAfterPriorAttempts !== startedEarlier) {
+        throw new WeeklyFlowPersistenceError('Phase 7 zero-work history flag is invalid');
+      }
+      await run.update({
+        aiApproverV02JobId: null,
+        lastPhaseCompleted: 7,
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          attempts,
+          result: { kind: 'zero_work', zeroWorkAfterPriorAttempts }
+        }),
+        runCompleted: true,
+        runCompletedAt: completedAt
+      });
+      return toRunRecord(run);
+    });
+  },
+
+  async recordPhaseSevenCompleted(runId, completedAt, v02RunId, jobId, phaseResult) {
+    requireValidDate(completedAt, 'Phase 7 completion time');
+    return performPersistenceOperation('Phase 7 completion could not be persisted', async () => {
+      const run = await requireRun(model, runId);
+      assertPhaseSevenInProgress(run);
+      requirePhaseSevenInputs(run);
+      const current = currentPhaseSevenAttempt(run, v02RunId);
+      const normalizedJobId = requireNonEmptyString(jobId, 'aiApproverV02JobId');
+      if (
+        current.attempt.jobId !== normalizedJobId ||
+        run.aiApproverV02JobId !== normalizedJobId
+      ) {
+        throw new WeeklyFlowPersistenceError('Phase 7 completion identity does not match');
+      }
+      if (current.attempt.monitoringLimitedAt !== undefined) {
+        throw new WeeklyFlowPersistenceError('A monitoring-limited V02 run cannot complete Phase 7');
+      }
+      const result = asJsonRecord(phaseResult);
+      if (result.status !== 'completed') {
+        throw new WeeklyFlowPersistenceError('Phase 7 completion requires completed status');
+      }
+      await run.update({
+        aiApproverV02JobId: normalizedJobId,
+        lastPhaseCompleted: 7,
+        phaseData: mergePhaseData(run.phaseData, 7, {
+          status: 'completed',
+          completedAt: completedAt.toISOString(),
+          attempts: current.attempts,
+          result
+        }),
+        runCompleted: true,
+        runCompletedAt: completedAt
+      });
+      return toRunRecord(run);
+    });
+  },
+
   async recordFailure(runId, failure: WeeklyFlowFailure) {
     return performPersistenceOperation('Weekly flow failure could not be persisted', async () => {
       const run = await requireRun(model, runId);
@@ -1069,6 +1423,11 @@ export const createSequelizeWeeklyFlowPersistence = (
       const run = await requireRun(model, runId);
       if (run.runCompleted) {
         throw new WeeklyFlowPersistenceError('Weekly flow run is already complete');
+      }
+      if (run.lastPhaseStarted === 7 || run.lastPhaseCompleted === 6) {
+        throw new WeeklyFlowPersistenceError(
+          'Phase 7 must complete the weekly run through its dedicated atomic operation'
+        );
       }
       await run.update({ runCompleted: true, runCompletedAt: completedAt });
       return toRunRecord(run);

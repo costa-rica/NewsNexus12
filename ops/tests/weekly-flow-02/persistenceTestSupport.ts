@@ -117,6 +117,7 @@ export const createInMemoryPersistence = (
     },
     async recordPhaseStarted(runId, phase, startedAt) {
       calls.push(`start:${phase}`);
+      if (phase === 7) throw new Error('Phase 7 requires dedicated start');
       const run = requireRun(runId);
       run.lastPhaseStarted = phase;
       run.phaseData[`phase${phase}`] = {
@@ -179,7 +180,7 @@ export const createInMemoryPersistence = (
     },
     async recordPhaseCompleted(runId, phase, completedAt, phaseResult, fields = {}) {
       calls.push(`complete:${phase}`);
-      if (phase === 6) throw new Error('Phase 6 requires dedicated completion');
+      if (phase === 6 || phase === 7) throw new Error(`Phase ${phase} requires dedicated completion`);
       const run = requireRun(runId);
       run.lastPhaseCompleted = phase;
       Object.assign(run, fields);
@@ -468,6 +469,195 @@ export const createInMemoryPersistence = (
       };
       return touch(run, completedAt);
     },
+    async recordPhaseSevenStarted(runId, startedAt, inputs) {
+      calls.push('start:7');
+      const run = requireRun(runId);
+      if (run.lastPhaseCompleted !== 6 || run.lastPhaseStarted === 7 || run.runCompleted) {
+        throw new Error('Phase 7 cannot start');
+      }
+      if (
+        inputs.selectionMode !== 'article_position_count' ||
+        inputs.requestedArticleCount !== run.articleCount ||
+        inputs.allowPastApprovedBoundary !== true ||
+        inputs.allowDescriptionFallback !== true
+      ) {
+        throw new Error('Phase 7 inputs are invalid');
+      }
+      run.lastPhaseStarted = 7;
+      run.aiApproverV02JobId = null;
+      run.phaseData.phase7 = {
+        status: 'started',
+        startedAt: startedAt.toISOString(),
+        input: structuredClone(inputs),
+        attempts: []
+      };
+      return touch(run, startedAt);
+    },
+    async recordPhaseSevenPreview(
+      runId,
+      preview,
+      expectedCurrentV02RunId,
+      expectedCurrentJobId
+    ) {
+      calls.push('preview:7');
+      const run = requireRun(runId);
+      const phase7 = (run.phaseData.phase7 as Record<string, unknown>) ?? {};
+      if (
+        run.lastPhaseStarted !== 7 ||
+        run.lastPhaseCompleted !== 6 ||
+        (phase7.currentV02RunId ?? null) !== expectedCurrentV02RunId ||
+        run.aiApproverV02JobId !== expectedCurrentJobId
+      ) {
+        throw new Error('Phase 7 preview expected identity does not match');
+      }
+      const attempts = structuredClone((phase7.attempts as Record<string, unknown>[]) ?? []);
+      if (attempts.some((attempt) => attempt.v02RunId === preview.v02RunId)) {
+        throw new Error('Phase 7 preview run ID is already recorded');
+      }
+      attempts.push({ ...structuredClone(preview) });
+      run.aiApproverV02JobId = null;
+      run.phaseData.phase7 = {
+        ...phase7,
+        attempts,
+        currentV02RunId: preview.v02RunId,
+        latestProgress: {
+          observedAt: preview.previewCreatedAt,
+          status: 'preview_created',
+          v02RunId: preview.v02RunId
+        }
+      };
+      return touch(run, new Date(preview.previewCreatedAt));
+    },
+    async recordPhaseSevenJobBound(runId, v02RunId, jobId, observedAt, acceptedStatus) {
+      calls.push('bind:7');
+      const run = requireRun(runId);
+      const phase7 = (run.phaseData.phase7 as Record<string, unknown>) ?? {};
+      if (phase7.currentV02RunId !== v02RunId) throw new Error('Phase 7 current run mismatch');
+      const attempts = structuredClone((phase7.attempts as Record<string, unknown>[]) ?? []);
+      const attempt = attempts.find((entry) => entry.v02RunId === v02RunId);
+      if (!attempt) throw new Error('Phase 7 current attempt is missing');
+      if (
+        (attempt.jobId !== undefined && attempt.jobId !== jobId) ||
+        (run.aiApproverV02JobId !== null && run.aiApproverV02JobId !== jobId)
+      ) {
+        throw new Error('Phase 7 job identity conflicts with current state');
+      }
+      attempt.jobId = jobId;
+      attempt.acceptedObservedAt = observedAt.toISOString();
+      attempt.acceptedStatus = acceptedStatus;
+      attempt.lastObservedStatus = acceptedStatus;
+      run.aiApproverV02JobId = jobId;
+      run.phaseData.phase7 = {
+        ...phase7,
+        attempts,
+        latestProgress: {
+          observedAt: observedAt.toISOString(),
+          status: acceptedStatus,
+          v02RunId,
+          jobId
+        }
+      };
+      return touch(run, observedAt);
+    },
+    async recordPhaseSevenProgress(runId, v02RunId, progress) {
+      calls.push('progress:7');
+      const run = requireRun(runId);
+      const phase7 = (run.phaseData.phase7 as Record<string, unknown>) ?? {};
+      if (phase7.currentV02RunId !== v02RunId) throw new Error('Phase 7 current run mismatch');
+      const attempts = structuredClone((phase7.attempts as Record<string, unknown>[]) ?? []);
+      const attempt = attempts.find((entry) => entry.v02RunId === v02RunId);
+      if (!attempt) throw new Error('Phase 7 current attempt is missing');
+      if (attempt.jobId !== undefined && run.aiApproverV02JobId !== attempt.jobId) {
+        throw new Error('Phase 7 current job mirror does not match');
+      }
+      Object.assign(attempt, {
+        ...(progress.status ? { lastObservedStatus: progress.status } : {}),
+        ...(progress.queueCreatedAt ? { queueCreatedAt: progress.queueCreatedAt } : {}),
+        ...(progress.endingReason ? { endingReason: progress.endingReason } : {}),
+        ...(progress.counts ? { counts: structuredClone(progress.counts) } : {}),
+        ...(progress.monitoringLimitedAt
+          ? { monitoringLimitedAt: progress.monitoringLimitedAt.toISOString() }
+          : {}),
+        ...(progress.cancellationRequestedAt
+          ? { cancellationRequestedAt: progress.cancellationRequestedAt.toISOString() }
+          : {}),
+        ...(progress.cancellationOutcome
+          ? { cancellationOutcome: progress.cancellationOutcome }
+          : {}),
+        ...(progress.inactiveVerifiedAt
+          ? { inactiveVerifiedAt: progress.inactiveVerifiedAt.toISOString() }
+          : {})
+      });
+      run.phaseData.phase7 = {
+        ...phase7,
+        attempts,
+        latestProgress: {
+          observedAt: progress.observedAt.toISOString(),
+          v02RunId,
+          ...(run.aiApproverV02JobId ? { jobId: run.aiApproverV02JobId } : {}),
+          ...(progress.status ? { status: progress.status } : {})
+        }
+      };
+      return touch(run, progress.observedAt);
+    },
+    async recordPhaseSevenZeroWorkCompleted(
+      runId,
+      completedAt,
+      expectedCurrentV02RunId,
+      zeroWorkAfterPriorAttempts
+    ) {
+      calls.push('complete-zero:7');
+      const run = requireRun(runId);
+      const phase7 = (run.phaseData.phase7 as Record<string, unknown>) ?? {};
+      if ((phase7.currentV02RunId ?? null) !== expectedCurrentV02RunId) {
+        throw new Error('Phase 7 zero-work expected run does not match');
+      }
+      const attempts = structuredClone((phase7.attempts as Record<string, unknown>[]) ?? []);
+      const startedEarlier = attempts.some((attempt) => attempt.jobId !== undefined);
+      if (startedEarlier !== zeroWorkAfterPriorAttempts) {
+        throw new Error('Phase 7 zero-work history flag is invalid');
+      }
+      run.aiApproverV02JobId = null;
+      run.lastPhaseCompleted = 7;
+      run.runCompleted = true;
+      run.runCompletedAt = completedAt;
+      run.phaseData.phase7 = {
+        ...phase7,
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        attempts,
+        result: { kind: 'zero_work', zeroWorkAfterPriorAttempts }
+      };
+      return touch(run, completedAt);
+    },
+    async recordPhaseSevenCompleted(runId, completedAt, v02RunId, jobId, phaseResult) {
+      calls.push('complete:7');
+      const run = requireRun(runId);
+      const phase7 = (run.phaseData.phase7 as Record<string, unknown>) ?? {};
+      if (phase7.currentV02RunId !== v02RunId) throw new Error('Phase 7 current run mismatch');
+      const attempts = structuredClone((phase7.attempts as Record<string, unknown>[]) ?? []);
+      const attempt = attempts.find((entry) => entry.v02RunId === v02RunId);
+      if (
+        !attempt ||
+        attempt.jobId !== jobId ||
+        run.aiApproverV02JobId !== jobId ||
+        attempt.monitoringLimitedAt !== undefined ||
+        phaseResult.status !== 'completed'
+      ) {
+        throw new Error('Phase 7 completion identity or result is invalid');
+      }
+      run.lastPhaseCompleted = 7;
+      run.runCompleted = true;
+      run.runCompletedAt = completedAt;
+      run.phaseData.phase7 = {
+        ...phase7,
+        status: 'completed',
+        completedAt: completedAt.toISOString(),
+        attempts,
+        result: structuredClone(phaseResult)
+      };
+      return touch(run, completedAt);
+    },
     async recordFailure(runId, failure) {
       calls.push(`failure:${failure.phase ?? 'run'}`);
       const run = requireRun(runId);
@@ -482,6 +672,9 @@ export const createInMemoryPersistence = (
     async recordRunCompleted(runId, completedAt) {
       calls.push('run-complete');
       const run = requireRun(runId);
+      if (run.lastPhaseStarted === 7 || run.lastPhaseCompleted === 6) {
+        throw new Error('Phase 7 requires dedicated atomic completion');
+      }
       run.runCompleted = true;
       run.runCompletedAt = completedAt;
       return touch(run, completedAt);

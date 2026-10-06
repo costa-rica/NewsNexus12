@@ -496,6 +496,181 @@ describe('createSequelizeWeeklyFlowPersistence', () => {
     );
   });
 
+  it('protects Phase 7 current attempt identity and completes atomically', async () => {
+    const run = mockRun({
+      id: 70,
+      lastPhaseStarted: 6,
+      lastPhaseCompleted: 6,
+      articleCount: 2,
+      phaseData: { phase6: { status: 'completed' } }
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    const inputs = {
+      selectionMode: 'article_position_count' as const,
+      requestedArticleCount: 2,
+      allowPastApprovedBoundary: true as const,
+      allowDescriptionFallback: true as const
+    };
+
+    await persistence.recordPhaseSevenStarted(70, new Date('2026-10-06T10:00:00Z'), inputs);
+    await persistence.recordPhaseSevenPreview(
+      70,
+      {
+        v02RunId: 41,
+        previewCreatedAt: '2026-10-06T10:00:01Z',
+        previewExpiresAt: '2026-10-06T10:15:01Z',
+        plannedEligibleCount: 2,
+        continuationReason: 'initial'
+      },
+      null,
+      null
+    );
+    await persistence.recordPhaseSevenJobBound(
+      70,
+      41,
+      '0007',
+      new Date('2026-10-06T10:00:02Z'),
+      'queued'
+    );
+    await persistence.recordPhaseSevenProgress(70, 41, {
+      observedAt: new Date('2026-10-06T10:01:00Z'),
+      status: 'failed',
+      queueCreatedAt: '2026-10-06T10:00:02Z'
+    });
+    const continued = await persistence.recordPhaseSevenPreview(
+      70,
+      {
+        v02RunId: 42,
+        previewCreatedAt: '2026-10-06T10:02:00Z',
+        previewExpiresAt: '2026-10-06T10:17:00Z',
+        plannedEligibleCount: 2,
+        continuationReason: 'saved_run_failed'
+      },
+      41,
+      '0007'
+    );
+    assert.equal(continued.aiApproverV02JobId, null);
+    const attempts = (continued.phaseData.phase7 as Record<string, unknown>)
+      .attempts as Array<Record<string, unknown>>;
+    assert.deepEqual(attempts.map((attempt) => attempt.jobId), ['0007', undefined]);
+
+    await persistence.recordPhaseSevenJobBound(
+      70,
+      42,
+      '0008',
+      new Date('2026-10-06T10:02:01Z'),
+      'queued'
+    );
+    const completed = await persistence.recordPhaseSevenCompleted(
+      70,
+      new Date('2026-10-06T10:04:00Z'),
+      42,
+      '0008',
+      { status: 'completed', completedCount: 2 }
+    );
+    assert.equal(completed.lastPhaseCompleted, 7);
+    assert.equal(completed.runCompleted, true);
+    assert.equal(completed.runCompletedAt?.toISOString(), '2026-10-06T10:04:00.000Z');
+    await assert.rejects(
+      persistence.recordPhaseCompleted(70, 7, new Date(), {}),
+      /dedicated atomic completion/
+    );
+  });
+
+  it('records Phase 7 zero work after prior attempts and clears the job mirror', async () => {
+    const run = mockRun({
+      id: 71,
+      lastPhaseStarted: 6,
+      lastPhaseCompleted: 6,
+      articleCount: 1
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await persistence.recordPhaseSevenStarted(71, new Date('2026-10-06T11:00:00Z'), {
+      selectionMode: 'article_position_count',
+      requestedArticleCount: 1,
+      allowPastApprovedBoundary: true,
+      allowDescriptionFallback: true
+    });
+    await persistence.recordPhaseSevenPreview(71, {
+      v02RunId: 50,
+      previewCreatedAt: '2026-10-06T11:00:01Z',
+      previewExpiresAt: '2026-10-06T11:15:01Z',
+      plannedEligibleCount: 1,
+      continuationReason: 'initial'
+    }, null, null);
+    await persistence.recordPhaseSevenJobBound(
+      71,
+      50,
+      '0010',
+      new Date('2026-10-06T11:00:02Z'),
+      'queued'
+    );
+    const completed = await persistence.recordPhaseSevenZeroWorkCompleted(
+      71,
+      new Date('2026-10-06T11:05:00Z'),
+      50,
+      true
+    );
+    assert.equal(completed.aiApproverV02JobId, null);
+    assert.equal(completed.runCompleted, true);
+    assert.deepEqual((completed.phaseData.phase7 as Record<string, unknown>).result, {
+      kind: 'zero_work',
+      zeroWorkAfterPriorAttempts: true
+    });
+  });
+
+  it('rejects Phase 7 stale mirrors and monitoring-limited completion', async () => {
+    const run = mockRun({
+      id: 72,
+      lastPhaseStarted: 7,
+      lastPhaseCompleted: 6,
+      articleCount: 1,
+      aiApproverV02JobId: 'old-job',
+      phaseData: {
+        phase7: {
+          status: 'started',
+          startedAt: '2026-10-06T12:00:00Z',
+          input: {
+            selectionMode: 'article_position_count',
+            requestedArticleCount: 1,
+            allowPastApprovedBoundary: true,
+            allowDescriptionFallback: true
+          },
+          currentV02RunId: 60,
+          attempts: [{
+            v02RunId: 60,
+            previewCreatedAt: '2026-10-06T12:00:01Z',
+            previewExpiresAt: '2026-10-06T12:15:01Z',
+            plannedEligibleCount: 1,
+            continuationReason: 'initial',
+            jobId: 'new-job'
+          }]
+        }
+      }
+    });
+    const persistence = createSequelizeWeeklyFlowPersistence(mockModel([run]).model);
+    await assert.rejects(
+      persistence.recordPhaseSevenProgress(72, 60, {
+        observedAt: new Date('2026-10-06T12:01:00Z'),
+        status: 'running'
+      }),
+      /current job mirror/
+    );
+
+    run.aiApproverV02JobId = 'new-job';
+    await persistence.recordPhaseSevenProgress(72, 60, {
+      observedAt: new Date('2026-10-07T00:00:02Z'),
+      status: 'running',
+      monitoringLimitedAt: new Date('2026-10-07T00:00:02Z')
+    });
+    await assert.rejects(
+      persistence.recordPhaseSevenCompleted(72, new Date(), 60, 'new-job', {
+        status: 'completed'
+      }),
+      /monitoring-limited/
+    );
+  });
+
   it('validates typed Phase 4 high-water marks when reading a run', async () => {
     const valid = mockRun({
       id: 5,
