@@ -41,6 +41,17 @@ import {
   type StateAssignerWorker
 } from './phases/06_runStateAssignment';
 import { StateAssignerClientError } from './phases/06_stateAssignerClient';
+import {
+  RunAiApproverV02Error,
+  runAiApproverV02,
+  type RunAiApproverV02Dependencies,
+  type RunAiApproverV02Result
+} from './phases/07_runAiApproverV02';
+import {
+  AiApproverV02ClientError,
+  createAiApproverV02Worker,
+  type AiApproverV02Worker
+} from './phases/07_aiApproverV02Client';
 import type { WeeklyFlowInvocation } from './cli';
 import {
   WeeklyFlowPersistenceError,
@@ -84,6 +95,12 @@ type RunState = (
   dependencies: RunStateAssignmentDependencies
 ) => Promise<RunStateAssignmentResult>;
 
+type RunAiApprover = (
+  run: WeeklyFlowRunRecord,
+  config: OpsConfig,
+  dependencies: RunAiApproverV02Dependencies
+) => Promise<RunAiApproverV02Result>;
+
 export interface CoordinatorDependencies {
   request: WorkerRequest;
   createBackup: CreateBackup;
@@ -91,9 +108,11 @@ export interface CoordinatorDependencies {
   collectRss: CollectRss;
   runSemantic: RunSemantic;
   runState: RunState;
+  runAiApprover: RunAiApprover;
   rssWorker: GoogleNewsRssWorker;
   semanticWorker: SemanticScorerWorker;
   stateWorker: StateAssignerWorker;
+  aiApproverWorker: AiApproverV02Worker;
   delay: (milliseconds: number) => Promise<void>;
   persistence: WeeklyFlowPersistence;
   invocation: WeeklyFlowInvocation;
@@ -125,6 +144,8 @@ const phaseFailureCategory = (phase: WeeklyFlowPhase, error: unknown): string =>
   if (phase === 5 && error instanceof SemanticScorerClientError) return error.category;
   if (phase === 6 && error instanceof RunStateAssignmentError) return error.category;
   if (phase === 6 && error instanceof StateAssignerClientError) return error.category;
+  if (phase === 7 && error instanceof RunAiApproverV02Error) return error.category;
+  if (phase === 7 && error instanceof AiApproverV02ClientError) return error.category;
   if (error instanceof WeeklyFlowPersistenceError) return 'persistence';
   return 'unknown';
 };
@@ -200,6 +221,7 @@ export async function runCoordinator(
   const collectRss = dependencies.collectRss ?? collectGoogleNewsRss;
   const runSemantic = dependencies.runSemantic ?? runSemanticScoring;
   const runState = dependencies.runState ?? runStateAssignment;
+  const runApprover = dependencies.runAiApprover ?? runAiApproverV02;
   const persistence = dependencies.persistence;
   const invocation = dependencies.invocation ?? defaultInvocation;
   const now = dependencies.now ?? currentTime;
@@ -208,6 +230,15 @@ export async function runCoordinator(
   const semanticWorker =
     dependencies.semanticWorker ?? createSemanticScorerWorker(config, request);
   const stateWorker = dependencies.stateWorker ?? createStateAssignerWorker(config, request);
+  const aiApproverWorker =
+    dependencies.aiApproverWorker ??
+    createAiApproverV02Worker(
+      {
+        baseUrl: config.workerPythonBaseUrl,
+        requestTimeoutSeconds: config.aiApproverV02RequestTimeoutSeconds
+      },
+      request
+    );
   logger.info('------------------------------------------------------------');
   logger.info('### Starting weekly pipeline coordinator ###');
   let selection;
@@ -481,6 +512,11 @@ export async function runCoordinator(
         skippedCount: result.skippedCount,
         failedCount: result.failedCount
       });
+      const refreshed = await persistence.getRunById(runId);
+      if (refreshed === null) {
+        throw new WeeklyFlowPersistenceError(`Weekly flow run ${runId} was not found`);
+      }
+      activeRun = refreshed;
     } catch (error: unknown) {
       logger.error('Phase 6 stopped without verified state assignment completion', {
         runId,
@@ -502,9 +538,61 @@ export async function runCoordinator(
     });
   }
 
-  logger.info('Weekly pipeline stopped at the Phase 7 boundary', {
-    runId,
-    lastPhaseCompleted: 6,
-    runCompleted: false
-  });
+  if (activeRun.runCompleted) return;
+  if ((activeRun.lastPhaseCompleted ?? 0) < 7) {
+    if (activeRun.lastPhaseCompleted !== 6 || (activeRun.articleCount ?? 0) <= 0) {
+      const error = new RunAiApproverV02Error(
+        'invalid_run_state',
+        'Phase 7 requires completed Phase 6 with a positive articleCount'
+      );
+      await recordFailure(persistence, logger, runId, 7, error, now);
+      throw error;
+    }
+    try {
+      logger.info('Phase 7 started or continued: monitoring AI Approver V02', {
+        runId,
+        phase: 7,
+        savedJobId: activeRun.aiApproverV02JobId,
+        articleCount: activeRun.articleCount
+      });
+      const result = await runApprover(activeRun, config, {
+        persistence,
+        worker: aiApproverWorker,
+        now,
+        delay: wait,
+        onEvent: (event) => {
+          logger.info('Phase 7 AI Approver V02 event', { runId, phase: 7, ...event });
+        }
+      });
+      logger.info(
+        result.kind === 'zero_work'
+          ? 'Phase 7 completed with no eligible Articles; weekly run completed'
+          : 'Phase 7 completed: AI Approver V02 verified; weekly run completed',
+        {
+          runId,
+          phase: 7,
+          kind: result.kind,
+          ...(result.kind === 'completed'
+            ? { v02RunId: result.v02RunId, jobId: result.jobId, ...result.counts }
+            : { zeroWorkAfterPriorAttempts: result.zeroWorkAfterPriorAttempts })
+        }
+      );
+    } catch (error: unknown) {
+      logger.error('Phase 7 stopped without verified AI Approver V02 completion', {
+        runId,
+        phase: 7,
+        failureCategory: phaseFailureCategory(7, error),
+        error: failureMessage(error),
+        ...persistenceErrorDiagnostics(error)
+      });
+      await recordFailure(persistence, logger, runId, 7, error, now);
+      throw error;
+    }
+  } else {
+    logger.info('Phase 7 already completed; reusing persisted result', {
+      runId,
+      phase: 7,
+      aiApproverV02JobId: activeRun.aiApproverV02JobId
+    });
+  }
 }

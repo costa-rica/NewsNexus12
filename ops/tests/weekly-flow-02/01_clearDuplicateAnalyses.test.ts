@@ -201,6 +201,71 @@ const successfulStateRunner: CoordinatorDependencies['runState'] = async (
   };
 };
 
+const successfulAiApproverRunner: CoordinatorDependencies['runAiApprover'] = async (
+  run,
+  _config,
+  dependencies
+) => {
+  const inputs = {
+    selectionMode: 'article_position_count' as const,
+    requestedArticleCount: run.articleCount ?? 0,
+    allowPastApprovedBoundary: true as const,
+    allowDescriptionFallback: true as const
+  };
+  const started = run.lastPhaseStarted === 7
+    ? run
+    : await dependencies.persistence.recordPhaseSevenStarted(
+        run.id,
+        dependencies.now(),
+        inputs
+      );
+  const phase7 = started.phaseData.phase7 as Record<string, unknown>;
+  const existingRunId = phase7.currentV02RunId as number | undefined;
+  const v02RunId = existingRunId ?? 41;
+  if (existingRunId === undefined) {
+    await dependencies.persistence.recordPhaseSevenPreview(
+      run.id,
+      {
+        v02RunId,
+        previewCreatedAt: dependencies.now().toISOString(),
+        previewExpiresAt: new Date(dependencies.now().getTime() + 900_000).toISOString(),
+        plannedEligibleCount: run.articleCount ?? 0,
+        continuationReason: 'test'
+      },
+      null,
+      null
+    );
+  }
+  const jobId = started.aiApproverV02JobId ?? 'approver-job-1';
+  await dependencies.persistence.recordPhaseSevenJobBound(
+    run.id,
+    v02RunId,
+    jobId,
+    dependencies.now(),
+    'completed'
+  );
+  await dependencies.persistence.recordPhaseSevenCompleted(
+    run.id,
+    dependencies.now(),
+    v02RunId,
+    jobId,
+    { status: 'completed', completedCount: run.articleCount ?? 0 }
+  );
+  return {
+    kind: 'completed',
+    v02RunId,
+    jobId,
+    counts: {
+      plannedEligibleCount: run.articleCount ?? 0,
+      attemptedCount: run.articleCount ?? 0,
+      completedCount: run.articleCount ?? 0,
+      failedCount: 0,
+      invalidResponseCount: 0,
+      skippedCount: 0
+    }
+  };
+};
+
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -435,7 +500,7 @@ describe('runCoordinator', () => {
     });
   });
 
-  it('runs Phases 1 through 6 in order and stops at the Phase 7 boundary', async () => {
+  it('runs Phases 1 through 7 in order and completes the weekly run', async () => {
     const { logger, entries } = recordingLogger();
     const request: WorkerRequest = async () => jsonResponse(successfulBody(7));
     const calls: string[] = [];
@@ -446,6 +511,7 @@ describe('runCoordinator', () => {
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       request: async (...args) => {
         calls.push('phase-1');
         return request(...args);
@@ -507,7 +573,7 @@ describe('runCoordinator', () => {
         }
       }
     );
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 completed')));
     assert.equal(entries.filter((entry) => entry.level === 'error').length, 0);
     assert.deepEqual(memory.calls, [
       'get-latest',
@@ -530,11 +596,16 @@ describe('runCoordinator', () => {
       'get:1',
       'start:6',
       'progress:6',
-      'complete:6'
+      'complete:6',
+      'get:1',
+      'start:7',
+      'preview:7',
+      'bind:7',
+      'complete:7'
     ]);
-    assert.equal(memory.runs[0].lastPhaseStarted, 6);
-    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
-    assert.equal(memory.runs[0].runCompleted, false);
+    assert.equal(memory.runs[0].lastPhaseStarted, 7);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
+    assert.equal(memory.runs[0].runCompleted, true);
     assert.equal(memory.runs[0].backupPath, successfulBackup.backupPath);
     assert.equal(memory.runs[0].backupByteSize, '2048');
   });
@@ -666,6 +737,7 @@ describe('runCoordinator', () => {
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => ({
@@ -680,7 +752,7 @@ describe('runCoordinator', () => {
     assert.equal(completion?.metadata?.eligibleCount, 0);
     assert.equal(completion?.metadata?.processedCount, 0);
     assert.equal(completion?.metadata?.deletedCount, 0);
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 completed')));
   });
 
   it('continues a recent run at the Phase 4 boundary without rerunning Phases 1 through 3', async () => {
@@ -725,6 +797,7 @@ describe('runCoordinator', () => {
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       now: () => new Date('2026-10-03T12:00:00.000Z'),
       request: async () => {
         phaseCalls += 1;
@@ -755,10 +828,15 @@ describe('runCoordinator', () => {
       'get:12',
       'start:6',
       'progress:6',
-      'complete:6'
+      'complete:6',
+      'get:12',
+      'start:7',
+      'preview:7',
+      'bind:7',
+      'complete:7'
     ]);
     assert.equal(memory.runs.length, 1);
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 completed')));
   });
 
   it('does not invoke Phase 1 when recording its start fails', async () => {
@@ -827,6 +905,7 @@ describe('runCoordinator', () => {
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       request: async () => jsonResponse(successfulBody()),
       createBackup: async () => successfulBackup,
       deleteArticles: async () => successfulDeletion
@@ -836,7 +915,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].id, 7);
     assert.equal(memory.runs[0].lastPhaseCompleted, 1);
     assert.equal(memory.runs[1].id, 8);
-    assert.equal(memory.runs[1].lastPhaseCompleted, 6);
+    assert.equal(memory.runs[1].lastPhaseCompleted, 7);
   });
 
   it('continues only the explicit run ID and never searches for a substitute', async () => {
@@ -859,6 +938,7 @@ describe('runCoordinator', () => {
       rssWorker: successfulRssWorker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       invocation: { mode: 'continue', runId: 4 },
       now: () => new Date('2026-10-03T12:00:00.000Z')
     });
@@ -877,7 +957,12 @@ describe('runCoordinator', () => {
       'get:4',
       'start:6',
       'progress:6',
-      'complete:6'
+      'complete:6',
+      'get:4',
+      'start:7',
+      'preview:7',
+      'bind:7',
+      'complete:7'
     ]);
     assert.equal(memory.runs.length, 2);
   });
@@ -1056,13 +1141,14 @@ describe('runCoordinator', () => {
       rssWorker: worker,
       runSemantic: successfulSemanticRunner,
       runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
       now: () => new Date('2026-10-05T10:00:00.000Z'),
       delay: async () => undefined
     });
 
     assert.equal(starts, 1);
     assert.equal(memory.runs[0].rssJobId, 'replacement-job');
-    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
     assert.equal(memory.calls.some((call) => call.startsWith('start:1')), false);
   });
 
@@ -1097,7 +1183,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].lastPhaseCompleted, 4);
     assert.equal(memory.runs[0].lastError?.phase, 5);
     assert.equal(memory.calls.includes('failure:5'), true);
-    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 boundary')), false);
+    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 started')), false);
   });
 
   it('skips completed Phase 4 and runs Phase 5 from persisted state', async () => {
@@ -1122,11 +1208,12 @@ describe('runCoordinator', () => {
         throw new Error('RSS should be skipped');
       },
       runSemantic: successfulSemanticRunner,
-      runState: successfulStateRunner
+      runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
     });
 
     assert.equal(rssCalls, 0);
-    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
     assert.ok(entries.some((entry) => entry.message.includes('Phase 4 already completed')));
   });
 
@@ -1159,12 +1246,13 @@ describe('runCoordinator', () => {
         workerCalls += 1;
         throw new Error('semantic scoring should be skipped');
       },
-      runState: successfulStateRunner
+      runState: successfulStateRunner,
+      runAiApprover: successfulAiApproverRunner,
     });
 
     assert.equal(workerCalls, 0);
     assert.ok(entries.some((entry) => entry.message.includes('Phase 5 already completed')));
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 completed')));
   });
 
   it('records a Phase 6 failure while preserving completed Phase 5', async () => {
@@ -1203,7 +1291,7 @@ describe('runCoordinator', () => {
     assert.equal(memory.runs[0].lastError?.phase, 6);
     assert.equal(memory.runs[0].lastError?.category, 'incompatible_contract');
     assert.equal(memory.calls.includes('failure:6'), true);
-    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 boundary')), false);
+    assert.equal(entries.some((entry) => entry.message.includes('Phase 7 started')), false);
   });
 
   it('continues a saved Phase 6 job through the injected state runner', async () => {
@@ -1240,15 +1328,16 @@ describe('runCoordinator', () => {
       runState: async (run, stateConfig, stateDependencies) => {
         receivedJobId = run.stateAssignerJobId;
         return successfulStateRunner(run, stateConfig, stateDependencies);
-      }
+      },
+      runAiApprover: successfulAiApproverRunner
     });
 
     assert.equal(receivedJobId, 'saved-state-job');
-    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
-    assert.equal(memory.runs[0].runCompleted, false);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
+    assert.equal(memory.runs[0].runCompleted, true);
   });
 
-  it('skips all worker phases when Phase 6 is already complete', async () => {
+  it('skips completed worker phases and runs Phase 7 when Phase 6 is complete', async () => {
     const { logger, entries } = recordingLogger();
     const memory = createInMemoryPersistence([
       createRunRecord({
@@ -1283,13 +1372,112 @@ describe('runCoordinator', () => {
       runState: async () => {
         workerCalls += 1;
         throw new Error('state assignment should be skipped');
-      }
+      },
+      runAiApprover: successfulAiApproverRunner
     });
 
     assert.equal(workerCalls, 0);
     assert.ok(entries.some((entry) => entry.message.includes('Phase 6 already completed')));
-    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 boundary')));
-    assert.equal(memory.runs[0].runCompleted, false);
+    assert.ok(entries.some((entry) => entry.message.includes('Phase 7 completed')));
+    assert.equal(memory.runs[0].runCompleted, true);
+  });
+
+  it('uses the injected request for Phase 7 after Phase 6 is complete', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 27,
+        runStartedAt: new Date('2026-10-06T17:00:00Z'),
+        lastPhaseStarted: 6,
+        lastPhaseCompleted: 6,
+        articleCount: 2,
+        rssJobId: 'rss-complete',
+        semanticScorerJobId: 'semantic-complete',
+        stateAssignerJobId: 'state-complete',
+        targetArticleThresholdDaysOld: 180,
+        phaseData: {
+          phase4: { status: 'completed' },
+          phase5: { status: 'completed' },
+          phase6: { status: 'completed' }
+        }
+      })
+    ]);
+    const requestPaths: string[] = [];
+    const phaseSevenInputs = {
+      selectionMode: 'article_position_count',
+      requestedArticleCount: 2,
+      allowPastApprovedBoundary: true,
+      allowDescriptionFallback: true
+    };
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      now: () => new Date('2026-10-06T18:04:00Z'),
+      delay: async () => assert.fail('completed Phase 7 must not delay'),
+      request: async (url, init) => {
+        requestPaths.push(url.pathname);
+        if (url.pathname === '/ai-approver-v02/preview') {
+          assert.deepEqual(JSON.parse(String(init.body)), phaseSevenInputs);
+          return jsonResponse({
+            id: 41,
+            status: 'draft',
+            jobId: null,
+            ...phaseSevenInputs,
+            plannedEligibleCount: 2,
+            selectionSnapshot: [
+              { articleId: 20, contentSource: 'article_contents_02' },
+              { articleId: 19, contentSource: 'description' }
+            ],
+            previewToken: 'secret-token',
+            createdAt: '2026-10-06T18:00:00Z',
+            previewExpiresAt: '2026-10-06T18:15:00Z'
+          });
+        }
+        if (url.pathname === '/ai-approver-v02/start') {
+          assert.deepEqual(JSON.parse(String(init.body)), {
+            runId: 41,
+            previewToken: 'secret-token'
+          });
+          return jsonResponse({ runId: 41, jobId: '0007', status: 'queued' }, 202);
+        }
+        assert.equal(url.pathname, '/ai-approver-v02/runs/41');
+        return jsonResponse({
+          run: {
+            id: 41,
+            status: 'completed',
+            jobId: '0007',
+            ...phaseSevenInputs,
+            plannedEligibleCount: 2,
+            attemptedCount: 2,
+            completedCount: 2,
+            failedCount: 0,
+            invalidResponseCount: 0,
+            skippedCount: 0,
+            endingReason: 'selection_exhausted',
+            createdAt: '2026-10-06T18:00:00Z',
+            startedAt: '2026-10-06T18:01:00Z',
+            endedAt: '2026-10-06T18:03:00Z'
+          },
+          queueStatus: {
+            jobId: '0007',
+            endpointName: '/ai-approver-v02/start',
+            status: 'completed',
+            createdAt: '2026-10-06T18:00:30Z',
+            startedAt: '2026-10-06T18:01:00Z',
+            endedAt: '2026-10-06T18:03:01Z',
+            parameters: { runId: 41 }
+          }
+        });
+      }
+    });
+
+    assert.deepEqual(requestPaths, [
+      '/ai-approver-v02/preview',
+      '/ai-approver-v02/start',
+      '/ai-approver-v02/runs/41'
+    ]);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
+    assert.equal(memory.runs[0].runCompleted, true);
   });
 
   it('rejects an ineligible explicit run without writing or starting a phase', async () => {
