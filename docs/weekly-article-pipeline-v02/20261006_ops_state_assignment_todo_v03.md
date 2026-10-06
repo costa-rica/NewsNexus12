@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T16:58:40Z
-updated_at: 2026-10-06T17:14:57Z
+updated_at: 2026-10-06T17:15:35Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -251,52 +251,52 @@ Complete the persistence and runner changes in one phase. Do not stop at an inte
 5. [x] Fix failures and repeat all checks.
 6. [x] Check off completed Phase 4 tasks.
 7. [x] Stage only Phase 4 documentation changes.
-8. [ ] Commit using repository guidance and reference Phase 4 of this todo in the commit body.
+8. [x] Commit using repository guidance and reference Phase 4 of this todo in the commit body.
 
 ## Phase 5: Final Regression and Handoff
 
-- [ ] Confirm every approved plan V06 requirement is implemented.
-- [ ] Confirm the todo V02 assessment concern is resolved.
-- [ ] Confirm Phase 1 was additive and every phase checkpoint was passable.
-- [ ] Confirm one shared module owns V04 and V06 recovery parsing.
-- [ ] Confirm runner, production persistence, and in-memory persistence use the shared module.
-- [ ] Confirm completion normalizes legacy state without requiring an earlier recovery write.
-- [ ] Confirm a legacy replacement cannot be falsely marked incompatible.
-- [ ] Confirm attempt history never limits continuation eligibility.
-- [ ] Confirm one invocation starts at most one new job.
-- [ ] Confirm repeated later invocations remain allowed.
-- [ ] Confirm exact job ID plus `createdAt` protects against reuse.
-- [ ] Confirm Phase 6 completion leaves the weekly run incomplete at Phase 7.
-- [ ] Confirm no schema, worker-node runtime, Phase 7, or systemd implementation change was introduced.
-- [ ] Confirm no archive file was modified.
-- [ ] Confirm default tests use no real network, database, worker, or AI process.
-- [ ] Build `db-models`.
-- [ ] Run the ops type check.
-- [ ] Run the complete ops test suite.
-- [ ] Build ops.
-- [ ] Run `git diff --check`.
-- [ ] Review the final diff for accidental scope expansion.
-- [ ] Fix failures and repeat the full sequence.
-- [ ] Check off completed Phase 5 tasks.
-- [ ] Commit final verification fixes if any; do not create an empty commit.
-- [ ] Provide the operator with verification results and remaining deployment warnings.
+- [x] Confirm every approved plan V06 requirement is implemented.
+- [x] Confirm the todo V02 assessment concern is resolved.
+- [x] Confirm Phase 1 was additive and every phase checkpoint was passable.
+- [x] Confirm one shared module owns V04 and V06 recovery parsing.
+- [x] Confirm runner, production persistence, and in-memory persistence use the shared module.
+- [x] Confirm completion normalizes legacy state without requiring an earlier recovery write.
+- [x] Confirm a legacy replacement cannot be falsely marked incompatible.
+- [x] Confirm attempt history never limits continuation eligibility.
+- [x] Confirm one invocation starts at most one new job.
+- [x] Confirm repeated later invocations remain allowed.
+- [x] Confirm exact job ID plus `createdAt` protects against reuse.
+- [x] Confirm Phase 6 completion leaves the weekly run incomplete at Phase 7.
+- [x] Confirm no schema, worker-node runtime, Phase 7, or systemd implementation change was introduced.
+- [x] Confirm no archive file was modified.
+- [x] Confirm default tests use no real network, database, worker, or AI process.
+- [x] Build `db-models`.
+- [x] Run the ops type check.
+- [x] Run the complete ops test suite.
+- [x] Build ops.
+- [x] Run `git diff --check`.
+- [x] Review the final diff for accidental scope expansion.
+- [x] Fix failures and repeat the full sequence.
+- [x] Check off completed Phase 5 tasks.
+- [x] Commit final verification fixes if any; do not create an empty commit.
+- [x] Provide the operator with verification results and remaining deployment warnings.
 
 ## Completion Criteria
 
-- [ ] Phase 6 has no lifetime continuation-attempt cap.
-- [ ] All three continuation paths can revisit incomplete Phase 6 repeatedly.
-- [ ] One invocation starts at most one new state-assignment job.
-- [ ] One shared module parses and normalizes V04 and V06 recovery state.
-- [ ] Every consumer uses the shared normalizer after cutover.
-- [ ] Every Phase 6 write preserves recovery state in V06 form after cutover.
-- [ ] Completion safely handles a legacy marker as its first recovery-state read.
-- [ ] Incompatible attempts use exact job ID plus `createdAt`.
-- [ ] Legacy normalization records only proven source incompatibility.
-- [ ] A compatible legacy replacement can complete.
-- [ ] A compatible job after multiple earlier failures can complete.
-- [ ] Attempt history is compact, deduplicated, and never an attempt limit.
-- [ ] Monitoring-limited and incompatible jobs remain unable to complete.
-- [ ] Malformed and unverified jobs remain non-replaceable.
-- [ ] Immutable Article count, threshold, and Phase 6 start survive continuation.
-- [ ] Documentation accurately describes continuation, cost, selection drift, and systemd restart safety.
-- [ ] Ops type checks, tests, build, and diff checks pass.
+- [x] Phase 6 has no lifetime continuation-attempt cap.
+- [x] All three continuation paths can revisit incomplete Phase 6 repeatedly.
+- [x] One invocation starts at most one new state-assignment job.
+- [x] One shared module parses and normalizes V04 and V06 recovery state.
+- [x] Every consumer uses the shared normalizer after cutover.
+- [x] Every Phase 6 write preserves recovery state in V06 form after cutover.
+- [x] Completion safely handles a legacy marker as its first recovery-state read.
+- [x] Incompatible attempts use exact job ID plus `createdAt`.
+- [x] Legacy normalization records only proven source incompatibility.
+- [x] A compatible legacy replacement can complete.
+- [x] A compatible job after multiple earlier failures can complete.
+- [x] Attempt history is compact, deduplicated, and never an attempt limit.
+- [x] Monitoring-limited and incompatible jobs remain unable to complete.
+- [x] Malformed and unverified jobs remain non-replaceable.
+- [x] Immutable Article count, threshold, and Phase 6 start survive continuation.
+- [x] Documentation accurately describes continuation, cost, selection drift, and systemd restart safety.
+- [x] Ops type checks, tests, build, and diff checks pass.
