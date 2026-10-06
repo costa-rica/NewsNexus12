@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T16:58:40Z
-updated_at: 2026-10-06T16:58:40Z
+updated_at: 2026-10-06T17:04:59Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -59,40 +59,40 @@ V03 resolves `20261006_ops_state_assignment_todo_v02_assessment_claude.md`:
 
 ## Phase 1: Add Shared Recovery Helpers
 
-- [ ] Review plan V06, its assessment history, todo V02 assessment, and current Phase 6 recovery code.
-- [ ] Inventory every production and test reference to the V04 incompatible marker and replacement method.
-- [ ] Add `ops/src/weekly-flow-02/phaseSixRecoveryState.ts` as the only parser and normalizer for incompatible-contract recovery state.
-- [ ] Keep the existing persistence interface and V04 callers unchanged during this phase.
-- [ ] Add new exported types without replacing the live V04 type yet:
-  - [ ] `PhaseSixIncompatibleAttempt`.
-  - [ ] `PhaseSixIncompatibleRecoveryV06`.
-  - [ ] A validated V04 legacy input shape used only by the normalizer.
-- [ ] Define attempt identity as exact `jobId + jobCreatedAt`.
-- [ ] Implement V06 history parsing and validation.
-- [ ] Implement V04 marker parsing and normalization.
-- [ ] Normalize V04 without `replacementJobId` into one source attempt with attributable validated details.
-- [ ] Normalize V04 with `replacementJobId` into one source attempt only.
-- [ ] Omit status and cancellation fields when a V04 replacement makes their attribution ambiguous.
-- [ ] Never add the V04 replacement to attempt history without a worker lookup proving incompatibility and supplying `createdAt`.
-- [ ] Reject invalid legacy source identity, detection time, or missing-field evidence.
-- [ ] Implement helpers to:
-  - [ ] Find an attempt by exact identity.
-  - [ ] Add or update one attempt without duplication.
-  - [ ] Serialize compact V06 history.
-- [ ] Do not add `latestAttemptJobId` or any attempt counter.
-- [ ] Add `ops/tests/weekly-flow-02/phaseSixRecoveryState.test.ts`.
-- [ ] Add the compiled test path to the explicit `ops/package.json` test command.
-- [ ] Test V06 parsing, V04 normalization, ambiguous-field omission, deduplication, and reused job IDs.
-- [ ] Confirm no current production caller has changed behavior in Phase 1.
+- [x] Review plan V06, its assessment history, todo V02 assessment, and current Phase 6 recovery code.
+- [x] Inventory every production and test reference to the V04 incompatible marker and replacement method.
+- [x] Add `ops/src/weekly-flow-02/phaseSixRecoveryState.ts` as the only parser and normalizer for incompatible-contract recovery state.
+- [x] Keep the existing persistence interface and V04 callers unchanged during this phase.
+- [x] Add new exported types without replacing the live V04 type yet:
+  - [x] `PhaseSixIncompatibleAttempt`.
+  - [x] `PhaseSixIncompatibleRecoveryV06`.
+  - [x] A validated V04 legacy input shape used only by the normalizer.
+- [x] Define attempt identity as exact `jobId + jobCreatedAt`.
+- [x] Implement V06 history parsing and validation.
+- [x] Implement V04 marker parsing and normalization.
+- [x] Normalize V04 without `replacementJobId` into one source attempt with attributable validated details.
+- [x] Normalize V04 with `replacementJobId` into one source attempt only.
+- [x] Omit status and cancellation fields when a V04 replacement makes their attribution ambiguous.
+- [x] Never add the V04 replacement to attempt history without a worker lookup proving incompatibility and supplying `createdAt`.
+- [x] Reject invalid legacy source identity, detection time, or missing-field evidence.
+- [x] Implement helpers to:
+  - [x] Find an attempt by exact identity.
+  - [x] Add or update one attempt without duplication.
+  - [x] Serialize compact V06 history.
+- [x] Do not add `latestAttemptJobId` or any attempt counter.
+- [x] Add `ops/tests/weekly-flow-02/phaseSixRecoveryState.test.ts`.
+- [x] Add the compiled test path to the explicit `ops/package.json` test command.
+- [x] Test V06 parsing, V04 normalization, ambiguous-field omission, deduplication, and reused job IDs.
+- [x] Confirm no current production caller has changed behavior in Phase 1.
 
 ### Phase 1 Checkpoint
 
-1. [ ] Build `db-models`.
-2. [ ] Run the ops type check.
-3. [ ] Run the complete ops test suite.
-4. [ ] Build ops.
-5. [ ] Fix failures and repeat all checks.
-6. [ ] Check off completed Phase 1 tasks.
+1. [x] Build `db-models`.
+2. [x] Run the ops type check.
+3. [x] Run the complete ops test suite.
+4. [x] Build ops.
+5. [x] Fix failures and repeat all checks.
+6. [x] Check off completed Phase 1 tasks.
 7. [ ] Stage only Phase 1 changes.
 8. [ ] Commit using repository guidance and reference Phase 1 of this todo in the commit body.
 

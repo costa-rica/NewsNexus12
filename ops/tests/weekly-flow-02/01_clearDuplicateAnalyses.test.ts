@@ -1082,6 +1082,7 @@ describe('runCoordinator', () => {
     await assert.rejects(
       runCoordinator(logger, coordinatorConfig, {
         persistence: memory.persistence,
+        now: () => new Date('2026-10-05T12:00:00.000Z'),
         runSemantic: async () => {
           throw failure;
         }
@@ -1111,6 +1112,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      now: () => new Date('2026-10-05T12:00:00.000Z'),
       collectRss: async () => {
         rssCalls += 1;
         throw new Error('RSS should be skipped');
@@ -1144,6 +1146,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      now: () => new Date('2026-10-05T12:00:00.000Z'),
       collectRss: async () => {
         workerCalls += 1;
         throw new Error('RSS should be skipped');
@@ -1184,6 +1187,7 @@ describe('runCoordinator', () => {
     await assert.rejects(
       runCoordinator(logger, coordinatorConfig, {
         persistence: memory.persistence,
+        now: () => new Date('2026-10-05T12:00:00.000Z'),
         runState: async () => {
           throw failure;
         }
@@ -1228,6 +1232,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      now: () => new Date('2026-10-05T12:00:00.000Z'),
       runState: async (run, stateConfig, stateDependencies) => {
         receivedJobId = run.stateAssignerJobId;
         return successfulStateRunner(run, stateConfig, stateDependencies);
@@ -1262,6 +1267,7 @@ describe('runCoordinator', () => {
 
     await runCoordinator(logger, coordinatorConfig, {
       persistence: memory.persistence,
+      now: () => new Date('2026-10-05T12:00:00.000Z'),
       collectRss: async () => {
         workerCalls += 1;
         throw new Error('RSS should be skipped');
