@@ -20,6 +20,7 @@ from src.modules.deduper.config import validate_startup_env
 from src.modules.location_scorer.config import validate_location_scorer_startup_env
 from src.modules.queue.config import validate_queue_startup_env
 from src.routes.ai_approver_v02 import router as ai_approver_v02_router
+from src.routes.article_embeddings import router as article_embeddings_router
 from src.routes.deduper import router as deduper_router
 from src.routes.index import router as index_router
 from src.routes.location_scorer import router as location_scorer_router
@@ -102,5 +103,6 @@ app = FastAPI(title="NewsNexus Python Queuer", version="0.2.0")
 app.include_router(index_router)
 app.include_router(ai_approver_v02_router)
 app.include_router(deduper_router)
+app.include_router(article_embeddings_router)
 app.include_router(location_scorer_router)
 app.include_router(queue_info_router)

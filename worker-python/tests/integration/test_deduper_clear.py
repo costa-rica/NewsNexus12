@@ -103,7 +103,7 @@ def test_competing_operations_are_rejected_without_orphan_jobs(setup, path):
 @pytest.mark.parametrize("path", ["/deduper/jobs", "/deduper/jobs/reportId/42"])
 def test_start_response_is_unchanged_when_guard_is_free(setup, monkeypatch, path):
     client, manager, repo = setup
-    monkeypatch.setattr(manager, "_build_deduper_runner", lambda report_id: lambda _: None)
+    monkeypatch.setattr(manager, "_build_deduper_runner", lambda report_id, rebuild_embeddings=False: lambda _: None)
     response = client.get(path)
     assert response.status_code == 201
     assert response.json()["status"] == "queued"
@@ -227,7 +227,7 @@ def test_database_failure_preserves_cancellations_and_releases_guard(setup, monk
         assert repo.rows == 3
         repo.before_delete = lambda: None
         assert client.delete(CLEAR).status_code == 200
-        monkeypatch.setattr(manager, "_build_deduper_runner", lambda report_id: lambda _: None)
+        monkeypatch.setattr(manager, "_build_deduper_runner", lambda report_id, rebuild_embeddings=False: lambda _: None)
         assert client.get("/deduper/jobs/reportId/42").status_code == 201
     finally:
         release.set()

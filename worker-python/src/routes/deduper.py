@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 
 from src.modules.deduper.clear_control import (
     DeduperClearBusyError,
@@ -11,6 +12,12 @@ from src.modules.deduper.clear_control import (
 from src.services.job_manager import JobStatus, job_manager, utc_now_iso
 
 router = APIRouter(prefix="/deduper", tags=["deduper"])
+
+
+class DeduperJobRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rebuildEmbeddings: bool = False
 
 
 @router.get("/jobs", status_code=201)
@@ -25,6 +32,28 @@ def create_deduper_job():
 def create_deduper_job_by_report_id(report_id: int):
     try:
         return job_manager.enqueue_deduper_job(report_id=report_id)
+    except DeduperClearBusyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+
+
+@router.post("/jobs", status_code=201)
+def create_deduper_job_with_options(body: DeduperJobRequest | None = None):
+    request = body or DeduperJobRequest()
+    try:
+        return job_manager.enqueue_deduper_job(rebuild_embeddings=request.rebuildEmbeddings)
+    except DeduperClearBusyError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+
+
+@router.post("/jobs/reportId/{report_id}", status_code=201)
+def create_deduper_job_by_report_id_with_options(
+    report_id: int, body: DeduperJobRequest | None = None
+):
+    request = body or DeduperJobRequest()
+    try:
+        return job_manager.enqueue_deduper_job(
+            report_id=report_id, rebuild_embeddings=request.rebuildEmbeddings
+        )
     except DeduperClearBusyError as exc:
         return JSONResponse({"error": str(exc)}, status_code=409)
 

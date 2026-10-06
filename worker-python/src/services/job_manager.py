@@ -9,6 +9,13 @@ from typing import Any
 
 from loguru import logger
 
+from src.modules.article_embeddings import (
+    ArticleEmbeddingRepository,
+    ArticleEmbeddingService,
+    ArticleEmbeddingsCancelledError,
+    ArticleEmbeddingsConfig,
+    EmbeddingSyncMode,
+)
 from src.modules.deduper.clear_control import (
     DeduperCancellationProgress,
     DeduperClearControl,
@@ -55,6 +62,7 @@ class JobRecord:
 
 class JobManager:
     DEDUPER_ENDPOINT_NAME = "/deduper/start-job"
+    ARTICLE_EMBEDDINGS_ENDPOINT_NAME = "/article-embeddings/start-job"
 
     def __init__(
         self,
@@ -68,17 +76,21 @@ class JobManager:
             queue_engine, queue_store, self.DEDUPER_ENDPOINT_NAME
         )
 
-    def enqueue_deduper_job(self, report_id: int | None = None) -> dict[str, str | int]:
-        parameters: dict[str, str | int | float | bool | None] | None = None
+    def enqueue_deduper_job(
+        self, report_id: int | None = None, rebuild_embeddings: bool = False
+    ) -> dict[str, str | int]:
+        parameters: dict[str, str | int | float | bool | None] = {}
         if report_id is not None:
-            parameters = {"reportId": report_id}
+            parameters["reportId"] = report_id
+        if rebuild_embeddings:
+            parameters["rebuildEmbeddings"] = True
 
         with self.deduper_clear_control.exclusive_operation():
             result = self.queue_engine.enqueue_job(
                 EnqueueJobInput(
                     endpointName=self.DEDUPER_ENDPOINT_NAME,
-                    run=self._build_deduper_runner(report_id),
-                    parameters=parameters,
+                    run=self._build_deduper_runner(report_id, rebuild_embeddings),
+                    parameters=parameters or None,
                 )
             )
 
@@ -87,6 +99,19 @@ class JobManager:
             "status": result.status,
             **({"reportId": report_id} if report_id is not None else {}),
         }
+
+    def enqueue_article_embeddings_job(
+        self, mode: EmbeddingSyncMode = EmbeddingSyncMode.INCREMENTAL
+    ) -> dict[str, str]:
+        mode = EmbeddingSyncMode(mode)
+        result = self.queue_engine.enqueue_job(
+            EnqueueJobInput(
+                endpointName=self.ARTICLE_EMBEDDINGS_ENDPOINT_NAME,
+                run=self._build_article_embeddings_runner(mode),
+                parameters={"mode": str(mode)},
+            )
+        )
+        return {"jobId": result.jobId, "status": result.status, "mode": str(mode)}
 
     def get_job(self, job_id: str) -> JobRecord | None:
         queue_job = self.queue_engine.get_check_status(job_id)
@@ -191,15 +216,51 @@ class JobManager:
         orchestrator = DeduperOrchestrator(repository, config)
         return orchestrator, repository
 
-    def _build_deduper_runner(self, report_id: int | None):
+    def _create_article_embeddings_service(
+        self,
+    ) -> tuple[ArticleEmbeddingService, ArticleEmbeddingRepository]:
+        config = ArticleEmbeddingsConfig.from_env()
+        repository = ArticleEmbeddingRepository.from_config(config)
+        return ArticleEmbeddingService.from_config(repository, config), repository
+
+    def _build_article_embeddings_runner(self, mode: EmbeddingSyncMode):
+        def _run(context: QueueExecutionContext) -> None:
+            self._append_job_log(context.jobId, f"article_embeddings_started mode={mode}")
+            service, repository = self._create_article_embeddings_service()
+
+            try:
+                summary = service.sync(mode, should_cancel=context.is_cancel_requested)
+            except ArticleEmbeddingsCancelledError as exc:
+                # The queue engine marks a job canceled only on QueueJobCanceledError.
+                self._append_job_log(context.jobId, "article_embeddings_cancelled")
+                raise QueueJobCanceledError() from exc
+            except Exception as exc:
+                self._append_job_log(context.jobId, f"article_embeddings_failed error={exc}")
+                raise
+            finally:
+                repository.close()
+
+            if context.is_cancel_requested():
+                self._append_job_log(context.jobId, "article_embeddings_cancelled")
+                raise QueueJobCanceledError()
+
+            self._set_job_result(context.jobId, summary.to_dict())
+            self._append_job_log(context.jobId, "article_embeddings_completed")
+
+        return _run
+
+    def _build_deduper_runner(self, report_id: int | None, rebuild_embeddings: bool = False):
         def _run(context: QueueExecutionContext) -> None:
             self._append_job_log(context.jobId, "job_started", report_id)
             orchestrator, repository = self._create_orchestrator()
+            # Passed only when set, so orchestrators without the flag keep working.
+            run_kwargs: dict[str, Any] = {"rebuild_embeddings": True} if rebuild_embeddings else {}
 
             try:
                 summary = orchestrator.run_analyze_fast(
                     report_id=report_id,
                     should_cancel=context.is_cancel_requested,
+                    **run_kwargs,
                 )
             except DeduperProcessorError as exc:
                 self._update_job_result(
@@ -276,6 +337,23 @@ class JobManager:
             ),
         )
         self.logger.info(message)
+
+    def _set_job_result(self, job_id: str, result: dict[str, Any]) -> None:
+        self.queue_store.update_job(
+            job_id,
+            lambda job: QueueJobRecord(
+                jobId=job.jobId,
+                endpointName=job.endpointName,
+                status=job.status,
+                createdAt=job.createdAt,
+                startedAt=job.startedAt,
+                endedAt=job.endedAt,
+                failureReason=job.failureReason,
+                logs=job.logs,
+                parameters=job.parameters,
+                result=result,
+            ),
+        )
 
     def _update_job_result(
         self,

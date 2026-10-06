@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:59:09Z
+updated_at: 2026-10-06T23:03:20Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -202,38 +202,38 @@ Plan: Component 4, "New pipeline step" and "EmbeddingProcessor changes", plus "C
 
 Plan: Component 5, plus "Cancellation mapping".
 
-- [ ] `JobManager.enqueue_deduper_job(report_id=None, rebuild_embeddings=False)`:
-  - [ ] Add `rebuildEmbeddings: true` to the queue parameters only when true.
-  - [ ] Pass the flag through `_build_deduper_runner` to `run_analyze_fast`.
-- [ ] `src/routes/deduper.py`:
-  - [ ] Leave both GET job routes unchanged.
-  - [ ] Add `POST /deduper/jobs` and `POST /deduper/jobs/reportId/{report_id}` with an optional Pydantic body `{ "rebuildEmbeddings": bool = false }`.
-  - [ ] Return status 201 and keep the `DeduperClearBusyError` → 409 handling.
-  - [ ] Make sure the POST routes do not collide with `POST /deduper/jobs/{job_id}/cancel`.
-- [ ] Standalone job runner, in `JobManager` or a small job builder in the `article_embeddings` module:
-  - [ ] Endpoint name `/article-embeddings/start-job`.
-  - [ ] Calls `sync(mode, should_cancel=context.is_cancel_requested)` and stores `summary.to_dict()` as the job result.
-  - [ ] Converts `ArticleEmbeddingsCancelledError` into `QueueJobCanceledError`.
-  - [ ] Raises `QueueJobCanceledError` if a cancel was requested after sync returned.
-  - [ ] Lets other errors propagate.
-  - [ ] Creates its `ArticleEmbeddingRepository` with `from_config(...)` (owned mode) and calls `close()` in `finally`, including on cancel and failure.
-- [ ] Create `src/routes/article_embeddings.py`:
-  - [ ] Prefix `/article-embeddings`.
-  - [ ] `POST /jobs` with optional body `{ "mode": "incremental" | "rebuild" }`, default `incremental`.
-  - [ ] Returns `jobId`, `status` and `mode` with status 201.
-- [ ] Register the router in `src/main.py` with `app.include_router(...)`.
-- [ ] Tests, `tests/integration/`:
-  - [ ] The GET deduper routes behave as before.
-  - [ ] The POST deduper routes accept an empty body and `{ "rebuildEmbeddings": true }`, and reject an invalid body with 422.
-  - [ ] `POST /article-embeddings/jobs` enqueues with the requested mode, and rejects an unknown mode with 422.
-- [ ] Tests, queue job cancellation, checked at the queue job status:
-  - [ ] A deduper job cancelled during `ensure_embeddings()` ends as `canceled`.
-  - [ ] A deduper job cancelled during the sync step ends as `canceled`.
-  - [ ] A standalone embeddings job cancelled during sync ends as `canceled`.
-  - [ ] A standalone job whose sync raises an unrelated error ends as `failed`.
-  - [ ] The standalone runner closes its owned repository after completion, cancel and failure.
-- [ ] End-of-phase checks for worker-python.
-- [ ] Check off tasks and commit.
+- [x] `JobManager.enqueue_deduper_job(report_id=None, rebuild_embeddings=False)`:
+  - [x] Add `rebuildEmbeddings: true` to the queue parameters only when true.
+  - [x] Pass the flag through `_build_deduper_runner` to `run_analyze_fast`.
+- [x] `src/routes/deduper.py`:
+  - [x] Leave both GET job routes unchanged.
+  - [x] Add `POST /deduper/jobs` and `POST /deduper/jobs/reportId/{report_id}` with an optional Pydantic body `{ "rebuildEmbeddings": bool = false }`.
+  - [x] Return status 201 and keep the `DeduperClearBusyError` → 409 handling.
+  - [x] Make sure the POST routes do not collide with `POST /deduper/jobs/{job_id}/cancel`.
+- [x] Standalone job runner, in `JobManager` or a small job builder in the `article_embeddings` module:
+  - [x] Endpoint name `/article-embeddings/start-job`.
+  - [x] Calls `sync(mode, should_cancel=context.is_cancel_requested)` and stores `summary.to_dict()` as the job result.
+  - [x] Converts `ArticleEmbeddingsCancelledError` into `QueueJobCanceledError`.
+  - [x] Raises `QueueJobCanceledError` if a cancel was requested after sync returned.
+  - [x] Lets other errors propagate.
+  - [x] Creates its `ArticleEmbeddingRepository` with `from_config(...)` (owned mode) and calls `close()` in `finally`, including on cancel and failure.
+- [x] Create `src/routes/article_embeddings.py`:
+  - [x] Prefix `/article-embeddings`.
+  - [x] `POST /jobs` with optional body `{ "mode": "incremental" | "rebuild" }`, default `incremental`.
+  - [x] Returns `jobId`, `status` and `mode` with status 201.
+- [x] Register the router in `src/main.py` with `app.include_router(...)`.
+- [x] Tests, `tests/integration/`:
+  - [x] The GET deduper routes behave as before.
+  - [x] The POST deduper routes accept an empty body and `{ "rebuildEmbeddings": true }`, and reject an invalid body with 422.
+  - [x] `POST /article-embeddings/jobs` enqueues with the requested mode, and rejects an unknown mode with 422.
+- [x] Tests, queue job cancellation, checked at the queue job status:
+  - [x] A deduper job cancelled during `ensure_embeddings()` ends as `canceled`.
+  - [x] A deduper job cancelled during the sync step ends as `canceled`.
+  - [x] A standalone embeddings job cancelled during sync ends as `canceled`.
+  - [x] A standalone job whose sync raises an unrelated error ends as `failed`.
+  - [x] The standalone runner closes its owned repository after completion, cancel and failure.
+- [x] End-of-phase checks for worker-python.
+- [x] Check off tasks and commit.
 
 ## Phase 7: Docs
 
