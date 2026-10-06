@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T16:58:40Z
-updated_at: 2026-10-06T17:13:15Z
+updated_at: 2026-10-06T17:14:57Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -225,32 +225,32 @@ Complete the persistence and runner changes in one phase. Do not stop at an inte
 5. [x] Fix failures and repeat all checks.
 6. [x] Check off completed Phase 3 tasks.
 7. [x] Stage only Phase 3 changes.
-8. [ ] Commit only when Phase 3 produced code or test changes; do not create an empty commit.
+8. [x] Commit only when Phase 3 produced code or test changes; do not create an empty commit.
 
 ## Phase 4: Update Operator Documentation
 
-- [ ] Update `ops/README.md` to distinguish unlimited continuation invocations from one new job per invocation.
-- [ ] Document no-argument continuation inside the 72-hour window.
-- [ ] Document repeated `--continue-run` and `--continue-run ID` behavior.
-- [ ] Document explicit continuation's existing eligibility behavior.
-- [ ] Remove one-replacement and permanently-consumed language.
-- [ ] Document incompatible identity as job ID plus `createdAt`.
-- [ ] Document repeated-attempt AI cost and newest-first selection drift.
-- [ ] Document malformed and unverified states that still require investigation.
-- [ ] Update `ops/AGENTS.md` with the corrected Phase 6 recovery contract.
-- [ ] Warn that future systemd units must not use `Restart=on-failure`, `Restart=always`, or another automatic restart policy.
-- [ ] State that continuation after failure requires another timer trigger or deliberate operator command.
-- [ ] Do not add or enable a systemd unit.
+- [x] Update `ops/README.md` to distinguish unlimited continuation invocations from one new job per invocation.
+- [x] Document no-argument continuation inside the 72-hour window.
+- [x] Document repeated `--continue-run` and `--continue-run ID` behavior.
+- [x] Document explicit continuation's existing eligibility behavior.
+- [x] Remove one-replacement and permanently-consumed language.
+- [x] Document incompatible identity as job ID plus `createdAt`.
+- [x] Document repeated-attempt AI cost and newest-first selection drift.
+- [x] Document malformed and unverified states that still require investigation.
+- [x] Update `ops/AGENTS.md` with the corrected Phase 6 recovery contract.
+- [x] Warn that future systemd units must not use `Restart=on-failure`, `Restart=always`, or another automatic restart policy.
+- [x] State that continuation after failure requires another timer trigger or deliberate operator command.
+- [x] Do not add or enable a systemd unit.
 
 ### Phase 4 Checkpoint
 
-1. [ ] Build `db-models`.
-2. [ ] Run the ops type check.
-3. [ ] Run the complete ops test suite.
-4. [ ] Build ops.
-5. [ ] Fix failures and repeat all checks.
-6. [ ] Check off completed Phase 4 tasks.
-7. [ ] Stage only Phase 4 documentation changes.
+1. [x] Build `db-models`.
+2. [x] Run the ops type check.
+3. [x] Run the complete ops test suite.
+4. [x] Build ops.
+5. [x] Fix failures and repeat all checks.
+6. [x] Check off completed Phase 4 tasks.
+7. [x] Stage only Phase 4 documentation changes.
 8. [ ] Commit using repository guidance and reference Phase 4 of this todo in the commit body.
 
 ## Phase 5: Final Regression and Handoff

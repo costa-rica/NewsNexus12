@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-05T22:11:53Z
-updated_at: 2026-10-05T23:14:59Z
+updated_at: 2026-10-06T17:14:10Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -77,6 +77,9 @@ Weekly-flow-02 currently implements:
 - `--continue-run ID` targets that exact eligible run.
 - Runs stopped during Phases 1–3 are replaced rather than continued.
 - Runs past Phase 3 can continue through exactly 72 hours from the original `runStartedAt`.
+- Default continuation inside that window, `--continue-run`, and `--continue-run ID` may each revisit incomplete Phase 6 repeatedly.
+- Explicit continuation retains its existing ability to select an eligible older run; it does not bypass completed or Phase 1–3 eligibility checks.
+- An unsuccessful invocation exits. It never reinvokes the coordinator or consumes future continuation eligibility.
 - Completed Phase 4, Phase 5, and Phase 6 results are reused without restarting their worker jobs.
 - Preserve the original run ID, start time, Phase 4 high-water marks, first RSS IDs, and finalized `articleCount` during continuation.
 
@@ -89,6 +92,8 @@ Weekly-flow-02 currently implements:
 - A leftover lock file does not prove that a process is active; the kernel-held lock is authoritative.
 - After forcibly terminating a run, verify that any db-manager child process has ended before retrying.
 - A future systemd unit must treat 75 as an expected no-op and preserve process-group termination.
+- A future systemd service must not use `Restart=on-failure`, `Restart=always`, or another automatic restart policy.
+- Continuation after failure requires another timer trigger or a deliberate operator command.
 
 ## Phase 4 Worker Contract
 
@@ -149,11 +154,13 @@ Ops cannot infer semantic zero work or prove per-Article scoring coverage. A val
 
 Phase 6 replacement rules:
 
-1. A failed, canceled, unavailable, or inactive monitoring-limited saved job can be replaced once in an invocation.
+1. A failed, canceled, unavailable, inactive monitoring-limited, or inactive incompatible saved job can be replaced on a later eligible invocation.
 2. A saved active job is monitored rather than replaced.
 3. A job started or canceled during the current invocation is not replaced in that invocation.
 4. A Phase 6 start without a saved job ID is an accepted persistence gap eligible for one start.
 5. Replacements perform a new full newest-first selection and can spend additional AI work on older eligible Articles.
+6. Start at most one new state-assigner job per invocation, with no lifetime limit on later valid continuation invocations.
+7. Malformed, identity-mismatched, ambiguously active, or otherwise unverified jobs are not replacement-eligible.
 
 Phase 6 monitoring-limit rules:
 
@@ -167,13 +174,13 @@ Phase 6 monitoring-limit rules:
 Phase 6 incompatible-contract rules:
 
 1. Missing required queue parameters use the dedicated incompatible-contract path.
-2. Persist the source identity and missing fields before canceling an active job.
-3. Never trust the incompatible source result.
-4. Permit one marked replacement after the source is inactive or unavailable.
-5. Save the replacement job ID and consumed marker atomically.
-6. Stop immediately if that persistence write fails. A later duplicate start remains an accepted gap.
-7. Cancel an incompatible marked replacement when active and never start a second recovery replacement.
-8. Allow a compatible marked replacement to complete only after the full contract validates.
+2. Persist every incompatible attempt by exact job ID plus validated `createdAt`, with its missing fields, before cancellation or terminal exit.
+3. Merge repeated observations of the same exact identity instead of appending duplicates.
+4. Never trust a result from an exact incompatible identity.
+5. Cancel active incompatible jobs and verify inactivity or unavailability before later replacement.
+6. End the invocation after a newly started or newly canceled incompatible job.
+7. A later continuation may start another job regardless of incompatible-attempt history length.
+8. Allow a compatible current job to complete after the full contract validates.
 
 ## Persistence Rules
 
@@ -188,7 +195,9 @@ Phase 6 incompatible-contract rules:
 - Persist immutable Phase 6 inputs before starting worker-node and validate the audit mirror on every Phase 6 write.
 - Persist `stateAssignerJobId` immediately after a successful start response.
 - Store ordinary Phase 6 observations under `phaseData.phase6.latestProgress`.
-- Preserve Phase 6 monitoring and incompatible-contract markers through ordinary progress writes.
+- Parse and normalize legacy Phase 6 recovery state through `phaseSixRecoveryState.ts`.
+- Store incompatible-contract recovery as compact V06 attempt history and preserve it through every Phase 6 write.
+- Use the protected continuation-start persistence operation for every Phase 6 replacement reason.
 - Record Phase 6 failures with `phase: 6` and leave Phase 5 complete.
 
 ## Schema Rollout
@@ -218,5 +227,5 @@ Phase 6 incompatible-contract rules:
 - `docs/weekly-article-pipeline-v02/20261003_weekly_flow_02_persistence_plan_v03.md`
 - `docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_plan_v03.md`
 - `docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_todo_v02.md`
-- `docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_plan_v04.md`
-- `docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_todo_v01.md`
+- `docs/weekly-article-pipeline-v02/20261006_ops_state_assignment_plan_v06.md`
+- `docs/weekly-article-pipeline-v02/20261006_ops_state_assignment_todo_v03.md`

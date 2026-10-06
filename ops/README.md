@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-05T23:14:59Z
+updated_at: 2026-10-06T17:14:10Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -76,6 +76,10 @@ sudo -u limited_user -H sh -c 'npm run weekly-flow-02:start --workspace newsnexu
 - Run commands from the repository root after building ops.
 - This workflow performs real database deletion and queue work. Do not use it as a smoke test.
 - `--continue-run RUN_ID` requires a positive integer ID from `WeeklyArticleFlowRuns02`.
+- With no arguments, an incomplete run past Phase 3 is continued repeatedly while it remains inside the 72-hour window.
+- `--continue-run` may be issued repeatedly for the latest eligible incomplete run, including after 72 hours.
+- `--continue-run RUN_ID` may be issued repeatedly for that exact eligible incomplete run, including after 72 hours. Explicit continuation does not bypass completion or the Phase 1–3 replacement rules.
+- Continuation eligibility is not consumed by an unsuccessful Phase 6 attempt.
 - A successful positive-work run stops at the Phase 7 boundary and remains incomplete for the later phases.
 - Logs use the directory configured in `ops/.env`; durable progress is stored in `WeeklyArticleFlowRuns02`.
 - Phase 5 can monitor semantic scoring for up to six hours before exiting nonzero for operator review.
@@ -127,18 +131,25 @@ Monitoring behavior:
 
 Incompatible-worker recovery applies when a queue record lacks one or both required parameters.
 
-1. Save the incompatible source identity and missing fields.
-2. Cancel an active source and verify that it becomes inactive or unavailable.
-3. Do not replace a job in the invocation that started or canceled it.
-4. Permit one marked replacement on a later eligible continuation.
-5. Stop permanently without another recovery replacement when the marked replacement is also incompatible.
+1. Save each incompatible identity as the exact worker job ID plus its validated `createdAt`, along with the missing fields.
+2. Cancel an active incompatible job and verify that it becomes inactive or unavailable.
+3. End the invocation after a newly started or newly canceled incompatible job.
+4. Permit a later eligible continuation after verified inactivity, regardless of how many earlier attempts are recorded.
+5. Allow a compatible current job to complete unless its exact ID and `createdAt` match an incompatible or monitoring-limited record.
+
+Phase 6 may start at most one new state-assigner job in each coordinator invocation. There is no lifetime cap on valid continuation invocations or replacement jobs.
 
 Every replacement performs a new full newest-first selection. It does not resume only unfinished Articles.
 
 - Existing state assignments are excluded by the worker's normal selection rule.
-- A replacement can spend additional AI calls and select older eligible Articles beyond the original intended position window.
+- Repeated attempts can spend additional AI calls.
+- New Articles and earlier successful assignments can shift the newest-first selection between attempts, so a later attempt may select a different eligible set.
 - This applies to monitoring-limit, incompatible-contract, and missing-saved-job recovery.
-- If a replacement starts but its ID cannot be saved atomically, the invocation stops. A later continuation may start another replacement because that accepted gap has no queue-search or deduplication recovery.
+- If a continuation job starts but its ID cannot be saved atomically, the invocation stops for investigation. The worker job may be running without a durable coordinator identity.
+
+Malformed parameters, invalid or mismatched identity timestamps, ambiguous cancellation, and other unverified worker outcomes are not replacement-eligible. Inspect the saved run, worker queue, and logs before continuing.
+
+A failed invocation does not restart itself. Continuation requires a later timer trigger or a deliberate operator command. Any future systemd service must not use `Restart=on-failure`, `Restart=always`, or another automatic restart policy.
 
 Use `WeeklyArticleFlowRuns02.stateAssignerJobId`, the queue record's two parameters, and coordinator logs to correlate a Phase 6 attempt. Do not infer success from a start response or an unvalidated terminal status.
 
@@ -174,6 +185,6 @@ ops/
 - [Weekly pipeline requirements](../docs/weekly-article-pipeline-v02/20261003_weekly_combined_flow_prd_v10.md)
 - [Semantic scoring implementation plan](../docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_plan_v03.md)
 - [Semantic scoring implementation checklist](../docs/weekly-article-pipeline-v02/20261005_ops_semantic_scoring_todo_v02.md)
-- [State assignment implementation plan](../docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_plan_v04.md)
-- [State assignment implementation checklist](../docs/weekly-article-pipeline-v02/20261005_ops_state_assignment_todo_v01.md)
+- [State assignment continuation plan](../docs/weekly-article-pipeline-v02/20261006_ops_state_assignment_plan_v06.md)
+- [State assignment continuation checklist](../docs/weekly-article-pipeline-v02/20261006_ops_state_assignment_todo_v03.md)
 - [Ops agent instructions](AGENTS.md)
