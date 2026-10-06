@@ -33,8 +33,13 @@ export interface DatabaseBackupResult {
 
 function getModelRegistry(): ModelRegistry {
   const registry: ModelRegistry = {};
+  // Excluded models (e.g. ArticleEmbedding) are regenerated after import, not backed up.
+  const excludedModels = new Set<string>(db.BACKUP_EXCLUDED_MODELS ?? []);
 
   for (const [name, value] of Object.entries(db)) {
+    if (excludedModels.has(name)) {
+      continue;
+    }
     if (value && typeof (value as { findAll?: Function }).findAll === "function") {
       registry[name] = value as { findAll: Function };
     }

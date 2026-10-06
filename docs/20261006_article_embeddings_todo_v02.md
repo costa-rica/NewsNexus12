@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:45:13Z
+updated_at: 2026-10-06T22:46:55Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -65,14 +65,14 @@ Plan: Component 1.
 
 Plan: Component 2.
 
-- [ ] `db-manager/src/modules/backup.ts`: in `createDatabaseBackupZipFile`, skip any model in `BACKUP_EXCLUDED_MODELS`. Add no CSV and no manifest entry for it.
-- [ ] `api/src/modules/adminDb` `createDatabaseBackupZipFile`: skip the same models.
-- [ ] Confirm `db-manager/src/modules/zipImport.ts` needs no change: a missing `ArticleEmbedding.csv` is skipped by the `MODEL_LOAD_ORDER` loop.
-- [ ] Tests, db-manager `tests/modules/backup.test.ts`: an excluded model in the mocked registry produces no CSV and no manifest entry. Update the existing model-count assertion only if the mock registry changes.
-- [ ] Tests, db-manager `tests/modules/zipImport.test.ts`: a zip without `ArticleEmbedding.csv` imports successfully.
-- [ ] Tests, api `tests/modules/adminDb.module.test.ts`: the backup skips excluded models.
-- [ ] End-of-phase checks for db-manager and api.
-- [ ] Check off tasks and commit.
+- [x] `db-manager/src/modules/backup.ts`: in `createDatabaseBackupZipFile`, skip any model in `BACKUP_EXCLUDED_MODELS`. Add no CSV and no manifest entry for it.
+- [x] `api/src/modules/adminDb` `createDatabaseBackupZipFile`: skip the same models.
+- [x] Confirm `db-manager/src/modules/zipImport.ts` needs no change: a missing `ArticleEmbedding.csv` is skipped by the `MODEL_LOAD_ORDER` loop.
+- [x] Tests, db-manager `tests/modules/backup.test.ts`: an excluded model in the mocked registry produces no CSV and no manifest entry. Update the existing model-count assertion only if the mock registry changes.
+- [x] Tests, db-manager `tests/modules/zipImport.test.ts`: a zip without `ArticleEmbedding.csv` imports successfully.
+- [x] Tests, api `tests/modules/adminDb.module.test.ts`: the backup skips excluded models.
+- [x] End-of-phase checks for db-manager and api.
+- [x] Check off tasks and commit.
 
 ## Phase 3: worker-python Embeddings Module
 

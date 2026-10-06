@@ -8,6 +8,7 @@ const modelNames = [
   "ArticleContents02",
   "Article",
   "Prompt",
+  "ArticleEmbedding",
 ];
 
 const dbMock: Record<string, any> = {
@@ -16,6 +17,7 @@ const dbMock: Record<string, any> = {
   },
   initModels: jest.fn(),
   helperValue: "not-a-model",
+  BACKUP_EXCLUDED_MODELS: ["ArticleEmbedding"],
 };
 
 for (const name of modelNames) {
@@ -49,6 +51,28 @@ describe("adminDb module", () => {
 
     expect(dbMock.ArticleContents02.findAll).toHaveBeenCalledWith({ raw: true });
     expect(dbMock.Article.findAll).toHaveBeenCalledWith({ raw: true });
+    expect(zipFilePath).toContain("db_backup_");
+
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  });
+
+  test("createDatabaseBackupZipFile skips models in BACKUP_EXCLUDED_MODELS", async () => {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "api-admin-db-backup-"));
+    process.env.PATH_DB_BACKUPS = tempDir;
+    dbMock.ArticleEmbedding.findAll.mockResolvedValue([
+      { id: 1, articleId: 10, embedding: Buffer.from([1, 2, 3]) },
+    ]);
+
+    const { createDatabaseBackupZipFile } = await import("../../src/modules/adminDb");
+
+    const zipFilePath = await createDatabaseBackupZipFile();
+
+    // The excluded model is never read, so it cannot be written to a CSV.
+    expect(dbMock.ArticleEmbedding.findAll).not.toHaveBeenCalled();
+    expect(dbMock.ArticleContents02.findAll).toHaveBeenCalledWith({ raw: true });
     expect(zipFilePath).toContain("db_backup_");
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });

@@ -46,8 +46,13 @@ async function createDatabaseBackupZipFile(suffix = ""): Promise<string> {
 
     let hasData = false;
     const models = getModelRegistry();
+    // Excluded models (e.g. ArticleEmbedding) are regenerated after import, not backed up.
+    const excludedModels = new Set<string>(db.BACKUP_EXCLUDED_MODELS ?? []);
 
     for (const tableName in models) {
+      if (excludedModels.has(tableName)) {
+        continue;
+      }
       if (models.hasOwnProperty(tableName)) {
         const records = await models[tableName].findAll({ raw: true });
         if (records.length === 0) continue;

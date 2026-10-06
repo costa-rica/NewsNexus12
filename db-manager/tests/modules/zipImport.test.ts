@@ -39,6 +39,13 @@ jest.mock("@newsnexus/db-models", () => ({
       status: { type: { key: "STRING" }, allowNull: false },
     },
   },
+  ArticleEmbedding: {
+    bulkCreate: jest.fn(),
+    rawAttributes: {
+      id: { type: { key: "INTEGER" } },
+      articleId: { type: { key: "INTEGER" } },
+    },
+  },
   sequelize: {
     query: jest.fn(),
     sync: jest.fn(),
@@ -50,6 +57,7 @@ jest.mock("@newsnexus/db-models", () => ({
     "NewsApiRequest",
     "AiApproverRunV02",
     "Article",
+    "ArticleEmbedding",
     "User",
   ],
   resetAllSequences: jest.fn(),
@@ -373,6 +381,22 @@ describe("Zip import module", () => {
         { ignoreDuplicates: true, transaction: {} },
       );
       expect(db.resetAllSequences).toHaveBeenCalled();
+    });
+
+    it("imports a backup without ArticleEmbedding.csv and leaves that table empty", async () => {
+      const zipPath = path.join(tempDir, "no-embeddings.zip");
+      const zip = new AdmZip();
+      zip.addFile("Article.csv", Buffer.from("id,title\n1,Article 1"));
+      zip.writeZip(zipPath);
+
+      (db.Article.bulkCreate as jest.Mock).mockResolvedValue(null);
+      (db.sequelize.query as jest.Mock).mockResolvedValue(null);
+
+      const result = await importZipFileToDatabase(zipPath);
+
+      expect(result.importedTables).toEqual(["Article"]);
+      expect(result.skippedFiles).toEqual([]);
+      expect(db.ArticleEmbedding.bulkCreate).not.toHaveBeenCalled();
     });
 
     it("imports retained data and skips removed files from an old backup", async () => {

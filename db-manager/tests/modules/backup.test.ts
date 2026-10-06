@@ -24,6 +24,11 @@ jest.mock("@newsnexus/db-models", () => ({
   AiApproverArticlePredictionV02: {
     findAll: jest.fn(),
   },
+  // Excluded from backups through BACKUP_EXCLUDED_MODELS
+  ArticleEmbedding: {
+    findAll: jest.fn(),
+  },
+  BACKUP_EXCLUDED_MODELS: ["ArticleEmbedding"],
   // Add a non-model export to test filtering
   sequelize: {},
   initModels: jest.fn(),
@@ -222,6 +227,23 @@ describe("Backup module", () => {
         byteSize: null,
         sha256: null,
       });
+    });
+
+    it("skips models listed in BACKUP_EXCLUDED_MODELS", async () => {
+      (db.Article.findAll as jest.Mock).mockResolvedValue([{ id: 1, title: "Article 1" }]);
+      (db.ArticleApproved.findAll as jest.Mock).mockResolvedValue([]);
+      (db.User.findAll as jest.Mock).mockResolvedValue([]);
+      (db.ArticleEmbedding.findAll as jest.Mock).mockResolvedValue([
+        { id: 1, articleId: 1, embedding: Buffer.from([1, 2, 3]) },
+      ]);
+
+      const { backupPath } = await createDatabaseBackupZipFile();
+      const entryNames = new AdmZip(backupPath).getEntries().map((entry) => entry.entryName);
+      const manifest = readManifest(backupPath);
+
+      expect(db.ArticleEmbedding.findAll).not.toHaveBeenCalled();
+      expect(entryNames.some((name) => name.endsWith("ArticleEmbedding.csv"))).toBe(false);
+      expect(manifest.models.map((entry) => entry.modelName)).not.toContain("ArticleEmbedding");
     });
 
     it("includes AI Approver V02 models discovered through package exports", async () => {
