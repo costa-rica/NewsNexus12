@@ -8,10 +8,13 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from src.modules.article_embeddings import ArticleEmbeddingService, EmbeddingSyncMode
 from src.modules.deduper.config import DeduperConfig
+from src.modules.deduper.embedding_service import build_embedding_service
 from src.modules.deduper.errors import DeduperProcessorError
 from src.modules.deduper.processors.content_hash import ContentHashProcessor
 from src.modules.deduper.processors.embedding import EmbeddingProcessor
+from src.modules.deduper.processors.embedding_sync import EmbeddingSyncProcessor
 from src.modules.deduper.processors.load import LoadProcessor
 from src.modules.deduper.processors.states import StatesProcessor
 from src.modules.deduper.processors.url_check import UrlCheckProcessor
@@ -48,13 +51,27 @@ class DeduperOrchestrator:
         return ContentHashProcessor(self.repository, self.config).execute()
 
     def run_embedding(self) -> dict[str, Any]:
-        return EmbeddingProcessor(self.repository, self.config).execute()
+        return EmbeddingProcessor(
+            self.repository,
+            self.config,
+            embedding_service=self._build_embedding_service(),
+        ).execute()
+
+    def _build_embedding_service(self) -> ArticleEmbeddingService:
+        # One service per run, shared by the sync and scoring steps. It borrows
+        # this orchestrator's repository connection and never closes it.
+        return build_embedding_service(self.repository)
+
+    @staticmethod
+    def _sync_mode(rebuild_embeddings: bool) -> EmbeddingSyncMode:
+        return EmbeddingSyncMode.REBUILD if rebuild_embeddings else EmbeddingSyncMode.INCREMENTAL
 
     def run_analyze(
         self,
         report_id: int | None = None,
         should_cancel: Callable[[], bool] | None = None,
         clear_first: bool = True,
+        rebuild_embeddings: bool = False,
     ) -> PipelineSummary:
         summary = self.new_summary(PipelineRunMode.ANALYZE)
         summary.report_id = report_id
@@ -62,6 +79,8 @@ class DeduperOrchestrator:
 
         if clear_first:
             self.run_clear_table(skip_confirmation=True)
+        embedding_service = self._build_embedding_service()
+        sync_mode = self._sync_mode(rebuild_embeddings)
         steps = [
             (
                 PipelineStep.LOAD,
@@ -89,10 +108,21 @@ class DeduperOrchestrator:
                 ),
             ),
             (
+                PipelineStep.EMBEDDING_SYNC,
+                lambda: EmbeddingSyncProcessor(
+                    self.repository,
+                    self.config,
+                    embedding_service=embedding_service,
+                    mode=sync_mode,
+                ).execute(should_cancel=should_cancel),
+            ),
+            (
                 PipelineStep.EMBEDDING,
-                lambda: EmbeddingProcessor(self.repository, self.config).execute(
-                    should_cancel=should_cancel
-                ),
+                lambda: EmbeddingProcessor(
+                    self.repository,
+                    self.config,
+                    embedding_service=embedding_service,
+                ).execute(should_cancel=should_cancel),
             ),
         ]
 
@@ -104,6 +134,7 @@ class DeduperOrchestrator:
         report_id: int | None = None,
         should_cancel: Callable[[], bool] | None = None,
         clear_first: bool = True,
+        rebuild_embeddings: bool = False,
     ) -> PipelineSummary:
         summary = self.new_summary(PipelineRunMode.ANALYZE_FAST)
         summary.report_id = report_id
@@ -111,6 +142,8 @@ class DeduperOrchestrator:
 
         if clear_first:
             self.run_clear_table(skip_confirmation=True)
+        embedding_service = self._build_embedding_service()
+        sync_mode = self._sync_mode(rebuild_embeddings)
         steps = [
             (
                 PipelineStep.LOAD,
@@ -132,10 +165,21 @@ class DeduperOrchestrator:
                 ),
             ),
             (
+                PipelineStep.EMBEDDING_SYNC,
+                lambda: EmbeddingSyncProcessor(
+                    self.repository,
+                    self.config,
+                    embedding_service=embedding_service,
+                    mode=sync_mode,
+                ).execute(should_cancel=should_cancel),
+            ),
+            (
                 PipelineStep.EMBEDDING,
-                lambda: EmbeddingProcessor(self.repository, self.config).execute(
-                    should_cancel=should_cancel
-                ),
+                lambda: EmbeddingProcessor(
+                    self.repository,
+                    self.config,
+                    embedding_service=embedding_service,
+                ).execute(should_cancel=should_cancel),
             ),
         ]
 

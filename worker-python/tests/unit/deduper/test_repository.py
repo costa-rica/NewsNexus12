@@ -230,8 +230,6 @@ def test_content_hash_and_embedding_flows(repo: DeduperRepository) -> None:
     assert len(with_content) == 1
     assert with_content[0]["headlineNew"] == "H1"
 
-    assert repo.get_article_content(1) == "Text one"
-
     ch_updated = repo.update_analysis_content_hash_batch(
         [{"id": content_candidates[0]["id"], "contentHash": 0.92}]
     )
@@ -240,7 +238,7 @@ def test_content_hash_and_embedding_flows(repo: DeduperRepository) -> None:
     content_stats = repo.get_content_hash_processing_stats()
     assert content_stats["high_similarity_count"] == 1
 
-    emb_candidates = repo.get_analysis_records_for_embedding_update()
+    emb_candidates = repo.get_analysis_records_for_embedding_update_page(after_id=0, limit=10)
     assert len(emb_candidates) == 1
 
     emb_updated = repo.update_analysis_embedding_batch(

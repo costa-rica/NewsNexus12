@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-06T22:42:41Z
-updated_at: 2026-10-06T22:55:01Z
+updated_at: 2026-10-06T22:59:09Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -159,44 +159,44 @@ Plan: Component 4, "Bulk score writes" and "Scoring, page by page".
 
 Plan: Component 4, "New pipeline step" and "EmbeddingProcessor changes", plus "Cancellation mapping".
 
-- [ ] Add `PipelineStep.EMBEDDING_SYNC = "embedding_sync"` in `deduper/types.py`.
-- [ ] Connection ownership in deduper jobs:
-  - [ ] Build the `ArticleEmbeddingRepository` in borrowed mode from the job's `DeduperRepository` (`connection_provider=repository.get_connection`), in the orchestrator or a small factory it calls. Do not build it inside each processor.
-  - [ ] Pass one `ArticleEmbeddingService` to both `EmbeddingSyncProcessor` and `EmbeddingProcessor`.
-  - [ ] `JobManager` keeps closing only `DeduperRepository` in its existing `finally`. That one close also releases the connection the embeddings repository borrowed.
-- [ ] Create `deduper/processors/embedding_sync.py` with `EmbeddingSyncProcessor`:
-  - [ ] Skip with the same result shape as `EmbeddingProcessor` when `enable_embedding` is false.
-  - [ ] Call `ArticleEmbeddingService.sync(mode, should_cancel)` and return `summary.to_dict()`.
-  - [ ] Catch `ArticleEmbeddingsCancelledError` and raise `DeduperProcessorError("Embedding sync cancelled")`.
-- [ ] Orchestrator, `deduper/orchestrator.py`:
-  - [ ] Add `rebuild_embeddings: bool = False` to `run_analyze` and `run_analyze_fast`.
-  - [ ] Insert the `EMBEDDING_SYNC` step before `EMBEDDING` in both.
-  - [ ] Map false to `INCREMENTAL` and true to `REBUILD`.
-- [ ] Rewrite `EmbeddingProcessor.execute`:
-  - [ ] Keep the disabled-embedding skip and the missing-dependency error.
-  - [ ] Empty analysis table: if `get_analysis_article_ids()` returns no IDs, return the existing empty result (`processed: 0`, `status: "ok"` and zero similarity counts) without calling `ensure_embeddings` or loading the model. This matches today's early return when there are no records.
-  - [ ] Setup: `get_analysis_article_ids()`, then one `ensure_embeddings(ids, should_cancel)` call wrapped to convert `ArticleEmbeddingsCancelledError` into `DeduperProcessorError("Embedding processor cancelled")`.
-  - [ ] Scoring rules: both IDs missing from the dictionary gives 1.0, one missing gives 0.0, otherwise `np.dot` clamped to [0, 1].
-  - [ ] Page with `get_analysis_records_for_embedding_update_page` using `batch_size_embedding`. Write each page with `update_analysis_embedding_batch` before reading the next.
-  - [ ] Check `should_cancel` between pages and raise `DeduperProcessorError("Embedding processor cancelled")`.
-  - [ ] Return `get_embedding_processing_stats()` plus `processed` and `status`, as today.
-- [ ] Remove the processor's per-pair `get_article_content` calls, `embedding_cache`, `_set_cache`, `_get_or_compute_embedding`, `_load_model` and `_preprocess_text`.
-- [ ] Remove `get_analysis_records_for_embedding_update` from the repository if a search finds no other callers. Keep `get_article_content` only if something else still uses it.
-- [ ] Keep `DEDUPER_CACHE_MAX_ENTRIES` in use by the content hash processor.
-- [ ] Tests, `tests/unit/deduper/test_processors.py` and `test_orchestrator.py`:
-  - [ ] `test_embedding_processor_with_fake_model` still passes. Update its setup only to add the `ArticleEmbeddings` DDL and the fake encoder hook.
-  - [ ] Stored-embedding scores equal on-the-fly scores for the same fixtures.
-  - [ ] Fallback: an article with text but no stored row is encoded and scored.
-  - [ ] Cancellation during `ensure_embeddings()` raises `DeduperProcessorError`.
-  - [ ] With a page size smaller than the record count, every record is scored exactly once.
-  - [ ] Rows that score 0 are not read again.
-  - [ ] A spy on `update_analysis_embedding_batch` sees several calls, none larger than the page size.
-  - [ ] `EmbeddingSyncProcessor` returns a dictionary with `processed`, and converts a module cancel to `DeduperProcessorError`.
-  - [ ] Orchestrator: `embedding_sync` runs before `embedding` in both modes, is skipped when embedding is disabled, and a cancel during sync marks the run cancelled.
-  - [ ] Empty analysis table: `EmbeddingProcessor` returns `processed: 0`, loads no model and runs no query against `ArticleEmbeddings`.
-  - [ ] Connection ownership: after a deduper run, no extra pool is left open. Both processors used the `DeduperRepository` connection, and `DeduperRepository.close()` is the only close. Check this with a spy on `ConnectionPool` creation, or by asserting the embeddings repository is in borrowed mode.
-- [ ] End-of-phase checks for worker-python.
-- [ ] Check off tasks and commit.
+- [x] Add `PipelineStep.EMBEDDING_SYNC = "embedding_sync"` in `deduper/types.py`.
+- [x] Connection ownership in deduper jobs:
+  - [x] Build the `ArticleEmbeddingRepository` in borrowed mode from the job's `DeduperRepository` (`connection_provider=repository.get_connection`), in the orchestrator or a small factory it calls. Do not build it inside each processor.
+  - [x] Pass one `ArticleEmbeddingService` to both `EmbeddingSyncProcessor` and `EmbeddingProcessor`.
+  - [x] `JobManager` keeps closing only `DeduperRepository` in its existing `finally`. That one close also releases the connection the embeddings repository borrowed.
+- [x] Create `deduper/processors/embedding_sync.py` with `EmbeddingSyncProcessor`:
+  - [x] Skip with the same result shape as `EmbeddingProcessor` when `enable_embedding` is false.
+  - [x] Call `ArticleEmbeddingService.sync(mode, should_cancel)` and return `summary.to_dict()`.
+  - [x] Catch `ArticleEmbeddingsCancelledError` and raise `DeduperProcessorError("Embedding sync cancelled")`.
+- [x] Orchestrator, `deduper/orchestrator.py`:
+  - [x] Add `rebuild_embeddings: bool = False` to `run_analyze` and `run_analyze_fast`.
+  - [x] Insert the `EMBEDDING_SYNC` step before `EMBEDDING` in both.
+  - [x] Map false to `INCREMENTAL` and true to `REBUILD`.
+- [x] Rewrite `EmbeddingProcessor.execute`:
+  - [x] Keep the disabled-embedding skip and the missing-dependency error.
+  - [x] Empty analysis table: if `get_analysis_article_ids()` returns no IDs, return the existing empty result (`processed: 0`, `status: "ok"` and zero similarity counts) without calling `ensure_embeddings` or loading the model. This matches today's early return when there are no records.
+  - [x] Setup: `get_analysis_article_ids()`, then one `ensure_embeddings(ids, should_cancel)` call wrapped to convert `ArticleEmbeddingsCancelledError` into `DeduperProcessorError("Embedding processor cancelled")`.
+  - [x] Scoring rules: both IDs missing from the dictionary gives 1.0, one missing gives 0.0, otherwise `np.dot` clamped to [0, 1].
+  - [x] Page with `get_analysis_records_for_embedding_update_page` using `batch_size_embedding`. Write each page with `update_analysis_embedding_batch` before reading the next.
+  - [x] Check `should_cancel` between pages and raise `DeduperProcessorError("Embedding processor cancelled")`.
+  - [x] Return `get_embedding_processing_stats()` plus `processed` and `status`, as today.
+- [x] Remove the processor's per-pair `get_article_content` calls, `embedding_cache`, `_set_cache`, `_get_or_compute_embedding`, `_load_model` and `_preprocess_text`.
+- [x] Remove `get_analysis_records_for_embedding_update` from the repository if a search finds no other callers. Keep `get_article_content` only if something else still uses it.
+- [x] Keep `DEDUPER_CACHE_MAX_ENTRIES` in use by the content hash processor.
+- [x] Tests, `tests/unit/deduper/test_processors.py` and `test_orchestrator.py`:
+  - [x] `test_embedding_processor_with_fake_model` still passes. Update its setup only to add the `ArticleEmbeddings` DDL and the fake encoder hook.
+  - [x] Stored-embedding scores equal on-the-fly scores for the same fixtures.
+  - [x] Fallback: an article with text but no stored row is encoded and scored.
+  - [x] Cancellation during `ensure_embeddings()` raises `DeduperProcessorError`.
+  - [x] With a page size smaller than the record count, every record is scored exactly once.
+  - [x] Rows that score 0 are not read again.
+  - [x] A spy on `update_analysis_embedding_batch` sees several calls, none larger than the page size.
+  - [x] `EmbeddingSyncProcessor` returns a dictionary with `processed`, and converts a module cancel to `DeduperProcessorError`.
+  - [x] Orchestrator: `embedding_sync` runs before `embedding` in both modes, is skipped when embedding is disabled, and a cancel during sync marks the run cancelled.
+  - [x] Empty analysis table: `EmbeddingProcessor` returns `processed: 0`, loads no model and runs no query against `ArticleEmbeddings`.
+  - [x] Connection ownership: after a deduper run, no extra pool is left open. Both processors used the `DeduperRepository` connection, and `DeduperRepository.close()` is the only close. Check this with a spy on `ConnectionPool` creation, or by asserting the embeddings repository is in borrowed mode.
+- [x] End-of-phase checks for worker-python.
+- [x] Check off tasks and commit.
 
 ## Phase 6: Routes and Job Runners
 

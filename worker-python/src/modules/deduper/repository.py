@@ -318,18 +318,6 @@ class DeduperRepository:
             (limit,),
         )
 
-    def get_article_content(self, article_id: int) -> str | None:
-        rows = self.execute_query(
-            """
-            SELECT "textForPdfReport"
-            FROM "ArticleApproveds"
-            WHERE "articleId" = %s AND "isApproved" = TRUE
-            LIMIT 1
-            """,
-            (article_id,),
-        )
-        return rows[0]["textForPdfReport"] if rows else None
-
     def update_analysis_content_hash_batch(self, updates: list[dict[str, Any]]) -> int:
         if not updates:
             return 0
@@ -353,15 +341,6 @@ class DeduperRepository:
         }
 
         return self._count_queries(queries)
-
-    def get_analysis_records_for_embedding_update(self) -> list[dict[str, Any]]:
-        return self.execute_query(
-            """
-            SELECT id, "articleIdNew", "articleIdApproved"
-            FROM "ArticleDuplicateAnalyses"
-            WHERE "embeddingSearch" = 0
-            """
-        )
 
     def get_analysis_records_for_embedding_update_page(
         self, after_id: int, limit: int

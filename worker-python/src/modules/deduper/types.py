@@ -12,6 +12,7 @@ class PipelineStep(StrEnum):
     STATES = "states"
     URL_CHECK = "url_check"
     CONTENT_HASH = "content_hash"
+    EMBEDDING_SYNC = "embedding_sync"
     EMBEDDING = "embedding"
 
 
