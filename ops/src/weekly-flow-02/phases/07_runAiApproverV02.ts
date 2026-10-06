@@ -66,6 +66,41 @@ const timestamp = (value: unknown, field: string): string => {
   return value;
 };
 
+const optionalTimestamp = (value: unknown, field: string): string | undefined =>
+  value === undefined ? undefined : timestamp(value, field);
+
+const optionalString = (value: unknown, field: string): string | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new RunAiApproverV02Error('invalid_run_state', `${field} must be a non-empty string`);
+  }
+  return value;
+};
+
+const optionalCounts = (value: unknown, field: string): JsonRecord | undefined => {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    throw new RunAiApproverV02Error('invalid_run_state', `${field} must be an object`);
+  }
+  for (const name of [
+    'plannedEligibleCount',
+    'attemptedCount',
+    'completedCount',
+    'failedCount',
+    'invalidResponseCount',
+    'skippedCount'
+  ]) {
+    const count = value[name];
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+      throw new RunAiApproverV02Error(
+        'invalid_run_state',
+        `${field}.${name} must be a non-negative safe integer`
+      );
+    }
+  }
+  return structuredClone(value);
+};
+
 const phaseSevenState = (run: WeeklyFlowRunRecord): PhaseSevenState => {
   if (!isRecord(run.phaseData.phase7)) {
     throw new RunAiApproverV02Error('invalid_run_state', 'Phase 7 state is missing');
@@ -90,21 +125,92 @@ const phaseSevenState = (run: WeeklyFlowRunRecord): PhaseSevenState => {
     if (!isRecord(raw)) {
       throw new RunAiApproverV02Error('invalid_run_state', `Phase 7 attempt ${index} is invalid`);
     }
+    const previewCreatedAt = timestamp(raw.previewCreatedAt, `attempts[${index}].previewCreatedAt`);
+    const previewExpiresAt = timestamp(raw.previewExpiresAt, `attempts[${index}].previewExpiresAt`);
+    if (Date.parse(previewExpiresAt) <= Date.parse(previewCreatedAt)) {
+      throw new RunAiApproverV02Error(
+        'invalid_run_state',
+        `attempts[${index}] preview expiration is invalid`
+      );
+    }
+    const plannedEligibleCount = positiveInteger(
+      raw.plannedEligibleCount,
+      `attempts[${index}].plannedEligibleCount`
+    );
+    if (plannedEligibleCount > articleCount) {
+      throw new RunAiApproverV02Error(
+        'invalid_run_state',
+        `attempts[${index}] planned count exceeds articleCount`
+      );
+    }
+    const acceptedObservedAt = optionalTimestamp(
+      raw.acceptedObservedAt,
+      `attempts[${index}].acceptedObservedAt`
+    );
+    const queueCreatedAt = optionalTimestamp(
+      raw.queueCreatedAt,
+      `attempts[${index}].queueCreatedAt`
+    );
+    const monitoringLimitedAt = optionalTimestamp(
+      raw.monitoringLimitedAt,
+      `attempts[${index}].monitoringLimitedAt`
+    );
+    const cancellationRequestedAt = optionalTimestamp(
+      raw.cancellationRequestedAt,
+      `attempts[${index}].cancellationRequestedAt`
+    );
+    const inactiveVerifiedAt = optionalTimestamp(
+      raw.inactiveVerifiedAt,
+      `attempts[${index}].inactiveVerifiedAt`
+    );
+    if (
+      (acceptedObservedAt && Date.parse(acceptedObservedAt) < Date.parse(previewCreatedAt)) ||
+      (monitoringLimitedAt && queueCreatedAt && Date.parse(monitoringLimitedAt) < Date.parse(queueCreatedAt)) ||
+      (cancellationRequestedAt && monitoringLimitedAt && Date.parse(cancellationRequestedAt) < Date.parse(monitoringLimitedAt)) ||
+      (inactiveVerifiedAt && cancellationRequestedAt && Date.parse(inactiveVerifiedAt) < Date.parse(cancellationRequestedAt))
+    ) {
+      throw new RunAiApproverV02Error(
+        'invalid_run_state',
+        `attempts[${index}] chronology is invalid`
+      );
+    }
     return {
-      ...(structuredClone(raw) as unknown as PhaseSevenAttempt),
       v02RunId: positiveInteger(raw.v02RunId, `attempts[${index}].v02RunId`),
-      previewCreatedAt: timestamp(raw.previewCreatedAt, `attempts[${index}].previewCreatedAt`),
-      previewExpiresAt: timestamp(raw.previewExpiresAt, `attempts[${index}].previewExpiresAt`),
-      plannedEligibleCount: positiveInteger(
-        raw.plannedEligibleCount,
-        `attempts[${index}].plannedEligibleCount`
-      ),
+      previewCreatedAt,
+      previewExpiresAt,
+      plannedEligibleCount,
       continuationReason:
         typeof raw.continuationReason === 'string' && raw.continuationReason
           ? raw.continuationReason
-          : 'unknown'
+          : 'unknown',
+      ...(acceptedObservedAt ? { acceptedObservedAt } : {}),
+      ...(optionalString(raw.acceptedStatus, `attempts[${index}].acceptedStatus`)
+        ? { acceptedStatus: optionalString(raw.acceptedStatus, `attempts[${index}].acceptedStatus`) }
+        : {}),
+      ...(optionalString(raw.jobId, `attempts[${index}].jobId`)
+        ? { jobId: optionalString(raw.jobId, `attempts[${index}].jobId`) }
+        : {}),
+      ...(queueCreatedAt ? { queueCreatedAt } : {}),
+      ...(optionalString(raw.lastObservedStatus, `attempts[${index}].lastObservedStatus`)
+        ? { lastObservedStatus: optionalString(raw.lastObservedStatus, `attempts[${index}].lastObservedStatus`) }
+        : {}),
+      ...(optionalString(raw.endingReason, `attempts[${index}].endingReason`)
+        ? { endingReason: optionalString(raw.endingReason, `attempts[${index}].endingReason`) }
+        : {}),
+      ...(optionalCounts(raw.counts, `attempts[${index}].counts`)
+        ? { counts: optionalCounts(raw.counts, `attempts[${index}].counts`) }
+        : {}),
+      ...(monitoringLimitedAt ? { monitoringLimitedAt } : {}),
+      ...(cancellationRequestedAt ? { cancellationRequestedAt } : {}),
+      ...(optionalString(raw.cancellationOutcome, `attempts[${index}].cancellationOutcome`)
+        ? { cancellationOutcome: optionalString(raw.cancellationOutcome, `attempts[${index}].cancellationOutcome`) }
+        : {}),
+      ...(inactiveVerifiedAt ? { inactiveVerifiedAt } : {})
     };
   });
+  if (new Set(attempts.map((attempt) => attempt.v02RunId)).size !== attempts.length) {
+    throw new RunAiApproverV02Error('invalid_run_state', 'Phase 7 attempt IDs must be unique');
+  }
   const currentV02RunId =
     data.currentV02RunId === undefined || data.currentV02RunId === null
       ? null
@@ -114,6 +220,11 @@ const phaseSevenState = (run: WeeklyFlowRunRecord): PhaseSevenState => {
     !attempts.some((attempt) => attempt.v02RunId === currentV02RunId)
   ) {
     throw new RunAiApproverV02Error('invalid_run_state', 'Phase 7 current attempt is missing');
+  }
+  const current = attempts.find((attempt) => attempt.v02RunId === currentV02RunId);
+  const currentJobId = current?.jobId ?? null;
+  if (run.aiApproverV02JobId !== currentJobId) {
+    throw new RunAiApproverV02Error('invalid_run_state', 'Phase 7 current job mirror is invalid');
   }
   return {
     inputs: {
@@ -209,6 +320,12 @@ export async function runAiApproverV02(
         state.currentV02RunId,
         zeroWorkAfterPriorAttempts
       );
+      onEvent({
+        event: 'zero_work',
+        recoveryDecision: reason,
+        priorAttemptCount: state.attempts.length,
+        zeroWorkAfterPriorAttempts
+      });
       return { kind: 'zero_work', zeroWorkAfterPriorAttempts };
     }
     run = await persistence.recordPhaseSevenPreview(
@@ -225,6 +342,12 @@ export async function runAiApproverV02(
     );
     state = phaseSevenState(run);
     attempt = currentAttempt(state);
+    onEvent({
+      event: 'preview_persisted',
+      recoveryDecision: reason,
+      v02RunId: preview.preview.v02RunId,
+      plannedEligibleCount: preview.preview.plannedEligibleCount
+    });
     startedThisInvocation = true;
     const started = await worker.start(preview.preview.v02RunId, preview.preview.previewToken);
     run = await persistence.recordPhaseSevenJobBound(
@@ -273,6 +396,19 @@ export async function runAiApproverV02(
       }
       throw error;
     }
+
+    const queueAgeMilliseconds = detail.queueStatus
+      ? Math.max(0, now().getTime() - Date.parse(detail.queueStatus.createdAt))
+      : null;
+    onEvent({
+      event: 'status_observed',
+      v02RunId: attempt.v02RunId,
+      jobId: detail.run.jobId,
+      status: detail.run.status,
+      ...countsRecord(detail),
+      queueCreatedAt: detail.queueStatus?.createdAt ?? null,
+      queueAgeMilliseconds
+    });
 
     if (detail.run.jobId !== null && attempt.jobId === undefined) {
       run = await persistence.recordPhaseSevenJobBound(
@@ -339,6 +475,13 @@ export async function runAiApproverV02(
           `V02 run ${attempt.v02RunId} ended with ${detail.run.status}`
         );
       }
+      onEvent({
+        event: 'continuation_selected',
+        v02RunId: attempt.v02RunId,
+        jobId: detail.run.jobId,
+        status: detail.run.status,
+        recoveryDecision: `saved_run_${detail.run.status}`
+      });
       const result = await createAndStart(`saved_run_${detail.run.status}`);
       if (result) return result;
       continue;
@@ -361,6 +504,14 @@ export async function runAiApproverV02(
           monitoringLimitedAt: limitedAt
         });
       }
+      onEvent({
+        event: 'monitoring_limit_reached',
+        v02RunId: attempt.v02RunId,
+        jobId: detail.run.jobId,
+        status: detail.run.status,
+        queueCreatedAt: detail.queueStatus.createdAt,
+        queueAgeMilliseconds: Math.max(0, queueAge)
+      });
       const jobId = detail.run.jobId;
       if (!jobId) {
         throw new RunAiApproverV02Error('unverified_outcome', 'Active V02 run has no job ID');
@@ -375,6 +526,13 @@ export async function runAiApproverV02(
         cancellationRequestedAt,
         cancellationOutcome: outcome,
         ...(outcome === 'canceled' ? { inactiveVerifiedAt: now() } : {})
+      });
+      onEvent({
+        event: 'cancellation_observed',
+        v02RunId: attempt.v02RunId,
+        jobId,
+        status: detail.run.status,
+        cancellationOutcome: outcome
       });
       if (outcome === 'cancel_requested') {
         await delay(pollIntervalMilliseconds(config));

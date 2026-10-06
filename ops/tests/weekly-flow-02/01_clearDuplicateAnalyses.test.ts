@@ -27,6 +27,7 @@ import {
 } from '../../src/weekly-flow-02/phases/04_googleNewsRssClient';
 import { RunSemanticScoringError } from '../../src/weekly-flow-02/phases/05_runSemanticScoring';
 import { RunStateAssignmentError } from '../../src/weekly-flow-02/phases/06_runStateAssignment';
+import { RunAiApproverV02Error } from '../../src/weekly-flow-02/phases/07_runAiApproverV02';
 import { WeeklyFlowPersistenceError } from '../../src/weekly-flow-02/persistence';
 import { createInMemoryPersistence, createRunRecord } from './persistenceTestSupport';
 
@@ -1478,6 +1479,160 @@ describe('runCoordinator', () => {
     ]);
     assert.equal(memory.runs[0].lastPhaseCompleted, 7);
     assert.equal(memory.runs[0].runCompleted, true);
+  });
+
+  it('completes the weekly run when Phase 7 reports typed zero work', async () => {
+    const { logger, entries } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 28,
+        runStartedAt: new Date('2026-10-06T17:00:00Z'),
+        lastPhaseStarted: 6,
+        lastPhaseCompleted: 6,
+        articleCount: 2,
+        phaseData: { phase6: { status: 'completed' } }
+      })
+    ]);
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      now: () => new Date('2026-10-06T18:00:00Z'),
+      runAiApprover: async (run, _config, dependencies) => {
+        await dependencies.persistence.recordPhaseSevenStarted(run.id, dependencies.now(), {
+          selectionMode: 'article_position_count',
+          requestedArticleCount: 2,
+          allowPastApprovedBoundary: true,
+          allowDescriptionFallback: true
+        });
+        await dependencies.persistence.recordPhaseSevenZeroWorkCompleted(
+          run.id,
+          dependencies.now(),
+          null,
+          false
+        );
+        return { kind: 'zero_work', zeroWorkAfterPriorAttempts: false };
+      }
+    });
+
+    assert.equal(memory.runs[0].lastPhaseCompleted, 7);
+    assert.equal(memory.runs[0].runCompleted, true);
+    assert.ok(entries.some((entry) => entry.message.includes('no eligible Articles')));
+  });
+
+  it('continues an incomplete Phase 7 without restarting completed phases', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 29,
+        runStartedAt: new Date('2026-10-06T17:00:00Z'),
+        lastPhaseStarted: 7,
+        lastPhaseCompleted: 6,
+        articleCount: 2,
+        aiApproverV02JobId: '0007',
+        phaseData: {
+          phase6: { status: 'completed' },
+          phase7: {
+            status: 'started',
+            startedAt: '2026-10-06T17:30:00Z',
+            input: {
+              selectionMode: 'article_position_count',
+              requestedArticleCount: 2,
+              allowPastApprovedBoundary: true,
+              allowDescriptionFallback: true
+            },
+            currentV02RunId: 41,
+            attempts: [{
+              v02RunId: 41,
+              previewCreatedAt: '2026-10-06T17:30:01Z',
+              previewExpiresAt: '2026-10-06T17:45:01Z',
+              plannedEligibleCount: 2,
+              continuationReason: 'initial',
+              jobId: '0007',
+              acceptedObservedAt: '2026-10-06T17:30:02Z',
+              acceptedStatus: 'queued'
+            }]
+          }
+        }
+      })
+    ]);
+    let receivedRunId: number | null = null;
+
+    await runCoordinator(logger, coordinatorConfig, {
+      persistence: memory.persistence,
+      now: () => new Date('2026-10-06T18:00:00Z'),
+      collectRss: async () => assert.fail('Phase 4 must not restart'),
+      runSemantic: async () => assert.fail('Phase 5 must not restart'),
+      runState: async () => assert.fail('Phase 6 must not restart'),
+      runAiApprover: async (run, config, dependencies) => {
+        receivedRunId = run.id;
+        return successfulAiApproverRunner(run, config, dependencies);
+      }
+    });
+
+    assert.equal(receivedRunId, 29);
+    assert.equal(memory.runs[0].runCompleted, true);
+  });
+
+  it('preserves Phase 6 completion when Phase 7 fails', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 30,
+        runStartedAt: new Date('2026-10-06T17:00:00Z'),
+        lastPhaseStarted: 6,
+        lastPhaseCompleted: 6,
+        articleCount: 2,
+        phaseData: { phase6: { status: 'completed' } }
+      })
+    ]);
+    const failure = new RunAiApproverV02Error(
+      'unverified_outcome',
+      'V02 status could not be verified'
+    );
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        now: () => new Date('2026-10-06T18:00:00Z'),
+        runAiApprover: async () => {
+          throw failure;
+        }
+      }),
+      failure
+    );
+
+    assert.equal(memory.runs[0].lastPhaseCompleted, 6);
+    assert.equal(memory.runs[0].runCompleted, false);
+    assert.equal(memory.runs[0].lastError?.phase, 7);
+    assert.equal(memory.runs[0].lastError?.category, 'unverified_outcome');
+  });
+
+  it('rejects explicit continuation of completed Phase 7 without a worker request', async () => {
+    const { logger } = recordingLogger();
+    const memory = createInMemoryPersistence([
+      createRunRecord({
+        id: 31,
+        runCompleted: true,
+        runCompletedAt: new Date('2026-10-06T18:00:00Z'),
+        lastPhaseStarted: 7,
+        lastPhaseCompleted: 7
+      })
+    ]);
+    let workerRequests = 0;
+
+    await assert.rejects(
+      runCoordinator(logger, coordinatorConfig, {
+        persistence: memory.persistence,
+        invocation: { mode: 'continue', runId: 31 },
+        request: async () => {
+          workerRequests += 1;
+          throw new Error('worker request must not occur');
+        }
+      }),
+      /already complete/
+    );
+
+    assert.equal(workerRequests, 0);
   });
 
   it('rejects an ineligible explicit run without writing or starting a phase', async () => {

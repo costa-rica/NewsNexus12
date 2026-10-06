@@ -248,4 +248,340 @@ describe('runAiApproverV02', () => {
         error instanceof RunAiApproverV02Error && error.category === 'unverified_outcome'
     );
   });
+
+  it('records zero work after a prior failed attempt without aggregating its counts', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({ detail: async () => detail('failed') }),
+        now: () => new Date('2026-10-06T10:06:00Z'),
+        delay: async () => undefined
+      }),
+      /ended with failed/
+    );
+
+    const result = await runAiApproverV02(memory.runs[0], config, {
+      persistence: memory.persistence,
+      worker: worker({
+        preview: async () => ({ kind: 'zero_work' }),
+        detail: async () => detail('failed')
+      }),
+      now: () => new Date('2026-10-06T10:10:00Z'),
+      delay: async () => undefined
+    });
+
+    assert.deepEqual(result, { kind: 'zero_work', zeroWorkAfterPriorAttempts: true });
+    const phase7 = memory.runs[0].phaseData.phase7 as Record<string, unknown>;
+    assert.deepEqual(phase7.result, {
+      kind: 'zero_work',
+      zeroWorkAfterPriorAttempts: true
+    });
+  });
+
+  it('supports three continuation invocations and one new start in each invocation', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    let starts = 0;
+    const runAttempt = async (runId: number, jobId: string, terminal: 'failed' | 'completed') =>
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          preview: async () => ({
+            kind: 'work',
+            preview: {
+              v02RunId: runId,
+              previewToken: `token-${runId}`,
+              previewCreatedAt: `2026-10-06T10:${String(runId - 40).padStart(2, '0')}:00Z`,
+              previewExpiresAt: `2026-10-06T10:${String(runId - 25).padStart(2, '0')}:00Z`,
+              plannedEligibleCount: 2
+            }
+          }),
+          start: async () => {
+            starts += 1;
+            return { v02RunId: runId, jobId, status: 'queued' };
+          },
+          detail: async (context) =>
+            detail(context.expectedV02RunId === runId ? terminal : 'failed', {
+              runId: context.expectedV02RunId,
+              jobId,
+              createdAt: context.previewCreatedAt
+            })
+        }),
+        now: () => new Date('2026-10-06T10:10:00Z'),
+        delay: async () => undefined
+      });
+
+    await assert.rejects(runAttempt(41, 'reused-job', 'failed'), /ended with failed/);
+    await assert.rejects(runAttempt(42, 'reused-job', 'failed'), /ended with failed/);
+    const result = await runAttempt(43, 'reused-job', 'completed');
+
+    assert.equal(result.kind, 'completed');
+    assert.equal(starts, 3);
+    const attempts = ((memory.runs[0].phaseData.phase7 as Record<string, unknown>)
+      .attempts as Array<Record<string, unknown>>);
+    assert.deepEqual(attempts.map((attempt) => attempt.v02RunId), [41, 42, 43]);
+  });
+
+  it('replaces only a pre-acceptance 404 and stops on a post-acceptance 404', async () => {
+    const preAcceptance = createInMemoryPersistence([eligibleRun()]);
+    await assert.rejects(
+      runAiApproverV02(preAcceptance.runs[0], config, {
+        persistence: preAcceptance.persistence,
+        worker: worker({
+          start: async () => {
+            throw new AiApproverV02ClientError('transient_request', 'response lost');
+          }
+        }),
+        now: () => new Date('2026-10-06T10:01:00Z'),
+        delay: async () => undefined
+      }),
+      /response lost/
+    );
+    let previews = 0;
+    const recovered = await runAiApproverV02(preAcceptance.runs[0], config, {
+      persistence: preAcceptance.persistence,
+      worker: worker({
+        preview: async () => {
+          previews += 1;
+          return {
+            kind: 'work',
+            preview: {
+              v02RunId: 42,
+              previewToken: 'replacement',
+              previewCreatedAt: '2026-10-06T10:02:00Z',
+              previewExpiresAt: '2026-10-06T10:17:00Z',
+              plannedEligibleCount: 2
+            }
+          };
+        },
+        start: async () => ({ v02RunId: 42, jobId: '0008', status: 'queued' }),
+        detail: async (context) => {
+          if (context.expectedV02RunId === 41) {
+            throw new AiApproverV02ClientError(
+              'unavailable_unaccepted_preview',
+              'preview unavailable',
+              404
+            );
+          }
+          return detail('completed', {
+            runId: 42,
+            jobId: '0008',
+            createdAt: '2026-10-06T10:02:00Z'
+          });
+        }
+      }),
+      now: () => new Date('2026-10-06T10:06:00Z'),
+      delay: async () => undefined
+    });
+    assert.equal(recovered.kind, 'completed');
+    assert.equal(previews, 1);
+
+    const postAcceptance = createInMemoryPersistence([eligibleRun()]);
+    await assert.rejects(
+      runAiApproverV02(postAcceptance.runs[0], config, {
+        persistence: postAcceptance.persistence,
+        worker: worker({
+          detail: async () => {
+            throw new AiApproverV02ClientError(
+              'accepted_run_unavailable',
+              'accepted run unavailable',
+              404
+            );
+          }
+        }),
+        now: () => new Date('2026-10-06T10:06:00Z'),
+        delay: async () => undefined
+      }),
+      (error: unknown) =>
+        error instanceof AiApproverV02ClientError &&
+        error.category === 'accepted_run_unavailable'
+    );
+    assert.equal(
+      postAcceptance.calls.filter((call) => call === 'preview:7').length,
+      1
+    );
+  });
+
+  it('stops on a manual-run conflict without cancellation or another start', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    let starts = 0;
+    let cancellations = 0;
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          start: async () => {
+            starts += 1;
+            throw new AiApproverV02ClientError('start_conflict', 'manual run is active', 409);
+          },
+          cancel: async () => {
+            cancellations += 1;
+            return 'canceled';
+          }
+        }),
+        now: () => new Date('2026-10-06T10:01:00Z'),
+        delay: async () => undefined
+      }),
+      (error: unknown) =>
+        error instanceof AiApproverV02ClientError && error.category === 'start_conflict'
+    );
+    assert.equal(starts, 1);
+    assert.equal(cancellations, 0);
+  });
+
+  it('treats a queued accepted run without a job ID as orphaned', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          start: async () => {
+            throw new AiApproverV02ClientError('transient_request', 'response lost');
+          }
+        }),
+        now: () => new Date('2026-10-06T10:01:00Z'),
+        delay: async () => undefined
+      }),
+      /response lost/
+    );
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({ detail: async () => detail('queued', { jobId: null, queue: false }) }),
+        now: () => new Date('2026-10-06T10:02:00Z'),
+        delay: async () => undefined
+      }),
+      (error: unknown) =>
+        error instanceof RunAiApproverV02Error && error.category === 'orphaned_accepted_run'
+    );
+  });
+
+  it('resets transient failures after valid status and stops on the third consecutive failure', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    const outcomes: Array<AiApproverV02Detail | Error> = [
+      new AiApproverV02ClientError('transient_request', 'one'),
+      detail('running'),
+      new AiApproverV02ClientError('transient_request', 'one again'),
+      new AiApproverV02ClientError('transient_request', 'two'),
+      new AiApproverV02ClientError('transient_request', 'three')
+    ];
+    let delays = 0;
+
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          detail: async () => {
+            const outcome = outcomes.shift();
+            if (outcome instanceof Error) throw outcome;
+            if (!outcome) throw new Error('missing fixture outcome');
+            return outcome;
+          }
+        }),
+        now: () => new Date('2026-10-06T10:06:00Z'),
+        delay: async () => {
+          delays += 1;
+        }
+      }),
+      (error: unknown) =>
+        error instanceof AiApproverV02ClientError && error.message === 'three'
+    );
+    assert.equal(delays, 4);
+  });
+
+  it('caps polling with fake time and verifies cancel-requested inactivity', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    let currentTime = new Date('2026-10-06T21:59:02Z');
+    const delays: number[] = [];
+    const events: Array<Record<string, unknown>> = [];
+    const statuses = [detail('running'), detail('running'), detail('canceled')];
+
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          detail: async () => {
+            const next = statuses.shift();
+            if (!next) throw new Error('missing status fixture');
+            return next;
+          },
+          cancel: async () => 'cancel_requested'
+        }),
+        now: () => new Date(currentTime),
+        delay: async (milliseconds) => {
+          delays.push(milliseconds);
+          currentTime = new Date(currentTime.getTime() + milliseconds);
+        },
+        onEvent: (event) => events.push(event)
+      }),
+      (error: unknown) =>
+        error instanceof RunAiApproverV02Error && error.category === 'monitoring_limit'
+    );
+
+    assert.deepEqual(delays, [60_000, 300_000]);
+    assert.ok(events.some((event) => event.event === 'monitoring_limit_reached'));
+    assert.ok(events.some((event) => event.cancellationOutcome === 'cancel_requested'));
+    const attempt = ((memory.runs[0].phaseData.phase7 as Record<string, unknown>)
+      .attempts as Array<Record<string, unknown>>)[0];
+    assert.equal(typeof attempt.inactiveVerifiedAt, 'string');
+  });
+
+  it('accepts durable completion without queue evidence and with mixed Article outcomes', async () => {
+    const memory = createInMemoryPersistence([eligibleRun()]);
+    const completed = detail('completed', { queue: false });
+    completed.run.completedCount = 0;
+    completed.run.failedCount = 1;
+    completed.run.invalidResponseCount = 1;
+
+    const result = await runAiApproverV02(memory.runs[0], config, {
+      persistence: memory.persistence,
+      worker: worker({ detail: async () => completed }),
+      now: () => new Date('2030-01-01T00:00:00Z'),
+      delay: async () => assert.fail('completed result must not delay')
+    });
+
+    assert.equal(result.kind, 'completed');
+    if (result.kind === 'completed') {
+      assert.equal(result.counts.failedCount, 1);
+      assert.equal(result.counts.invalidResponseCount, 1);
+    }
+  });
+
+  it('rejects malformed persisted attempt identity before contacting the worker', async () => {
+    const run = eligibleRun();
+    run.lastPhaseStarted = 7;
+    run.aiApproverV02JobId = 'wrong-job';
+    run.phaseData.phase7 = {
+      status: 'started',
+      input: inputs,
+      currentV02RunId: 41,
+      attempts: [{
+        v02RunId: 41,
+        previewCreatedAt: '2026-10-06T10:00:00Z',
+        previewExpiresAt: '2026-10-06T10:15:00Z',
+        plannedEligibleCount: 2,
+        continuationReason: 'initial',
+        jobId: '0007'
+      }]
+    };
+    const memory = createInMemoryPersistence([run]);
+    let workerCalls = 0;
+
+    await assert.rejects(
+      runAiApproverV02(memory.runs[0], config, {
+        persistence: memory.persistence,
+        worker: worker({
+          detail: async () => {
+            workerCalls += 1;
+            return detail('completed');
+          }
+        }),
+        now: () => new Date('2026-10-06T10:06:00Z'),
+        delay: async () => undefined
+      }),
+      (error: unknown) =>
+        error instanceof RunAiApproverV02Error && error.category === 'invalid_run_state'
+    );
+    assert.equal(workerCalls, 0);
+  });
 });
