@@ -2,7 +2,8 @@
 Description=NewsNexus weekly flow 02
 Documentation=file:///home/limited_user/applications/NewsNexus12/ops/README.md
 Wants=network-online.target
-After=network-online.target
+Requires=newsnexus12-worker-node.service newsnexus12-worker-python.service
+After=network-online.target newsnexus12-worker-node.service newsnexus12-worker-python.service
 
 [Service]
 Type=oneshot
