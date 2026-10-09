@@ -1,0 +1,12 @@
+[Unit]
+Description=Run NewsNexus weekly flow 02 every Friday at 5 AM Los Angeles time
+Documentation=file:///home/limited_user/applications/NewsNexus12/ops/README.md
+
+[Timer]
+OnCalendar=America/Los_Angeles Fri *-*-* 05:00:00
+Unit=newsnexus-weekly-flow-02.service
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

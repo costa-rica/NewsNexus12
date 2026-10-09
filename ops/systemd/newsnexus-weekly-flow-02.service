@@ -1,0 +1,22 @@
+[Unit]
+Description=NewsNexus weekly flow 02
+Documentation=file:///home/limited_user/applications/NewsNexus12/ops/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=limited_user
+Group=limited_user
+WorkingDirectory=/home/limited_user/applications/NewsNexus12
+Environment=HOME=/home/limited_user
+ExecStart=/usr/bin/npm run weekly-flow-02:start --workspace newsnexus12-ops
+SuccessExitStatus=75
+Restart=no
+TimeoutStartSec=infinity
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
