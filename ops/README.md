@@ -1,6 +1,6 @@
 ---
 created_at: 2026-10-01T23:56:40Z
-updated_at: 2026-10-06T19:25:00Z
+updated_at: 2026-10-23T20:53:23Z
 created_by: codex (gpt-6) nicksmacbookair
 modified_by: codex (gpt-6.1-sol) nicksmacbookair
 ---
@@ -62,6 +62,27 @@ npm test --workspace newsnexus12-ops
 ---
 
 ## Usage
+
+### Run in the background with systemd
+
+- Requires the weekly-flow service to be installed on Ubuntu and ops to be built.
+- Start from any directory; the command returns immediately, and you can close the terminal:
+
+```bash
+sudo systemctl start --no-block newsnexus-weekly-flow-02.service
+```
+
+- Check status or follow logs later:
+
+```bash
+sudo systemctl status newsnexus-weekly-flow-02.service
+sudo journalctl -fu newsnexus-weekly-flow-02.service
+```
+
+- Press Ctrl+C to stop following logs; the workflow continues.
+- See [systemd service details](systemd/README.md) for logging and restart behavior.
+
+### Run in the foreground from a terminal
 
 ```bash
 # default: select or continue the latest run according to the recovery policy
