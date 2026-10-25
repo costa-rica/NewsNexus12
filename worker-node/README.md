@@ -146,6 +146,7 @@ Optional:
 8. `KEY_OPEN_AI` (required only with `USE_OPEN_AI_API=true`)
 9. `STATE_ASSIGNER_MODEL_NAME` (backend-specific default)
 10. `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (default `180`)
+11. `MINUTES_IN_BETWEEN_REQUESTS_RETRY` (default `120` minutes; wait before the single Google RSS HTTP 503 retry)
 
 ## Database
 

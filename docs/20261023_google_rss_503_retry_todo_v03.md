@@ -202,24 +202,24 @@ Goal: every 503, on either attempt, writes the header summary entry and then the
 
 ### Documentation
 
-- [ ] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY=120` to `worker-node/.env.example`, with a short comment that it is the wait before the single 503 retry and accepts fractional minutes.
-- [ ] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY` (default `120` minutes) to the Optional list in `worker-node/README.md`.
-- [ ] Do not edit any production `.env` file.
+- [x] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY=120` to `worker-node/.env.example`, with a short comment that it is the wait before the single 503 retry and accepts fractional minutes.
+- [x] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY` (default `120` minutes) to the Optional list in `worker-node/README.md`.
+- [x] Do not edit any production `.env` file.
 
 ### Final Verification
 
-- [ ] Run the end-of-phase steps one last time on the full worker-node suite.
-- [ ] Check PRD v04 Acceptance items 1 to 10 against the tests and note any item not covered by an automated test. Item 5's 120-minute fallback is expected to be untested (Deviation 3).
-- [ ] Confirm `ops/` was not changed. The coordinator's handling of `rate_limited` stays as it is.
+- [x] Run the end-of-phase steps one last time on the full worker-node suite.
+- [x] Check PRD v04 Acceptance items 1 to 10 against the tests and note any item not covered by an automated test. Item 5's 120-minute fallback is expected to be untested (Deviation 3).
+- [x] Confirm `ops/` was not changed. The coordinator's handling of `rate_limited` stays as it is.
 
 ### Operator Handoff
 
-- [ ] Report to the operator:
+- [x] Report to the operator:
   - The commits created in each phase.
   - That the production deployment steps in PRD v04 still need the operator: restart worker-node so `LOG_MAX_SIZE=20` takes effect, optionally set `MINUTES_IN_BETWEEN_REQUESTS_RETRY`, and copy the worker-node logs right after the next run.
   - Any acceptance item covered only by reasoning, not by a test.
 
 ### End of Phase 3
 
-- [ ] Check off the completed tasks.
-- [ ] Commit, for example `docs: document google rss 503 retry setting`.
+- [x] Check off the completed tasks.
+- [x] Commit, for example `docs: document google rss 503 retry setting`.
