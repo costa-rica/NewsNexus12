@@ -9,6 +9,7 @@ import {
   initModels
 } from '@newsnexus/db-models';
 import {
+  buildRssHeaderSummary,
   createRequestGoogleRssJobHandler,
   createRssSeedResult,
   DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS,
@@ -742,6 +743,150 @@ describe('requestGoogleRss terminal path results', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  const make503Response = (body: BodyInit | null, headers?: HeadersInit): Response =>
+    new Response(body, { status: 503, statusText: 'Service Unavailable', headers });
+
+  const runSingle503Row = async (rowId: number, makeResponse: () => Response): Promise<jest.SpyInstance> => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [[rowId, `diagnostic row ${rowId}`, '', '', '', '30d']]);
+    fetchSpy.mockImplementation(async () => makeResponse());
+    const errorSpy = jest.spyOn(logger, 'error');
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ jobId: `job-${rowId}` }));
+    return errorSpy;
+  };
+
+  const findLogMeta = (
+    spy: jest.SpyInstance,
+    message: string,
+    attempt: number
+  ): Record<string, unknown> | undefined =>
+    spy.mock.calls.find(
+      ([loggedMessage, meta]) => loggedMessage === message && (meta as Record<string, unknown>)?.attempt === attempt
+    )?.[1] as Record<string, unknown> | undefined;
+
+  it('logs a header summary before the full 503 response on each attempt', async () => {
+    const errorSpy = await runSingle503Row(200, () => {
+      const headers = new Headers({ 'Retry-After': '3600', 'X-Goog-Trace': 'abc' });
+      headers.append('Set-Cookie', 'NID=one; Path=/');
+      headers.append('Set-Cookie', 'GOOGLE_ABUSE_EXEMPTION=two; Path=/');
+      return make503Response('<html>blocked</html>', headers);
+    });
+
+    for (const attempt of [1, 2]) {
+      const summaryIndex = errorSpy.mock.calls.findIndex(
+        ([message, meta]) => message === 'RSS 503 header summary' && meta?.attempt === attempt
+      );
+      const fullIndex = errorSpy.mock.calls.findIndex(
+        ([message, meta]) => message === 'RSS 503 full response' && meta?.attempt === attempt
+      );
+      expect(summaryIndex).toBeGreaterThanOrEqual(0);
+      expect(fullIndex).toBeGreaterThan(summaryIndex);
+
+      const summary = errorSpy.mock.calls[summaryIndex][1];
+      const full = errorSpy.mock.calls[fullIndex][1];
+      expect(summary).toMatchObject({ queryId: 200, jobId: 'job-200', status: 503 });
+      expect(full).toMatchObject({ queryId: 200, jobId: 'job-200', capturedAt: summary.capturedAt });
+      expect(summary.headerSummary).toMatchObject({
+        'retry-after': '3600',
+        setCookieNames: ['NID', 'GOOGLE_ABUSE_EXEMPTION'],
+        googlePrefixedHeaders: { 'x-goog-trace': 'abc' }
+      });
+      expect(full.responseHeaders['set-cookie']).toEqual([
+        'NID=one; Path=/',
+        'GOOGLE_ABUSE_EXEMPTION=two; Path=/'
+      ]);
+      expect(full).toMatchObject({ body: '<html>blocked</html>', bodyTruncated: false });
+    }
+    expect(findLogMeta(errorSpy, 'RSS 503 header summary', 1)?.outcome).toBe('retry_scheduled_in_0.001_minutes');
+    expect(findLogMeta(errorSpy, 'RSS 503 header summary', 2)?.outcome).toBe('retry_exhausted');
+  });
+
+  it('keeps a 503 body of exactly 1 MB without truncation', async () => {
+    const errorSpy = await runSingle503Row(201, () => make503Response('a'.repeat(1_048_576)));
+
+    const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
+    expect(full).toMatchObject({ bodyByteLength: 1_048_576, bodyTruncated: false });
+    expect((full?.body as string).length).toBe(1_048_576);
+  });
+
+  it('truncates a 503 body larger than 1 MB', async () => {
+    const errorSpy = await runSingle503Row(202, () => make503Response('b'.repeat(1_048_577)));
+
+    const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
+    expect(full).toMatchObject({ bodyByteLength: 1_048_576, bodyTruncated: true });
+    expect((full?.body as string).length).toBe(1_048_576);
+  });
+
+  it('keeps status, headers, and the partial body when the 503 body read fails', async () => {
+    const errorSpy = await runSingle503Row(203, () => {
+      let sentChunk = false;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (!sentChunk) {
+            sentChunk = true;
+            controller.enqueue(new TextEncoder().encode('partial'));
+            return;
+          }
+          controller.error(new Error('stream broke'));
+        }
+      });
+      return make503Response(body, { 'Retry-After': '60' });
+    });
+
+    const summary = findLogMeta(errorSpy, 'RSS 503 header summary', 1);
+    const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
+    expect(summary?.headerSummary).toMatchObject({ 'retry-after': '60' });
+    expect(full).toMatchObject({
+      status: 503,
+      body: 'partial',
+      bodyTruncated: false,
+      bodyReadError: 'stream broke'
+    });
+    expect(full?.responseHeaders).toMatchObject({ 'retry-after': '60' });
+  });
+
+  it('logs the final URL and redirect flag of a 503', async () => {
+    const errorSpy = await runSingle503Row(204, () => {
+      const response = make503Response('sorry');
+      Object.defineProperty(response, 'url', { value: 'https://www.google.com/sorry/index' });
+      Object.defineProperty(response, 'redirected', { value: true });
+      return response;
+    });
+
+    const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
+    expect(full).toMatchObject({
+      requestUrl: makeGoogleRssUrl('"diagnostic row 204" when:30d'),
+      finalUrl: 'https://www.google.com/sorry/index',
+      redirected: true
+    });
+  });
+
+  it('logs recovery status and headers without a body', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [[205, 'diagnostic recovery', '', '', '', '30d']]);
+    fetchSpy
+      .mockImplementationOnce(async () => make503Response('unavailable'))
+      .mockImplementationOnce(
+        async () =>
+          new Response(makeRssXml('Diagnostic Recovery', 'https://example.com/rss-diagnostic-recovery'), {
+            status: 200,
+            headers: { 'X-Test': 'recovered' }
+          })
+      );
+    const infoSpy: jest.SpyInstance = jest.spyOn(logger, 'info');
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext());
+
+    const recovery = infoSpy.mock.calls.find(
+      ([message]) => message === 'RSS request recovered after HTTP 503 retry'
+    )?.[1] as Record<string, unknown> | undefined;
+    expect(recovery).toMatchObject({ attempt: 2, status: 200 });
+    expect(recovery?.responseHeaders).toMatchObject({ 'x-test': 'recovered' });
+    expect(recovery?.headerSummary).toBeDefined();
+    expect(recovery).not.toHaveProperty('body');
+  });
+
   it('keeps the successful row outcome when the target is reached', async () => {
     const urls = [
       'https://example.com/rss-target-1',
@@ -908,5 +1053,40 @@ describe('requestGoogleRss terminal path results', () => {
       and_keywords: 'duplicate two',
       status: 'success'
     });
+  });
+});
+
+describe('buildRssHeaderSummary', () => {
+  it('returns present header values and null for absent ones', () => {
+    const summary = buildRssHeaderSummary(new Headers({ 'retry-after': '120', server: 'GSE' }));
+
+    expect(summary['retry-after']).toBe('120');
+    expect(summary.server).toBe('GSE');
+    expect(summary['x-ratelimit-remaining']).toBeNull();
+    expect(summary.location).toBeNull();
+  });
+
+  it('finds mixed-case header names', () => {
+    const summary = buildRssHeaderSummary(new Headers({ 'RateLimit-Remaining': '0', 'Content-Type': 'text/html' }));
+
+    expect(summary['ratelimit-remaining']).toBe('0');
+    expect(summary['content-type']).toBe('text/html');
+  });
+
+  it('lists one name per Set-Cookie header', () => {
+    const headers = new Headers();
+    headers.append('Set-Cookie', 'NID=one; Path=/');
+    headers.append('Set-Cookie', 'AEC=two; Secure');
+
+    expect(buildRssHeaderSummary(headers).setCookieNames).toEqual(['NID', 'AEC']);
+    expect(buildRssHeaderSummary(new Headers()).setCookieNames).toEqual([]);
+  });
+
+  it('collects x-goog and x-google headers only', () => {
+    const summary = buildRssHeaderSummary(
+      new Headers({ 'X-Goog-Request': 'a', 'x-google-backends': 'b', 'x-other': 'c' })
+    );
+
+    expect(summary.googlePrefixedHeaders).toEqual({ 'x-goog-request': 'a', 'x-google-backends': 'b' });
   });
 });

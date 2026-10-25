@@ -126,77 +126,77 @@ Goal: every 503, on either attempt, writes the header summary entry and then the
 
 ### Fetch Result Changes
 
-- [ ] Add an options argument to `fetchRssItems()`, for example `{ captureResponseDetails: boolean }`. The main loop passes `true` for attempt 2 and `false` for attempt 1.
-- [ ] Extend `RssFetchResult` with optional fields for response details. Suggested names, consistent with the existing camelCase style:
+- [x] Add an options argument to `fetchRssItems()`, for example `{ captureResponseDetails: boolean }`. The main loop passes `true` for attempt 2 and `false` for attempt 1.
+- [x] Extend `RssFetchResult` with optional fields for response details. Suggested names, consistent with the existing camelCase style:
   - `responseHeaders`: all headers as a plain object. Store `set-cookie` as an array from `headers.getSetCookie()`.
   - `finalUrl`: from `response.url`.
   - `redirected`: from `response.redirected`.
   - `statusText`: from `response.statusText`.
   - `diagnosticBody`: present only for 503, containing `text`, `byteLength`, `bodyTruncated`, and an optional `readError`.
-- [ ] Fill `responseHeaders`, `finalUrl`, `redirected`, and `statusText` only when the response is a 503, or when `captureResponseDetails` is `true`. Do not read them on other responses.
-- [ ] Do not add fallbacks for missing `headers` just to tolerate test mocks. Mocks that reach the capture code must be real `Response` objects.
-- [ ] Keep the existing `logger.error('RSS request failed with status ...')` line for non-OK responses.
+- [x] Fill `responseHeaders`, `finalUrl`, `redirected`, and `statusText` only when the response is a 503, or when `captureResponseDetails` is `true`. Do not read them on other responses.
+- [x] Do not add fallbacks for missing `headers` just to tolerate test mocks. Mocks that reach the capture code must be real `Response` objects.
+- [x] Keep the existing `logger.error('RSS request failed with status ...')` line for non-OK responses.
 
 ### Bounded Body Read on 503
 
-- [ ] Add a helper, for example `readBodyWithCap(response, capBytes, signal)`, that:
-  - [ ] Reads `response.body` with `getReader()`, collecting chunks until the total exceeds 1,048,576 bytes.
-  - [ ] Once over the cap, keeps exactly the first 1,048,576 bytes, sets `bodyTruncated: true`, and calls `reader.cancel()`.
-  - [ ] Sets `bodyTruncated: false` when the stream ends at or under the cap, including exactly 1,048,576 bytes.
-  - [ ] Decodes with `TextDecoder('utf-8')` without the `fatal` option, so invalid bytes do not throw.
-  - [ ] Handles a `null` body as an empty string with `byteLength: 0`.
-  - [ ] Catches read errors and returns the partial text plus `readError`. It never throws.
-- [ ] Define the 1 MB cap as a named constant in the module, for example `RSS_503_BODY_CAPTURE_LIMIT_BYTES`.
-- [ ] In `fetchRssItems()`, for 503 only, do not clear the 10-second timeout until the body read finishes. The same timer then bounds the body read, and outer cancellation still aborts it through the linked controller. Clear the timer in a `finally`-style path for every outcome.
-- [ ] For non-503, non-OK responses, keep today's behavior and do not read the body.
+- [x] Add a helper, for example `readBodyWithCap(response, capBytes, signal)`, that:
+  - [x] Reads `response.body` with `getReader()`, collecting chunks until the total exceeds 1,048,576 bytes.
+  - [x] Once over the cap, keeps exactly the first 1,048,576 bytes, sets `bodyTruncated: true`, and calls `reader.cancel()`.
+  - [x] Sets `bodyTruncated: false` when the stream ends at or under the cap, including exactly 1,048,576 bytes.
+  - [x] Decodes with `TextDecoder('utf-8')` without the `fatal` option, so invalid bytes do not throw.
+  - [x] Handles a `null` body as an empty string with `byteLength: 0`.
+  - [x] Catches read errors and returns the partial text plus `readError`. It never throws.
+- [x] Define the 1 MB cap as a named constant in the module, for example `RSS_503_BODY_CAPTURE_LIMIT_BYTES`.
+- [x] In `fetchRssItems()`, for 503 only, do not clear the 10-second timeout until the body read finishes. The same timer then bounds the body read, and outer cancellation still aborts it through the linked controller. Clear the timer in a `finally`-style path for every outcome.
+- [x] For non-503, non-OK responses, keep today's behavior and do not read the body.
 
 ### Header Summary
 
-- [ ] Add a module constant listing the PRD v04 header keys. Keep the names lowercase and the list in one place:
+- [x] Add a module constant listing the PRD v04 header keys. Keep the names lowercase and the list in one place:
   - `retry-after`, `ratelimit`, `ratelimit-policy`, `ratelimit-limit`, `ratelimit-remaining`, `ratelimit-reset`
   - `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`
   - `x-rate-limit-limit`, `x-rate-limit-remaining`, `x-rate-limit-reset`
   - `location`, `content-type`, `content-length`, `content-encoding`, `cache-control`, `expires`
   - `date`, `server`, `via`, `x-request-id`, `x-cloud-trace-context`, `traceparent`
-- [ ] Add a pure helper, for example `buildRssHeaderSummary(headers)`, that returns:
+- [x] Add a pure helper, for example `buildRssHeaderSummary(headers)`, that returns:
   - One field per listed key, with the header value or `null`. `Headers.get()` is already case-insensitive.
   - `setCookieNames`: the names before the first `=` in each `getSetCookie()` entry, or `[]`.
   - `googlePrefixedHeaders`: every header whose lowercase name starts with `x-goog` or `x-google`, or `{}`.
-- [ ] Export the helper so it can be unit-tested directly, like `mapRssItems`.
+- [x] Export the helper so it can be unit-tested directly, like `mapRssItems`.
 
 ### Log Entries
 
-- [ ] On every 503, in the main loop, write two `logger.error` entries in this order:
+- [x] On every 503, in the main loop, write two `logger.error` entries in this order:
   1. Message `RSS 503 header summary`, with metadata `queryId`, `jobId`, `attempt`, `timestamp` (UTC ISO), `status`, `statusText`, `finalUrl`, `redirected`, `outcome`, and `headerSummary`.
   2. Message `RSS 503 full response`, with metadata `queryId`, `jobId`, `attempt`, the same `timestamp`, `requestUrl`, `finalUrl`, `redirected`, `status`, `statusText`, `responseHeaders`, `body`, `bodyByteLength`, `bodyTruncated`, and `bodyReadError` when present.
-- [ ] Set `outcome` to `retry_scheduled_in_N_minutes` on attempt 1 and `retry_exhausted` on attempt 2. Any clear, consistent value is fine.
-- [ ] Compute the timestamp once and reuse it in both entries.
-- [ ] Do not redact or sanitize headers or body. Winston's normal JSON escaping is fine.
-- [ ] On recovery, extend the Phase 1 recovery log with `responseHeaders` and `headerSummary`. Do not log the body.
-- [ ] Do not include `queryResults` in any 503 entry.
-- [ ] Remove the Phase 1 minimal 503 log line if the two new entries fully replace it. The retry-scheduled line may stay.
+- [x] Set `outcome` to `retry_scheduled_in_N_minutes` on attempt 1 and `retry_exhausted` on attempt 2. Any clear, consistent value is fine.
+- [x] Compute the timestamp once and reuse it in both entries.
+- [x] Do not redact or sanitize headers or body. Winston's normal JSON escaping is fine.
+- [x] On recovery, extend the Phase 1 recovery log with `responseHeaders` and `headerSummary`. Do not log the body.
+- [x] Do not include `queryResults` in any 503 entry.
+- [x] Remove the Phase 1 minimal 503 log line if the two new entries fully replace it. The retry-scheduled line may stay.
 
 ### Tests
 
-- [ ] Unit-test `buildRssHeaderSummary()`:
-  - [ ] Present keys return values, and absent keys return `null`.
-  - [ ] Mixed-case header names are still found.
-  - [ ] Two `Set-Cookie` headers give two names.
-  - [ ] `x-goog-*` and `x-google-*` headers are collected; unrelated `x-*` headers are not.
-- [ ] Job-level tests spying on `logger.error`:
-  - [ ] A 503 with headers and a small body writes the header summary entry before the full-response entry, with matching `queryId`, `jobId`, `attempt`, and `timestamp`.
-  - [ ] The full-response entry has the unredacted `set-cookie` values and the complete body, with `bodyTruncated: false`.
-  - [ ] Body exactly 1,048,576 bytes gives `bodyTruncated: false` and the full length.
-  - [ ] Body of 1,048,577 bytes or more gives `bodyTruncated: true` and exactly 1,048,576 captured bytes.
-  - [ ] A body stream that errors after a partial chunk still logs status, headers, header summary, the partial body, and `bodyReadError`. Use a `ReadableStream` that enqueues a chunk and then errors.
-  - [ ] A `redirected: true` response with a different `url` is logged with both values.
-  - [ ] Recovery logs the numeric HTTP status (`200`), headers, and header summary, but no body.
-  - [ ] A first-attempt 200 response is not inspected for details. The existing plain-object mocks still pass unchanged.
+- [x] Unit-test `buildRssHeaderSummary()`:
+  - [x] Present keys return values, and absent keys return `null`.
+  - [x] Mixed-case header names are still found.
+  - [x] Two `Set-Cookie` headers give two names.
+  - [x] `x-goog-*` and `x-google-*` headers are collected; unrelated `x-*` headers are not.
+- [x] Job-level tests spying on `logger.error`:
+  - [x] A 503 with headers and a small body writes the header summary entry before the full-response entry, with matching `queryId`, `jobId`, `attempt`, and `timestamp`.
+  - [x] The full-response entry has the unredacted `set-cookie` values and the complete body, with `bodyTruncated: false`.
+  - [x] Body exactly 1,048,576 bytes gives `bodyTruncated: false` and the full length.
+  - [x] Body of 1,048,577 bytes or more gives `bodyTruncated: true` and exactly 1,048,576 captured bytes.
+  - [x] A body stream that errors after a partial chunk still logs status, headers, header summary, the partial body, and `bodyReadError`. Use a `ReadableStream` that enqueues a chunk and then errors.
+  - [x] A `redirected: true` response with a different `url` is logged with both values.
+  - [x] Recovery logs the numeric HTTP status (`200`), headers, and header summary, but no body.
+  - [x] A first-attempt 200 response is not inspected for details. The existing plain-object mocks still pass unchanged.
 
 ### End of Phase 2
 
-- [ ] Run the end-of-phase steps.
-- [ ] Commit, for example `feat: log full google rss 503 responses`.
+- [x] Run the end-of-phase steps.
+- [x] Commit, for example `feat: log full google rss 503 responses`.
 
 ## Phase 3: Documentation and Handoff
 

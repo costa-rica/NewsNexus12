@@ -38,6 +38,39 @@ export const DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS = 72;
 
 const DEFAULT_RETRY_DELAY_MINUTES = 120;
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const RSS_503_BODY_CAPTURE_LIMIT_BYTES = 1_048_576;
+
+const RSS_HEADER_SUMMARY_KEYS = [
+  'retry-after',
+  'ratelimit',
+  'ratelimit-policy',
+  'ratelimit-limit',
+  'ratelimit-remaining',
+  'ratelimit-reset',
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'x-rate-limit-limit',
+  'x-rate-limit-remaining',
+  'x-rate-limit-reset',
+  'location',
+  'content-type',
+  'content-length',
+  'content-encoding',
+  'cache-control',
+  'expires',
+  'date',
+  'server',
+  'via',
+  'x-request-id',
+  'x-cloud-trace-context',
+  'traceparent'
+] as const;
+
+export type RssHeaderSummary = Record<(typeof RSS_HEADER_SUMMARY_KEYS)[number], string | null> & {
+  setCookieNames: string[];
+  googlePrefixedHeaders: Record<string, string>;
+};
 
 interface RssItem {
   title?: string;
@@ -48,11 +81,24 @@ interface RssItem {
   content?: string;
 }
 
+interface RssDiagnosticBody {
+  text: string;
+  byteLength: number;
+  bodyTruncated: boolean;
+  readError?: string;
+}
+
 interface RssFetchResult {
   status: 'success' | 'error';
   items: RssItem[];
   error?: string;
   statusCode?: number;
+  statusText?: string;
+  finalUrl?: string;
+  redirected?: boolean;
+  responseHeaders?: Record<string, string | string[]>;
+  headerSummary?: RssHeaderSummary;
+  diagnosticBody?: RssDiagnosticBody;
 }
 
 export type GoogleRssEndingReason =
@@ -223,11 +269,92 @@ export const createRssSeedResult = (
   };
 };
 
-const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetchResult> => {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+export const buildRssHeaderSummary = (headers: Headers): RssHeaderSummary => {
+  const googlePrefixedHeaders: Record<string, string> = {};
+  headers.forEach((value, name) => {
+    // 'x-goog' also matches 'x-google-*' names.
+    if (name.toLowerCase().startsWith('x-goog')) {
+      googlePrefixedHeaders[name.toLowerCase()] = value;
+    }
+  });
 
+  const keyedValues = Object.fromEntries(
+    RSS_HEADER_SUMMARY_KEYS.map((key) => [key, headers.get(key)])
+  ) as Record<(typeof RSS_HEADER_SUMMARY_KEYS)[number], string | null>;
+
+  return {
+    ...keyedValues,
+    setCookieNames: headers.getSetCookie().map((cookie) => cookie.split('=')[0].trim()),
+    googlePrefixedHeaders
+  };
+};
+
+const collectResponseHeaders = (headers: Headers): Record<string, string | string[]> => {
+  const collected: Record<string, string | string[]> = {};
+  headers.forEach((value, name) => {
+    if (name !== 'set-cookie') {
+      collected[name] = value;
+    }
+  });
+
+  const setCookies = headers.getSetCookie();
+  if (setCookies.length > 0) {
+    collected['set-cookie'] = setCookies;
+  }
+  return collected;
+};
+
+const readBodyWithCap = async (response: Response, capBytes: number): Promise<RssDiagnosticBody> => {
+  if (!response.body) {
+    return { text: '', byteLength: 0, bodyTruncated: false };
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  let bodyTruncated = false;
+  let readError: string | undefined;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      const remaining = capBytes - byteLength;
+      if (value.byteLength > remaining) {
+        chunks.push(value.subarray(0, remaining));
+        byteLength += remaining;
+        bodyTruncated = true;
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+
+      chunks.push(value);
+      byteLength += value.byteLength;
+    }
+  } catch (error) {
+    readError = error instanceof Error ? error.message : 'Unknown body read error';
+  }
+
+  return {
+    text: new TextDecoder('utf-8').decode(Buffer.concat(chunks)),
+    byteLength,
+    bodyTruncated,
+    ...(readError ? { readError } : {})
+  };
+};
+
+const fetchRssItems = async (
+  url: string,
+  signal: AbortSignal,
+  options: { captureResponseDetails: boolean } = { captureResponseDetails: false }
+): Promise<RssFetchResult> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
     signal.addEventListener(
       'abort',
       () => {
@@ -243,16 +370,36 @@ const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetch
       }
     });
 
-    clearTimeout(timeout);
+    // A 503 body is captured for diagnostics, so its read stays under the same timeout.
+    if (response.status !== 503) {
+      clearTimeout(timeout);
+    }
+
+    const responseDetails =
+      response.status === 503 || options.captureResponseDetails
+        ? {
+            statusText: response.statusText,
+            finalUrl: response.url,
+            redirected: response.redirected,
+            responseHeaders: collectResponseHeaders(response.headers),
+            headerSummary: buildRssHeaderSummary(response.headers)
+          }
+        : {};
 
     if (!response.ok) {
       const errorMessage = `RSS request failed with status ${response.status}`;
       logger.error(errorMessage);
+      const diagnosticBody =
+        response.status === 503
+          ? await readBodyWithCap(response, RSS_503_BODY_CAPTURE_LIMIT_BYTES)
+          : undefined;
       return {
         status: 'error',
         items: [],
         error: errorMessage,
-        statusCode: response.status
+        statusCode: response.status,
+        ...responseDetails,
+        ...(diagnosticBody ? { diagnosticBody } : {})
       };
     }
 
@@ -264,7 +411,8 @@ const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetch
     return {
       status: 'success',
       items: mapRssItems(items),
-      statusCode: response.status
+      statusCode: response.status,
+      ...responseDetails
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown RSS fetch error';
@@ -274,7 +422,52 @@ const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetch
       items: [],
       error: message
     };
+  } finally {
+    clearTimeout(timeout);
   }
+};
+
+const logRss503Diagnostics = (params: {
+  queryId: number;
+  jobId: string;
+  attempt: number;
+  requestUrl: string;
+  outcome: string;
+  response: RssFetchResult;
+}): void => {
+  const { response } = params;
+  // Winston's format.timestamp() owns the `timestamp` key, so the capture time uses `capturedAt`.
+  const capturedAt = new Date().toISOString();
+
+  logger.error('RSS 503 header summary', {
+    queryId: params.queryId,
+    jobId: params.jobId,
+    attempt: params.attempt,
+    capturedAt,
+    status: response.statusCode,
+    statusText: response.statusText,
+    finalUrl: response.finalUrl,
+    redirected: response.redirected,
+    outcome: params.outcome,
+    headerSummary: response.headerSummary
+  });
+
+  logger.error('RSS 503 full response', {
+    queryId: params.queryId,
+    jobId: params.jobId,
+    attempt: params.attempt,
+    capturedAt,
+    requestUrl: params.requestUrl,
+    finalUrl: response.finalUrl,
+    redirected: response.redirected,
+    status: response.statusCode,
+    statusText: response.statusText,
+    responseHeaders: response.responseHeaders,
+    body: response.diagnosticBody?.text,
+    bodyByteLength: response.diagnosticBody?.byteLength,
+    bodyTruncated: response.diagnosticBody?.bodyTruncated,
+    ...(response.diagnosticBody?.readError ? { bodyReadError: response.diagnosticBody.readError } : {})
+  });
 };
 
 const ensureAggregatorSourceAndEntity = async (): Promise<{
@@ -594,6 +787,14 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       let response = await fetchRssItems(requestUrl, context.signal);
 
       if (!context.signal.aborted && response.statusCode === 503) {
+        logRss503Diagnostics({
+          queryId: row.id,
+          jobId: context.jobId,
+          attempt,
+          requestUrl,
+          outcome: `retry_scheduled_in_${retryDelayMinutes}_minutes`,
+          response
+        });
         logger.error('RSS request returned HTTP 503; scheduling one retry', {
           queryId: row.id,
           jobId: context.jobId,
@@ -616,7 +817,7 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         }
 
         attempt = 2;
-        response = await fetchRssItems(requestUrl, context.signal);
+        response = await fetchRssItems(requestUrl, context.signal, { captureResponseDetails: true });
       }
 
       if (context.signal.aborted) {
@@ -632,10 +833,13 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       }
 
       if (response.statusCode === 503) {
-        logger.error('RSS retry returned HTTP 503; retry exhausted', {
+        logRss503Diagnostics({
           queryId: row.id,
           jobId: context.jobId,
-          attempt
+          attempt,
+          requestUrl,
+          outcome: 'retry_exhausted',
+          response
         });
         queryResults[i] = {
           ...queryResults[i],
@@ -654,7 +858,9 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
           queryId: row.id,
           jobId: context.jobId,
           attempt,
-          status: response.statusCode
+          status: response.statusCode,
+          responseHeaders: response.responseHeaders,
+          headerSummary: response.headerSummary
         });
       }
 
