@@ -76,16 +76,16 @@ Goal: one retry per query after `MINUTES_IN_BETWEEN_REQUESTS_RETRY`, with today'
 
 ### Configuration
 
-- [ ] In `runLegacyWorkflow()`, next to the `delayBetweenRequestsMs` parse, add a `retryDelayMs` parse for `MINUTES_IN_BETWEEN_REQUESTS_RETRY`.
-  - [ ] Unset or empty: use 120 minutes, with no warning.
-  - [ ] Accept positive, finite numbers, including fractions. Use `Number(...)`, not `parseInt`, so `0.001` works.
-  - [ ] Reject zero, negatives, `NaN`, `Infinity`, non-numeric text, and values whose milliseconds exceed `2_147_483_647`. Log a `warn` naming the setting and the bad value, then use 120 minutes.
-  - [ ] Log the effective retry delay once at job start, next to the existing delay log line.
-- [ ] Keep the `MILISECONDS_IN_BETWEEN_REQUESTS` parse unchanged.
+- [x] In `runLegacyWorkflow()`, next to the `delayBetweenRequestsMs` parse, add a `retryDelayMs` parse for `MINUTES_IN_BETWEEN_REQUESTS_RETRY`.
+  - [x] Unset or empty: use 120 minutes, with no warning.
+  - [x] Accept positive, finite numbers, including fractions. Use `Number(...)`, not `parseInt`, so `0.001` works.
+  - [x] Reject zero, negatives, `NaN`, `Infinity`, non-numeric text, and values whose milliseconds exceed `2_147_483_647`. Log a `warn` naming the setting and the bad value, then use 120 minutes.
+  - [x] Log the effective retry delay once at job start, next to the existing delay log line.
+- [x] Keep the `MILISECONDS_IN_BETWEEN_REQUESTS` parse unchanged.
 
 ### Retry Flow
 
-- [ ] In the main loop, replace the single `fetchRssItems()` call with an attempt sequence for the current row:
+- [x] In the main loop, replace the single `fetchRssItems()` call with an attempt sequence for the current row:
   1. Attempt 1: fetch.
   2. If the signal aborted, keep the existing "canceled during RSS fetch" handling.
   3. If the status is 503: log an `error` that includes query ID, job ID, attempt number, and planned wait in minutes. Then `await delay(retryDelayMs, context.signal)`.
@@ -95,30 +95,30 @@ Goal: one retry per query after `MINUTES_IN_BETWEEN_REQUESTS_RETRY`, with today'
   7. If attempt 2 is a 503: log retry exhaustion, then use the existing `rate_limited` terminal block (row `failed` / `rate_limited`, later rows stay `not_reached`).
   8. If attempt 2 has `status === 'success'`: log recovery (query ID, job ID, attempt 2, and the numeric HTTP status), then continue with the existing code path using attempt 2's result.
   9. Any other attempt 2 result (for example HTTP 500, a network failure, or an XML parse failure): do not log recovery. Continue with the existing `rss_fetch_error` handling using attempt 2's result.
-- [ ] In `fetchRssItems()`, add `statusCode: response.status` to the successful return, so recovery logs carry the real HTTP status. Error returns already include it when a response exists.
-- [ ] Make sure `storeRequestAndArticles()` runs once, only for the final non-503 result. No `NewsApiRequest` row is created for a 503 attempt.
-- [ ] The retry allowance is per row. Declare attempt state inside the loop body so it resets each iteration.
-- [ ] The normal `delay(delayBetweenRequestsMs)` after the row stays as it is. Do not add a cadence delay between attempt 1 and attempt 2.
-- [ ] Update the terminal `endingMessage`. Keep the HTTP 503 status, row ID, and URL. Drop the "rate limit likely exceeded" claim. State that one retry was attempted after N minutes. Keep `endingReason = 'rate_limited'` and the `rate_limited` row note unchanged.
+- [x] In `fetchRssItems()`, add `statusCode: response.status` to the successful return, so recovery logs carry the real HTTP status. Error returns already include it when a response exists.
+- [x] Make sure `storeRequestAndArticles()` runs once, only for the final non-503 result. No `NewsApiRequest` row is created for a 503 attempt.
+- [x] The retry allowance is per row. Declare attempt state inside the loop body so it resets each iteration.
+- [x] The normal `delay(delayBetweenRequestsMs)` after the row stays as it is. Do not add a cadence delay between attempt 1 and attempt 2.
+- [x] Update the terminal `endingMessage`. Keep the HTTP 503 status, row ID, and URL. Drop the "rate limit likely exceeded" claim. State that one retry was attempted after N minutes. Keep `endingReason = 'rate_limited'` and the `rate_limited` row note unchanged.
 
 ### Tests
 
-- [ ] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY='0.001'` setup and restore to the `beforeEach` and `afterEach` of the `requestGoogleRss terminal path results` block and any other block that can hit a 503.
-- [ ] Update the two existing 503 tests, `writes endingReason=rate_limited on HTTP 503 response` and `records HTTP 503 as rate_limited and leaves later rows not_reached`:
-  - [ ] Replace each plain-object 503 mock with a real `Response`. It is a one-line change per test, for example `fetchSpy.mockResolvedValue(new Response('unavailable', { status: 503 }))`.
-  - [ ] `mockResolvedValue` returns the same object every call, and a `Response` body can be read only once. Use `mockImplementation(async () => new Response('unavailable', { status: 503 }))` so each attempt gets a fresh response.
-  - [ ] Keep the existing assertions. Add one that `fetchSpy` was called exactly twice.
-- [ ] Add: 503 then 200 succeeds, saves articles once, row is `success`, ending reason is `queries_exhausted`, and exactly one `NewsApiRequest` row exists for the URL.
-- [ ] Add: 503 then 200 on row 1, then 503 then 200 on row 2. Both rows recover, proving the allowance resets per row. Expect four fetches.
-- [ ] Add: 503 then a non-503 error such as 500. The row gets the existing `rss_fetch_error` note, the job continues to the next row, and no recovery entry is logged. Spy on `logger` to assert the absence.
-- [ ] Add: cancel during the retry wait. Use a larger retry value such as `'0.01'` (600 ms) and abort after about 100 ms. Expect ending reason `canceled`, the row `skipped` / `canceled`, and exactly one fetch.
-- [ ] Do not add tests for unset, empty, or invalid `MINUTES_IN_BETWEEN_REQUESTS_RETRY` values. Their fallback would really wait 120 minutes. This is Deviation 3. Fractional overrides are covered by the recovery tests above.
-- [ ] In the new tests, use a fresh real `Response` (with `mockImplementation`) for every 503 and every attempt 2 response, so Phase 2 does not need to rewrite them.
+- [x] Add `MINUTES_IN_BETWEEN_REQUESTS_RETRY='0.001'` setup and restore to the `beforeEach` and `afterEach` of the `requestGoogleRss terminal path results` block and any other block that can hit a 503.
+- [x] Update the two existing 503 tests, `writes endingReason=rate_limited on HTTP 503 response` and `records HTTP 503 as rate_limited and leaves later rows not_reached`:
+  - [x] Replace each plain-object 503 mock with a real `Response`. It is a one-line change per test, for example `fetchSpy.mockResolvedValue(new Response('unavailable', { status: 503 }))`.
+  - [x] `mockResolvedValue` returns the same object every call, and a `Response` body can be read only once. Use `mockImplementation(async () => new Response('unavailable', { status: 503 }))` so each attempt gets a fresh response.
+  - [x] Keep the existing assertions. Add one that `fetchSpy` was called exactly twice.
+- [x] Add: 503 then 200 succeeds, saves articles once, row is `success`, ending reason is `queries_exhausted`, and exactly one `NewsApiRequest` row exists for the URL.
+- [x] Add: 503 then 200 on row 1, then 503 then 200 on row 2. Both rows recover, proving the allowance resets per row. Expect four fetches.
+- [x] Add: 503 then a non-503 error such as 500. The row gets the existing `rss_fetch_error` note, the job continues to the next row, and no recovery entry is logged. Spy on `logger` to assert the absence.
+- [x] Add: cancel during the retry wait. Use a larger retry value such as `'0.01'` (600 ms) and abort after about 100 ms. Expect ending reason `canceled`, the row `skipped` / `canceled`, and exactly one fetch.
+- [x] Do not add tests for unset, empty, or invalid `MINUTES_IN_BETWEEN_REQUESTS_RETRY` values. Their fallback would really wait 120 minutes. This is Deviation 3. Fractional overrides are covered by the recovery tests above.
+- [x] In the new tests, use a fresh real `Response` (with `mockImplementation`) for every 503 and every attempt 2 response, so Phase 2 does not need to rewrite them.
 
 ### End of Phase 1
 
-- [ ] Run the end-of-phase steps.
-- [ ] Commit, for example `feat: retry google rss 503 once after wait`.
+- [x] Run the end-of-phase steps.
+- [x] Commit, for example `feat: retry google rss 503 once after wait`.
 
 ## Phase 2: 503 Response Capture and Header Summary
 

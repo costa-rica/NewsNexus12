@@ -15,6 +15,7 @@ import {
   GoogleRssJobResult,
   mapRssItems
 } from '../../src/modules/jobs/requestGoogleRssJob';
+import logger from '../../src/modules/logger';
 
 const makeQueueContext = (overrides: Partial<{
   jobId: string;
@@ -280,10 +281,13 @@ describe('requestGoogleRss terminal path results', () => {
   let spreadsheetPath: string;
   let fetchSpy: jest.SpyInstance;
   let originalDelay: string | undefined;
+  let originalRetryDelay: string | undefined;
 
   beforeEach(async () => {
     originalDelay = process.env.MILISECONDS_IN_BETWEEN_REQUESTS;
     process.env.MILISECONDS_IN_BETWEEN_REQUESTS = '500';
+    originalRetryDelay = process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY;
+    process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY = '0.001';
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rss-terminal-'));
     spreadsheetPath = await createTestSpreadsheet(tempDir);
     fetchSpy = jest.spyOn(global, 'fetch');
@@ -296,6 +300,11 @@ describe('requestGoogleRss terminal path results', () => {
       delete process.env.MILISECONDS_IN_BETWEEN_REQUESTS;
     } else {
       process.env.MILISECONDS_IN_BETWEEN_REQUESTS = originalDelay;
+    }
+    if (originalRetryDelay === undefined) {
+      delete process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY;
+    } else {
+      process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY = originalRetryDelay;
     }
     await fs.rm(tempDir, { recursive: true, force: true });
   });
@@ -318,11 +327,7 @@ describe('requestGoogleRss terminal path results', () => {
   });
 
   it('writes endingReason=rate_limited on HTTP 503 response', async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 503,
-      text: async () => ''
-    } as Response);
+    fetchSpy.mockImplementation(async () => new Response('', { status: 503 }));
 
     const updateResult = jest.fn(() => Promise.resolve());
     const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
@@ -332,6 +337,7 @@ describe('requestGoogleRss terminal path results', () => {
     expect(updateResult).toHaveBeenCalledWith(
       expect.objectContaining<Partial<GoogleRssJobResult>>({ endingReason: 'rate_limited' })
     );
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('writes endingReason=error when spreadsheet is unreadable', async () => {
@@ -605,11 +611,7 @@ describe('requestGoogleRss terminal path results', () => {
       [61, 'tail query', '', '', '', '30d']
     ]);
     const rateLimitedUrl = makeGoogleRssUrl('rate limited query when:30d');
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 503,
-      text: async () => 'unavailable'
-    } as Response);
+    fetchSpy.mockImplementation(async () => new Response('unavailable', { status: 503 }));
 
     const updateResult = jest.fn(() => Promise.resolve());
     const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
@@ -629,6 +631,115 @@ describe('requestGoogleRss terminal path results', () => {
       note: 'not_reached'
     });
     await expect(NewsApiRequest.count({ where: { url: rateLimitedUrl } })).resolves.toBe(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries one HTTP 503 and saves the recovered response once', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [[100, 'retry recovers', '', '', '', '30d']]);
+    const requestUrl = makeGoogleRssUrl('"retry recovers" when:30d');
+    const articleUrl = 'https://example.com/rss-retry-recovers';
+    fetchSpy
+      .mockImplementationOnce(async () => new Response('unavailable', { status: 503 }))
+      .mockImplementationOnce(
+        async () => new Response(makeRssXml('Retry Recovers', articleUrl), { status: 200 })
+      );
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('queries_exhausted');
+    expect(result.queryResults[0]).toMatchObject({ status: 'success', saved_articles: 1, note: null });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    await expect(NewsApiRequest.count({ where: { url: requestUrl } })).resolves.toBe(1);
+    await expect(countArticlesByUrls([articleUrl])).resolves.toBe(1);
+  });
+
+  it('gives each row its own HTTP 503 retry', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [101, 'first retry row', '', '', '', '30d'],
+      [102, 'second retry row', '', '', '', '30d']
+    ]);
+    const articleUrls = ['https://example.com/rss-retry-row-1', 'https://example.com/rss-retry-row-2'];
+    fetchSpy
+      .mockImplementationOnce(async () => new Response('unavailable', { status: 503 }))
+      .mockImplementationOnce(
+        async () => new Response(makeRssXml('Retry Row 1', articleUrls[0]), { status: 200 })
+      )
+      .mockImplementationOnce(async () => new Response('unavailable', { status: 503 }))
+      .mockImplementationOnce(
+        async () => new Response(makeRssXml('Retry Row 2', articleUrls[1]), { status: 200 })
+      );
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('queries_exhausted');
+    expect(result.queryResults[0]).toMatchObject({ status: 'success', saved_articles: 1 });
+    expect(result.queryResults[1]).toMatchObject({ status: 'success', saved_articles: 1 });
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    await expectArticlesExist(articleUrls);
+  });
+
+  it('handles a non-503 retry failure as an RSS fetch error without logging recovery', async () => {
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [103, 'retry fails differently', '', '', '', '30d'],
+      [104, 'after retry failure', '', '', '', '30d']
+    ]);
+    const articleUrl = 'https://example.com/rss-after-retry-failure';
+    fetchSpy
+      .mockImplementationOnce(async () => new Response('unavailable', { status: 503 }))
+      .mockImplementationOnce(async () => new Response('server error', { status: 500 }))
+      .mockImplementationOnce(
+        async () => new Response(makeRssXml('After Retry Failure', articleUrl), { status: 200 })
+      );
+    const infoSpy = jest.spyOn(logger, 'info');
+
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+
+    await handler(makeQueueContext({ updateResult }));
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('queries_exhausted');
+    expect(result.queryResults[0]).toMatchObject({
+      status: 'failed',
+      saved_articles: 0,
+      note: 'rss_fetch_error: RSS request failed with status 500'
+    });
+    expect(result.queryResults[1]).toMatchObject({ status: 'success', saved_articles: 1 });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(infoSpy).not.toHaveBeenCalledWith(
+      'RSS request recovered after HTTP 503 retry',
+      expect.anything()
+    );
+  });
+
+  it('stops without another fetch when canceled during the HTTP 503 retry wait', async () => {
+    process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY = '0.01';
+    spreadsheetPath = await createTestSpreadsheet(tempDir, [
+      [105, 'cancel retry wait', '', '', '', '30d'],
+      [106, 'after canceled retry', '', '', '', '30d']
+    ]);
+    fetchSpy.mockImplementation(async () => new Response('unavailable', { status: 503 }));
+    const controller = new AbortController();
+    const updateResult = jest.fn(() => Promise.resolve());
+    const handler = createRequestGoogleRssJobHandler({ spreadsheetPath, doNotRepeatRequestsWithinHours: 0 });
+    const abortTimer = setTimeout(() => controller.abort(), 100);
+
+    await handler(makeQueueContext({ signal: controller.signal, updateResult }));
+    clearTimeout(abortTimer);
+
+    const result = getLatestResult(updateResult);
+    expect(result.endingReason).toBe('canceled');
+    expect(result.queryResults[0]).toMatchObject({ status: 'skipped', saved_articles: 0, note: 'canceled' });
+    expect(result.queryResults[1]).toMatchObject({ status: 'skipped', note: 'not_reached' });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the successful row outcome when the target is reached', async () => {

@@ -36,6 +36,9 @@ import {
 
 export const DEFAULT_REQUEST_GOOGLE_RSS_REPEAT_WINDOW_HOURS = 72;
 
+const DEFAULT_RETRY_DELAY_MINUTES = 120;
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 interface RssItem {
   title?: string;
   description?: string;
@@ -260,7 +263,8 @@ const fetchRssItems = async (url: string, signal: AbortSignal): Promise<RssFetch
     const items = parsed?.rss?.channel?.[0]?.item || [];
     return {
       status: 'success',
-      items: mapRssItems(items)
+      items: mapRssItems(items),
+      statusCode: response.status
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown RSS fetch error';
@@ -475,9 +479,26 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
     return parsed;
   })();
 
+  const retryDelayMinutes = (() => {
+    const envValue = process.env.MINUTES_IN_BETWEEN_REQUESTS_RETRY;
+    if (!envValue || envValue.trim() === '') {
+      return DEFAULT_RETRY_DELAY_MINUTES;
+    }
+    const parsed = Number(envValue);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed * 60_000 > MAX_TIMER_DELAY_MS) {
+      logger.warn(
+        `Invalid MINUTES_IN_BETWEEN_REQUESTS_RETRY: ${envValue}. Must be a positive number of minutes. Using ${DEFAULT_RETRY_DELAY_MINUTES}.`
+      );
+      return DEFAULT_RETRY_DELAY_MINUTES;
+    }
+    return parsed;
+  })();
+  const retryDelayMs = Math.round(retryDelayMinutes * 60_000);
+
   logger.info(
     `Delay between requests: ${delayBetweenRequestsMs}ms (${(delayBetweenRequestsMs / 1000).toFixed(1)}s)`
   );
+  logger.info(`Delay before HTTP 503 retry: ${retryDelayMinutes} minutes`);
 
   await ensureDbReady();
 
@@ -569,7 +590,34 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
         `Requesting RSS (id: ${row.id}, ${queryResult.timeRange}${timeRangeNote}): ${requestUrl}`
       );
 
-      const response = await fetchRssItems(requestUrl, context.signal);
+      let attempt = 1;
+      let response = await fetchRssItems(requestUrl, context.signal);
+
+      if (!context.signal.aborted && response.statusCode === 503) {
+        logger.error('RSS request returned HTTP 503; scheduling one retry', {
+          queryId: row.id,
+          jobId: context.jobId,
+          attempt,
+          retryDelayMinutes
+        });
+
+        await delay(retryDelayMs, context.signal);
+
+        if (context.signal.aborted) {
+          queryResults[i] = {
+            ...queryResults[i],
+            status: 'skipped',
+            saved_articles: 0,
+            note: 'canceled'
+          };
+          endingReason = 'canceled';
+          endingMessage = 'Job was canceled during the HTTP 503 retry wait.';
+          break;
+        }
+
+        attempt = 2;
+        response = await fetchRssItems(requestUrl, context.signal);
+      }
 
       if (context.signal.aborted) {
         queryResults[i] = {
@@ -584,6 +632,11 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
       }
 
       if (response.statusCode === 503) {
+        logger.error('RSS retry returned HTTP 503; retry exhausted', {
+          queryId: row.id,
+          jobId: context.jobId,
+          attempt
+        });
         queryResults[i] = {
           ...queryResults[i],
           status: 'failed',
@@ -591,9 +644,18 @@ const runLegacyWorkflow = async (context: RequestGoogleRssJobContext): Promise<v
           note: 'rate_limited'
         };
         endingReason = 'rate_limited';
-        endingMessage = `HTTP 503 Service Unavailable (id: ${row.id}): ${requestUrl}. Google RSS rate limit likely exceeded. Try increasing MILISECONDS_IN_BETWEEN_REQUESTS (current: ${delayBetweenRequestsMs}ms).`;
+        endingMessage = `HTTP 503 Service Unavailable (id: ${row.id}): ${requestUrl}. One retry after ${retryDelayMinutes} minutes also returned HTTP 503.`;
         logger.error(endingMessage);
         break;
+      }
+
+      if (attempt === 2 && response.status === 'success') {
+        logger.info('RSS request recovered after HTTP 503 retry', {
+          queryId: row.id,
+          jobId: context.jobId,
+          attempt,
+          status: response.statusCode
+        });
       }
 
       const savedThisRequest = await storeRequestAndArticles({
