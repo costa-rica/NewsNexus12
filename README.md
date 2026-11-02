@@ -11,8 +11,9 @@ Run from root of project.
 ### 1. Install Node dependencies:
 
 ```bash
-npm install
+npm ci
 ```
+- instead of `npm install`
 
 The root npm workspace includes `db-models`, `db-manager`, `api`, `worker-node`, and `portal`.
 `worker-python` is not included in the npm workspace flow.
