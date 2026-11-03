@@ -148,6 +148,11 @@ Optional:
 10. `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` (default `180`)
 11. `MINUTES_IN_BETWEEN_REQUESTS_RETRY` (default `120` minutes; wait before the single Google RSS HTTP 503 retry)
 
+## Google RSS 503 diagnostics
+
+- Response-body capture is limited to 10 KiB (10,240 bytes) per HTTP 503 response. Larger bodies are truncated and logged with `bodyTruncated=true`.
+- Headers and log metadata are additional to the body cap. The single retry still uses `MINUTES_IN_BETWEEN_REQUESTS_RETRY` (default `120` minutes).
+
 ## Database
 
 - Type: Postgres 16 via Sequelize 6 in `@newsnexus/db-models`

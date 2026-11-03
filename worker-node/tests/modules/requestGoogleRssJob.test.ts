@@ -802,20 +802,20 @@ describe('requestGoogleRss terminal path results', () => {
     expect(findLogMeta(errorSpy, 'RSS 503 header summary', 2)?.outcome).toBe('retry_exhausted');
   });
 
-  it('keeps a 503 body of exactly 1 MB without truncation', async () => {
-    const errorSpy = await runSingle503Row(201, () => make503Response('a'.repeat(1_048_576)));
+  it('keeps a 503 body of exactly 10 KiB without truncation', async () => {
+    const errorSpy = await runSingle503Row(201, () => make503Response('a'.repeat(10_240)));
 
     const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
-    expect(full).toMatchObject({ bodyByteLength: 1_048_576, bodyTruncated: false });
-    expect((full?.body as string).length).toBe(1_048_576);
+    expect(full).toMatchObject({ bodyByteLength: 10_240, bodyTruncated: false });
+    expect((full?.body as string).length).toBe(10_240);
   });
 
-  it('truncates a 503 body larger than 1 MB', async () => {
-    const errorSpy = await runSingle503Row(202, () => make503Response('b'.repeat(1_048_577)));
+  it('truncates a 503 body larger than 10 KiB', async () => {
+    const errorSpy = await runSingle503Row(202, () => make503Response('b'.repeat(10_241)));
 
     const full = findLogMeta(errorSpy, 'RSS 503 full response', 1);
-    expect(full).toMatchObject({ bodyByteLength: 1_048_576, bodyTruncated: true });
-    expect((full?.body as string).length).toBe(1_048_576);
+    expect(full).toMatchObject({ bodyByteLength: 10_240, bodyTruncated: true });
+    expect((full?.body as string).length).toBe(10_240);
   });
 
   it('keeps status, headers, and the partial body when the 503 body read fails', async () => {

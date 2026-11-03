@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-23T22:41:00Z
-updated_at: 2026-10-23T22:41:00Z
+updated_at: 2026-11-03T19:29:40Z
 created_by: claude (opus-5.5) nicksmacbookair
-modified_by: claude (opus-5.5) nicksmacbookair
+modified_by: codex (gpt-6) nicksmacbookair
 ---
 
 # Google RSS 503 Retry TODO v03
@@ -146,7 +146,7 @@ Goal: every 503, on either attempt, writes the header summary entry and then the
   - [x] Decodes with `TextDecoder('utf-8')` without the `fatal` option, so invalid bytes do not throw.
   - [x] Handles a `null` body as an empty string with `byteLength: 0`.
   - [x] Catches read errors and returns the partial text plus `readError`. It never throws.
-- [x] Define the 1 MB cap as a named constant in the module, for example `RSS_503_BODY_CAPTURE_LIMIT_BYTES`.
+- [x] Define the 10 KiB cap as a named constant in the module, for example `RSS_503_BODY_CAPTURE_LIMIT_BYTES`.
 - [x] In `fetchRssItems()`, for 503 only, do not clear the 10-second timeout until the body read finishes. The same timer then bounds the body read, and outer cancellation still aborts it through the linked controller. Clear the timer in a `finally`-style path for every outcome.
 - [x] For non-503, non-OK responses, keep today's behavior and do not read the body.
 

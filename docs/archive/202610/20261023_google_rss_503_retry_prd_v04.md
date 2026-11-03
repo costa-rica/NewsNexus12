@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-23T22:06:04Z
-updated_at: 2026-10-23T22:06:04Z
+updated_at: 2026-11-03T19:29:40Z
 created_by: claude (opus-5.5) nicksmacbookair
-modified_by: claude (opus-5.5) nicksmacbookair
+modified_by: codex (gpt-6) nicksmacbookair
 ---
 
 # Google RSS 503 Retry PRD v04
@@ -38,7 +38,7 @@ References:
 
 ## Decisions From Earlier Open Questions
 
-1. Body safety cap: 1 MB, as long as the log files have room. Production `LOG_MAX_SIZE` is raised to `20` for the next run (see Deployment).
+1. Body safety cap: 10 KiB, as long as the log files have room. Production `LOG_MAX_SIZE` is raised to `20` for the next run (see Deployment).
 2. Cookie headers: log them unredacted for this diagnostic run. Reconsider once the cause is known.
 3. Run length: a weekly run of 13 hours or more is acceptable.
 4. Recovered retry: log status and headers only, not the body.
@@ -129,7 +129,7 @@ Headers to look up (case-insensitive):
 
 Notes:
 
-- Header capture is not limited by the 1 MB body cap. All headers are always recorded in full in entry 2; this summary only makes the likely clues easy to find.
+- Header capture is not limited by the 10 KiB body cap. All headers are always recorded in full in entry 2; this summary only makes the likely clues easy to find.
 - Keep the lookup list as a single constant in the job module so it is easy to extend.
 
 ### Entry 2: Full response
@@ -143,7 +143,7 @@ Notes:
 
 Body capture rules:
 
-- Read the body in a stream, up to a 1 MB (1,048,576 bytes) safety cap. Do not buffer an unlimited response.
+- Read the body in a stream, up to a 10 KiB (10,240 bytes) safety cap. Do not buffer an unlimited response.
 - Set `bodyTruncated: true` only when the body exceeds the cap; otherwise `false`.
 - Bound the body read by the existing 10-second request timeout. Today that timer is cleared once headers arrive, so it must also cover the 503 body read.
 - If reading the body fails or times out, log the error alongside the status, headers, and any partial body. Never lose the status or headers.
@@ -182,7 +182,7 @@ These are operator steps on the production host, not code changes.
 5. Unset, empty, and invalid values for `MINUTES_IN_BETWEEN_REQUESTS_RETRY` use 120 minutes; invalid values also log a warning. Valid overrides, including fractions, are honored.
 6. Every 503 writes the header summary entry before the full-response entry, and both share query ID, job ID, attempt number, and timestamp.
 7. The header summary records present headers with their values and absent headers as `null`. It lists cookie names and all `x-goog` and `x-google` prefixed headers. Header lookup ignores case.
-8. The full-response entry contains the request URL, final URL, redirect flag, status, status text, all exposed headers unredacted, and the complete body. Truncation is flagged correctly for bodies under, at, and over the 1 MB cap.
+8. The full-response entry contains the request URL, final URL, redirect flag, status, status text, all exposed headers unredacted, and the complete body. Truncation is flagged correctly for bodies under, at, and over the 10 KiB cap.
 9. A body-read failure or timeout still logs the header summary, status, and headers.
 10. A recovered retry logs its status, all headers, and its header summary, with no body.
 
