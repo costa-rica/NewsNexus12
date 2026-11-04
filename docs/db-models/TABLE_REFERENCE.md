@@ -63,6 +63,8 @@ Database table reference for NewsNexus12 (PostgreSQL via Sequelize ORM).
 
 - **Table name**: `ArticlesApproved02`
 
+> **Legacy table.** No current code writes to it. It is not used by ai-approver-v02 (which uses `AiApproverArticlePredictionV02`); it was most likely populated by an older AI approver service that has since been removed.
+
 | Column                      | Type     | Constraints        | Notes                        |
 | --------------------------- | -------- | ------------------ | ---------------------------- |
 | id                          | INTEGER  | PK, Auto Increment |                              |
