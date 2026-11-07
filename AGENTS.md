@@ -1,6 +1,6 @@
 ---
 created_at: 2026-05-21T23:27:44Z
-updated_at: 2026-11-03T19:48:16Z
+updated_at: 2026-11-07T17:52:40Z
 created_by: nick
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -135,9 +135,20 @@ Should a report without dates cover the trailing seven days, including today?
 (codex) Recommend the trailing seven days in the Toggl user timezone.
 ```
 
-## Commit Message Guidance
+## Git Guidance
 
-### Guidelines
+### Branch Names
+
+- Format: `dev_NN_short_description`.
+- `NN` is one more than the highest number on any local or remote branch. Run `git fetch` and `git branch -a` first.
+- `short_description` is lowercase words joined by underscores, no more than 30 characters, naming the work (for example `google_rss_503_retry`).
+- Use the `dev_` prefix for all work: features, fixes, and docs.
+- Continuing the same topic gets a new number plus a `_01`, `_02` suffix (for example `dev_35_weekly_combined_flow_02`).
+- Branch from an up-to-date `main`. Never reuse a merged branch.
+
+### Commit Messages
+
+#### Guidelines
 
 - Only generate the message for staged files/changes
 - Title is lowercase, no period at the end.
@@ -163,9 +174,9 @@ Should a report without dates cover the trailing seven days, including today?
 - use lowercase only
 - if multiple agents contributed, add one line per agent (no bullets, just separate lines)
 
-### Format
+#### Format
 
-#### Ideal Format
+##### Ideal Format
 
 ```
 <type>:<space><message title>
@@ -173,7 +184,7 @@ Should a report without dates cover the trailing seven days, including today?
 <bullet points summarizing what was updated>
 ```
 
-#### Broad Format
+##### Broad Format
 
 ```
 <message title>
@@ -181,7 +192,7 @@ Should a report without dates cover the trailing seven days, including today?
 <bullet points summarizing what was updated>
 ```
 
-#### Types for Ideal Format
+##### Types for Ideal Format
 
 | Type     | Description                           |
 | -------- | ------------------------------------- |
