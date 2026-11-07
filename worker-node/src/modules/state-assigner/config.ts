@@ -101,7 +101,7 @@ const assertCodexBinaryAvailable = (
     {
       field: 'codex',
       message:
-        'codex CLI not found on PATH; install the Codex CLI (docs/CODEX_CLI_SERVER_SETUP.md) or set USE_OPEN_AI_API=true with KEY_OPEN_AI'
+        'codex CLI not found on PATH; install the Codex CLI (docs/CODEX_CLI_PRODUCTION_RUNBOOK.md) or set USE_OPEN_AI_API=true with KEY_OPEN_AI'
     }
   ]);
 };

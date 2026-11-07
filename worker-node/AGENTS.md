@@ -177,7 +177,7 @@ Important behavior:
 - To stay on the OpenAI API, set `USE_OPEN_AI_API=true` and keep `KEY_OPEN_AI` populated.
 - `KEY_OPEN_AI` alone no longer selects the OpenAI API backend.
 - If `USE_OPEN_AI_API=true` but `KEY_OPEN_AI` is missing, the workflow logs a warning and falls back to Codex CLI.
-- When Codex CLI is selected, the route validates that a `codex` executable is on the service user's `PATH`; see `../docs/CODEX_CLI_SERVER_SETUP.md`.
+- When Codex CLI is selected, the route validates that a `codex` executable is on the service user's `PATH`; see `../docs/CODEX_CLI_PRODUCTION_RUNBOOK.md`.
 
 4. AI invocation and timeout behavior are backend-aware.
 
