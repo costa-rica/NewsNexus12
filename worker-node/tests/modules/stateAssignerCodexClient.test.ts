@@ -36,7 +36,10 @@ const flush = async (): Promise<void> => {
 };
 
 const waitForSpawn = async (spawn: jest.Mock): Promise<FakeCodexChild> => {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  // The client creates a real temp directory and file before spawning, so wait on
+  // elapsed time rather than a fixed number of event-loop turns.
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
     if (spawn.mock.results[0]?.value) {
       return spawn.mock.results[0].value as FakeCodexChild;
     }
