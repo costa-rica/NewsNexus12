@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T22:00:24Z
+updated_at: 2026-11-09T22:01:06Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -74,20 +74,20 @@ Tests in `worker-node/tests/modules/stateAssignerCodexClient.test.ts`:
 
 File: `ops/src/weekly-flow-02/phases/06_runStateAssignment.ts`. Plan Section 3.
 
-- [ ] In the `job.status === 'completed'` branch, after the existing `monitoringLimited` and missing-result checks and before `recordPhaseSixCompleted`, add the rule: `selectedCount > 0` and `completedCount === 0` means the job did not succeed.
-  - [ ] If `startedThisInvocation`, throw `RunStateAssignmentError('unsuccessful_result', ...)` with a message like `State assigner completed 0 of 1547 selected articles (skipped 0, failed 1547)`.
-  - [ ] Otherwise, follow the existing saved-failed-job path: emit `replacement_eligible`, set `pendingContinuation` with reason `saved_job_failed`, clear `jobId`, and `continue`. Copy the existing pattern from the `failed` / `canceled` branch.
-- [ ] In the existing `failed` / `canceled` branch, append the job's `failureReason` to the thrown message when present.
-- [ ] Do not add a continuation reason or touch `persistence.ts` or `sequelizePersistence.ts`.
+- [x] In the `job.status === 'completed'` branch, after the existing `monitoringLimited` and missing-result checks and before `recordPhaseSixCompleted`, add the rule: `selectedCount > 0` and `completedCount === 0` means the job did not succeed.
+  - [x] If `startedThisInvocation`, throw `RunStateAssignmentError('unsuccessful_result', ...)` with a message like `State assigner completed 0 of 1547 selected articles (skipped 0, failed 1547)`.
+  - [x] Otherwise, follow the existing saved-failed-job path: emit `replacement_eligible`, set `pendingContinuation` with reason `saved_job_failed`, clear `jobId`, and `continue`. Copy the existing pattern from the `failed` / `canceled` branch.
+- [x] In the existing `failed` / `canceled` branch, append the job's `failureReason` to the thrown message when present.
+- [x] Do not add a continuation reason or touch `persistence.ts` or `sequelizePersistence.ts`.
 
 Tests in `ops/tests/weekly-flow-02/06_runStateAssignment.test.ts`:
 
-- [ ] A completed job with `selected > 0, completed = 0` started this invocation throws `unsuccessful_result` and does not call `recordPhaseSixCompleted`.
-- [ ] The same result from a saved job becomes replacement-eligible and a new job is started.
-- [ ] `selected = 0` still completes Phase 6.
-- [ ] A partial result (`completed > 0`, some failed) still completes Phase 6.
-- [ ] A failed job's thrown message includes its `failureReason`.
-- [ ] Run the end-of-phase routine for ops and commit.
+- [x] A completed job with `selected > 0, completed = 0` started this invocation throws `unsuccessful_result` and does not call `recordPhaseSixCompleted`.
+- [x] The same result from a saved job becomes replacement-eligible and a new job is started.
+- [x] `selected = 0` still completes Phase 6.
+- [x] A partial result (`completed > 0`, some failed) still completes Phase 6.
+- [x] A failed job's thrown message includes its `failureReason`.
+- [x] Run the end-of-phase routine for ops and commit.
 
 ## Phase 4: worker-python V02
 

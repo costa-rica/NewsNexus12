@@ -711,6 +711,28 @@ export const runStateAssignment = async (
           'Completed state assigner job is missing its validated result'
         );
       }
+      // A completed job that selected Articles but assigned none is not a success.
+      if (job.result.selectedCount > 0 && job.result.completedCount === 0) {
+        if (startedThisInvocation) {
+          throw new RunStateAssignmentError(
+            'unsuccessful_result',
+            `State assigner completed 0 of ${job.result.selectedCount} selected articles ` +
+              `(skipped ${job.result.skippedCount}, failed ${job.result.failedCount})`
+          );
+        }
+        dependencies.onEvent?.({
+          action: 'replacement_eligible',
+          jobId: job.jobId,
+          status: job.status,
+          recoveryAction: 'saved_terminal_job'
+        });
+        pendingContinuation = {
+          priorJobId: job.jobId,
+          reason: 'saved_job_failed'
+        };
+        jobId = null;
+        continue;
+      }
       const completedAt = dependencies.now();
       await dependencies.persistence.recordPhaseSixCompleted(
         run.id,
@@ -742,7 +764,9 @@ export const runStateAssignment = async (
       if (startedThisInvocation) {
         throw new RunStateAssignmentError(
           'unsuccessful_result',
-          `State assigner job ended with status ${job.status}`
+          job.failureReason
+            ? `State assigner job ended with status ${job.status}: ${job.failureReason}`
+            : `State assigner job ended with status ${job.status}`
         );
       }
       dependencies.onEvent?.({

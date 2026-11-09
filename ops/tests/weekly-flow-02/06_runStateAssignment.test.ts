@@ -196,6 +196,77 @@ describe('runStateAssignment', () => {
     assert.deepEqual(delays, [300_000]);
   });
 
+  it('fails a new completed job that selected Articles but completed none', async () => {
+    const memory = createInMemoryPersistence([phaseFiveRun()]);
+    const worker: StateAssignerWorker = {
+      start: async () => startResult('new-job'),
+      getStatus: async () =>
+        compatible('new-job', 'completed', {
+          result: result({ selectedCount: 12, completedCount: 0, skippedCount: 2, failedCount: 10 })
+        }),
+      cancel: async () => 'canceled'
+    };
+
+    await assert.rejects(
+      runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+      (error: unknown) =>
+        error instanceof RunStateAssignmentError &&
+        error.category === 'unsuccessful_result' &&
+        error.message ===
+          'State assigner completed 0 of 12 selected articles (skipped 2, failed 10)'
+    );
+    assert.equal(memory.calls.includes('complete:6'), false);
+    assert.equal(memory.runs[0].lastPhaseCompleted, 5);
+  });
+
+  it('replaces a saved completed job that selected Articles but completed none', async () => {
+    const memory = createInMemoryPersistence([continuedRun()]);
+    let starts = 0;
+    const worker: StateAssignerWorker = {
+      start: async () => {
+        starts += 1;
+        return startResult('replacement');
+      },
+      getStatus: async (jobId) =>
+        jobId === 'saved-job'
+          ? compatible('saved-job', 'completed', {
+              result: result({ selectedCount: 12, completedCount: 0, skippedCount: 0, failedCount: 12 })
+            })
+          : compatible('replacement', 'completed'),
+      cancel: async () => 'canceled'
+    };
+
+    const phaseResult = await runStateAssignment(
+      memory.runs[0],
+      config,
+      dependencies(memory.persistence, worker)
+    );
+
+    assert.equal(starts, 1);
+    assert.equal(phaseResult.kind, 'ready_for_phase_7');
+    assert.equal(phaseResult.stateAssignerJobId, 'replacement');
+    assert.equal(phaseResult.completedCount, 10);
+  });
+
+  it('includes the worker failure reason when a new job fails', async () => {
+    const memory = createInMemoryPersistence([phaseFiveRun()]);
+    const failureReason =
+      'State assigner stopped after 3 article failures since the last success (completed 0, skipped 0, failed 3)';
+    const worker: StateAssignerWorker = {
+      start: async () => startResult('new-job'),
+      getStatus: async () => compatible('new-job', 'failed', { failureReason }),
+      cancel: async () => 'canceled'
+    };
+
+    await assert.rejects(
+      runStateAssignment(memory.runs[0], config, dependencies(memory.persistence, worker)),
+      (error: unknown) =>
+        error instanceof RunStateAssignmentError &&
+        error.category === 'unsuccessful_result' &&
+        error.message === `State assigner job ended with status failed: ${failureReason}`
+    );
+  });
+
   it('resets tolerated transient failures after a valid active response', async () => {
     const memory = createInMemoryPersistence([continuedRun()]);
     const delays: number[] = [];
