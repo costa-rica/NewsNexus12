@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T21:54:05Z
+updated_at: 2026-11-09T21:59:25Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -33,25 +33,25 @@ Run the commands for the package or packages the phase changed:
 
 File: `worker-node/src/modules/jobs/stateAssignerJob.ts`. Plan Section 1.
 
-- [ ] Add module constant `MAX_ARTICLE_FAILURES_SINCE_SUCCESS = 3`.
-- [ ] In `processStateAssignmentsWithTimeout`, track `failuresSinceSuccess`:
-  - [ ] Reset to 0 after a successful article.
-  - [ ] Leave unchanged on a timeout (skipped article).
-  - [ ] Add 1 in the existing `catch` block, after the existing abort check.
-- [ ] Add the prompt ID (`prompt.id`) to the existing `Failed to process article <id>: <message>` error log.
-- [ ] When `failuresSinceSuccess` reaches the limit, log an error and throw a plain `Error`. Message format:
+- [x] Add module constant `MAX_ARTICLE_FAILURES_SINCE_SUCCESS = 3`.
+- [x] In `processStateAssignmentsWithTimeout`, track `failuresSinceSuccess`:
+  - [x] Reset to 0 after a successful article.
+  - [x] Leave unchanged on a timeout (skipped article).
+  - [x] Add 1 in the existing `catch` block, after the existing abort check.
+- [x] Add the prompt ID (`prompt.id`) to the existing `Failed to process article <id>: <message>` error log.
+- [x] When `failuresSinceSuccess` reaches the limit, log an error and throw a plain `Error`. Message format:
   - `State assigner stopped after 3 article failures since the last success (completed X, skipped Y, failed Z); last article <articleId>, prompt <promptId>: <last error message>`
-- [ ] After the loop ends normally, log one info line with the final completed, skipped, and failed counts.
-- [ ] Do not change cancellation behavior. An aborted signal still returns counts without counting a failure.
+- [x] After the loop ends normally, log one info line with the final completed, skipped, and failed counts.
+- [x] Do not change cancellation behavior. An aborted signal still returns counts without counting a failure.
 
 Tests in `worker-node/tests/modules/stateAssignerJob.test.ts`:
 
-- [ ] Three failures with no success throw. The message has the counts, last article ID, prompt ID, and last error.
-- [ ] Success reset: fail, fail, success, fail, fail completes without throwing.
-- [ ] Mixed types: a Codex-style failure, an invalid-response-style failure, and another Codex-style failure throw on the third article. (In worker-node both are just thrown errors with different messages.)
-- [ ] Timeouts do not count: fail, timeout, fail, timeout completes without throwing.
-- [ ] Abort still returns counts. Keep or extend the existing abort test.
-- [ ] Run the end-of-phase routine for worker-node and commit.
+- [x] Three failures with no success throw. The message has the counts, last article ID, prompt ID, and last error.
+- [x] Success reset: fail, fail, success, fail, fail completes without throwing.
+- [x] Mixed types: a Codex-style failure, an invalid-response-style failure, and another Codex-style failure throw on the third article. (In worker-node both are just thrown errors with different messages.)
+- [x] Timeouts do not count: fail, timeout, fail, timeout completes without throwing.
+- [x] Abort still returns counts. Keep or extend the existing abort test.
+- [x] Run the end-of-phase routine for worker-node and commit.
 
 ## Phase 2: worker-node prompt removal
 

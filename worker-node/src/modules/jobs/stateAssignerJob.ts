@@ -116,6 +116,7 @@ export interface StateAssignerJobDependencies {
 
 const LEGACY_AI_NAME = 'NewsNexusLlmStateAssigner01';
 const DEFAULT_ITERATION_TIMEOUT_MS = 10_000;
+const MAX_ARTICLE_FAILURES_SINCE_SUCCESS = 3;
 
 const resolveEntityWhoCategorizesId = async (): Promise<number> => {
   const aiEntity = await ArtificialIntelligence.findOne({
@@ -298,6 +299,7 @@ export const processStateAssignmentsWithTimeout = async ({
     skippedCount: 0,
     failedCount: 0
   };
+  let failuresSinceSuccess = 0;
 
   for (let index = 0; index < articles.length; index += 1) {
     if (signal.aborted) {
@@ -332,6 +334,7 @@ export const processStateAssignmentsWithTimeout = async ({
 
       await persistAssignment(article.id, result.value!, prompt.id, entityWhoCategorizesId);
       counts.completedCount += 1;
+      failuresSinceSuccess = 0;
       log.info(`Successfully processed article ${article.id}`);
     } catch (error) {
       if (signal.aborted) {
@@ -339,12 +342,26 @@ export const processStateAssignmentsWithTimeout = async ({
       }
 
       counts.failedCount += 1;
+      failuresSinceSuccess += 1;
       const message = error instanceof Error ? error.message : 'Unknown state assigner error';
-      log.error(`Failed to process article ${article.id}: ${message}`);
+      log.error(`Failed to process article ${article.id} with prompt ${prompt.id}: ${message}`);
+
+      if (failuresSinceSuccess >= MAX_ARTICLE_FAILURES_SINCE_SUCCESS) {
+        const stopMessage =
+          `State assigner stopped after ${MAX_ARTICLE_FAILURES_SINCE_SUCCESS} article failures since the last success ` +
+          `(completed ${counts.completedCount}, skipped ${counts.skippedCount}, failed ${counts.failedCount}); ` +
+          `last article ${article.id}, prompt ${prompt.id}: ${message}`;
+        log.error(stopMessage);
+        throw new Error(stopMessage);
+      }
+
       log.warn(`Skipping article ${article.id} and continuing with next article`);
     }
   }
 
+  log.info(
+    `State assigner finished processing articles (completed ${counts.completedCount}, skipped ${counts.skippedCount}, failed ${counts.failedCount})`
+  );
   return counts;
 };
 
