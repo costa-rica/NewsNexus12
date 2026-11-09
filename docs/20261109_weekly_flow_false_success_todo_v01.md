@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T21:59:25Z
+updated_at: 2026-11-09T22:00:24Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -57,18 +57,18 @@ Tests in `worker-node/tests/modules/stateAssignerJob.test.ts`:
 
 File: `worker-node/src/modules/state-assigner/codexCliClient.ts`, function `analyzeArticleWithCodexCli`. Plan Section 2.
 
-- [ ] Raise `OUTPUT_TAIL_CHARS` from 400 to 2000.
-- [ ] Collect the full stdout and stderr text for each call instead of rolling tails. Remove or replace `recordTail` as needed.
-- [ ] Before building any error message, replace every exact occurrence of the built `prompt` with `[prompt removed]` in both streams. Then keep the last `OUTPUT_TAIL_CHARS` characters of each.
-- [ ] Apply this to every existing error path that includes output (nonzero exit, stdin error, unreadable output file, empty output, invalid JSON).
-- [ ] Leave the invalid-JSON `output file tail` as the model's reply, limited to `OUTPUT_TAIL_CHARS`.
+- [x] Raise `OUTPUT_TAIL_CHARS` from 400 to 2000.
+- [x] Collect the full stdout and stderr text for each call instead of rolling tails. Remove or replace `recordTail` as needed.
+- [x] Before building any error message, replace every exact occurrence of the built `prompt` with `[prompt removed]` in both streams. Then keep the last `OUTPUT_TAIL_CHARS` characters of each.
+- [x] Apply this to every existing error path that includes output (nonzero exit, stdin error, unreadable output file, empty output, invalid JSON).
+- [x] Leave the invalid-JSON `output file tail` as the model's reply, limited to `OUTPUT_TAIL_CHARS`.
 
 Tests in `worker-node/tests/modules/stateAssignerCodexClient.test.ts`:
 
-- [ ] Update the existing bounded-tail test (`'a'.repeat(450)` followed by `failure tail`) so it still proves the tail is bounded at the new 2000-character limit.
-- [ ] stderr containing the full prompt followed by an error: the message contains the error and does not contain the prompt.
-- [ ] Same case with a prompt longer than 2000 characters: the prompt is still removed whole.
-- [ ] Run the end-of-phase routine for worker-node and commit.
+- [x] Update the existing bounded-tail test (`'a'.repeat(450)` followed by `failure tail`) so it still proves the tail is bounded at the new 2000-character limit.
+- [x] stderr containing the full prompt followed by an error: the message contains the error and does not contain the prompt.
+- [x] Same case with a prompt longer than 2000 characters: the prompt is still removed whole.
+- [x] Run the end-of-phase routine for worker-node and commit.
 
 ## Phase 3: ops Phase 6 gate
 

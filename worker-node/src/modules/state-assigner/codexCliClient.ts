@@ -10,7 +10,8 @@ import { StateAssignerAiConfig } from './config';
 import { buildStateAssignerPrompt, StateAssignerPromptArticle } from './prompt';
 import { ChatGptResponse, parseChatGptResponse } from './responseParsing';
 
-const OUTPUT_TAIL_CHARS = 400;
+const OUTPUT_TAIL_CHARS = 2000;
+const PROMPT_REMOVED = '[prompt removed]';
 const CODEX_KILL_GRACE_MS = 5_000;
 
 interface CodexChildProcess extends EventEmitter, CancelableProcessHandle {
@@ -38,8 +39,12 @@ const createAbortError = (message: string): Error => {
   return error;
 };
 
-const recordTail = (current: string, chunk: Buffer | string): string =>
-  `${current}${chunk.toString()}`.slice(-OUTPUT_TAIL_CHARS);
+// Codex can echo the prompt (which contains Article text) in its output. Remove it whole
+// before truncating, so error messages keep Codex's own error and not the Article.
+const redactedTail = (output: string, prompt: string): string => {
+  const withoutPrompt = prompt === '' ? output : output.split(prompt).join(PROMPT_REMOVED);
+  return withoutPrompt.slice(-OUTPUT_TAIL_CHARS);
+};
 
 const outputTail = (stdoutTail: string, stderrTail: string): string => {
   const combined = [stdoutTail.trim(), stderrTail.trim()].filter((value) => value !== '').join(' ');
@@ -217,16 +222,18 @@ export const analyzeArticleWithCodexCli = async (
 
     registerCancelableProcess(child);
 
-    let stdoutTail = '';
-    let stderrTail = '';
+    let stdoutText = '';
+    let stderrText = '';
     let stdinError: Error | null = null;
 
     child.stdout.on('data', (chunk: Buffer | string) => {
-      stdoutTail = recordTail(stdoutTail, chunk);
+      stdoutText += chunk.toString();
     });
     child.stderr.on('data', (chunk: Buffer | string) => {
-      stderrTail = recordTail(stderrTail, chunk);
+      stderrText += chunk.toString();
     });
+    const stdoutTail = (): string => redactedTail(stdoutText, prompt);
+    const stderrTail = (): string => redactedTail(stderrText, prompt);
 
     writePromptToStdin(child, prompt, (error) => {
       stdinError = error;
@@ -235,8 +242,8 @@ export const analyzeArticleWithCodexCli = async (
     await waitForClose(
       child,
       signal,
-      () => stdoutTail,
-      () => stderrTail,
+      stdoutTail,
+      stderrTail,
       () => stdinError
     );
 
@@ -247,15 +254,15 @@ export const analyzeArticleWithCodexCli = async (
       throw new Error(
         errorMessage(
           'codex exec output file could not be read',
-          stdoutTail,
-          stderrTail,
+          stdoutTail(),
+          stderrTail(),
           error instanceof Error ? error : new Error(String(error))
         )
       );
     }
 
     if (rawContent === '') {
-      throw new Error(errorMessage('codex exec produced empty output', stdoutTail, stderrTail));
+      throw new Error(errorMessage('codex exec produced empty output', stdoutTail(), stderrTail()));
     }
 
     try {
@@ -265,8 +272,8 @@ export const analyzeArticleWithCodexCli = async (
       throw new Error(
         errorMessage(
           `codex exec output is not valid state assigner JSON: ${message}; output file tail: ${rawContent.slice(-OUTPUT_TAIL_CHARS)}`,
-          stdoutTail,
-          stderrTail
+          stdoutTail(),
+          stderrTail()
         )
       );
     }

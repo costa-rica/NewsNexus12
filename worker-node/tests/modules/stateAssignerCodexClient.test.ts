@@ -181,12 +181,55 @@ describe('analyzeArticleWithCodexCli', () => {
     await flush();
 
     const outputPath = getOutputPath(harness.spawn);
-    child.stderr.write(`${'a'.repeat(450)}failure tail`);
+    child.stderr.write(`${'a'.repeat(2500)}failure tail`);
     child.close(1);
 
     await expect(promise).rejects.toThrow('codex exec failed with exit code 1');
     await expect(promise).rejects.toThrow('failure tail');
+    const message = await promise.then(
+      () => '',
+      (error: Error) => error.message
+    );
+    expect(message).not.toContain('a'.repeat(2001));
     await expect(fs.stat(path.dirname(outputPath))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('removes the echoed prompt from Codex output and keeps the error', async () => {
+    const harness = buildHarness();
+    const promise = harness.run('distinctive article body');
+    const child = await waitForSpawn(harness.spawn);
+    await flush();
+
+    child.stderr.write(`user\n${child.stdinContent}\nERROR: model_not_found`);
+    child.close(1);
+
+    const message = await promise.then(
+      () => '',
+      (error: Error) => error.message
+    );
+    expect(child.stdinContent).toContain('distinctive article body');
+    expect(message).toContain('ERROR: model_not_found');
+    expect(message).toContain('[prompt removed]');
+    expect(message).not.toContain('distinctive article body');
+  });
+
+  it('removes a prompt longer than the output tail limit whole', async () => {
+    const harness = buildHarness();
+    const longContent = `article-start ${'x'.repeat(3000)} article-end`;
+    const promise = harness.run(longContent);
+    const child = await waitForSpawn(harness.spawn);
+    await flush();
+
+    child.stderr.write(`user\n${child.stdinContent}\nERROR: not logged in`);
+    child.close(1);
+
+    const message = await promise.then(
+      () => '',
+      (error: Error) => error.message
+    );
+    expect(message).toContain('ERROR: not logged in');
+    expect(message).not.toContain('article-end');
+    expect(message).not.toContain('xxxxxxxxxx');
   });
 
   it('rejects empty output files', async () => {
