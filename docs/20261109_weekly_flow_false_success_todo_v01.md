@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T22:05:07Z
+updated_at: 2026-11-09T22:05:13Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -131,6 +131,6 @@ Plan Section 6.
 
 The implementing agent does not deploy or touch any server.
 
-- [ ] Push the branch only if the operator asks.
-- [ ] Tell the operator the work is ready, with the commit list and test results.
-- [ ] Remind the operator of the plan's optional manual check on `nws-nn12dev` (plan Section 8) and the deployment steps (plan Section 9). The operator runs both.
+- [x] Push the branch only if the operator asks.
+- [x] Tell the operator the work is ready, with the commit list and test results.
+- [x] Remind the operator of the plan's optional manual check on `nws-nn12dev` (plan Section 8) and the deployment steps (plan Section 9). The operator runs both.
