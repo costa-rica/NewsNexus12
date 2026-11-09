@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T22:01:06Z
+updated_at: 2026-11-09T22:03:09Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -95,27 +95,27 @@ Files: `worker-python/src/modules/ai_approver_v02/client.py` and `orchestrator.p
 
 Client (`evaluate`):
 
-- [ ] On a nonzero exit, take `result.stderr`, replace every exact occurrence of `rendered_prompt` with `[prompt removed]`, keep the last 2000 characters, and append that to the existing `error_message` text.
-- [ ] On `OSError`, append the exception text to the existing `error_message`.
-- [ ] Do not include `result.stdout`. Do not change any `error_code`.
+- [x] On a nonzero exit, take `result.stderr`, replace every exact occurrence of `rendered_prompt` with `[prompt removed]`, keep the last 2000 characters, and append that to the existing `error_message` text.
+- [x] On `OSError`, append the exception text to the existing `error_message`.
+- [x] Do not include `result.stdout`. Do not change any `error_code`.
 
 Orchestrator (`run`):
 
-- [ ] Replace the literals with module constants `MAX_CLI_FAILURES_SINCE_SUCCESS = 3` and `MAX_INVALID_RESPONSES_SINCE_SUCCESS = 3`. The invalid-response limit changes from 5 to 3.
-- [ ] Keep the existing reset rule: only a completed outcome resets both counters.
-- [ ] Log a loguru warning for each `failed` or `invalid_response` outcome: run ID, article ID, prompt version ID (`prompt["id"]`), `error_code`, `error_message`.
-- [ ] Log a loguru error when either breaker trips: run ID, ending reason, last article ID, prompt version ID, and the last `error_message`.
-- [ ] Keep ending reasons `codex_cli_failures` and `invalid_responses` and run status `circuit_breaker` unchanged.
+- [x] Replace the literals with module constants `MAX_CLI_FAILURES_SINCE_SUCCESS = 3` and `MAX_INVALID_RESPONSES_SINCE_SUCCESS = 3`. The invalid-response limit changes from 5 to 3.
+- [x] Keep the existing reset rule: only a completed outcome resets both counters.
+- [x] Log a loguru warning for each `failed` or `invalid_response` outcome: run ID, article ID, prompt version ID (`prompt["id"]`), `error_code`, `error_message`.
+- [x] Log a loguru error when either breaker trips: run ID, ending reason, last article ID, prompt version ID, and the last `error_message`.
+- [x] Keep ending reasons `codex_cli_failures` and `invalid_responses` and run status `circuit_breaker` unchanged.
 
 Tests (existing files, existing `FakeRepository` and `FakeClient` helpers, no new test architecture):
 
-- [ ] `test_client.py`: replace `test_client_redacts_prompt_from_process_failure`. stderr holds the prompt followed by a provider error such as `model_not_found`. Assert `error_message` does not contain the prompt, contains the provider error, and does not contain stdout content.
-- [ ] `test_client.py`: a prompt longer than 2000 characters in stderr is removed whole.
-- [ ] `test_orchestrator.py`: update `test_orchestrator_stops_at_invalid_response_breaker` to trip on the third invalid response since the last completed evaluation.
-- [ ] `test_orchestrator.py`: the CLI-failure breaker still trips at 3.
-- [ ] `test_orchestrator.py`: mixed outcomes CLI failure, invalid, CLI failure, invalid, CLI failure trip `codex_cli_failures` on the fifth article.
-- [ ] `test_orchestrator.py`: success reset CLI failure, CLI failure, completed, CLI failure, CLI failure finishes the run as `completed`.
-- [ ] Run the end-of-phase routine for worker-python and commit.
+- [x] `test_client.py`: replace `test_client_redacts_prompt_from_process_failure`. stderr holds the prompt followed by a provider error such as `model_not_found`. Assert `error_message` does not contain the prompt, contains the provider error, and does not contain stdout content.
+- [x] `test_client.py`: a prompt longer than 2000 characters in stderr is removed whole.
+- [x] `test_orchestrator.py`: update `test_orchestrator_stops_at_invalid_response_breaker` to trip on the third invalid response since the last completed evaluation.
+- [x] `test_orchestrator.py`: the CLI-failure breaker still trips at 3.
+- [x] `test_orchestrator.py`: mixed outcomes CLI failure, invalid, CLI failure, invalid, CLI failure trip `codex_cli_failures` on the fifth article.
+- [x] `test_orchestrator.py`: success reset CLI failure, CLI failure, completed, CLI failure, CLI failure finishes the run as `completed`.
+- [x] Run the end-of-phase routine for worker-python and commit.
 
 ## Phase 5: Documentation
 

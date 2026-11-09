@@ -10,6 +10,18 @@ import tempfile
 from src.modules.ai_approver_v02.config import AiApproverV02Config
 from src.modules.ai_approver_v02.types import ModelOutcome
 
+DIAGNOSTIC_TAIL_CHARS = 2000
+PROMPT_REMOVED = "[prompt removed]"
+
+
+def _diagnostic_excerpt(text: str | None, rendered_prompt: str) -> str:
+    """Remove the prompt (which holds Article text) whole, then keep a bounded tail."""
+    if not text:
+        return ""
+    if rendered_prompt:
+        text = text.replace(rendered_prompt, PROMPT_REMOVED)
+    return text[-DIAGNOSTIC_TAIL_CHARS:].strip()
+
 
 def _parse_payload(raw: str) -> ModelOutcome:
     try:
@@ -90,18 +102,22 @@ class AiApproverV02CodexClient:
                     error_code="codex_timeout",
                     error_message="Codex execution timed out",
                 )
-            except OSError:
+            except OSError as error:
+                detail = _diagnostic_excerpt(str(error), rendered_prompt)
+                message = "Codex execution could not start"
                 return ModelOutcome(
                     status="failed",
                     error_code="codex_process_error",
-                    error_message="Codex execution could not start",
+                    error_message=f"{message}: {detail}" if detail else message,
                 )
 
             if result.returncode != 0:
+                detail = _diagnostic_excerpt(result.stderr, rendered_prompt)
+                message = f"Codex execution failed with exit code {result.returncode}"
                 return ModelOutcome(
                     status="failed",
                     error_code="codex_exit_error",
-                    error_message=f"Codex execution failed with exit code {result.returncode}",
+                    error_message=f"{message}; stderr tail: {detail}" if detail else message,
                 )
 
             try:

@@ -61,21 +61,48 @@ def test_client_uses_isolated_cli_and_removes_output(
     assert not os.path.exists(str(observed["output_path"]))
 
 
-def test_client_redacts_prompt_from_process_failure(monkeypatch) -> None:
+def test_client_removes_prompt_and_keeps_provider_error(monkeypatch) -> None:
+    prompt = "Title: sensitive title\nContent: sensitive article body"
     monkeypatch.setattr(
         "src.modules.ai_approver_v02.client.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0],
             1,
-            "sensitive title",
-            "sensitive content",
+            "stdout-only text",
+            f"user\n{prompt}\nERROR: model_not_found",
         ),
     )
 
-    outcome = AiApproverV02CodexClient(_config()).evaluate("sensitive prompt")
+    outcome = AiApproverV02CodexClient(_config()).evaluate(prompt)
+    message = outcome.error_message or ""
 
     assert outcome.status == "failed"
-    assert "sensitive" not in (outcome.error_message or "")
+    assert outcome.error_code == "codex_exit_error"
+    assert "Codex execution failed with exit code 1" in message
+    assert "ERROR: model_not_found" in message
+    assert "[prompt removed]" in message
+    assert "sensitive" not in message
+    assert "stdout-only text" not in message
+
+
+def test_client_removes_long_prompt_whole(monkeypatch) -> None:
+    prompt = "article-start " + "x" * 3000 + " article-end"
+    monkeypatch.setattr(
+        "src.modules.ai_approver_v02.client.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            1,
+            "",
+            f"user\n{prompt}\nERROR: not logged in",
+        ),
+    )
+
+    outcome = AiApproverV02CodexClient(_config()).evaluate(prompt)
+    message = outcome.error_message or ""
+
+    assert "ERROR: not logged in" in message
+    assert "article-end" not in message
+    assert "xxxxxxxxxx" not in message
 
 
 def test_client_cleans_output_after_timeout(monkeypatch) -> None:

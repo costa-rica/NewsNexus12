@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from loguru import logger
+
 from src.modules.ai_approver_v02.client import AiApproverV02CodexClient
 from src.modules.ai_approver_v02.prompts import render_prompt
 from src.modules.ai_approver_v02.repository import AiApproverV02Repository
 from src.modules.queue.engine import QueueJobCanceledError
+
+# Each count resets only after a completed evaluation. A failure of one type does
+# not reset the other type's count.
+MAX_CLI_FAILURES_SINCE_SUCCESS = 3
+MAX_INVALID_RESPONSES_SINCE_SUCCESS = 3
 
 
 class AiApproverV02Orchestrator:
@@ -78,18 +85,37 @@ class AiApproverV02Orchestrator:
                     )
                     invalid_responses += 1
 
-                if cli_failures >= 3:
-                    self.repository.finish_run(
+                if outcome.status != "completed":
+                    logger.warning(
+                        "AI Approver V02 article evaluation {}: run={} article={} "
+                        "prompt={} error_code={} error_message={}",
+                        outcome.status,
                         run_id,
-                        "circuit_breaker",
-                        "codex_cli_failures",
+                        article.article_id,
+                        prompt["id"],
+                        outcome.error_code,
+                        outcome.error_message,
                     )
-                    return {"runId": run_id, "status": "circuit_breaker"}
-                if invalid_responses >= 5:
+
+                ending_reason = None
+                if cli_failures >= MAX_CLI_FAILURES_SINCE_SUCCESS:
+                    ending_reason = "codex_cli_failures"
+                elif invalid_responses >= MAX_INVALID_RESPONSES_SINCE_SUCCESS:
+                    ending_reason = "invalid_responses"
+                if ending_reason is not None:
+                    logger.error(
+                        "AI Approver V02 circuit breaker tripped: run={} reason={} "
+                        "article={} prompt={} error_message={}",
+                        run_id,
+                        ending_reason,
+                        article.article_id,
+                        prompt["id"],
+                        outcome.error_message,
+                    )
                     self.repository.finish_run(
                         run_id,
                         "circuit_breaker",
-                        "invalid_responses",
+                        ending_reason,
                     )
                     return {"runId": run_id, "status": "circuit_breaker"}
 

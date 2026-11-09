@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from loguru import logger
 
 from src.modules.ai_approver_v02.orchestrator import AiApproverV02Orchestrator
 from src.modules.ai_approver_v02.types import ArticleInput, ModelOutcome
@@ -118,9 +119,73 @@ def test_orchestrator_stops_at_invalid_response_breaker() -> None:
 
     result = AiApproverV02Orchestrator(repository, client).run(1, lambda: False)
 
-    assert len(repository.persisted) == 6
+    assert len(repository.persisted) == 4
     assert repository.finished == ("circuit_breaker", "invalid_responses")
     assert result["status"] == "circuit_breaker"
+
+
+def test_orchestrator_stops_at_three_cli_failures() -> None:
+    repository = FakeRepository(5)
+    client = FakeClient([ModelOutcome(status="failed") for _ in range(5)])
+
+    result = AiApproverV02Orchestrator(repository, client).run(1, lambda: False)
+
+    assert len(repository.persisted) == 3
+    assert repository.finished == ("circuit_breaker", "codex_cli_failures")
+    assert result["status"] == "circuit_breaker"
+
+
+def test_orchestrator_success_resets_failure_counts() -> None:
+    repository = FakeRepository(5)
+    client = FakeClient(
+        [
+            ModelOutcome(status="failed"),
+            ModelOutcome(status="failed"),
+            ModelOutcome(
+                status="completed",
+                prediction="approved",
+                reasoning="yes",
+            ),
+            ModelOutcome(status="failed"),
+            ModelOutcome(status="failed"),
+        ]
+    )
+
+    result = AiApproverV02Orchestrator(repository, client).run(1, lambda: False)
+
+    assert len(repository.persisted) == 5
+    assert repository.finished == ("completed", None)
+    assert result["status"] == "completed"
+
+
+def test_orchestrator_logs_failures_and_breaker_reason() -> None:
+    messages: list[str] = []
+    sink_id = logger.add(messages.append, format="{level} {message}")
+    try:
+        repository = FakeRepository(3)
+        client = FakeClient(
+            [
+                ModelOutcome(
+                    status="failed",
+                    error_code="codex_exit_error",
+                    error_message=f"exit 1; stderr tail: ERROR: model_not_found {index}",
+                )
+                for index in range(3)
+            ]
+        )
+
+        AiApproverV02Orchestrator(repository, client).run(1, lambda: False)
+    finally:
+        logger.remove(sink_id)
+
+    warnings = [message for message in messages if message.startswith("WARNING")]
+    errors = [message for message in messages if message.startswith("ERROR")]
+    assert len(warnings) == 3
+    assert "run=1 article=3 prompt=7 error_code=codex_exit_error" in warnings[0]
+    assert "ERROR: model_not_found 0" in warnings[0]
+    assert len(errors) == 1
+    assert "reason=codex_cli_failures article=1 prompt=7" in errors[0]
+    assert "ERROR: model_not_found 2" in errors[0]
 
 
 def test_orchestrator_cancels_before_next_article() -> None:
