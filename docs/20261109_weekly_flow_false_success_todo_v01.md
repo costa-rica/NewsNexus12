@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-09T21:54:05Z
-updated_at: 2026-11-09T22:03:09Z
+updated_at: 2026-11-09T22:05:07Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -121,11 +121,11 @@ Tests (existing files, existing `FakeRepository` and `FakeClient` helpers, no ne
 
 Plan Section 6.
 
-- [ ] `ops/AGENTS.md`, Phase 6 Worker Contract: replace "A completed result may select zero Articles or contain skipped and failed Articles." with a line saying a completed result may select zero Articles, but a result that selected Articles must have at least one completed Article.
-- [ ] `worker-node/AGENTS.md`, state-assigner section: note the stop after 3 article failures since the last success, and that Codex output in errors has the prompt removed.
-- [ ] `docs/CODEX_CLI_PRODUCTION_RUNBOOK.md`, Section 2: replace "Both workers keep going after each failed article. One bad setting can fail a whole batch while the job still shows as completed. Check the failed counts." with the plan's stop rules table and its notes. Update the runbook's `updated_at` and `modified_by`.
-- [ ] Update `updated_at` and `modified_by` in any other edited file that has YAML frontmatter.
-- [ ] Run all three packages' end-of-phase routines once more, then commit.
+- [x] `ops/AGENTS.md`, Phase 6 Worker Contract: replace "A completed result may select zero Articles or contain skipped and failed Articles." with a line saying a completed result may select zero Articles, but a result that selected Articles must have at least one completed Article.
+- [x] `worker-node/AGENTS.md`, state-assigner section: note the stop after 3 article failures since the last success, and that Codex output in errors has the prompt removed.
+- [x] `docs/CODEX_CLI_PRODUCTION_RUNBOOK.md`, Section 2: replace "Both workers keep going after each failed article. One bad setting can fail a whole batch while the job still shows as completed. Check the failed counts." with the plan's stop rules table and its notes. Update the runbook's `updated_at` and `modified_by`.
+- [x] Update `updated_at` and `modified_by` in any other edited file that has YAML frontmatter.
+- [x] Run all three packages' end-of-phase routines once more, then commit.
 
 ## Phase 6: Hand-off to the operator
 

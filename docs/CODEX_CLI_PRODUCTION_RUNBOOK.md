@@ -1,6 +1,6 @@
 ---
 created_at: 2026-11-07T17:23:52Z
-updated_at: 2026-11-07T17:23:52Z
+updated_at: 2026-11-09T22:03:25Z
 created_by: claude (opus-5.5) nicksmacbookair
 modified_by: claude (opus-5.5) nicksmacbookair
 ---
@@ -94,7 +94,20 @@ sudo journalctl -u newsnexus12-worker-python.service --since "1 hour ago" --no-p
 
 - The exact error text for an expired login has not been captured on this server yet. Add it here the first time it happens.
 - A model rejection is not an auth failure. Do not re-authenticate because of `model_not_found` alone.
-- Both workers keep going after each failed article. One bad setting can fail a whole batch while the job still shows as completed. Check the failed counts.
+- Codex errors in both workers' logs have the prompt removed. They show the article ID, prompt ID, and the last 2000 characters of Codex's output.
+
+Stop rules: a run of failures ends the weekly flow.
+
+| Worker | Condition | Result |
+| ------ | --------- | ------ |
+| worker-node state assigner | 3 failed articles since the last success, of either type (Codex failure or invalid response) | Job `failed`; Phase 6 fails; weekly run fails |
+| ops Phase 6 | Job completed with articles selected but none completed | Phase 6 fails; weekly run fails |
+| worker-python V02 | 3 Codex failures since the last completed evaluation | Run `circuit_breaker`; Phase 7 fails; weekly run fails |
+| worker-python V02 | 3 invalid responses since the last completed evaluation | Run `circuit_breaker`; Phase 7 fails; weekly run fails |
+
+- Only a success resets a count. In V02, a failure of one type does not reset the other type's count.
+- Timeouts in worker-node and skipped articles in V02 neither add to nor reset a count.
+- Mixed failures stop the workers at different points: worker-node on the third failure of any kind, V02 on the third of one type (up to 5 failures in a mixed run). Both end the weekly flow.
 
 ## 3. Health check without a model call
 

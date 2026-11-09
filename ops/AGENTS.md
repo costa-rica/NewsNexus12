@@ -1,8 +1,8 @@
 ---
 created_at: 2026-10-05T22:11:53Z
-updated_at: 2026-10-06T19:25:00Z
+updated_at: 2026-11-09T22:03:25Z
 created_by: codex (gpt-6.1-sol) nicksmacbookair
-modified_by: codex (gpt-6.1-sol) nicksmacbookair
+modified_by: claude (opus-5.5) nicksmacbookair
 ---
 
 # Ops Agent Instructions
@@ -147,7 +147,7 @@ Ops cannot infer semantic zero work or prove per-Article scoring coverage. A val
 - Do not send Article IDs, ID ranges, `includeArticlesThatMightHaveBeenStateAssigned`, AI keys, prompt text, Article content, or filesystem paths.
 - Poll immediately, then every configured interval without overlapping requests.
 - Validate worker endpoint identity, job ID, lifecycle timestamps, exact queue parameters, result inputs, nonnegative counts, and the count invariant.
-- A completed result may select zero Articles or contain skipped and failed Articles.
+- A completed result may select zero Articles. A result that selected Articles must have at least one completed Article; zero completed Articles fails Phase 6 (or is replaced on continuation, like a saved failed job). Skipped and failed Articles are otherwise allowed.
 - Stop on the third consecutive transient status failure and reset the counter after a valid response.
 - Stop immediately on permanent or malformed responses.
 - Start no more than one state-assigner job per coordinator invocation.

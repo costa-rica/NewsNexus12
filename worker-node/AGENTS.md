@@ -186,6 +186,8 @@ Important behavior:
 - The Codex prompt is written over stdin, not passed as an argv argument.
 - Codex uses `STATE_ASSIGNER_CODEX_TIMEOUT_SECONDS` per article, defaulting to 180 seconds.
 - The global worker queue has concurrency 1, so a large Codex-backed batch can occupy the queue for much longer than the old OpenAI path.
+- The job stops after 3 article failures since the last success (Codex failures and invalid responses count together; timeouts do not count). It throws, so the queue marks the job `failed` with the reason.
+- Codex output in error messages has the echoed prompt removed and keeps a 2000-character tail. Failure logs carry the Article ID and prompt ID instead of Article text.
 
 5. Cancellation behavior must stay cooperative and child-process aware.
 
